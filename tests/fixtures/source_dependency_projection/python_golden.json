@@ -1,0 +1,317 @@
+{
+  "source": "70d33332e14d9b6da9c31f6a05446148221f074b",
+  "python": "3.12.3",
+  "source_hashes": {
+    "tools/analysis/dependencies/graph_client.py": "a41ac1b576cb6a153757196cf2b4b916a14de20eb1157ac2b62ce3b0e0c5ece9",
+    "tools/analysis/dependencies/source_dependency_graph.py": "91509805987c973d0bffc5e0050166a9727ef1938262aeeb3cec0c494af4bc61",
+    "tools/agent/skills/skill_projection_registry.py": "7b72a8e692b86422e04477ee251bc39214e35b0c0e7a8ec37591fb37ca253859"
+  },
+  "input_files_base64": {
+    "tools/feature.py": "IyBAZGVwZW5kZW5jeS1zdGFydAojIGNvbnRyYWN0IHRvb2wKIyByZXNwb25zaWJpbGl0eSBJbXBsZW1lbnRzIHRoZSBmZWF0dXJlIGNvbnRyYWN0LgojIHVwc3RyZWFtIGRlc2lnbiAuLi9kb2N1bWVudHMvZGVzaWduL2ZlYXR1cmUubWQgZmVhdHVyZSBkZXNpZ24KIyBAZGVwZW5kZW5jeS1lbmQKZGVmIGZlYXR1cmUoKSAtPiBOb25lOgogICAgcGFzcwo=",
+    "documents/design/parent.md": "PCEtLQpAZGVwZW5kZW5jeS1zdGFydApjb250cmFjdCBkZXNpZ24KcmVzcG9uc2liaWxpdHkgRGVmaW5lcyB0aGUgcGFyZW50IGNvbnRyYWN0Lgpkb3duc3RyZWFtIGRlc2lnbiBmZWF0dXJlLm1kIHNwZWNpYWxpemVzIHRoZSBwYXJlbnQKQGRlcGVuZGVuY3ktZW5kCi0tPgojIFBhcmVudAo=",
+    "documents/design/feature.md": "PCEtLQpAZGVwZW5kZW5jeS1zdGFydApjb250cmFjdCBkZXNpZ24KcmVzcG9uc2liaWxpdHkgRGVmaW5lcyB0aGUgZmVhdHVyZSBjb250cmFjdC4KdXBzdHJlYW0gZGVzaWduIHBhcmVudC5tZCBpbmhlcml0cyB0aGUgcGFyZW50IGNvbnRyYWN0CnVwc3RyZWFtIHJlZmVyZW5jZSAuLi9ub3Rlcy9zb3VyY2UtZXZpZGVuY2UubWQgcmVjb3JkcyBub24tYXV0aG9yaXRhdGl2ZSBjb250ZXh0CmRvd25zdHJlYW0gaW1wbGVtZW50YXRpb24gLi4vLi4vdG9vbHMvZmVhdHVyZS5weSBpbXBsZW1lbnRzIHRoZSBmZWF0dXJlCkBkZXBlbmRlbmN5LWVuZAotLT4KIyBGZWF0dXJlCg==",
+    "documents/notes/source-evidence.md": "IyBTb3VyY2UgZXZpZGVuY2UKClRoaXMgbm90ZSBpcyBzdXBwb3J0aW5nIGNvbnRleHQsIG5vdCBhIGRlc2lnbiBvd25lci4K"
+  },
+  "cases": [
+    {
+      "name": "query",
+      "operation": "query",
+      "path": null,
+      "accepted": true,
+      "output": {
+        "schema": "agent-canon.graph.query.v1",
+        "command": "query",
+        "status": "fresh",
+        "payload": {
+          "nodes": [
+            {
+              "id": "node:025b6ea63a605b8051f1aebd5f9c1301596307bd0c15b29fcb5e1307c0a939ac",
+              "path": "documents/design/feature.md"
+            },
+            {
+              "id": "node:f533e34d4074462f55918a063432441e9242525b301ba1cadc6bb006635c2f14",
+              "path": "documents/design/parent.md"
+            },
+            {
+              "id": "node:6991fc1e0ece71eca9063c9cab96bad59fd831313a5be5edc5ee01e3181aeb02",
+              "path": "documents/notes/source-evidence.md"
+            },
+            {
+              "id": "node:a1867e05d66987f8760f8ca0c76ef4f1bf01802c5cc7d63077bc7cebae6d654d",
+              "path": "tools/feature.py"
+            }
+          ],
+          "facts": [
+            {
+              "id": "dependency:fd0256d5818732f92d4368bf085bc169393add0e49308f4928dfd64018c15b45",
+              "kind": "dependency",
+              "inferred": false,
+              "from": "node:025b6ea63a605b8051f1aebd5f9c1301596307bd0c15b29fcb5e1307c0a939ac",
+              "to": "node:a1867e05d66987f8760f8ca0c76ef4f1bf01802c5cc7d63077bc7cebae6d654d",
+              "producer": "tracked-source-manifest",
+              "source_path": "documents/design/feature.md",
+              "source_span": {
+                "path": "documents/design/feature.md",
+                "start_line": 7,
+                "start_column": 1,
+                "end_line": 7,
+                "end_column": 1
+              },
+              "evidence_ref": "documents/design/feature.md:7",
+              "authority": "tracked-source",
+              "dependency_detail": {
+                "direction": "downstream",
+                "kind": "implementation",
+                "reason": "implements the feature"
+              }
+            },
+            {
+              "id": "dependency:24a01830de0d7b665398b64acf3671d92faa850e6ea50a5a048b167795a04a07",
+              "kind": "dependency",
+              "inferred": false,
+              "from": "node:025b6ea63a605b8051f1aebd5f9c1301596307bd0c15b29fcb5e1307c0a939ac",
+              "to": "node:f533e34d4074462f55918a063432441e9242525b301ba1cadc6bb006635c2f14",
+              "producer": "tracked-source-manifest",
+              "source_path": "documents/design/feature.md",
+              "source_span": {
+                "path": "documents/design/feature.md",
+                "start_line": 5,
+                "start_column": 1,
+                "end_line": 5,
+                "end_column": 1
+              },
+              "evidence_ref": "documents/design/feature.md:5",
+              "authority": "tracked-source",
+              "dependency_detail": {
+                "direction": "upstream",
+                "kind": "design",
+                "reason": "inherits the parent contract"
+              }
+            },
+            {
+              "id": "dependency:4f9235568d2aa091f3fabd35306d70d63779f83fad84add51ceda11a59a93283",
+              "kind": "dependency",
+              "inferred": false,
+              "from": "node:025b6ea63a605b8051f1aebd5f9c1301596307bd0c15b29fcb5e1307c0a939ac",
+              "to": "node:6991fc1e0ece71eca9063c9cab96bad59fd831313a5be5edc5ee01e3181aeb02",
+              "producer": "tracked-source-manifest",
+              "source_path": "documents/design/feature.md",
+              "source_span": {
+                "path": "documents/design/feature.md",
+                "start_line": 6,
+                "start_column": 1,
+                "end_line": 6,
+                "end_column": 1
+              },
+              "evidence_ref": "documents/design/feature.md:6",
+              "authority": "tracked-source",
+              "dependency_detail": {
+                "direction": "upstream",
+                "kind": "reference",
+                "reason": "records non-authoritative context"
+              }
+            },
+            {
+              "id": "dependency:a6d1435437254677dea47cbc03fc57e58458b008d306cf69139f35597cf9b225",
+              "kind": "dependency",
+              "inferred": false,
+              "from": "node:f533e34d4074462f55918a063432441e9242525b301ba1cadc6bb006635c2f14",
+              "to": "node:025b6ea63a605b8051f1aebd5f9c1301596307bd0c15b29fcb5e1307c0a939ac",
+              "producer": "tracked-source-manifest",
+              "source_path": "documents/design/parent.md",
+              "source_span": {
+                "path": "documents/design/parent.md",
+                "start_line": 5,
+                "start_column": 1,
+                "end_line": 5,
+                "end_column": 1
+              },
+              "evidence_ref": "documents/design/parent.md:5",
+              "authority": "tracked-source",
+              "dependency_detail": {
+                "direction": "downstream",
+                "kind": "design",
+                "reason": "specializes the parent"
+              }
+            },
+            {
+              "id": "dependency:6c94bd85c26dac3e8d60856716d86a95c32822aa7bcc2d90540d13717ff67237",
+              "kind": "dependency",
+              "inferred": false,
+              "from": "node:a1867e05d66987f8760f8ca0c76ef4f1bf01802c5cc7d63077bc7cebae6d654d",
+              "to": "node:025b6ea63a605b8051f1aebd5f9c1301596307bd0c15b29fcb5e1307c0a939ac",
+              "producer": "tracked-source-manifest",
+              "source_path": "tools/feature.py",
+              "source_span": {
+                "path": "tools/feature.py",
+                "start_line": 4,
+                "start_column": 1,
+                "end_line": 4,
+                "end_column": 1
+              },
+              "evidence_ref": "tools/feature.py:4",
+              "authority": "tracked-source",
+              "dependency_detail": {
+                "direction": "upstream",
+                "kind": "design",
+                "reason": "feature design"
+              }
+            }
+          ],
+          "graph_fingerprint": "6547c7e7413c35c31ab7975064f4917c4a478862167c56feeacb1588d6cf5592",
+          "projection": "tracked-source",
+          "exit_code": 0
+        },
+        "exit_code": 0,
+        "dependency_facts": [
+          {
+            "id": "dependency:24a01830de0d7b665398b64acf3671d92faa850e6ea50a5a048b167795a04a07",
+            "direction": "upstream",
+            "kind": "design",
+            "source": "documents/design/feature.md",
+            "target": "documents/design/parent.md",
+            "reason": "inherits the parent contract",
+            "producer": "tracked-source-manifest",
+            "source_path": "documents/design/feature.md",
+            "source_span": {
+              "path": "documents/design/feature.md",
+              "start_line": 5,
+              "start_column": 1,
+              "end_line": 5,
+              "end_column": 1
+            },
+            "evidence_ref": "documents/design/feature.md:5",
+            "authority": "tracked-source"
+          },
+          {
+            "id": "dependency:4f9235568d2aa091f3fabd35306d70d63779f83fad84add51ceda11a59a93283",
+            "direction": "upstream",
+            "kind": "reference",
+            "source": "documents/design/feature.md",
+            "target": "documents/notes/source-evidence.md",
+            "reason": "records non-authoritative context",
+            "producer": "tracked-source-manifest",
+            "source_path": "documents/design/feature.md",
+            "source_span": {
+              "path": "documents/design/feature.md",
+              "start_line": 6,
+              "start_column": 1,
+              "end_line": 6,
+              "end_column": 1
+            },
+            "evidence_ref": "documents/design/feature.md:6",
+            "authority": "tracked-source"
+          },
+          {
+            "id": "dependency:fd0256d5818732f92d4368bf085bc169393add0e49308f4928dfd64018c15b45",
+            "direction": "downstream",
+            "kind": "implementation",
+            "source": "documents/design/feature.md",
+            "target": "tools/feature.py",
+            "reason": "implements the feature",
+            "producer": "tracked-source-manifest",
+            "source_path": "documents/design/feature.md",
+            "source_span": {
+              "path": "documents/design/feature.md",
+              "start_line": 7,
+              "start_column": 1,
+              "end_line": 7,
+              "end_column": 1
+            },
+            "evidence_ref": "documents/design/feature.md:7",
+            "authority": "tracked-source"
+          },
+          {
+            "id": "dependency:a6d1435437254677dea47cbc03fc57e58458b008d306cf69139f35597cf9b225",
+            "direction": "downstream",
+            "kind": "design",
+            "source": "documents/design/parent.md",
+            "target": "documents/design/feature.md",
+            "reason": "specializes the parent",
+            "producer": "tracked-source-manifest",
+            "source_path": "documents/design/parent.md",
+            "source_span": {
+              "path": "documents/design/parent.md",
+              "start_line": 5,
+              "start_column": 1,
+              "end_line": 5,
+              "end_column": 1
+            },
+            "evidence_ref": "documents/design/parent.md:5",
+            "authority": "tracked-source"
+          },
+          {
+            "id": "dependency:6c94bd85c26dac3e8d60856716d86a95c32822aa7bcc2d90540d13717ff67237",
+            "direction": "upstream",
+            "kind": "design",
+            "source": "tools/feature.py",
+            "target": "documents/design/feature.md",
+            "reason": "feature design",
+            "producer": "tracked-source-manifest",
+            "source_path": "tools/feature.py",
+            "source_span": {
+              "path": "tools/feature.py",
+              "start_line": 4,
+              "start_column": 1,
+              "end_line": 4,
+              "end_column": 1
+            },
+            "evidence_ref": "tools/feature.py:4",
+            "authority": "tracked-source"
+          }
+        ],
+        "source_identity": null
+      }
+    },
+    {
+      "name": "context",
+      "operation": "context",
+      "path": "documents/design/feature.md",
+      "accepted": true,
+      "output": {
+        "schema": "agent-canon.graph.context.v1",
+        "command": "context",
+        "status": "fresh",
+        "payload": {
+          "resolved_path": "documents/design/feature.md",
+          "source_identity": {
+            "snapshot_commit": "working-tree",
+            "source_path": "documents/design/feature.md",
+            "content_sha256": "cbf723d65de4be924ff6815e1c9c92a6388bc33da2bd3ced9f9efad82e300d4a"
+          },
+          "evidence_paths": [
+            "documents/design/feature.md",
+            "documents/design/parent.md",
+            "documents/notes/source-evidence.md",
+            "tools/feature.py"
+          ],
+          "parent_paths": [
+            "documents/design/parent.md"
+          ],
+          "graph_fingerprint": "6547c7e7413c35c31ab7975064f4917c4a478862167c56feeacb1588d6cf5592",
+          "projection": "tracked-source",
+          "exit_code": 0
+        },
+        "exit_code": 0,
+        "dependency_facts": [],
+        "source_identity": {
+          "snapshot_commit": "working-tree",
+          "source_path": "documents/design/feature.md",
+          "content_sha256": "cbf723d65de4be924ff6815e1c9c92a6388bc33da2bd3ced9f9efad82e300d4a"
+        }
+      }
+    },
+    {
+      "name": "missing-context",
+      "operation": "context",
+      "path": "missing.md",
+      "accepted": false,
+      "error": "source dependency context failed: source path is unavailable: missing.md"
+    }
+  ],
+  "export": {
+    "accepted": true,
+    "edges_base64": "ZG93bnN0cmVhbQlpbXBsZW1lbnRhdGlvbglkb2N1bWVudHMvZGVzaWduL2ZlYXR1cmUubWQJdG9vbHMvZmVhdHVyZS5weQp1cHN0cmVhbQlkZXNpZ24JZG9jdW1lbnRzL2Rlc2lnbi9mZWF0dXJlLm1kCWRvY3VtZW50cy9kZXNpZ24vcGFyZW50Lm1kCnVwc3RyZWFtCXJlZmVyZW5jZQlkb2N1bWVudHMvZGVzaWduL2ZlYXR1cmUubWQJZG9jdW1lbnRzL25vdGVzL3NvdXJjZS1ldmlkZW5jZS5tZApkb3duc3RyZWFtCWRlc2lnbglkb2N1bWVudHMvZGVzaWduL3BhcmVudC5tZAlkb2N1bWVudHMvZGVzaWduL2ZlYXR1cmUubWQKdXBzdHJlYW0JZGVzaWduCXRvb2xzL2ZlYXR1cmUucHkJZG9jdW1lbnRzL2Rlc2lnbi9mZWF0dXJlLm1kCg==",
+    "manifests_base64": "ZG9jdW1lbnRzL2Rlc2lnbi9mZWF0dXJlLm1kCmRvY3VtZW50cy9kZXNpZ24vcGFyZW50Lm1kCnRvb2xzL2ZlYXR1cmUucHkK"
+  }
+}

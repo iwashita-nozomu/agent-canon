@@ -13,16 +13,12 @@ from __future__ import annotations
 import hashlib
 import json
 import subprocess
-import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "bin" / "agent-canon"
-MONITOR_SCRIPT = (
-    PROJECT_ROOT / "tools" / "runtime" / "lifecycle" / "workflow_monitor.py"
-)
 
 
 READY_REQUIRED_OUTPUTS = (
@@ -501,83 +497,6 @@ class EvaluateAgentRunTest(unittest.TestCase):
             self.assertIn("- feedback_actions_resolved: yes", report)
             self.assertIn("- learning_capture_complete: yes", report)
 
-    def test_closeout_token_preset_satisfies_validation_failure_response(
-        self,
-    ) -> None:
-        """The workflow monitor preset should satisfy evaluator closeout evidence."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            source_dir = Path(tmp_dir) / "source"
-            runtime = external_runtime(source_dir)
-            report_dir = runtime / "run"
-            write_ready_run(report_dir)
-            (report_dir / "workflow_monitoring.md").unlink()
-            monitor = subprocess.run(
-                [
-                    sys.executable,
-                    str(MONITOR_SCRIPT),
-                    "--report-dir",
-                    str(report_dir),
-                    "--runtime-root",
-                    str(runtime),
-                    "--closeout-token-preset",
-                    "--tool-warning-status",
-                    "none",
-                    "--signal",
-                    "skills=$agent-orchestration,$codex-task-workflow",
-                    "--signal",
-                    "stage owner=codex subagent=worker write_capable_child=yes",
-                    "--behavior-event",
-                    "subagent_routing=worker stage=implementation write_capable_child=yes child_execution_receipts=pass status=observed",
-                    "--behavior-event",
-                    "subagent_lifecycle=closed subagents_closed=yes",
-                    "--behavior-event",
-                    "generated_role_view_v1 profile-attribution topology_derived_v1 "
-                    "declared_team_peak_plus_nested_reservations_v1 requested_capacity_loader "
-                    "model-capacity thread-capacity",
-                    "--behavior-event",
-                    "execution_path_comparison_not_required reason=unit-test-single-route",
-                    "--decision",
-                    "skill_improvement_decision=recorded",
-                    "--decision",
-                    "config_improvement_decision=not_applicable",
-                    "--decision",
-                    "workflow_improvement_decision=not_applicable",
-                    "--decision",
-                    "knowledge_learning_decision=not_applicable",
-                    "--intervention",
-                    "Closeout preset generated standard evaluator tokens.",
-                ],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-            self.assertEqual(monitor.returncode, 0, monitor.stderr)
-            monitoring = (report_dir / "workflow_monitoring.md").read_text(
-                encoding="utf-8"
-            )
-            self.assertIn(
-                "validation_failure_not_observed reason=standard-closeout-preset",
-                monitoring,
-            )
-
-            result = subprocess.run(
-                [
-                    str(SCRIPT),
-                    "run-evaluation",
-                    "--report-dir",
-                    str(report_dir),
-                ],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn("AGENT_EVALUATION_STATUS=pass", result.stdout)
-
     def test_evaluate_ready_run_ignores_template_comment_revise_text(self) -> None:
         """Template comments containing revise should not be treated as open findings."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -957,8 +876,8 @@ class EvaluateAgentRunTest(unittest.TestCase):
             self.assertIn("runtime_feedback=observed", result.stdout)
             self.assertIn("applied or recorded", result.stdout)
 
-    def test_evaluate_missing_hook_tool_protocol_feedback_fails(self) -> None:
-        """Hook and tool outcomes must route into protocol feedback decisions."""
+    def test_evaluate_does_not_require_protocol_update_bookkeeping(self) -> None:
+        """Absent protocol-update bookkeeping does not fail a ready run."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             report_dir = Path(tmp_dir) / "run"
             write_ready_run(report_dir)
@@ -989,9 +908,11 @@ class EvaluateAgentRunTest(unittest.TestCase):
                 text=True,
             )
 
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("AGENT_EVALUATION_STATUS=revise", result.stdout)
-            self.assertIn("hook and tool results", result.stdout.lower())
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("AGENT_EVALUATION_STATUS=pass", result.stdout)
+            self.assertNotIn(
+                "behavior::hook_tool_protocol_feedback_recorded", result.stdout
+            )
 
     def test_evaluate_missing_code_checker_results_fail(self) -> None:
         """Run evaluation should require code checker behavior evidence."""

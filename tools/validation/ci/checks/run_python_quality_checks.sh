@@ -80,18 +80,10 @@ if [ -d python ]; then
   fi
 else
   AGENT_CANON_W2_OWNER_PATHS=(
-    "${WORKSPACE_ROOT}/tools/agent/orchestration/review_dispatch.py" \
     "${WORKSPACE_ROOT}/tools/runtime/artifacts/artifact_identity.py" \
-    "${WORKSPACE_ROOT}/tools/runtime/artifacts/external_artifact_binding.py" \
-    "${WORKSPACE_ROOT}/tools/repository/github/publication_integrator.py" \
     "${WORKSPACE_ROOT}/tools/runtime/artifacts/report_artifact_checks.py" \
-    "${WORKSPACE_ROOT}/tools/runtime/archive/work_log.py" \
     tests/agent_tools/test_artifact_identity.py \
     tests/agent_tools/test_codex_hooks.py \
-    tests/agent_tools/test_external_artifact_binding.py \
-    tests/agent_tools/test_publication_integrator.py \
-    tests/agent_tools/test_review_dispatch.py \
-    tests/agent_tools/test_work_log.py
   )
   for candidate_path in "${AGENT_CANON_W2_OWNER_PATHS[@]}"; do
     if [ -f "${candidate_path}" ]; then
@@ -104,10 +96,6 @@ else
   PYTHON_TEST_PATHS=(
     tests/agent_tools/test_artifact_identity.py
     tests/agent_tools/test_codex_hooks.py
-    tests/agent_tools/test_external_artifact_binding.py
-    tests/agent_tools/test_publication_integrator.py
-    tests/agent_tools/test_review_dispatch.py
-    tests/agent_tools/test_work_log.py
   )
 fi
 

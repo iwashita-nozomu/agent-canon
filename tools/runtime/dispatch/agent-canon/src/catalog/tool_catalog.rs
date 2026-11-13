@@ -28,7 +28,7 @@ pub const DEFAULT_COMMAND_SOURCES: [&str; 2] = [
 pub const ENTRY_WIRING_SOURCES: [&str; 6] = [
     "tools/validation/ci/runners/run_all_checks.sh",
     "tools/validation/ci/checks/check_agent_canon_pr.sh",
-    "eval/producers/run_accumulated_agent_evals.py",
+    "tools/runtime/dispatch/agent-canon/src/eval_accumulation.rs",
     "agents/skills/agent-canon-update.md",
     ".github/PULL_REQUEST_TEMPLATE.md",
     ".github/PULL_REQUEST_TEMPLATE/agent_canon.md",
@@ -232,6 +232,17 @@ pub fn resolve_repo_path(root: &Path, relative_path: &str, source_root: Option<&
     } else {
         root_path
     }
+}
+
+/// Read one YAML document using the catalog owner's parser without imposing
+/// the legacy catalog checker's shape or runtime-dispatch validation.
+pub fn load_yaml_document(path: &Path) -> Result<Yaml, String> {
+    let text = fs::read_to_string(path).map_err(|error| format!("{}: {error}", path.display()))?;
+    let mut documents = YamlLoader::load_from_str(&text).map_err(|error| error.to_string())?;
+    if documents.len() > 1 {
+        return Err("multiple YAML documents".to_owned());
+    }
+    Ok(documents.pop().unwrap_or(Yaml::Null))
 }
 
 fn load_catalog(path: &Path) -> (Option<Yaml>, Vec<Finding>) {
@@ -507,8 +518,13 @@ fn check_default_wiring(root: &Path, entries: &[&Yaml]) -> Vec<Finding> {
             .and_then(|value| value.to_str())
             == Some("rs")
         {
-            native_cli_dispatch(entry)
-                .is_some_and(|argv| native_cli_invocation_is_referenced(&command_text, &argv))
+            native_cli_dispatch(entry).is_some_and(|argv| {
+                native_cli_invocation_is_referenced(&command_text, &argv)
+                    || fs::read_to_string(
+                        root.join("tools/runtime/dispatch/agent-canon/src/eval_accumulation.rs"),
+                    )
+                    .is_ok_and(|source| native_eval_producer_is_referenced(&source, &argv))
+            })
         } else {
             default_text.contains(&path) || default_text.contains(basename)
         };
@@ -527,6 +543,38 @@ fn native_cli_dispatch(entry: &Yaml) -> Option<Vec<String>> {
     let dispatch = mapping_value(entry, "dispatch")?;
     let argv = string_list(mapping_value(dispatch, "argv"));
     (argv.len() >= 2 && argv[0].as_str() == "tools/bin/agent-canon").then_some(argv)
+}
+
+fn native_eval_producer_is_referenced(source: &str, argv: &[String]) -> bool {
+    if argv
+        .first()
+        .is_none_or(|value| value != "tools/bin/agent-canon")
+    {
+        return false;
+    }
+    let Some(selector) = argv.get(1) else {
+        return false;
+    };
+    let Ok(tokens) = rust_tokens(source) else {
+        return false;
+    };
+    let Some(start) = tokens
+        .windows(2)
+        .position(|pair| pair[0].value == "const" && pair[1].value == "PRODUCER_SELECTORS")
+    else {
+        return false;
+    };
+    let table = &tokens[start..];
+    let Some(end) = table.iter().position(|token| token.value == ";") else {
+        return false;
+    };
+    table[..end].windows(5).any(|row| {
+        row[0].value == "("
+            && row[1].value.starts_with('"')
+            && row[2].value == ","
+            && row[3].value == format!("\"{selector}\"")
+            && row[4].value == ")"
+    })
 }
 
 // Only a command-position wrapper/direct invocation proves native default wiring.
@@ -548,7 +596,10 @@ fn native_cli_invocation_is_referenced(text: &str, argv: &[String]) -> bool {
             return false;
         };
         let mut command_starts = Vec::new();
-        if tokens.first().is_some_and(|token| token.value == "if") {
+        if tokens
+            .first()
+            .is_some_and(|token| matches!(token.value.as_str(), "if" | "elif"))
+        {
             command_starts.push(1);
         }
         command_starts.push(0);
@@ -1042,7 +1093,11 @@ pub fn check_tool_docs_manifest(root: &Path, catalog_entries: &[&Yaml]) -> Vec<F
         if !resolve_repo_path(root, doc, None).is_file() {
             findings.push(Finding::new("tool_docs", doc, "missing-doc"));
         }
-        if !tool_doc_name_matches(tool, doc) {
+        let public_command_name = Path::new(doc)
+            .file_stem()
+            .and_then(|value| value.to_str())
+            .is_some_and(|name| name.replace('_', "-") == id.replace('_', "-"));
+        if !tool_doc_name_matches(tool, doc) && !public_command_name {
             findings.push(Finding::new("tool_docs", doc, "tool-doc-name-mismatch"));
         }
         if !string_list(mapping_value(catalog_entry, "docs")).contains(doc) {
@@ -2589,4 +2644,51 @@ pub fn run(args: &[String]) -> i32 {
     let mut output = stdout.lock();
     let mut error = stderr.lock();
     run_with_io(args, &mut output, &mut error)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{native_cli_invocation_is_referenced, native_eval_producer_is_referenced};
+
+    #[test]
+    fn eval_wiring_uses_the_registered_native_producer_set() {
+        let argv = vec![
+            "tools/bin/agent-canon".into(),
+            "evaluate-codex-agent-roles".into(),
+        ];
+        let source = "const PRODUCER_SELECTORS: &[(&str, &str)] = &[(\"role\", \"evaluate-codex-agent-roles\")];";
+        assert!(native_eval_producer_is_referenced(source, &argv));
+        assert!(!native_eval_producer_is_referenced(
+            source,
+            &["other".into(), argv[1].clone()]
+        ));
+        assert!(!native_eval_producer_is_referenced(
+            source,
+            &[argv[0].clone(), "unknown-producer".into()]
+        ));
+        assert!(!native_eval_producer_is_referenced(
+            "let incidental = \"evaluate-codex-agent-roles\";",
+            &argv
+        ));
+    }
+
+    #[test]
+    fn conditional_native_commands_preserve_command_position() {
+        let argv = vec![
+            "tools/bin/agent-canon".to_owned(),
+            "experiment-registry".to_owned(),
+        ];
+        assert!(native_cli_invocation_is_referenced(
+            "elif run_agent_canon experiment-registry 2>&1; then",
+            &argv
+        ));
+        assert!(native_cli_invocation_is_referenced(
+            "if run_agent_canon experiment-registry; then",
+            &argv
+        ));
+        assert!(!native_cli_invocation_is_referenced(
+            "echo run_agent_canon experiment-registry",
+            &argv
+        ));
+    }
 }

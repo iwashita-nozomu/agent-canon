@@ -14,7 +14,6 @@
 from __future__ import annotations
 
 import argparse
-import ast
 import base64
 import binascii
 import ctypes
@@ -57,6 +56,7 @@ from tools.runtime.artifacts.report_artifact_checks import (  # noqa: E402
     parse_review_identity,
 )
 from tools.runtime.archive.runtime_log_paths import (  # noqa: E402
+    ACTIVE_RUN_POINTER,
     HOOK_SPOOL_INDEX_NAME,
     LOG_ARCHIVE_REMOTE,
     agent_canon_git_commit_key,
@@ -78,7 +78,6 @@ from tools.repository.workspace.parent_root_side_effects import (  # noqa: E402
     ParentRootSideEffectError,
     attest_parent_root,
 )
-from tools.runtime.authority.task_authority import ACTIVE_RUN_POINTER  # noqa: E402
 
 DEFAULT_COMMIT_NAME = "AgentCanon Log Archive"
 DEFAULT_COMMIT_EMAIL = "agent-canon-log@example.invalid"
@@ -121,18 +120,29 @@ RUNTIME_EVENT_RECEIPT_SCHEMA = (
 )
 RUNTIME_EVENT_CONTEXT_SCHEMA = "codex.context_discovery.v1"
 RUNTIME_SESSION_ROOT_ENV = "AGENT_CANON_CODEX_SESSION_ROOT"
-CONTEXT_DISCOVERY_CERTIFICATE_SCHEMA = (
-    "agent_canon.context_discovery_certificate.v1"
-)
+CONTEXT_DISCOVERY_CERTIFICATE_SCHEMA = "agent_canon.context_discovery_certificate.v1"
 CONTEXT_DISCOVERY_CERTIFICATE_PREFIX = (
     CONTEXT_DISCOVERY_CERTIFICATE_SCHEMA + "\0"
 ).encode("ascii")
 CONTEXT_DISCOVERY_CERTIFICATE_NAME = re.compile(
     r"^context_discovery\.(?P<certificate_id>[0-9a-f]{64})\.json$"
 )
-RUNTIME_EVENT_FAMILY_NAMES = ("requirements", "design", "review", "validation", "lifecycle")
+RUNTIME_EVENT_FAMILY_NAMES = (
+    "requirements",
+    "design",
+    "review",
+    "validation",
+    "lifecycle",
+)
 RUNTIME_EVENT_GATE_RESULTS = (
-    "APPROVE", "REVISE", "ESCALATE", "PASS", "FAIL", "BLOCKED", "READY", "INCOMPLETE"
+    "APPROVE",
+    "REVISE",
+    "ESCALATE",
+    "PASS",
+    "FAIL",
+    "BLOCKED",
+    "READY",
+    "INCOMPLETE",
 )
 RUNTIME_EVENT_DECISIONS = ("APPROVE", "REVISE", "ESCALATE", "NONE")
 RUNTIME_EVENT_HEX64 = re.compile(r"^[0-9a-f]{64}$")
@@ -168,16 +178,27 @@ RUNTIME_EVENT_YEAR = re.compile(r"^[0-9]{4}$")
 RUNTIME_EVENT_MONTH_DAY = re.compile(r"^[0-9]{2}$")
 RUNTIME_EVENT_GENERATED_ROOTS = frozenset(
     {
-        "reports/agent-eval-runs", "reports/agent-improvement-guide",
-        "reports/agent-runtime-dashboard", "reports/dependency-review",
-        "reports/hooks", "reports/.cache",
+        "reports/agent-eval-runs",
+        "reports/agent-improvement-guide",
+        "reports/agent-runtime-dashboard",
+        "reports/dependency-review",
+        "reports/hooks",
+        "reports/.cache",
     }
 )
 RUNTIME_EVENT_RESULT_FILES = {
-    "requirements": ("requirements_review.md", "requirements-review", "ReviewArtifactV1"),
+    "requirements": (
+        "requirements_review.md",
+        "requirements-review",
+        "ReviewArtifactV1",
+    ),
     "design": ("design_review.md", "design-review", "ReviewArtifactV1"),
     "review": ("change_review.md", "change-review", "ReviewArtifactV1"),
-    "validation": ("validation_result.json", "validation", "agent_canon.runtime_result_input.v1"),
+    "validation": (
+        "validation_result.json",
+        "validation",
+        "agent_canon.runtime_result_input.v1",
+    ),
     "lifecycle": ("closeout_gate.md", "closeout", "CloseoutGateV1"),
 }
 ARCHIVE_FORBIDDEN_CONTENT = re.compile(
@@ -193,34 +214,6 @@ HOOK_SPOOL_CURSOR_SCHEMA_VERSION = 1
 HOOK_SPOOL_CURSOR_NAME = ".spool-cursor.json"
 ARCHIVE_TRANSACTION_LOCK_RELATIVE = Path("locks") / "archive-transaction.lock"
 HOOK_SPOOL_ZERO_SHA256 = "0" * 64
-HOOK_HOT_PATH_ROOTS = (
-    "HookLogContext.append",
-    "canonical_hook_event_bytes",
-    "publish_hook_event_noreplace",
-)
-HOOK_HOT_PATH_RUNTIME_PATH_HELPERS = frozenset(
-    {"codex_trace_key", "hook_event_spool_root", "repo_log_key"}
-)
-HOOK_HOT_PATH_FORBIDDEN_CALLS = frozenset(
-    {
-        "subprocess",
-        "system",
-        "source_git_head",
-        "hook_results_dir",
-        "mounted_log_archive_root",
-        "ensure_archive_branch",
-        "runtime_log_archive_git",
-        "rglob",
-        "glob",
-        "walk",
-        "graph",
-        "git",
-        "fetch",
-        "status",
-        "commit",
-        "push",
-    }
-)
 _ACTIVE_ARCHIVE_LOCKS: set[Path] = set()
 AT_FDCWD = -100
 RENAME_NOREPLACE = 1
@@ -480,229 +473,19 @@ RESULT_FAMILY_SPECS = tuple(
 )
 
 
-def fixed_result_family_spec(result_family: str, gate_id: str | None = None) -> ResultFamilySpec:
+def fixed_result_family_spec(
+    result_family: str, gate_id: str | None = None
+) -> ResultFamilySpec:
     """Return the sole fixed specification for one result family and gate."""
-    spec = next((item for item in RESULT_FAMILY_SPECS if item.result_family == result_family), None)
+    spec = next(
+        (item for item in RESULT_FAMILY_SPECS if item.result_family == result_family),
+        None,
+    )
     if spec is None or (gate_id is not None and spec.gate_id != gate_id):
         raise RuntimeEventMaterializationError(
             "result_authority_mismatch", "result family and gate id do not match"
         )
     return spec
-
-
-def _ast_call_name(call: ast.Call) -> str:
-    """Return one dotted call target when syntax fixes it statically."""
-    return _ast_expression_name(call.func)
-
-
-def _ast_expression_name(node: ast.expr) -> str:
-    """Return a dotted expression name without evaluating source code."""
-    parts: list[str] = []
-    while isinstance(node, ast.Attribute):
-        parts.append(node.attr)
-        node = node.value
-    if isinstance(node, ast.Name):
-        parts.append(node.id)
-    return ".".join(reversed(parts))
-
-
-def _resolve_ast_alias(name: str, aliases: dict[str, str]) -> str:
-    """Resolve imported and local name aliases to a stable dotted target."""
-    resolved = name
-    visited: set[str] = set()
-    while resolved:
-        first, separator, remainder = resolved.partition(".")
-        replacement = aliases.get(first)
-        if replacement is None or first in visited:
-            break
-        visited.add(first)
-        resolved = replacement + (f".{remainder}" if separator else "")
-    return resolved
-
-
-def _module_ast_aliases(tree: ast.Module) -> dict[str, str]:
-    """Index statically named import and module-level assignment aliases."""
-    aliases: dict[str, str] = {}
-    for node in tree.body:
-        if isinstance(node, ast.Import):
-            for alias in node.names:
-                aliases[alias.asname or alias.name.split(".", 1)[0]] = alias.name
-        elif isinstance(node, ast.ImportFrom) and node.module:
-            for alias in node.names:
-                if alias.name != "*":
-                    aliases[alias.asname or alias.name] = f"{node.module}.{alias.name}"
-        elif isinstance(node, (ast.Assign, ast.AnnAssign)):
-            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
-            value = node.value
-            if value is None:
-                continue
-            target_name = next(
-                (target.id for target in targets if isinstance(target, ast.Name)),
-                None,
-            )
-            value_name = _ast_expression_name(value)
-            if target_name and value_name:
-                aliases[target_name] = _resolve_ast_alias(value_name, aliases)
-    return aliases
-
-
-def _definition_ast_aliases(
-    definition: ast.FunctionDef | ast.AsyncFunctionDef,
-    module_aliases: dict[str, str],
-) -> dict[str, str]:
-    """Extend module aliases with statically named aliases in one function."""
-    aliases = dict(module_aliases)
-    for node in ast.walk(definition):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)) and node is not definition:
-            continue
-        if not isinstance(node, (ast.Assign, ast.AnnAssign)):
-            continue
-        targets = node.targets if isinstance(node, ast.Assign) else [node.target]
-        value = node.value
-        if value is None:
-            continue
-        value_name = _ast_expression_name(value)
-        if not value_name:
-            continue
-        resolved = _resolve_ast_alias(value_name, aliases)
-        for target in targets:
-            if isinstance(target, ast.Name):
-                aliases[target.id] = resolved
-    return aliases
-
-
-def _hot_path_definitions(tree: ast.Module) -> dict[str, ast.FunctionDef | ast.AsyncFunctionDef]:
-    """Index module functions and HookLogContext methods for call-graph traversal."""
-    definitions: dict[str, ast.FunctionDef | ast.AsyncFunctionDef] = {}
-    for node in tree.body:
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            definitions[node.name] = node
-        if isinstance(node, ast.ClassDef) and node.name == "HookLogContext":
-            for child in node.body:
-                if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                    definitions[f"HookLogContext.{child.name}"] = child
-    return definitions
-
-
-def _runtime_path_definitions(
-    tree: ast.Module,
-) -> dict[str, ast.FunctionDef | ast.AsyncFunctionDef]:
-    """Index runtime_log_paths functions under an unambiguous module prefix."""
-    return {
-        f"runtime_log_paths.{node.name}": node
-        for node in tree.body
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-    }
-
-
-def _runtime_path_imports(tree: ast.Module) -> dict[str, str]:
-    """Return approved runtime_log_paths helper bindings imported by the hook."""
-    bindings: dict[str, str] = {}
-    for node in tree.body:
-        if not isinstance(node, ast.ImportFrom) or node.module != "runtime_log_paths":
-            continue
-        for alias in node.names:
-            if alias.name in HOOK_HOT_PATH_RUNTIME_PATH_HELPERS:
-                bindings[alias.asname or alias.name] = f"runtime_log_paths.{alias.name}"
-    return bindings
-
-
-def check_hook_hot_path(path: Path) -> tuple[str, ...]:
-    """Return static forbidden-operation findings reachable from hook append."""
-    try:
-        text = path.read_text(encoding="utf-8")
-        tree = ast.parse(text, filename=str(path))
-    except (OSError, SyntaxError, UnicodeError):
-        return ("hook_source_unreadable",)
-
-    definitions = _hot_path_definitions(tree)
-    module_aliases = _module_ast_aliases(tree)
-    runtime_imports = _runtime_path_imports(tree)
-    findings: set[str] = set()
-    if runtime_imports:
-        runtime_path = (
-            path.resolve().parents[2]
-            / "tools"
-            / "runtime"
-            / "archive"
-            / "runtime_log_paths.py"
-        )
-        try:
-            runtime_text = runtime_path.read_text(encoding="utf-8")
-            runtime_tree = ast.parse(runtime_text, filename=str(runtime_path))
-        except (OSError, SyntaxError, UnicodeError):
-            findings.add("runtime_log_paths_source_unreadable")
-        else:
-            definitions.update(_runtime_path_definitions(runtime_tree))
-            module_aliases.update(_module_ast_aliases(runtime_tree))
-            for target in runtime_imports.values():
-                if target not in definitions:
-                    findings.add(f"missing:{target}")
-    append_node = definitions.get("HookLogContext.append")
-    if append_node is None:
-        findings.add("missing:HookLogContext.append")
-    else:
-        annotation = append_node.returns
-        if not isinstance(annotation, ast.Name) or annotation.id != "HookAppendResult":
-            findings.add("return_annotation:HookLogContext.append")
-
-    pending = list(HOOK_HOT_PATH_ROOTS)
-    visited: set[str] = set()
-    while pending:
-        name = pending.pop()
-        if name in visited:
-            continue
-        visited.add(name)
-        definition = definitions.get(name)
-        if definition is None:
-            findings.add(f"missing:{name}")
-            continue
-        aliases = _definition_ast_aliases(definition, module_aliases)
-        for node in ast.walk(definition):
-            if not isinstance(node, ast.Call):
-                continue
-            call_name = _ast_call_name(node)
-            resolved_call = _resolve_ast_alias(call_name, aliases)
-            call_parts = tuple(
-                part.casefold() for part in resolved_call.split(".") if part
-            )
-            forbidden = next(
-                (part for part in call_parts if part in HOOK_HOT_PATH_FORBIDDEN_CALLS),
-                None,
-            )
-            if forbidden is not None:
-                findings.add(f"forbidden:{resolved_call}")
-            if resolved_call in {
-                "print",
-                "builtins.print",
-                "sys.stdout.write",
-                "sys.stderr.write",
-            }:
-                findings.add(f"output:{resolved_call}")
-
-            local_name = ""
-            if name.startswith("runtime_log_paths.") and "." not in resolved_call:
-                candidate = f"runtime_log_paths.{resolved_call}"
-                if candidate in definitions:
-                    local_name = candidate
-            elif resolved_call.startswith("self."):
-                local_name = f"HookLogContext.{resolved_call.removeprefix('self.')}"
-            elif resolved_call.startswith("runtime_log_paths."):
-                local_name = resolved_call
-            elif "." not in resolved_call and resolved_call in definitions:
-                local_name = resolved_call
-            if local_name in definitions and local_name not in visited:
-                pending.append(local_name)
-    return tuple(sorted(findings))
-
-
-def command_check_hook_hot_path(path: Path) -> int:
-    """Print the stable, context-free hook hot-path checker result."""
-    findings = check_hook_hot_path(path)
-    print(f"RUNTIME_LOG_HOT_PATH_PATH={path}")
-    print(f"RUNTIME_LOG_HOT_PATH_FORBIDDEN_COUNT={len(findings)}")
-    print(f"RUNTIME_LOG_HOT_PATH={'pass' if not findings else 'fail'}")
-    return 0 if not findings else 1
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -736,17 +519,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    check_hot_path = subparsers.add_parser(
-        "check-hook-hot-path",
-        help="Statically reject blocking or output-producing hook append operations.",
-    )
-    check_hot_path.add_argument("--path", type=Path, default=None)
-
     context_discovery = subparsers.add_parser(
         "append-context-discovery",
         help="Publish one immutable native ContextDiscoveryV1 certificate.",
     )
-    context_discovery.add_argument("--run-id", required=True, help="Active reports/agents run id.")
+    context_discovery.add_argument(
+        "--run-id", required=True, help="Active reports/agents run id."
+    )
     context_discovery.add_argument(
         "--agent-context-id", required=True, help="Native Codex session context UUID."
     )
@@ -759,26 +538,47 @@ def build_parser() -> argparse.ArgumentParser:
         help="Materialize one source-bound runtime event into the active run bundle.",
     )
     materialize.add_argument(
-        "--result-family", choices=RUNTIME_EVENT_FAMILY_NAMES, required=True,
+        "--result-family",
+        choices=RUNTIME_EVENT_FAMILY_NAMES,
+        required=True,
         help="Fixed result-artifact family to verify.",
     )
-    materialize.add_argument("--run-id", required=True, help="Active reports/agents run id.")
-    materialize.add_argument("--gate-id", required=True, help="Fixed gate id for the result family.")
-    materialize.add_argument("--base-ref", required=True, help="Git ref used for target/base verification.")
     materialize.add_argument(
-        "--unit-id", help="Optional first sixteen hexadecimal characters of the source record hash."
+        "--run-id", required=True, help="Active reports/agents run id."
+    )
+    materialize.add_argument(
+        "--gate-id", required=True, help="Fixed gate id for the result family."
+    )
+    materialize.add_argument(
+        "--base-ref", required=True, help="Git ref used for target/base verification."
+    )
+    materialize.add_argument(
+        "--unit-id",
+        help="Optional first sixteen hexadecimal characters of the source record hash.",
     )
 
-    subparsers.add_parser("repo-key", help="Print the source repository key and log branch.")
+    subparsers.add_parser(
+        "repo-key", help="Print the source repository key and log branch."
+    )
 
     ensure = subparsers.add_parser(
         "ensure",
         help="Clone/fetch the archive and select logs/<stable-source-repository-id>.",
     )
-    ensure.add_argument("--no-fetch", action="store_true", help="Do not fetch origin before selecting the branch.")
+    ensure.add_argument(
+        "--no-fetch",
+        action="store_true",
+        help="Do not fetch origin before selecting the branch.",
+    )
 
-    status = subparsers.add_parser("status", help="Print archive clone, branch, and dirty state.")
-    status.add_argument("--porcelain", action="store_true", help="Include git status --porcelain output.")
+    status = subparsers.add_parser(
+        "status", help="Print archive clone, branch, and dirty state."
+    )
+    status.add_argument(
+        "--porcelain",
+        action="store_true",
+        help="Include git status --porcelain output.",
+    )
 
     check_clean = subparsers.add_parser(
         "check-clean",
@@ -900,17 +700,33 @@ def build_parser() -> argparse.ArgumentParser:
         help="Do not rebase when the remote branch advances during --publish.",
     )
 
-    push = subparsers.add_parser("push", help="Commit and push append-only logs for this source repository.")
-    push.add_argument("--message", help="Commit message. Defaults to 'Append <stable-source-repository-id> runtime logs'.")
-    push.add_argument("--no-pull", action="store_true", help="Do not pull --rebase before pushing.")
+    push = subparsers.add_parser(
+        "push", help="Commit and push append-only logs for this source repository."
+    )
+    push.add_argument(
+        "--message",
+        help="Commit message. Defaults to 'Append <stable-source-repository-id> runtime logs'.",
+    )
+    push.add_argument(
+        "--no-pull", action="store_true", help="Do not pull --rebase before pushing."
+    )
 
     sync = subparsers.add_parser(
         "sync",
         help="Ensure the archive, snapshot current agent reports, commit, and push log artifacts.",
     )
-    sync.add_argument("--message", help="Commit message. Defaults to 'Append <stable-source-repository-id> runtime logs'.")
-    sync.add_argument("--no-pull", action="store_true", help="Do not pull --rebase before pushing.")
-    sync.add_argument("--no-push", action="store_true", help="Copy artifacts into the archive without pushing.")
+    sync.add_argument(
+        "--message",
+        help="Commit message. Defaults to 'Append <stable-source-repository-id> runtime logs'.",
+    )
+    sync.add_argument(
+        "--no-pull", action="store_true", help="Do not pull --rebase before pushing."
+    )
+    sync.add_argument(
+        "--no-push",
+        action="store_true",
+        help="Copy artifacts into the archive without pushing.",
+    )
     sync.add_argument(
         "--no-agent-reports",
         action="store_true",
@@ -966,7 +782,11 @@ def git(
     command = ["git", "-C", str(archive_root), *args]
     for attempt in range(GIT_INDEX_LOCK_RETRIES + 1):
         result = run(command, check=False)
-        if result.returncode == 0 or not git_index_locked(result) or attempt == GIT_INDEX_LOCK_RETRIES:
+        if (
+            result.returncode == 0
+            or not git_index_locked(result)
+            or attempt == GIT_INDEX_LOCK_RETRIES
+        ):
             if check and result.returncode != 0:
                 detail = result.stderr.strip() or result.stdout.strip()
                 raise ArchiveGitError(f"{' '.join(command)} failed: {detail}")
@@ -997,7 +817,9 @@ def default_source_root(canon_root: Path) -> Path:
     return canon_root.resolve()
 
 
-def _parent_boundary() -> tuple[ParentRootSideEffectBoundary, ParentRootAttestationReceipt] | None:
+def _parent_boundary() -> (
+    tuple[ParentRootSideEffectBoundary, ParentRootAttestationReceipt] | None
+):
     """Return the parent capability for a bounded child invocation."""
     configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
     if not configured:
@@ -1031,7 +853,9 @@ def _parent_ensure_directory(path: Path, purpose: str) -> Path:
         path.mkdir(parents=True, exist_ok=True)
         return path
     boundary, attestation = bound
-    return boundary.ensure_parent_owned_directory(attestation, path, purpose).physical_path
+    return boundary.ensure_parent_owned_directory(
+        attestation, path, purpose
+    ).physical_path
 
 
 def _parent_copy_file(source: Path, target: Path, purpose: str) -> None:
@@ -1048,7 +872,11 @@ def _parent_copy_file(source: Path, target: Path, purpose: str) -> None:
 def build_context(args: argparse.Namespace) -> ArchiveContext:
     """Resolve source/canon/archive paths and branch names."""
     canon_root = args.canon_root.resolve()
-    source_root = (args.source_root.resolve() if args.source_root else default_source_root(canon_root))
+    source_root = (
+        args.source_root.resolve()
+        if args.source_root
+        else default_source_root(canon_root)
+    )
     runtime_root = args.runtime_root.resolve() if args.runtime_root else None
     archive_root = (
         args.archive_root.resolve()
@@ -1176,7 +1004,9 @@ def _rollout_files(agent_context_id: str) -> tuple[Path, ...]:
                                 if resolved.is_relative_to(root):
                                     files.add(resolved)
         except OSError as exc:
-            raise RuntimeEventMaterializationError("source_unavailable", str(exc)) from exc
+            raise RuntimeEventMaterializationError(
+                "source_unavailable", str(exc)
+            ) from exc
     return tuple(sorted(files, key=lambda path: path.as_posix().encode("utf-8")))
 
 
@@ -1245,7 +1075,9 @@ def _native_task_complete(
     if not isinstance(payload, dict) or payload.get("type") != "task_complete":
         return None
     native_turn_id = payload.get("turn_id")
-    if not isinstance(native_turn_id, str) or not RUNTIME_EVENT_UUID.fullmatch(native_turn_id):
+    if not isinstance(native_turn_id, str) or not RUNTIME_EVENT_UUID.fullmatch(
+        native_turn_id
+    ):
         raise RuntimeEventMaterializationError(
             "context_schema_invalid", "task_complete turn id is invalid"
         )
@@ -1256,7 +1088,9 @@ def _native_task_complete(
 
 def discover_rollout_context(agent_context_id: str, turn_id: str) -> dict[str, object]:
     """Certify native session metadata, rollout identity, and task joins."""
-    if not RUNTIME_EVENT_UUID.fullmatch(agent_context_id) or not RUNTIME_EVENT_UUID.fullmatch(turn_id):
+    if not RUNTIME_EVENT_UUID.fullmatch(
+        agent_context_id
+    ) or not RUNTIME_EVENT_UUID.fullmatch(turn_id):
         raise RuntimeEventMaterializationError(
             "source_identity_mismatch", "context or turn selector is not a UUID"
         )
@@ -1271,7 +1105,8 @@ def discover_rollout_context(agent_context_id: str, turn_id: str) -> dict[str, o
         )
     if len(files) != 1:
         raise RuntimeEventMaterializationError(
-            "context_source_ambiguous", "rollout path is not unique for the context selector"
+            "context_source_ambiguous",
+            "rollout path is not unique for the context selector",
         )
     snapshots: dict[Path, bytes] = {}
     sessions: list[tuple[Path, dict[str, object], dict[str, object]]] = []
@@ -1280,7 +1115,9 @@ def discover_rollout_context(agent_context_id: str, turn_id: str) -> dict[str, o
         try:
             snapshot = path.read_bytes()
         except OSError as exc:
-            raise RuntimeEventMaterializationError("source_unavailable", str(exc)) from exc
+            raise RuntimeEventMaterializationError(
+                "source_unavailable", str(exc)
+            ) from exc
         snapshots[path] = snapshot
         for record in _iter_source_snapshot_records(snapshot):
             value = cast(dict[str, object], record["value"])
@@ -1288,7 +1125,8 @@ def discover_rollout_context(agent_context_id: str, turn_id: str) -> dict[str, o
             if session is not None:
                 if cast(str, session["identity"]) != agent_context_id:
                     raise RuntimeEventMaterializationError(
-                        "source_identity_mismatch", "session_meta id does not match selector"
+                        "source_identity_mismatch",
+                        "session_meta id does not match selector",
                     )
                 sessions.append((path, record, session))
             completion = _native_task_complete(value, turn_id)
@@ -1314,12 +1152,14 @@ def discover_rollout_context(agent_context_id: str, turn_id: str) -> dict[str, o
     task_path, task_record, _task = completions[0]
     if session_path != task_path:
         raise RuntimeEventMaterializationError(
-            "source_identity_mismatch", "session_meta and task_complete use different rollouts"
+            "source_identity_mismatch",
+            "session_meta and task_complete use different rollouts",
         )
     name_identity = _rollout_name_identity(session_path)
     if name_identity is None or name_identity[1] != agent_context_id:
         raise RuntimeEventMaterializationError(
-            "source_identity_mismatch", "rollout filename does not match context selector"
+            "source_identity_mismatch",
+            "rollout filename does not match context selector",
         )
     file_bytes = snapshots[session_path]
     path_bytes = session_path.as_posix().encode("utf-8")
@@ -1373,7 +1213,13 @@ def _iter_source_snapshot_records(source: bytes) -> Iterator[dict[str, object]]:
             except (UnicodeDecodeError, json.JSONDecodeError):
                 value = None
             if isinstance(value, dict):
-                yield {"line": line_number, "offset": offset, "length": length, "raw": raw, "value": value}
+                yield {
+                    "line": line_number,
+                    "offset": offset,
+                    "length": length,
+                    "raw": raw,
+                    "value": value,
+                }
         offset += length
 
 
@@ -1389,13 +1235,27 @@ def iter_source_records(path: Path) -> Iterator[dict[str, object]]:
 def is_source_snapshot_path(relative: Path) -> bool:
     """Return whether a path belongs to the finite owner-approved source universe."""
     parts = relative.parts
-    excluded = {".git", ".agent-canon", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache"}
+    excluded = {
+        ".git",
+        ".agent-canon",
+        "__pycache__",
+        ".pytest_cache",
+        ".mypy_cache",
+        ".ruff_cache",
+    }
     if not parts or any(part in excluded for part in parts):
         return False
-    if len(parts) >= 3 and parts[0] == "experiments" and parts[2] in {"result", "report"}:
+    if (
+        len(parts) >= 3
+        and parts[0] == "experiments"
+        and parts[2] in {"result", "report"}
+    ):
         return False
     normalized = relative.as_posix()
-    if any(normalized == root or normalized.startswith(f"{root}/") for root in RUNTIME_EVENT_GENERATED_ROOTS):
+    if any(
+        normalized == root or normalized.startswith(f"{root}/")
+        for root in RUNTIME_EVENT_GENERATED_ROOTS
+    ):
         return False
     if RUNTIME_EVENT_GENERATED_NAME.fullmatch(relative.name):
         return False
@@ -1471,6 +1331,7 @@ def validate_context_discovery_certificate(raw: bytes) -> None:
         raise RuntimeEventMaterializationError(
             "context_schema_invalid", "context certificate JSON is invalid"
         ) from exc
+
     def matches(pattern: re.Pattern[str], item: object) -> bool:
         return isinstance(item, str) and pattern.fullmatch(item) is not None
 
@@ -1480,9 +1341,12 @@ def validate_context_discovery_certificate(raw: bytes) -> None:
         )
     if list(value) != ["schema", "certificate_id", "context", "repository", "rollout"]:
         raise RuntimeEventMaterializationError(
-            "context_schema_invalid", "context certificate top-level keys are not canonical"
+            "context_schema_invalid",
+            "context certificate top-level keys are not canonical",
         )
-    if value["schema"] != CONTEXT_DISCOVERY_CERTIFICATE_SCHEMA or not matches(RUNTIME_EVENT_HEX64, value["certificate_id"]):
+    if value["schema"] != CONTEXT_DISCOVERY_CERTIFICATE_SCHEMA or not matches(
+        RUNTIME_EVENT_HEX64, value["certificate_id"]
+    ):
         raise RuntimeEventMaterializationError(
             "context_schema_invalid", "context certificate schema or id is invalid"
         )
@@ -1490,8 +1354,13 @@ def validate_context_discovery_certificate(raw: bytes) -> None:
     repository = value["repository"]
     rollout = value["rollout"]
     if not isinstance(context, dict) or list(context) != [
-        "schema", "agent_id", "agent_context_id", "codex_thread_id",
-        "parent_id", "turn_id", "role",
+        "schema",
+        "agent_id",
+        "agent_context_id",
+        "codex_thread_id",
+        "parent_id",
+        "turn_id",
+        "role",
     ]:
         raise RuntimeEventMaterializationError(
             "context_schema_invalid", "context certificate context shape is invalid"
@@ -1500,8 +1369,16 @@ def validate_context_discovery_certificate(raw: bytes) -> None:
         raise RuntimeEventMaterializationError(
             "context_schema_invalid", "context certificate context schema is invalid"
         )
-    for field in ("agent_id", "agent_context_id", "codex_thread_id", "parent_id", "turn_id"):
-        if not isinstance(context[field], str) or not RUNTIME_EVENT_UUID.fullmatch(context[field]):
+    for field in (
+        "agent_id",
+        "agent_context_id",
+        "codex_thread_id",
+        "parent_id",
+        "turn_id",
+    ):
+        if not isinstance(context[field], str) or not RUNTIME_EVENT_UUID.fullmatch(
+            context[field]
+        ):
             raise RuntimeEventMaterializationError(
                 "context_schema_invalid", f"context certificate {field} is invalid"
             )
@@ -1515,7 +1392,10 @@ def validate_context_discovery_certificate(raw: bytes) -> None:
             "context_schema_invalid", "context certificate identity joins are invalid"
         )
     if not isinstance(repository, dict) or list(repository) != [
-        "root", "root_path_sha256", "head_oid", "tree_oid",
+        "root",
+        "root_path_sha256",
+        "head_oid",
+        "tree_oid",
     ]:
         raise RuntimeEventMaterializationError(
             "context_schema_invalid", "context certificate repository shape is invalid"
@@ -1527,10 +1407,16 @@ def validate_context_discovery_certificate(raw: bytes) -> None:
         or not matches(RUNTIME_EVENT_OID40, repository["tree_oid"])
     ):
         raise RuntimeEventMaterializationError(
-            "context_schema_invalid", "context certificate repository identity is invalid"
+            "context_schema_invalid",
+            "context certificate repository identity is invalid",
         )
     if not isinstance(rollout, dict) or list(rollout) != [
-        "path", "path_sha256", "file_sha256", "session_cwd", "session_meta", "task_complete",
+        "path",
+        "path_sha256",
+        "file_sha256",
+        "session_cwd",
+        "session_meta",
+        "task_complete",
     ]:
         raise RuntimeEventMaterializationError(
             "context_schema_invalid", "context certificate rollout shape is invalid"
@@ -1548,10 +1434,14 @@ def validate_context_discovery_certificate(raw: bytes) -> None:
     for field in ("session_meta", "task_complete"):
         descriptor = rollout[field]
         if not isinstance(descriptor, dict) or list(descriptor) != [
-            "line", "byte_offset", "byte_length", "record_sha256",
+            "line",
+            "byte_offset",
+            "byte_length",
+            "record_sha256",
         ]:
             raise RuntimeEventMaterializationError(
-                "context_schema_invalid", f"context certificate {field} shape is invalid"
+                "context_schema_invalid",
+                f"context certificate {field} shape is invalid",
             )
         if (
             type(descriptor["line"]) is not int
@@ -1563,11 +1453,13 @@ def validate_context_discovery_certificate(raw: bytes) -> None:
             or not matches(RUNTIME_EVENT_HEX64, descriptor["record_sha256"])
         ):
             raise RuntimeEventMaterializationError(
-                "context_schema_invalid", f"context certificate {field} range is invalid"
+                "context_schema_invalid",
+                f"context certificate {field} range is invalid",
             )
     if _context_certificate_id(value) != value["certificate_id"]:
         raise RuntimeEventMaterializationError(
-            "context_schema_invalid", "context certificate id does not cover canonical bytes"
+            "context_schema_invalid",
+            "context certificate id does not cover canonical bytes",
         )
     if _context_certificate_bytes(value) != raw:
         raise RuntimeEventMaterializationError(
@@ -1582,7 +1474,9 @@ def validate_context_discovery_certificate(raw: bytes) -> None:
 def _source_git_identity(root: Path) -> tuple[str, str]:
     """Read the current source repository HEAD and tree identities."""
     head = run(["git", "-C", str(root), "rev-parse", "--verify", "HEAD"], check=False)
-    tree = run(["git", "-C", str(root), "rev-parse", "--verify", "HEAD^{tree}"], check=False)
+    tree = run(
+        ["git", "-C", str(root), "rev-parse", "--verify", "HEAD^{tree}"], check=False
+    )
     head_oid = head.stdout.strip()
     tree_oid = tree.stdout.strip()
     if (
@@ -1665,6 +1559,8 @@ def _active_run_directory(context: ArchiveContext, run_id: str) -> Path:
             "source_unavailable", "active run directory is absent"
         )
     return active_run
+
+
 def _require_relative_schema_path(value: object, field: str) -> str:
     """Validate one canonical repository-relative schema path."""
     if (
@@ -1690,20 +1586,35 @@ def parse_porcelain_v1_line(line: str) -> dict[str, str]:
         or "\n" in line
         or "\r" in line
     ):
-        raise RuntimeEventMaterializationError("source_snapshot_invalid", "porcelain-v1 line is too short")
-    return {"raw": line, "status_x": line[0], "status_y": line[1], "separator": line[2], "path": line[3:]}
+        raise RuntimeEventMaterializationError(
+            "source_snapshot_invalid", "porcelain-v1 line is too short"
+        )
+    return {
+        "raw": line,
+        "status_x": line[0],
+        "status_y": line[1],
+        "separator": line[2],
+        "path": line[3:],
+    }
 
 
 def capture_porcelain_v1(root: Path) -> tuple[dict[str, str], ...]:
     """Capture ordered raw porcelain-v1 status lines and validate their shape."""
-    result = run(["git", "-C", str(root), "status", "--porcelain=v1", "--untracked-files=all"], check=False)
+    result = run(
+        ["git", "-C", str(root), "status", "--porcelain=v1", "--untracked-files=all"],
+        check=False,
+    )
     if result.returncode != 0:
-        raise RuntimeEventMaterializationError("source_snapshot_invalid", result.stderr.strip())
+        raise RuntimeEventMaterializationError(
+            "source_snapshot_invalid", result.stderr.strip()
+        )
     statuses: list[dict[str, str]] = []
     for line in result.stdout.splitlines():
         parsed = parse_porcelain_v1_line(line)
         if not parsed["path"]:
-            raise RuntimeEventMaterializationError("source_snapshot_invalid", "porcelain-v1 path is empty")
+            raise RuntimeEventMaterializationError(
+                "source_snapshot_invalid", "porcelain-v1 path is empty"
+            )
         source_paths = _porcelain_source_paths(parsed["path"])
         if any(_path_has_traversal(path) for path in source_paths):
             raise RuntimeEventMaterializationError(
@@ -1715,12 +1626,21 @@ def capture_porcelain_v1(root: Path) -> tuple[dict[str, str], ...]:
     return tuple(statuses)
 
 
-def validate_markdown_review_result(text: str, expected_gate_id: str) -> dict[str, object]:
+def validate_markdown_review_result(
+    text: str, expected_gate_id: str
+) -> dict[str, object]:
     """Validate one fixed Markdown review artifact through W2 review checks."""
     identity = parse_review_identity(text)
     decisions = final_review_decision_lines(text)
-    if len(decisions) != 1 or decisions[0].upper() not in {"APPROVE", "REVISE", "ESCALATE"}:
-        raise RuntimeEventMaterializationError("result_authority_mismatch", "review decision is not exactly one supported value")
+    if len(decisions) != 1 or decisions[0].upper() not in {
+        "APPROVE",
+        "REVISE",
+        "ESCALATE",
+    }:
+        raise RuntimeEventMaterializationError(
+            "result_authority_mismatch",
+            "review decision is not exactly one supported value",
+        )
     decision = decisions[0].upper()
     if identity.decision_approved != (decision == "APPROVE"):
         raise RuntimeEventMaterializationError(
@@ -1728,9 +1648,13 @@ def validate_markdown_review_result(text: str, expected_gate_id: str) -> dict[st
             "review decision disagrees with canonical identity authority",
         )
     if identity.design_artifact_path is None or identity.review_target_sha256 is None:
-        raise RuntimeEventMaterializationError("result_authority_mismatch", "review identity fields are incomplete")
+        raise RuntimeEventMaterializationError(
+            "result_authority_mismatch", "review identity fields are incomplete"
+        )
     if check_final_review_artifact(text) and decision == "APPROVE":
-        raise RuntimeEventMaterializationError("result_authority_mismatch", "; ".join(check_final_review_artifact(text)))
+        raise RuntimeEventMaterializationError(
+            "result_authority_mismatch", "; ".join(check_final_review_artifact(text))
+        )
     return {
         "schema": "ReviewArtifactV1",
         "path": identity.design_artifact_path,
@@ -1762,24 +1686,59 @@ def parse_validation_result(raw: bytes, expected_gate_id: str) -> dict[str, obje
     except RuntimeEventMaterializationError:
         raise
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise RuntimeEventMaterializationError("result_authority_mismatch", "validation result is not UTF-8 JSON") from exc
-    expected = ["schema", "result", "gate_id", "target_paths", "base_ref", "observations"]
-    if not isinstance(value, dict) or list(value) != expected or value.get("schema") != "agent_canon.runtime_result_input.v1":
-        raise RuntimeEventMaterializationError("result_authority_mismatch", "validation result keys or schema mismatch")
-    if value.get("gate_id") != expected_gate_id or value.get("result") not in {"PASS", "FAIL", "BLOCKED"}:
-        raise RuntimeEventMaterializationError("result_authority_mismatch", "validation result gate mismatch")
+        raise RuntimeEventMaterializationError(
+            "result_authority_mismatch", "validation result is not UTF-8 JSON"
+        ) from exc
+    expected = [
+        "schema",
+        "result",
+        "gate_id",
+        "target_paths",
+        "base_ref",
+        "observations",
+    ]
+    if (
+        not isinstance(value, dict)
+        or list(value) != expected
+        or value.get("schema") != "agent_canon.runtime_result_input.v1"
+    ):
+        raise RuntimeEventMaterializationError(
+            "result_authority_mismatch", "validation result keys or schema mismatch"
+        )
+    if value.get("gate_id") != expected_gate_id or value.get("result") not in {
+        "PASS",
+        "FAIL",
+        "BLOCKED",
+    }:
+        raise RuntimeEventMaterializationError(
+            "result_authority_mismatch", "validation result gate mismatch"
+        )
     target_paths = value.get("target_paths")
-    if not isinstance(target_paths, list) or not target_paths or len(set(target_paths)) != len(target_paths):
-        raise RuntimeEventMaterializationError("result_authority_mismatch", "validation target_paths are invalid")
+    if (
+        not isinstance(target_paths, list)
+        or not target_paths
+        or len(set(target_paths)) != len(target_paths)
+    ):
+        raise RuntimeEventMaterializationError(
+            "result_authority_mismatch", "validation target_paths are invalid"
+        )
     if any(
         not isinstance(path, str)
         or Path(path).is_absolute()
         or _path_has_traversal(path)
         for path in cast(list[object], target_paths)
     ):
-        raise RuntimeEventMaterializationError("result_authority_mismatch", "validation target_paths are invalid")
-    if not isinstance(value.get("base_ref"), str) or not value["base_ref"] or not isinstance(value.get("observations"), dict):
-        raise RuntimeEventMaterializationError("result_authority_mismatch", "validation identity fields are incomplete")
+        raise RuntimeEventMaterializationError(
+            "result_authority_mismatch", "validation target_paths are invalid"
+        )
+    if (
+        not isinstance(value.get("base_ref"), str)
+        or not value["base_ref"]
+        or not isinstance(value.get("observations"), dict)
+    ):
+        raise RuntimeEventMaterializationError(
+            "result_authority_mismatch", "validation identity fields are incomplete"
+        )
     result = cast(dict[str, object], value)
     result["gate_result"] = result["result"]
     result["decision"] = "NONE"
@@ -1837,29 +1796,50 @@ def parse_lifecycle_result(text: str, expected_gate_id: str) -> dict[str, object
             "result_authority_mismatch", "closeout readiness fields are incomplete"
         )
     if fields.get("closeout_gate_id") != expected_gate_id:
-        raise RuntimeEventMaterializationError("result_authority_mismatch", "closeout gate id mismatch")
+        raise RuntimeEventMaterializationError(
+            "result_authority_mismatch", "closeout gate id mismatch"
+        )
     status = fields.get("status")
     if status not in {"READY", "BLOCKED", "INCOMPLETE"}:
-        raise RuntimeEventMaterializationError("result_authority_mismatch", "closeout status is unsupported")
-    target_paths = [item.strip() for item in fields.get("target_paths", "").split(",") if item.strip()]
+        raise RuntimeEventMaterializationError(
+            "result_authority_mismatch", "closeout status is unsupported"
+        )
+    target_paths = [
+        item.strip()
+        for item in fields.get("target_paths", "").split(",")
+        if item.strip()
+    ]
     evidence_path = fields.get("evidence_path", "")
     if not target_paths or any(
-        Path(item).is_absolute() or _path_has_traversal(item)
-        for item in target_paths
+        Path(item).is_absolute() or _path_has_traversal(item) for item in target_paths
     ):
-        raise RuntimeEventMaterializationError("result_authority_mismatch", "closeout target_paths are invalid")
+        raise RuntimeEventMaterializationError(
+            "result_authority_mismatch", "closeout target_paths are invalid"
+        )
     if (
         not evidence_path
         or Path(evidence_path).is_absolute()
         or _path_has_traversal(evidence_path)
     ):
-        raise RuntimeEventMaterializationError("result_authority_mismatch", "closeout evidence_path is invalid")
-    if not fields.get("base_ref") or not RUNTIME_EVENT_HEX64.fullmatch(fields.get("evidence_sha256", "")):
-        raise RuntimeEventMaterializationError("result_authority_mismatch", "closeout identity fields are incomplete")
+        raise RuntimeEventMaterializationError(
+            "result_authority_mismatch", "closeout evidence_path is invalid"
+        )
+    if not fields.get("base_ref") or not RUNTIME_EVENT_HEX64.fullmatch(
+        fields.get("evidence_sha256", "")
+    ):
+        raise RuntimeEventMaterializationError(
+            "result_authority_mismatch", "closeout identity fields are incomplete"
+        )
     return {
-        "schema": "CloseoutGateV1", "path": "closeout_gate.md", "target_paths": target_paths,
-        "evidence_path": evidence_path, "base_ref": fields["base_ref"], "gate_id": expected_gate_id,
-        "gate_result": status, "decision": "NONE", "evidence_sha256": fields["evidence_sha256"],
+        "schema": "CloseoutGateV1",
+        "path": "closeout_gate.md",
+        "target_paths": target_paths,
+        "evidence_path": evidence_path,
+        "base_ref": fields["base_ref"],
+        "gate_id": expected_gate_id,
+        "gate_result": status,
+        "decision": "NONE",
+        "evidence_sha256": fields["evidence_sha256"],
     }
 
 
@@ -1867,58 +1847,97 @@ def validate_validation_result(result: dict[str, object]) -> None:
     """Validate the fixed validation-result observation shape."""
     observations = result.get("observations")
     if not isinstance(observations, dict):
-        raise RuntimeEventMaterializationError("result_authority_mismatch", "validation observations are missing")
+        raise RuntimeEventMaterializationError(
+            "result_authority_mismatch", "validation observations are missing"
+        )
     for field in ("head_oid", "base_oid"):
-        if not isinstance(observations.get(field), str) or not RUNTIME_EVENT_OID40.fullmatch(cast(str, observations[field])):
-            raise RuntimeEventMaterializationError("result_authority_mismatch", f"validation {field} is invalid")
+        if not isinstance(
+            observations.get(field), str
+        ) or not RUNTIME_EVENT_OID40.fullmatch(cast(str, observations[field])):
+            raise RuntimeEventMaterializationError(
+                "result_authority_mismatch", f"validation {field} is invalid"
+            )
 
 
 def validate_lifecycle_result(result: dict[str, object]) -> None:
     """Validate lifecycle evidence fields before source identity verification."""
     if result.get("gate_result") not in {"READY", "BLOCKED", "INCOMPLETE"}:
-        raise RuntimeEventMaterializationError("result_authority_mismatch", "lifecycle gate result is invalid")
+        raise RuntimeEventMaterializationError(
+            "result_authority_mismatch", "lifecycle gate result is invalid"
+        )
     evidence_path = result.get("evidence_path")
     target_paths = result.get("target_paths")
-    if not isinstance(evidence_path, str) or not evidence_path or not is_source_snapshot_path(Path(evidence_path)):
-        raise RuntimeEventMaterializationError("result_authority_mismatch", "lifecycle evidence_path is outside source scope")
+    if (
+        not isinstance(evidence_path, str)
+        or not evidence_path
+        or not is_source_snapshot_path(Path(evidence_path))
+    ):
+        raise RuntimeEventMaterializationError(
+            "result_authority_mismatch",
+            "lifecycle evidence_path is outside source scope",
+        )
     if not isinstance(target_paths, list) or evidence_path not in target_paths:
-        raise RuntimeEventMaterializationError("result_authority_mismatch", "lifecycle evidence_path is not a target path")
+        raise RuntimeEventMaterializationError(
+            "result_authority_mismatch", "lifecycle evidence_path is not a target path"
+        )
 
 
 def derive_gate_result(result: dict[str, object]) -> str:
     """Return the one verifier-owned gate result."""
     value = result.get("gate_result")
     if not isinstance(value, str) or value not in RUNTIME_EVENT_GATE_RESULTS:
-        raise RuntimeEventMaterializationError("result_authority_mismatch", "gate result is unsupported")
+        raise RuntimeEventMaterializationError(
+            "result_authority_mismatch", "gate result is unsupported"
+        )
     return value
 
 
 def _git_bytes(root: Path, args: list[str]) -> subprocess.CompletedProcess[bytes]:
     """Run one Git command while retaining exact binary output."""
-    return subprocess.run(["git", "-C", str(root), *args], check=False, capture_output=True)
+    return subprocess.run(
+        ["git", "-C", str(root), *args], check=False, capture_output=True
+    )
 
 
-def verify_target_identities(root: Path, result: dict[str, object], base_ref: str) -> tuple[dict[str, object], ...]:
+def verify_target_identities(
+    root: Path, result: dict[str, object], base_ref: str
+) -> tuple[dict[str, object], ...]:
     """Verify exact target content/blob and base identities for one artifact."""
     base = run(["git", "-C", str(root), "rev-parse", "--verify", base_ref], check=False)
     head = run(["git", "-C", str(root), "rev-parse", "--verify", "HEAD"], check=False)
     if base.returncode != 0 or head.returncode != 0:
-        raise RuntimeEventMaterializationError("target_identity_mismatch", "Git base/head identity is unavailable")
+        raise RuntimeEventMaterializationError(
+            "target_identity_mismatch", "Git base/head identity is unavailable"
+        )
     base_oid, head_oid = base.stdout.strip(), head.stdout.strip()
-    if not RUNTIME_EVENT_OID40.fullmatch(base_oid) or not RUNTIME_EVENT_OID40.fullmatch(head_oid):
-        raise RuntimeEventMaterializationError("target_identity_mismatch", "Git base/head identity is invalid")
+    if not RUNTIME_EVENT_OID40.fullmatch(base_oid) or not RUNTIME_EVENT_OID40.fullmatch(
+        head_oid
+    ):
+        raise RuntimeEventMaterializationError(
+            "target_identity_mismatch", "Git base/head identity is invalid"
+        )
     target_paths = result.get("target_paths")
     if not isinstance(target_paths, list) or not target_paths:
-        raise RuntimeEventMaterializationError("target_identity_mismatch", "target path set is empty")
+        raise RuntimeEventMaterializationError(
+            "target_identity_mismatch", "target path set is empty"
+        )
     expected_sha = result.get("review_target_sha256")
     observations = result.get("observations")
-    observed_targets = observations.get("targets") if isinstance(observations, dict) else None
+    observed_targets = (
+        observations.get("targets") if isinstance(observations, dict) else None
+    )
     if observed_targets is not None and not isinstance(observed_targets, dict):
-        raise RuntimeEventMaterializationError("target_identity_mismatch", "target observations are invalid")
+        raise RuntimeEventMaterializationError(
+            "target_identity_mismatch", "target observations are invalid"
+        )
     identities: list[dict[str, object]] = []
-    ordered_paths = sorted(cast(list[str], target_paths), key=lambda value: value.encode("utf-8"))
+    ordered_paths = sorted(
+        cast(list[str], target_paths), key=lambda value: value.encode("utf-8")
+    )
     if len(set(ordered_paths)) != len(ordered_paths):
-        raise RuntimeEventMaterializationError("target_identity_mismatch", "target paths are duplicated")
+        raise RuntimeEventMaterializationError(
+            "target_identity_mismatch", "target paths are duplicated"
+        )
     for path_value in ordered_paths:
         relative = Path(path_value)
         if (
@@ -1926,38 +1945,82 @@ def verify_target_identities(root: Path, result: dict[str, object], base_ref: st
             or _path_has_traversal(path_value)
             or not is_source_snapshot_path(relative)
         ):
-            raise RuntimeEventMaterializationError("target_identity_mismatch", f"target path is outside source scope: {path_value}")
+            raise RuntimeEventMaterializationError(
+                "target_identity_mismatch",
+                f"target path is outside source scope: {path_value}",
+            )
         target = (root / relative).resolve()
         try:
             target.relative_to(root.resolve())
             target_bytes = target.read_bytes()
         except (OSError, ValueError) as exc:
-            raise RuntimeEventMaterializationError("target_identity_mismatch", f"target cannot be read: {path_value}") from exc
+            raise RuntimeEventMaterializationError(
+                "target_identity_mismatch", f"target cannot be read: {path_value}"
+            ) from exc
         content_sha = hashlib.sha256(target_bytes).hexdigest()
-        blob = run(["git", "-C", str(root), "hash-object", "--", path_value], check=False)
+        blob = run(
+            ["git", "-C", str(root), "hash-object", "--", path_value], check=False
+        )
         blob_oid = blob.stdout.strip()
         if blob.returncode != 0 or not RUNTIME_EVENT_OID40.fullmatch(blob_oid):
-            raise RuntimeEventMaterializationError("target_identity_mismatch", f"target blob is unavailable: {path_value}")
+            raise RuntimeEventMaterializationError(
+                "target_identity_mismatch", f"target blob is unavailable: {path_value}"
+            )
         if isinstance(expected_sha, str) and content_sha != expected_sha:
-            raise RuntimeEventMaterializationError("target_identity_mismatch", f"target sha mismatch: {path_value}")
-        if isinstance(observed_targets, dict) and isinstance(observed_targets.get(path_value), dict):
+            raise RuntimeEventMaterializationError(
+                "target_identity_mismatch", f"target sha mismatch: {path_value}"
+            )
+        if isinstance(observed_targets, dict) and isinstance(
+            observed_targets.get(path_value), dict
+        ):
             observed = cast(dict[str, object], observed_targets[path_value])
-            if observed.get("content_sha256") != content_sha or observed.get("git_blob_oid") != blob_oid:
-                raise RuntimeEventMaterializationError("target_identity_mismatch", f"recorded target mismatch: {path_value}")
-        present = run(["git", "-C", str(root), "cat-file", "-e", f"{base_oid}:{path_value}"], check=False).returncode == 0
+            if (
+                observed.get("content_sha256") != content_sha
+                or observed.get("git_blob_oid") != blob_oid
+            ):
+                raise RuntimeEventMaterializationError(
+                    "target_identity_mismatch",
+                    f"recorded target mismatch: {path_value}",
+                )
+        present = (
+            run(
+                ["git", "-C", str(root), "cat-file", "-e", f"{base_oid}:{path_value}"],
+                check=False,
+            ).returncode
+            == 0
+        )
         base_sha: str | None = None
         base_blob: str | None = None
         if present:
             base_content = _git_bytes(root, ["show", f"{base_oid}:{path_value}"])
-            base_object = run(["git", "-C", str(root), "rev-parse", "--verify", f"{base_oid}:{path_value}"], check=False)
+            base_object = run(
+                [
+                    "git",
+                    "-C",
+                    str(root),
+                    "rev-parse",
+                    "--verify",
+                    f"{base_oid}:{path_value}",
+                ],
+                check=False,
+            )
             if base_content.returncode != 0 or base_object.returncode != 0:
-                raise RuntimeEventMaterializationError("target_identity_mismatch", f"base target cannot be read: {path_value}")
+                raise RuntimeEventMaterializationError(
+                    "target_identity_mismatch",
+                    f"base target cannot be read: {path_value}",
+                )
             base_sha = hashlib.sha256(base_content.stdout).hexdigest()
             base_blob = base_object.stdout.strip()
-        identities.append({
-            "path": path_value, "content_sha256": content_sha, "git_blob_oid": blob_oid,
-            "base_present": present, "base_content_sha256": base_sha, "base_git_blob_oid": base_blob,
-        })
+        identities.append(
+            {
+                "path": path_value,
+                "content_sha256": content_sha,
+                "git_blob_oid": blob_oid,
+                "base_present": present,
+                "base_content_sha256": base_sha,
+                "base_git_blob_oid": base_blob,
+            }
+        )
     return tuple(identities)
 
 
@@ -1992,7 +2055,10 @@ def canonical_preimage_bytes(record: RuntimeEventRecord) -> bytes:
             "base_oid": source_snapshot["base_oid"],
         },
     }
-    return (json.dumps(preimage, ensure_ascii=False, separators=(",", ":"), allow_nan=False) + "\n").encode("utf-8")
+    return (
+        json.dumps(preimage, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
+        + "\n"
+    ).encode("utf-8")
 
 
 def derive_publication_attempt_id(materialization_id: str, target_path: str) -> str:
@@ -2019,21 +2085,31 @@ def _canonical_runtime_event_bytes(record: RuntimeEventRecord) -> bytes:
     value = dict(record.value)
     zeroed = dict(value)
     zeroed["artifact_sha256"] = "0" * 64
-    preimage = (json.dumps(zeroed, ensure_ascii=False, separators=(",", ":"), allow_nan=False) + "\n").encode("utf-8")
+    preimage = (
+        json.dumps(zeroed, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
+        + "\n"
+    ).encode("utf-8")
     value["artifact_sha256"] = hashlib.sha256(preimage).hexdigest()
     record.value.clear()
     record.value.update(value)
-    return (json.dumps(value, ensure_ascii=False, separators=(",", ":"), allow_nan=False) + "\n").encode("utf-8")
+    return (
+        json.dumps(value, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
+        + "\n"
+    ).encode("utf-8")
 
 
 def validate_runtime_event_schema(raw: bytes) -> None:
     """Validate exact runtime-event structure, canonical bytes, and hashes."""
     if not raw.endswith(b"\n") or b"\n" in raw[:-1] or not raw[:-1]:
-        raise RuntimeEventMaterializationError("schema_invalid", "runtime event must be one JSON line with one terminal LF")
+        raise RuntimeEventMaterializationError(
+            "schema_invalid", "runtime event must be one JSON line with one terminal LF"
+        )
 
     def pairs(pairs: list[tuple[str, object]]) -> dict[str, object]:
         if len({key for key, _value in pairs}) != len(pairs):
-            raise RuntimeEventMaterializationError("schema_invalid", "duplicate JSON key")
+            raise RuntimeEventMaterializationError(
+                "schema_invalid", "duplicate JSON key"
+            )
         return dict(pairs)
 
     def matches(pattern: re.Pattern[str], value: object) -> bool:
@@ -2045,18 +2121,68 @@ def validate_runtime_event_schema(raw: bytes) -> None:
     except RuntimeEventMaterializationError:
         raise
     except (UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError) as exc:
-        raise RuntimeEventMaterializationError("schema_invalid", "runtime event JSON is invalid") from exc
+        raise RuntimeEventMaterializationError(
+            "schema_invalid", "runtime event JSON is invalid"
+        ) from exc
     if not isinstance(value, dict):
-        raise RuntimeEventMaterializationError("schema_invalid", "runtime event must be an object")
-    top = ["schema", "materialization_id", "result_family", "gate", "source_event", "result_artifact", "target_identities", "source_snapshot", "publication_intent", "artifact_sha256"]
+        raise RuntimeEventMaterializationError(
+            "schema_invalid", "runtime event must be an object"
+        )
+    top = [
+        "schema",
+        "materialization_id",
+        "result_family",
+        "gate",
+        "source_event",
+        "result_artifact",
+        "target_identities",
+        "source_snapshot",
+        "publication_intent",
+        "artifact_sha256",
+    ]
     if list(value) != top or value.get("schema") != RUNTIME_EVENT_SCHEMA:
-        raise RuntimeEventMaterializationError("schema_invalid", "runtime event top-level keys are not canonical")
-    if value.get("result_family") not in RUNTIME_EVENT_FAMILY_NAMES or not matches(RUNTIME_EVENT_HEX64, value.get("materialization_id")):
-        raise RuntimeEventMaterializationError("schema_invalid", "runtime event schema or materialization id is invalid")
+        raise RuntimeEventMaterializationError(
+            "schema_invalid", "runtime event top-level keys are not canonical"
+        )
+    if value.get("result_family") not in RUNTIME_EVENT_FAMILY_NAMES or not matches(
+        RUNTIME_EVENT_HEX64, value.get("materialization_id")
+    ):
+        raise RuntimeEventMaterializationError(
+            "schema_invalid", "runtime event schema or materialization id is invalid"
+        )
     expected_nested = {
         "gate": ["id", "result"],
-        "source_event": ["agent_id", "agent_context_id", "codex_thread_id", "parent_id", "turn_id", "role", "decision", "applicable_gate_result", "rollout_path", "rollout_path_bytes_b64", "rollout_path_sha256", "rollout_file_sha256", "record_line", "record_byte_offset", "record_byte_length", "record_bytes_b64", "record_sha256", "stable_record_id"],
-        "result_artifact": ["path", "schema", "artifact_sha256", "artifact_blob_oid", "gate_id", "gate_result", "target_paths", "base_ref", "base_oid"],
+        "source_event": [
+            "agent_id",
+            "agent_context_id",
+            "codex_thread_id",
+            "parent_id",
+            "turn_id",
+            "role",
+            "decision",
+            "applicable_gate_result",
+            "rollout_path",
+            "rollout_path_bytes_b64",
+            "rollout_path_sha256",
+            "rollout_file_sha256",
+            "record_line",
+            "record_byte_offset",
+            "record_byte_length",
+            "record_bytes_b64",
+            "record_sha256",
+            "stable_record_id",
+        ],
+        "result_artifact": [
+            "path",
+            "schema",
+            "artifact_sha256",
+            "artifact_blob_oid",
+            "gate_id",
+            "gate_result",
+            "target_paths",
+            "base_ref",
+            "base_oid",
+        ],
         "source_snapshot": ["head_oid", "base_ref", "base_oid", "porcelain_v1"],
         "publication_intent": ["schema", "attempt_id", "target_path", "prepared_state"],
     }
@@ -2064,64 +2190,143 @@ def validate_runtime_event_schema(raw: bytes) -> None:
     for name, keys in expected_nested.items():
         item = value.get(name)
         if not isinstance(item, dict) or list(item) != keys:
-            raise RuntimeEventMaterializationError("schema_invalid", f"{name} keys are not canonical")
+            raise RuntimeEventMaterializationError(
+                "schema_invalid", f"{name} keys are not canonical"
+            )
         objects[name] = cast(dict[str, object], item)
     gate = objects["gate"]
-    if not isinstance(gate["id"], str) or gate["result"] not in RUNTIME_EVENT_GATE_RESULTS:
+    if (
+        not isinstance(gate["id"], str)
+        or gate["result"] not in RUNTIME_EVENT_GATE_RESULTS
+    ):
         raise RuntimeEventMaterializationError("schema_invalid", "gate is invalid")
     fixed_result_family_spec(cast(str, value["result_family"]), cast(str, gate["id"]))
     source = objects["source_event"]
-    for field in ("agent_id", "agent_context_id", "codex_thread_id", "parent_id", "turn_id"):
-        if not isinstance(source[field], str) or not RUNTIME_EVENT_UUID.fullmatch(cast(str, source[field])):
-            raise RuntimeEventMaterializationError("schema_invalid", f"source event {field} is invalid")
-    if not isinstance(source["role"], str) or not source["role"] or source["decision"] not in RUNTIME_EVENT_DECISIONS or source["applicable_gate_result"] != gate["result"]:
-        raise RuntimeEventMaterializationError("schema_invalid", "source event role, decision, or gate is invalid")
+    for field in (
+        "agent_id",
+        "agent_context_id",
+        "codex_thread_id",
+        "parent_id",
+        "turn_id",
+    ):
+        if not isinstance(source[field], str) or not RUNTIME_EVENT_UUID.fullmatch(
+            cast(str, source[field])
+        ):
+            raise RuntimeEventMaterializationError(
+                "schema_invalid", f"source event {field} is invalid"
+            )
+    if (
+        not isinstance(source["role"], str)
+        or not source["role"]
+        or source["decision"] not in RUNTIME_EVENT_DECISIONS
+        or source["applicable_gate_result"] != gate["result"]
+    ):
+        raise RuntimeEventMaterializationError(
+            "schema_invalid", "source event role, decision, or gate is invalid"
+        )
     if (
         not isinstance(source["rollout_path"], str)
         or not Path(cast(str, source["rollout_path"])).is_absolute()
         or _path_has_traversal(cast(str, source["rollout_path"]))
     ):
-        raise RuntimeEventMaterializationError("schema_invalid", "rollout path is invalid")
-    if type(source["record_line"]) is not int or source["record_line"] <= 0 or type(source["record_byte_offset"]) is not int or source["record_byte_offset"] < 0 or type(source["record_byte_length"]) is not int or source["record_byte_length"] <= 0:
-        raise RuntimeEventMaterializationError("schema_invalid", "record range is invalid")
-    for field in ("rollout_path_sha256", "rollout_file_sha256", "record_sha256", "stable_record_id"):
+        raise RuntimeEventMaterializationError(
+            "schema_invalid", "rollout path is invalid"
+        )
+    if (
+        type(source["record_line"]) is not int
+        or source["record_line"] <= 0
+        or type(source["record_byte_offset"]) is not int
+        or source["record_byte_offset"] < 0
+        or type(source["record_byte_length"]) is not int
+        or source["record_byte_length"] <= 0
+    ):
+        raise RuntimeEventMaterializationError(
+            "schema_invalid", "record range is invalid"
+        )
+    for field in (
+        "rollout_path_sha256",
+        "rollout_file_sha256",
+        "record_sha256",
+        "stable_record_id",
+    ):
         if not matches(RUNTIME_EVENT_HEX64, source[field]):
-            raise RuntimeEventMaterializationError("schema_invalid", f"source event {field} is invalid")
+            raise RuntimeEventMaterializationError(
+                "schema_invalid", f"source event {field} is invalid"
+            )
     if source["stable_record_id"] != source["record_sha256"]:
-        raise RuntimeEventMaterializationError("schema_invalid", "stable record id mismatch")
+        raise RuntimeEventMaterializationError(
+            "schema_invalid", "stable record id mismatch"
+        )
     try:
-        path_bytes = base64.b64decode(cast(str, source["rollout_path_bytes_b64"]), validate=True)
-        record_bytes = base64.b64decode(cast(str, source["record_bytes_b64"]), validate=True)
+        path_bytes = base64.b64decode(
+            cast(str, source["rollout_path_bytes_b64"]), validate=True
+        )
+        record_bytes = base64.b64decode(
+            cast(str, source["record_bytes_b64"]), validate=True
+        )
     except (ValueError, binascii.Error) as exc:
-        raise RuntimeEventMaterializationError("schema_invalid", "source event base64 is invalid") from exc
-    if path_bytes != cast(str, source["rollout_path"]).encode("utf-8") or hashlib.sha256(path_bytes).hexdigest() != source["rollout_path_sha256"] or len(record_bytes) != source["record_byte_length"] or hashlib.sha256(record_bytes).hexdigest() != source["record_sha256"]:
-        raise RuntimeEventMaterializationError("schema_invalid", "source byte identity mismatch")
+        raise RuntimeEventMaterializationError(
+            "schema_invalid", "source event base64 is invalid"
+        ) from exc
+    if (
+        path_bytes != cast(str, source["rollout_path"]).encode("utf-8")
+        or hashlib.sha256(path_bytes).hexdigest() != source["rollout_path_sha256"]
+        or len(record_bytes) != source["record_byte_length"]
+        or hashlib.sha256(record_bytes).hexdigest() != source["record_sha256"]
+    ):
+        raise RuntimeEventMaterializationError(
+            "schema_invalid", "source byte identity mismatch"
+        )
     artifact = objects["result_artifact"]
-    spec = fixed_result_family_spec(cast(str, value["result_family"]), cast(str, artifact["gate_id"]))
+    spec = fixed_result_family_spec(
+        cast(str, value["result_family"]), cast(str, artifact["gate_id"])
+    )
     artifact_path = _require_relative_schema_path(
         artifact["path"], "result_artifact.path"
     )
     if artifact["schema"] != spec.schema or artifact["gate_result"] != gate["result"]:
-        raise RuntimeEventMaterializationError("schema_invalid", "result artifact identity is invalid")
-    if not matches(RUNTIME_EVENT_HEX64, artifact["artifact_sha256"]) or not matches(RUNTIME_EVENT_OID40, artifact["artifact_blob_oid"]) or not matches(RUNTIME_EVENT_OID40, artifact["base_oid"]):
-        raise RuntimeEventMaterializationError("schema_invalid", "result artifact hashes are invalid")
+        raise RuntimeEventMaterializationError(
+            "schema_invalid", "result artifact identity is invalid"
+        )
+    if (
+        not matches(RUNTIME_EVENT_HEX64, artifact["artifact_sha256"])
+        or not matches(RUNTIME_EVENT_OID40, artifact["artifact_blob_oid"])
+        or not matches(RUNTIME_EVENT_OID40, artifact["base_oid"])
+    ):
+        raise RuntimeEventMaterializationError(
+            "schema_invalid", "result artifact hashes are invalid"
+        )
     targets = artifact["target_paths"]
     if not isinstance(targets, list) or not targets:
-        raise RuntimeEventMaterializationError("schema_invalid", "result artifact target paths are invalid")
+        raise RuntimeEventMaterializationError(
+            "schema_invalid", "result artifact target paths are invalid"
+        )
     target_paths = [
         _require_relative_schema_path(item, "result_artifact.target_paths")
         for item in targets
     ]
-    if (
-        len(set(target_paths)) != len(target_paths)
-        or target_paths != sorted(target_paths, key=lambda item: item.encode("utf-8"))
+    if len(set(target_paths)) != len(target_paths) or target_paths != sorted(
+        target_paths, key=lambda item: item.encode("utf-8")
     ):
-        raise RuntimeEventMaterializationError("schema_invalid", "result artifact target paths are invalid")
+        raise RuntimeEventMaterializationError(
+            "schema_invalid", "result artifact target paths are invalid"
+        )
     snapshot = objects["source_snapshot"]
-    if not RUNTIME_EVENT_OID40.fullmatch(cast(str, snapshot["head_oid"])) or snapshot["base_oid"] != artifact["base_oid"] or snapshot["base_ref"] != artifact["base_ref"]:
-        raise RuntimeEventMaterializationError("schema_invalid", "source snapshot base identity is invalid")
-    if not isinstance(snapshot["porcelain_v1"], list) or any(not isinstance(line, str) for line in cast(list[object], snapshot["porcelain_v1"])):
-        raise RuntimeEventMaterializationError("schema_invalid", "source snapshot porcelain is invalid")
+    if (
+        not RUNTIME_EVENT_OID40.fullmatch(cast(str, snapshot["head_oid"]))
+        or snapshot["base_oid"] != artifact["base_oid"]
+        or snapshot["base_ref"] != artifact["base_ref"]
+    ):
+        raise RuntimeEventMaterializationError(
+            "schema_invalid", "source snapshot base identity is invalid"
+        )
+    if not isinstance(snapshot["porcelain_v1"], list) or any(
+        not isinstance(line, str)
+        for line in cast(list[object], snapshot["porcelain_v1"])
+    ):
+        raise RuntimeEventMaterializationError(
+            "schema_invalid", "source snapshot porcelain is invalid"
+        )
     for line in cast(list[str], snapshot["porcelain_v1"]):
         try:
             parsed = parse_porcelain_v1_line(line)
@@ -2138,22 +2343,48 @@ def validate_runtime_event_schema(raw: bytes) -> None:
             )
     identity_list = value["target_identities"]
     if not isinstance(identity_list, list) or not identity_list:
-        raise RuntimeEventMaterializationError("schema_invalid", "target identities are empty")
+        raise RuntimeEventMaterializationError(
+            "schema_invalid", "target identities are empty"
+        )
     identity_paths: list[str] = []
     for identity in cast(list[object], identity_list):
-        if not isinstance(identity, dict) or list(identity) != ["path", "content_sha256", "git_blob_oid", "base_present", "base_content_sha256", "base_git_blob_oid"]:
-            raise RuntimeEventMaterializationError("schema_invalid", "target identity shape is invalid")
+        if not isinstance(identity, dict) or list(identity) != [
+            "path",
+            "content_sha256",
+            "git_blob_oid",
+            "base_present",
+            "base_content_sha256",
+            "base_git_blob_oid",
+        ]:
+            raise RuntimeEventMaterializationError(
+                "schema_invalid", "target identity shape is invalid"
+            )
         identity_path = _require_relative_schema_path(
             identity["path"], "target_identities.path"
         )
         identity_paths.append(identity_path)
-        if not matches(RUNTIME_EVENT_HEX64, identity["content_sha256"]) or not matches(RUNTIME_EVENT_OID40, identity["git_blob_oid"]) or not isinstance(identity["base_present"], bool):
-            raise RuntimeEventMaterializationError("schema_invalid", "target identity value is invalid")
+        if (
+            not matches(RUNTIME_EVENT_HEX64, identity["content_sha256"])
+            or not matches(RUNTIME_EVENT_OID40, identity["git_blob_oid"])
+            or not isinstance(identity["base_present"], bool)
+        ):
+            raise RuntimeEventMaterializationError(
+                "schema_invalid", "target identity value is invalid"
+            )
         if identity["base_present"]:
-            if not matches(RUNTIME_EVENT_HEX64, identity["base_content_sha256"]) or not matches(RUNTIME_EVENT_OID40, identity["base_git_blob_oid"]):
-                raise RuntimeEventMaterializationError("schema_invalid", "present target base identity is invalid")
-        elif identity["base_content_sha256"] is not None or identity["base_git_blob_oid"] is not None:
-            raise RuntimeEventMaterializationError("schema_invalid", "absent target base identity must be null")
+            if not matches(
+                RUNTIME_EVENT_HEX64, identity["base_content_sha256"]
+            ) or not matches(RUNTIME_EVENT_OID40, identity["base_git_blob_oid"]):
+                raise RuntimeEventMaterializationError(
+                    "schema_invalid", "present target base identity is invalid"
+                )
+        elif (
+            identity["base_content_sha256"] is not None
+            or identity["base_git_blob_oid"] is not None
+        ):
+            raise RuntimeEventMaterializationError(
+                "schema_invalid", "absent target base identity must be null"
+            )
     if identity_paths != target_paths or identity_paths != sorted(
         identity_paths, key=lambda item: item.encode("utf-8")
     ):
@@ -2175,13 +2406,23 @@ def validate_runtime_event_schema(raw: bytes) -> None:
         or publication["prepared_state"] != "prepared"
         or not matches(RUNTIME_EVENT_HEX64, publication["attempt_id"])
     ):
-        raise RuntimeEventMaterializationError("schema_invalid", "publication intent is invalid")
+        raise RuntimeEventMaterializationError(
+            "schema_invalid", "publication intent is invalid"
+        )
     if not matches(RUNTIME_EVENT_HEX64, value["artifact_sha256"]):
-        raise RuntimeEventMaterializationError("schema_invalid", "artifact hash is invalid")
+        raise RuntimeEventMaterializationError(
+            "schema_invalid", "artifact hash is invalid"
+        )
     record = RuntimeEventRecord(cast(dict[str, object], value))
-    expected_id = hashlib.sha256(RUNTIME_EVENT_MATERIALIZATION_SCHEMA.encode("utf-8") + b"\0" + canonical_preimage_bytes(record)).hexdigest()
+    expected_id = hashlib.sha256(
+        RUNTIME_EVENT_MATERIALIZATION_SCHEMA.encode("utf-8")
+        + b"\0"
+        + canonical_preimage_bytes(record)
+    ).hexdigest()
     if value["materialization_id"] != expected_id:
-        raise RuntimeEventMaterializationError("schema_invalid", "materialization id mismatch")
+        raise RuntimeEventMaterializationError(
+            "schema_invalid", "materialization id mismatch"
+        )
     if publication["attempt_id"] != derive_publication_attempt_id(
         cast(str, value["materialization_id"]), publication_path
     ):
@@ -2190,12 +2431,26 @@ def validate_runtime_event_schema(raw: bytes) -> None:
         )
     zeroed = dict(value)
     zeroed["artifact_sha256"] = "0" * 64
-    expected_artifact = hashlib.sha256((json.dumps(zeroed, ensure_ascii=False, separators=(",", ":"), allow_nan=False) + "\n").encode("utf-8")).hexdigest()
+    expected_artifact = hashlib.sha256(
+        (
+            json.dumps(
+                zeroed, ensure_ascii=False, separators=(",", ":"), allow_nan=False
+            )
+            + "\n"
+        ).encode("utf-8")
+    ).hexdigest()
     if value["artifact_sha256"] != expected_artifact:
-        raise RuntimeEventMaterializationError("schema_invalid", "artifact hash coverage mismatch")
-    canonical = (json.dumps(value, ensure_ascii=False, separators=(",", ":"), allow_nan=False) + "\n").encode("utf-8")
+        raise RuntimeEventMaterializationError(
+            "schema_invalid", "artifact hash coverage mismatch"
+        )
+    canonical = (
+        json.dumps(value, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
+        + "\n"
+    ).encode("utf-8")
     if canonical != raw:
-        raise RuntimeEventMaterializationError("schema_invalid", "runtime event is not canonical")
+        raise RuntimeEventMaterializationError(
+            "schema_invalid", "runtime event is not canonical"
+        )
 
 
 def _readback_runtime_event(target: Path) -> RuntimeEventRecord:
@@ -2207,7 +2462,9 @@ def _readback_runtime_event(target: Path) -> RuntimeEventRecord:
             "publication_uncertain", "artifact readback failed"
         ) from exc
     validate_runtime_event_schema(raw)
-    return RuntimeEventRecord(cast(dict[str, object], json.loads(raw[:-1].decode("utf-8"))))
+    return RuntimeEventRecord(
+        cast(dict[str, object], json.loads(raw[:-1].decode("utf-8")))
+    )
 
 
 @dataclass
@@ -2252,6 +2509,8 @@ def _renameat2_noreplace_at(
     if error_number in {errno.ENOSYS, errno.EINVAL, errno.ENOTSUP}:
         raise OSError(error_number, os.strerror(error_number), target_name)
     raise OSError(error_number, os.strerror(error_number), target_name)
+
+
 def _find_publication_parent_root(target: Path) -> Path | None:
     """Find a Git parent for an explicitly supplied publication target."""
     candidate = target.parent.absolute()
@@ -2276,9 +2535,7 @@ def _open_secure_publication_parent(
                 "publication requires an attested Git parent root",
             )
         attestation = attest_parent_root(
-            ParentRootAttestationRequest(
-                cwd=root, explicit_root=root, purpose=purpose
-            )
+            ParentRootAttestationRequest(cwd=root, explicit_root=root, purpose=purpose)
         )
         boundary = ParentRootSideEffectBoundary()
     else:
@@ -2301,10 +2558,7 @@ def _open_secure_publication_parent(
             for component in relative_parts:
                 child = os.open(
                     component,
-                    os.O_RDONLY
-                    | os.O_DIRECTORY
-                    | os.O_NOFOLLOW
-                    | os.O_CLOEXEC,
+                    os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC,
                     dir_fd=fd,
                 )
                 os.close(fd)
@@ -2343,10 +2597,7 @@ def _verify_secure_publication_parent(context: _SecurePublicationParent) -> None
         for component in context.relative_parts:
             child = os.open(
                 component,
-                os.O_RDONLY
-                | os.O_DIRECTORY
-                | os.O_NOFOLLOW
-                | os.O_CLOEXEC,
+                os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC,
                 dir_fd=fd,
             )
             os.close(fd)
@@ -2430,11 +2681,7 @@ def _secure_publish_noreplace(
             try:
                 descriptor = os.open(
                     temporary_name,
-                    os.O_RDWR
-                    | os.O_CREAT
-                    | os.O_EXCL
-                    | os.O_NOFOLLOW
-                    | os.O_CLOEXEC,
+                    os.O_RDWR | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC,
                     0o600,
                     dir_fd=context.fd,
                 )
@@ -2547,10 +2794,7 @@ def _validate_publication_attempt_directories(attempt_directory: Path) -> Path:
     spool_root = attempt_directory.parent
     runtime_spool = spool_root.parent
     runtime_root = runtime_spool.parent
-    if (
-        spool_root.name != "publication-outcome"
-        or runtime_spool.name != "spool"
-    ):
+    if spool_root.name != "publication-outcome" or runtime_spool.name != "spool":
         raise ValueError("publication spool path mismatch")
     for directory in (
         runtime_root,
@@ -2654,9 +2898,7 @@ def acquire_publication_attempt_lock(
                 if _parent_boundary() is None:
                     directory.mkdir(parents=True, mode=0o700, exist_ok=True)
                 else:
-                    _parent_ensure_directory(
-                        directory, "publication-outcome-directory"
-                    )
+                    _parent_ensure_directory(directory, "publication-outcome-directory")
             except FileExistsError:
                 pass
             metadata = directory.lstat()
@@ -2674,7 +2916,8 @@ def acquire_publication_attempt_lock(
             _validate_publication_attempt_directories(attempt_directory)
         except (OSError, ValueError) as exc:
             raise RuntimeEventMaterializationError(
-                "publication_attempt_lock_invalid", "attempt directory escapes spool root"
+                "publication_attempt_lock_invalid",
+                "attempt directory escapes spool root",
             ) from exc
         flags = os.O_RDWR | getattr(os, "O_CLOEXEC", 0)
         nofollow = getattr(os, "O_NOFOLLOW", 0)
@@ -2826,9 +3069,7 @@ def _verify_context_discovery_certificate(
     if (
         rollout_path.is_symlink()
         or resolved_rollout_path.as_posix() != rollout["path"]
-        or not any(
-            resolved_rollout_path.is_relative_to(root) for root in session_roots
-        )
+        or not any(resolved_rollout_path.is_relative_to(root) for root in session_roots)
         or _rollout_name_identity(rollout_path) is None
         or cast(tuple[str, str], _rollout_name_identity(rollout_path))[1]
         != certificate_context["agent_context_id"]
@@ -2840,7 +3081,9 @@ def _verify_context_discovery_certificate(
     eligible = _rollout_files(cast(str, certificate_context["agent_context_id"]))
     if len(eligible) != 1 or eligible[0] != rollout_path:
         raise RuntimeEventMaterializationError(
-            "context_source_ambiguous" if len(eligible) > 1 else "source_identity_mismatch",
+            "context_source_ambiguous"
+            if len(eligible) > 1
+            else "source_identity_mismatch",
             "certificate rollout is absent or not unique",
         )
     try:
@@ -2881,10 +3124,13 @@ def _verify_context_discovery_certificate(
         raise RuntimeEventMaterializationError(
             "source_identity_mismatch", "certificate native joins differ"
         )
-    if sum(
-        _native_session_meta(cast(dict[str, object], record["value"])) is not None
-        for record in records
-    ) != 1:
+    if (
+        sum(
+            _native_session_meta(cast(dict[str, object], record["value"])) is not None
+            for record in records
+        )
+        != 1
+    ):
         raise RuntimeEventMaterializationError(
             "context_source_ambiguous", "session_meta record is no longer unique"
         )
@@ -2899,7 +3145,9 @@ def _verify_context_discovery_certificate(
     )
     if len(selected_tasks) != 1 or selected_tasks[0] != task_record:
         raise RuntimeEventMaterializationError(
-            "context_source_ambiguous" if len(selected_tasks) > 1 else "source_identity_mismatch",
+            "context_source_ambiguous"
+            if len(selected_tasks) > 1
+            else "source_identity_mismatch",
             "selected task_complete record is no longer unique",
         )
     task_raw = cast(bytes, task_record["raw"])
@@ -2953,7 +3201,8 @@ def _load_context_discovery_certificate(
     certificate_path = candidates[0]
     if certificate_path.is_symlink() or not certificate_path.is_file():
         raise RuntimeEventMaterializationError(
-            "context_schema_invalid", "context discovery certificate is not a regular file"
+            "context_schema_invalid",
+            "context discovery certificate is not a regular file",
         )
     try:
         raw = certificate_path.read_bytes()
@@ -2964,10 +3213,15 @@ def _load_context_discovery_certificate(
     validate_context_discovery_certificate(raw)
     value = cast(
         dict[str, object],
-        json.loads(raw[:-1].decode("utf-8"), object_pairs_hook=_context_certificate_pairs),
+        json.loads(
+            raw[:-1].decode("utf-8"), object_pairs_hook=_context_certificate_pairs
+        ),
     )
     certificate_id = cast(str, value["certificate_id"])
-    filename_id = cast(re.Match[str], CONTEXT_DISCOVERY_CERTIFICATE_NAME.fullmatch(certificate_path.name)).group("certificate_id")
+    filename_id = cast(
+        re.Match[str],
+        CONTEXT_DISCOVERY_CERTIFICATE_NAME.fullmatch(certificate_path.name),
+    ).group("certificate_id")
     if certificate_id != filename_id:
         raise RuntimeEventMaterializationError(
             "source_identity_mismatch", "certificate filename id differs"
@@ -2986,7 +3240,9 @@ def command_append_context_discovery(
     certificate_id = cast(str, value["certificate_id"])
     target = active_run / f"context_discovery.{certificate_id}.json"
     _publish_context_discovery_noreplace(target, _context_certificate_bytes(value))
-    print(f"CONTEXT_DISCOVERY_PATH={target.relative_to(context.source_root).as_posix()}")
+    print(
+        f"CONTEXT_DISCOVERY_PATH={target.relative_to(context.source_root).as_posix()}"
+    )
     print(f"CONTEXT_DISCOVERY_CERTIFICATE_ID={certificate_id}")
     print(f"CONTEXT_DISCOVERY_RECORD_SHA256={source['record_sha256']}")
     print("CONTEXT_DISCOVERY_APPEND=pass")
@@ -3010,7 +3266,10 @@ def _publish_runtime_event_noreplace(target: Path, bytes_: bytes) -> dict[str, o
             "schema_invalid",
         }:
             raise RuntimeEventMaterializationError(
-            "publication_observation_invalid" if exc.code == "publication_uncertain" else "publication_failure", str(exc)
+                "publication_observation_invalid"
+                if exc.code == "publication_uncertain"
+                else "publication_failure",
+                str(exc),
             ) from exc
         raise
     except OSError as exc:
@@ -3021,7 +3280,14 @@ def _publish_runtime_event_noreplace(target: Path, bytes_: bytes) -> dict[str, o
         validate_runtime_event_schema(committed)
         committed_value = json.loads(committed[:-1].decode("utf-8"))
         readback_sha256 = cast(str, committed_value["artifact_sha256"])
-    except (RuntimeEventMaterializationError, OSError, UnicodeDecodeError, json.JSONDecodeError, KeyError, TypeError) as exc:
+    except (
+        RuntimeEventMaterializationError,
+        OSError,
+        UnicodeDecodeError,
+        json.JSONDecodeError,
+        KeyError,
+        TypeError,
+    ) as exc:
         raise RuntimeEventMaterializationError(
             "publication_failure",
             "artifact target readback is malformed",
@@ -3190,7 +3456,9 @@ def validate_publication_outcome_observation(raw: bytes) -> dict[str, object]:
         or not isinstance(observation.get("artifact_sha256"), str)
         or not RUNTIME_EVENT_HEX64.fullmatch(cast(str, observation["artifact_sha256"]))
         or not isinstance(observation.get("materialization_id"), str)
-        or not RUNTIME_EVENT_HEX64.fullmatch(cast(str, observation["materialization_id"]))
+        or not RUNTIME_EVENT_HEX64.fullmatch(
+            cast(str, observation["materialization_id"])
+        )
         or type(sequence) is not int
         or sequence not in (1, 2)
         or (sequence == 1 and prior is not None)
@@ -3214,10 +3482,7 @@ def validate_publication_outcome_observation(raw: bytes) -> dict[str, object]:
         not in ("succeeded", "failed", "unknown")
         or readback_status not in ("verified", "failed", "mismatch")
         or readback_status == "mismatch"
-        or (
-            readback_status == "failed"
-            and readback_sha256 is not None
-        )
+        or (readback_status == "failed" and readback_sha256 is not None)
         or (
             readback_status != "failed"
             and (
@@ -3373,8 +3638,7 @@ def spool_publication_outcome(
             "publication_observation_invalid", "observation attempt mismatch"
         )
     path = attempt_lock.attempt_directory / (
-        f"{cast(int, validated['sequence']):06d}-"
-        f"{validated['observation_sha256']}.json"
+        f"{cast(int, validated['sequence']):06d}-{validated['observation_sha256']}.json"
     )
     try:
         published_path, committed, _recovered = _secure_publish_noreplace(
@@ -3506,7 +3770,8 @@ def validate_publication_outcome_receipt(raw: bytes) -> dict[str, object]:
         or not isinstance(receipt.get("artifact_sha256"), str)
         or RUNTIME_EVENT_HEX64.fullmatch(cast(str, receipt["artifact_sha256"])) is None
         or not isinstance(receipt.get("materialization_id"), str)
-        or RUNTIME_EVENT_HEX64.fullmatch(cast(str, receipt["materialization_id"])) is None
+        or RUNTIME_EVENT_HEX64.fullmatch(cast(str, receipt["materialization_id"]))
+        is None
         or type(sequence) is not int
         or sequence not in (1, 2)
         or (sequence == 1 and prior is not None)
@@ -3684,7 +3949,9 @@ def confirm_publication_outcome_receipt(
             "publication_receipt_collision", "receipt candidate bytes differ"
         )
     intent = cast(dict[str, object], record["publication_intent"])
-    artifact_match = RUNTIME_EVENT_TARGET_NAME.fullmatch(cast(str, intent["target_path"]))
+    artifact_match = RUNTIME_EVENT_TARGET_NAME.fullmatch(
+        cast(str, intent["target_path"])
+    )
     name_match = RUNTIME_EVENT_RECEIPT_NAME.fullmatch(path.name)
     if (
         artifact_match is None
@@ -3720,9 +3987,7 @@ def confirm_publication_outcome_receipt(
         raise RuntimeEventMaterializationError(
             "publication_receipt_uncertain", "receipt changed during confirmation"
         )
-    validate_publication_receipt_chain(
-        record, observations, [*prior_receipts, receipt]
-    )
+    validate_publication_receipt_chain(record, observations, [*prior_receipts, receipt])
     return DurablePublicationOutcomeReceipt(path=path, value=receipt, bytes_=first)
 
 
@@ -3803,11 +4068,14 @@ def reconcile_runtime_event_publication(
             "schema_invalid", "prepared artifact target or hash mismatch"
         )
 
-    with acquire_publication_attempt_lock(source_root, attempt_id, runtime_root) as attempt_lock:
+    with acquire_publication_attempt_lock(
+        source_root, attempt_id, runtime_root
+    ) as attempt_lock:
         observations: list[dict[str, object]] = []
         observation_paths: dict[int, Path] = {}
         for path in sorted(
-            attempt_lock.attempt_directory.iterdir(), key=lambda item: os.fsencode(item.name)
+            attempt_lock.attempt_directory.iterdir(),
+            key=lambda item: os.fsencode(item.name),
         ):
             if path == attempt_lock.lock_path:
                 continue
@@ -3826,9 +4094,7 @@ def reconcile_runtime_event_publication(
                 raise RuntimeEventMaterializationError(
                     "publication_attempt_collision", "duplicate observation sequence"
                 )
-            observation = confirm_publication_outcome_observation(
-                attempt_lock, path
-            )
+            observation = confirm_publication_outcome_observation(attempt_lock, path)
             if (
                 observation["artifact_path"] != artifact_path
                 or observation["artifact_sha256"] != artifact_sha256
@@ -3849,7 +4115,9 @@ def reconcile_runtime_event_publication(
             )
         receipt_prefix = f"{target.stem}.outcome."
         receipt_paths: dict[int, Path] = {}
-        for path in sorted(target.parent.iterdir(), key=lambda item: os.fsencode(item.name)):
+        for path in sorted(
+            target.parent.iterdir(), key=lambda item: os.fsencode(item.name)
+        ):
             if not path.name.startswith(receipt_prefix):
                 continue
             match = RUNTIME_EVENT_RECEIPT_NAME.fullmatch(path.name)
@@ -3859,7 +4127,8 @@ def reconcile_runtime_event_publication(
                 )
             if match.group("attempt") != attempt_id:
                 raise RuntimeEventMaterializationError(
-                    "publication_attempt_collision", "receipt belongs to another attempt"
+                    "publication_attempt_collision",
+                    "receipt belongs to another attempt",
                 )
             sequence = int(match.group("sequence"))
             if sequence not in (1, 2):
@@ -3907,7 +4176,10 @@ def reconcile_runtime_event_publication(
                     candidate = json.loads(existing[:-1].decode("utf-8"))
                 except (UnicodeDecodeError, json.JSONDecodeError, IndexError):
                     candidate = None
-                if isinstance(candidate, dict) and candidate.get("schema") == RUNTIME_EVENT_SCHEMA:
+                if (
+                    isinstance(candidate, dict)
+                    and candidate.get("schema") == RUNTIME_EVENT_SCHEMA
+                ):
                     try:
                         validate_runtime_event_schema(existing)
                     except RuntimeEventMaterializationError as exc:
@@ -3953,8 +4225,8 @@ def reconcile_runtime_event_publication(
             }
             expected_bytes = _canonical_publication_outcome_receipt_bytes(receipt_value)
             try:
-                existing_receipt, existing_bytes = _readback_publication_outcome_receipt(
-                    path
+                existing_receipt, existing_bytes = (
+                    _readback_publication_outcome_receipt(path)
                 )
             except RuntimeEventMaterializationError as exc:
                 if exc.code == "publication_receipt_uncertain":
@@ -3963,7 +4235,10 @@ def reconcile_runtime_event_publication(
                     "publication_receipt_invalid", "existing receipt is invalid"
                 ) from exc
             if existing_bytes != expected_bytes:
-                if existing_receipt["receipt_sha256"] == receipt_value["receipt_sha256"]:
+                if (
+                    existing_receipt["receipt_sha256"]
+                    == receipt_value["receipt_sha256"]
+                ):
                     raise RuntimeEventMaterializationError(
                         "publication_receipt_invalid",
                         "existing receipt canonical bytes are inconsistent",
@@ -4159,7 +4434,9 @@ def reconcile_runtime_event_publication(
         return durable
 
 
-def command_materialize_runtime_event(context: ArchiveContext, args: argparse.Namespace) -> int:
+def command_materialize_runtime_event(
+    context: ArchiveContext, args: argparse.Namespace
+) -> int:
     """Materialize one fixed result-family event into the active run bundle."""
     spec = fixed_result_family_spec(args.result_family, args.gate_id)
     run_id = safe_run_id(args.run_id)
@@ -4169,71 +4446,153 @@ def command_materialize_runtime_event(context: ArchiveContext, args: argparse.Na
     try:
         result_bytes = result_path.read_bytes()
     except OSError as exc:
-        raise RuntimeEventMaterializationError("result_authority_mismatch", f"fixed result artifact is absent: {result_path}") from exc
+        raise RuntimeEventMaterializationError(
+            "result_authority_mismatch",
+            f"fixed result artifact is absent: {result_path}",
+        ) from exc
     if spec.result_family in {"requirements", "design", "review"}:
-        result = validate_markdown_review_result(result_bytes.decode("utf-8"), spec.gate_id)
+        result = validate_markdown_review_result(
+            result_bytes.decode("utf-8"), spec.gate_id
+        )
     elif spec.result_family == "validation":
         result = parse_validation_result(result_bytes, spec.gate_id)
         validate_validation_result(result)
         observations = cast(dict[str, object], result["observations"])
-        head = run(["git", "-C", str(context.source_root), "rev-parse", "--verify", "HEAD"], check=False).stdout.strip()
-        base = run(["git", "-C", str(context.source_root), "rev-parse", "--verify", cast(str, result["base_ref"])], check=False).stdout.strip()
+        head = run(
+            ["git", "-C", str(context.source_root), "rev-parse", "--verify", "HEAD"],
+            check=False,
+        ).stdout.strip()
+        base = run(
+            [
+                "git",
+                "-C",
+                str(context.source_root),
+                "rev-parse",
+                "--verify",
+                cast(str, result["base_ref"]),
+            ],
+            check=False,
+        ).stdout.strip()
         if observations.get("head_oid") != head or observations.get("base_oid") != base:
-            raise RuntimeEventMaterializationError("target_identity_mismatch", "validation observations do not match Git identities")
+            raise RuntimeEventMaterializationError(
+                "target_identity_mismatch",
+                "validation observations do not match Git identities",
+            )
     else:
         result = parse_lifecycle_result(result_bytes.decode("utf-8"), spec.gate_id)
         validate_lifecycle_result(result)
         evidence_path = context.source_root / cast(str, result["evidence_path"])
-        if hashlib.sha256(evidence_path.read_bytes()).hexdigest() != result["evidence_sha256"]:
-            raise RuntimeEventMaterializationError("result_authority_mismatch", "lifecycle evidence hash does not match bytes")
+        if (
+            hashlib.sha256(evidence_path.read_bytes()).hexdigest()
+            != result["evidence_sha256"]
+        ):
+            raise RuntimeEventMaterializationError(
+                "result_authority_mismatch",
+                "lifecycle evidence hash does not match bytes",
+            )
     if result.get("base_ref") not in {None, args.base_ref}:
-        raise RuntimeEventMaterializationError("target_identity_mismatch", "result base_ref differs from selected base ref")
+        raise RuntimeEventMaterializationError(
+            "target_identity_mismatch", "result base_ref differs from selected base ref"
+        )
     artifact_sha = hashlib.sha256(result_bytes).hexdigest()
     artifact_relative = result_path.relative_to(context.source_root).as_posix()
-    artifact_blob = run(["git", "-C", str(context.source_root), "hash-object", "--", artifact_relative], check=False)
-    if artifact_blob.returncode != 0 or not RUNTIME_EVENT_OID40.fullmatch(artifact_blob.stdout.strip()):
-        raise RuntimeEventMaterializationError("result_authority_mismatch", "result artifact Git blob is unavailable")
+    artifact_blob = run(
+        ["git", "-C", str(context.source_root), "hash-object", "--", artifact_relative],
+        check=False,
+    )
+    if artifact_blob.returncode != 0 or not RUNTIME_EVENT_OID40.fullmatch(
+        artifact_blob.stdout.strip()
+    ):
+        raise RuntimeEventMaterializationError(
+            "result_authority_mismatch", "result artifact Git blob is unavailable"
+        )
     targets = verify_target_identities(context.source_root, result, args.base_ref)
-    head = run(["git", "-C", str(context.source_root), "rev-parse", "--verify", "HEAD"], check=False)
-    base = run(["git", "-C", str(context.source_root), "rev-parse", "--verify", args.base_ref], check=False)
-    if head.returncode != 0 or base.returncode != 0 or not RUNTIME_EVENT_OID40.fullmatch(head.stdout.strip()) or not RUNTIME_EVENT_OID40.fullmatch(base.stdout.strip()):
-        raise RuntimeEventMaterializationError("target_identity_mismatch", "source snapshot identities are unavailable")
+    head = run(
+        ["git", "-C", str(context.source_root), "rev-parse", "--verify", "HEAD"],
+        check=False,
+    )
+    base = run(
+        ["git", "-C", str(context.source_root), "rev-parse", "--verify", args.base_ref],
+        check=False,
+    )
+    if (
+        head.returncode != 0
+        or base.returncode != 0
+        or not RUNTIME_EVENT_OID40.fullmatch(head.stdout.strip())
+        or not RUNTIME_EVENT_OID40.fullmatch(base.stdout.strip())
+    ):
+        raise RuntimeEventMaterializationError(
+            "target_identity_mismatch", "source snapshot identities are unavailable"
+        )
     gate_result = derive_gate_result(result)
     record_sha = cast(str, source_event["record_sha256"])
     unit_id = args.unit_id or record_sha[:16]
     if not re.fullmatch(r"[0-9a-f]{16}", unit_id) or unit_id != record_sha[:16]:
-        raise RuntimeEventMaterializationError("source_identity_mismatch", "unit id does not match source record hash")
+        raise RuntimeEventMaterializationError(
+            "source_identity_mismatch", "unit id does not match source record hash"
+        )
     target = active_run / f"runtime_event.{unit_id}.json"
     source_event["decision"] = cast(str, result.get("decision", "NONE"))
     source_event["applicable_gate_result"] = gate_result
     value: dict[str, object] = {
-        "schema": RUNTIME_EVENT_SCHEMA, "materialization_id": "0" * 64, "result_family": spec.result_family,
-        "gate": {"id": spec.gate_id, "result": gate_result}, "source_event": {
-            "agent_id": source_event["agent_id"], "agent_context_id": source_event["agent_context_id"],
-            "codex_thread_id": source_event["codex_thread_id"], "parent_id": source_event["parent_id"],
-            "turn_id": source_event["turn_id"], "role": source_event["role"], "decision": source_event["decision"],
-            "applicable_gate_result": source_event["applicable_gate_result"], "rollout_path": source_event["rollout_path"],
-            "rollout_path_bytes_b64": source_event["rollout_path_bytes_b64"], "rollout_path_sha256": source_event["rollout_path_sha256"],
-            "rollout_file_sha256": source_event["rollout_file_sha256"], "record_line": source_event["record_line"],
-            "record_byte_offset": source_event["record_byte_offset"], "record_byte_length": source_event["record_byte_length"],
-            "record_bytes_b64": source_event["record_bytes_b64"], "record_sha256": source_event["record_sha256"],
+        "schema": RUNTIME_EVENT_SCHEMA,
+        "materialization_id": "0" * 64,
+        "result_family": spec.result_family,
+        "gate": {"id": spec.gate_id, "result": gate_result},
+        "source_event": {
+            "agent_id": source_event["agent_id"],
+            "agent_context_id": source_event["agent_context_id"],
+            "codex_thread_id": source_event["codex_thread_id"],
+            "parent_id": source_event["parent_id"],
+            "turn_id": source_event["turn_id"],
+            "role": source_event["role"],
+            "decision": source_event["decision"],
+            "applicable_gate_result": source_event["applicable_gate_result"],
+            "rollout_path": source_event["rollout_path"],
+            "rollout_path_bytes_b64": source_event["rollout_path_bytes_b64"],
+            "rollout_path_sha256": source_event["rollout_path_sha256"],
+            "rollout_file_sha256": source_event["rollout_file_sha256"],
+            "record_line": source_event["record_line"],
+            "record_byte_offset": source_event["record_byte_offset"],
+            "record_byte_length": source_event["record_byte_length"],
+            "record_bytes_b64": source_event["record_bytes_b64"],
+            "record_sha256": source_event["record_sha256"],
             "stable_record_id": source_event["stable_record_id"],
-        }, "result_artifact": {
-            "path": artifact_relative, "schema": spec.schema, "artifact_sha256": artifact_sha,
-            "artifact_blob_oid": artifact_blob.stdout.strip(), "gate_id": spec.gate_id, "gate_result": gate_result,
-            "target_paths": [cast(dict[str, object], item)["path"] for item in targets], "base_ref": args.base_ref, "base_oid": base.stdout.strip(),
-        }, "target_identities": list(targets), "source_snapshot": {
-            "head_oid": head.stdout.strip(), "base_ref": args.base_ref, "base_oid": base.stdout.strip(),
-            "porcelain_v1": [item["raw"] for item in capture_porcelain_v1(context.source_root)],
-        }, "publication_intent": {
+        },
+        "result_artifact": {
+            "path": artifact_relative,
+            "schema": spec.schema,
+            "artifact_sha256": artifact_sha,
+            "artifact_blob_oid": artifact_blob.stdout.strip(),
+            "gate_id": spec.gate_id,
+            "gate_result": gate_result,
+            "target_paths": [cast(dict[str, object], item)["path"] for item in targets],
+            "base_ref": args.base_ref,
+            "base_oid": base.stdout.strip(),
+        },
+        "target_identities": list(targets),
+        "source_snapshot": {
+            "head_oid": head.stdout.strip(),
+            "base_ref": args.base_ref,
+            "base_oid": base.stdout.strip(),
+            "porcelain_v1": [
+                item["raw"] for item in capture_porcelain_v1(context.source_root)
+            ],
+        },
+        "publication_intent": {
             "schema": RUNTIME_EVENT_PUBLICATION_INTENT_SCHEMA,
             "attempt_id": "0" * 64,
             "target_path": target.relative_to(context.source_root).as_posix(),
             "prepared_state": "prepared",
-        }, "artifact_sha256": "0" * 64,
+        },
+        "artifact_sha256": "0" * 64,
     }
     record = RuntimeEventRecord(value)
-    value["materialization_id"] = hashlib.sha256(RUNTIME_EVENT_MATERIALIZATION_SCHEMA.encode("utf-8") + b"\0" + canonical_preimage_bytes(record)).hexdigest()
+    value["materialization_id"] = hashlib.sha256(
+        RUNTIME_EVENT_MATERIALIZATION_SCHEMA.encode("utf-8")
+        + b"\0"
+        + canonical_preimage_bytes(record)
+    ).hexdigest()
     publication_intent = cast(dict[str, object], value["publication_intent"])
     publication_intent["attempt_id"] = derive_publication_attempt_id(
         cast(str, value["materialization_id"]),
@@ -4270,7 +4629,9 @@ def command_materialize_runtime_event(context: ArchiveContext, args: argparse.Na
 
 def remote_branch_exists(context: ArchiveContext, branch: str) -> bool:
     """Return whether origin/<branch> exists locally after fetch."""
-    result = git(context.archive_root, ["rev-parse", "--verify", f"origin/{branch}"], check=False)
+    result = git(
+        context.archive_root, ["rev-parse", "--verify", f"origin/{branch}"], check=False
+    )
     return result.returncode == 0
 
 
@@ -4378,8 +4739,12 @@ def archive_status_summary(context: ArchiveContext) -> ArchiveStatusSummary:
             dirty_keys.add(key)
         if is_global:
             global_dirty = True
-    foreign_keys = tuple(sorted(key for key in dirty_keys if key not in associated_keys))
-    foreign_tree_keys = tuple(sorted(key for key in tree_keys if key not in associated_keys))
+    foreign_keys = tuple(
+        sorted(key for key in dirty_keys if key not in associated_keys)
+    )
+    foreign_tree_keys = tuple(
+        sorted(key for key in tree_keys if key not in associated_keys)
+    )
     return ArchiveStatusSummary(
         current_branch=current,
         dirty=bool(status.strip()),
@@ -4393,26 +4758,42 @@ def archive_status_summary(context: ArchiveContext) -> ArchiveStatusSummary:
     )
 
 
-def print_status_summary(context: ArchiveContext, summary: ArchiveStatusSummary) -> None:
+def print_status_summary(
+    context: ArchiveContext, summary: ArchiveStatusSummary
+) -> None:
     """Print stable structured archive status lines."""
     print(f"RUNTIME_LOG_ARCHIVE_CURRENT_BRANCH={summary.current_branch}")
     print(f"RUNTIME_LOG_ARCHIVE_EXPECTED_BRANCH={context.branch}")
-    print(f"RUNTIME_LOG_ARCHIVE_BRANCH_MATCH={'yes' if summary.branch_matches else 'no'}")
+    print(
+        f"RUNTIME_LOG_ARCHIVE_BRANCH_MATCH={'yes' if summary.branch_matches else 'no'}"
+    )
     print(f"RUNTIME_LOG_ARCHIVE_DIRTY={'yes' if summary.dirty else 'no'}")
     print(f"RUNTIME_LOG_ARCHIVE_DIRTY_KEYS={','.join(summary.dirty_keys)}")
-    print(f"RUNTIME_LOG_ARCHIVE_CURRENT_KEY_DIRTY={'yes' if summary.current_key_dirty else 'no'}")
-    print(f"RUNTIME_LOG_ARCHIVE_FOREIGN_DIRTY_KEYS={','.join(summary.foreign_dirty_keys)}")
-    print(f"RUNTIME_LOG_ARCHIVE_FOREIGN_DIRTY={'yes' if summary.foreign_dirty_keys else 'no'}")
+    print(
+        f"RUNTIME_LOG_ARCHIVE_CURRENT_KEY_DIRTY={'yes' if summary.current_key_dirty else 'no'}"
+    )
+    print(
+        f"RUNTIME_LOG_ARCHIVE_FOREIGN_DIRTY_KEYS={','.join(summary.foreign_dirty_keys)}"
+    )
+    print(
+        f"RUNTIME_LOG_ARCHIVE_FOREIGN_DIRTY={'yes' if summary.foreign_dirty_keys else 'no'}"
+    )
     print(f"RUNTIME_LOG_ARCHIVE_TREE_KEYS={','.join(summary.tree_keys)}")
-    print(f"RUNTIME_LOG_ARCHIVE_FOREIGN_TREE_KEYS={','.join(summary.foreign_tree_keys)}")
-    print(f"RUNTIME_LOG_ARCHIVE_FOREIGN_TREE={'yes' if summary.foreign_tree_keys else 'no'}")
+    print(
+        f"RUNTIME_LOG_ARCHIVE_FOREIGN_TREE_KEYS={','.join(summary.foreign_tree_keys)}"
+    )
+    print(
+        f"RUNTIME_LOG_ARCHIVE_FOREIGN_TREE={'yes' if summary.foreign_tree_keys else 'no'}"
+    )
     print(f"RUNTIME_LOG_ARCHIVE_GLOBAL_DIRTY={'yes' if summary.global_dirty else 'no'}")
 
 
 def archive_next_action(context: ArchiveContext, summary: ArchiveStatusSummary) -> str:
     """Return the next operation for a non-clean archive state."""
     if not summary.branch_matches:
-        return f"run runtime_log_archive_git.py ensure for archive branch {context.branch}"
+        return (
+            f"run runtime_log_archive_git.py ensure for archive branch {context.branch}"
+        )
     if summary.foreign_dirty_keys:
         return (
             "commit or migrate foreign repo-key log paths before closeout: "
@@ -4429,7 +4810,9 @@ def safe_archive_relative_path(value: str) -> Path:
     """Return an archive-relative path or fail for unsafe input."""
     path = Path(value)
     if path.is_absolute() or ".." in path.parts:
-        raise ArchiveGitError(f"archive path must be relative and cannot contain '..': {value}")
+        raise ArchiveGitError(
+            f"archive path must be relative and cannot contain '..': {value}"
+        )
     return path
 
 
@@ -4480,7 +4863,15 @@ def source_is_tracked(canon_root: Path, path: Path) -> bool:
     except ValueError:
         return False
     result = run(
-        ["git", "-C", str(canon_root), "ls-files", "--error-unmatch", "--", relative.as_posix()],
+        [
+            "git",
+            "-C",
+            str(canon_root),
+            "ls-files",
+            "--error-unmatch",
+            "--",
+            relative.as_posix(),
+        ],
         check=False,
     )
     return result.returncode == 0
@@ -4520,7 +4911,10 @@ def switch_to_archive_branch(context: ArchiveContext, branch: str) -> None:
         git(context.archive_root, ["switch", branch])
         return
     if remote_branch_exists(context, branch):
-        git(context.archive_root, ["switch", "--track", "-c", branch, f"origin/{branch}"])
+        git(
+            context.archive_root,
+            ["switch", "--track", "-c", branch, f"origin/{branch}"],
+        )
         return
     if remote_branch_exists(context, "main"):
         git(context.archive_root, ["switch", "-c", branch, "origin/main"])
@@ -4541,14 +4935,18 @@ def ensure_archive(
         # publication.  Treat that empty directory as a clone placeholder;
         # never remove or replace a non-empty path owned by somebody else.
         if any(context.archive_root.iterdir()):
-            raise ArchiveGitError(f"archive path is not a Git clone: {context.archive_root}")
+            raise ArchiveGitError(
+                f"archive path is not a Git clone: {context.archive_root}"
+            )
         context.archive_root.rmdir()
     if not context.archive_root.exists():
         _parent_ensure_directory(context.archive_root.parent, "runtime-archive-clone")
         run(["git", "clone", context.remote, str(context.archive_root)])
         created = True
     if not is_archive_clone(context.archive_root):
-        raise ArchiveGitError(f"archive path is not a Git clone: {context.archive_root}")
+        raise ArchiveGitError(
+            f"archive path is not a Git clone: {context.archive_root}"
+        )
 
     ensure_origin(context)
     if fetch:
@@ -4687,7 +5085,9 @@ def _atomic_write_bytes(path: Path, payload: bytes) -> None:
         boundary.atomic_publish(receipt, payload)
         return
     path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{path.name}.", dir=path.parent
+    )
     temporary = Path(temporary_name)
     try:
         with os.fdopen(descriptor, "wb") as stream:
@@ -4729,9 +5129,7 @@ def _restore_atomic_file(path: Path, prior: bytes | None) -> None:
 
 def _spool_root(transaction: PreparedArchiveTransaction) -> Path:
     context = _require_prepared(transaction)
-    return hook_event_spool_root(
-        context.source_root, context.runtime_root
-    ).resolve()
+    return hook_event_spool_root(context.source_root, context.runtime_root).resolve()
 
 
 def snapshot_hook_spool_events(
@@ -4742,7 +5140,9 @@ def snapshot_hook_spool_events(
     if not root.is_dir():
         return ()
     paths: list[Path] = []
-    for runtime_directory in sorted(root.iterdir(), key=lambda path: path.name.encode("utf-8")):
+    for runtime_directory in sorted(
+        root.iterdir(), key=lambda path: path.name.encode("utf-8")
+    ):
         if not runtime_directory.is_dir() or runtime_directory.is_symlink():
             continue
         for hook_directory in sorted(
@@ -4750,7 +5150,9 @@ def snapshot_hook_spool_events(
         ):
             if not hook_directory.is_dir() or hook_directory.is_symlink():
                 continue
-            for path in sorted(hook_directory.iterdir(), key=lambda item: item.name.encode("utf-8")):
+            for path in sorted(
+                hook_directory.iterdir(), key=lambda item: item.name.encode("utf-8")
+            ):
                 if path.suffix != ".json" or not path.is_file() or path.is_symlink():
                     continue
                 paths.append(path.resolve())
@@ -4765,7 +5167,9 @@ def snapshot_hook_spool_events(
         after = path.stat().st_size
         if before != after or len(payload) != before:
             raise ArchiveGitError(f"spool_snapshot_changed:{path}")
-        snapshot.append(HookSpoolEvent(path=path, size=before, bytes_sha256=_hash_bytes(payload)))
+        snapshot.append(
+            HookSpoolEvent(path=path, size=before, bytes_sha256=_hash_bytes(payload))
+        )
     return tuple(snapshot)
 
 
@@ -4793,22 +5197,24 @@ def load_hook_spool_cursor(
         payload = cast(object, json.loads(cursor_bytes.decode("utf-8")))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise ArchiveGitError(f"hook_spool_cursor_invalid:{cursor_path}") from exc
-    expected_keys = sorted([
-        "schema",
-        "schema_version",
-        "repo_key",
-        "generation",
-        "prior_cursor_sha256",
-        "transaction_id",
-        "source_event_count",
-        "accepted_event_count",
-        "duplicate_event_count",
-        "failed_event_count",
-        "source_set_sha256",
-        "dedup_index_sha256",
-        "archive_commit_oid",
-        "cursor_body_sha256",
-    ])
+    expected_keys = sorted(
+        [
+            "schema",
+            "schema_version",
+            "repo_key",
+            "generation",
+            "prior_cursor_sha256",
+            "transaction_id",
+            "source_event_count",
+            "accepted_event_count",
+            "duplicate_event_count",
+            "failed_event_count",
+            "source_set_sha256",
+            "dedup_index_sha256",
+            "archive_commit_oid",
+            "cursor_body_sha256",
+        ]
+    )
     if not isinstance(payload, dict) or list(payload) != expected_keys:
         raise ArchiveGitError("hook_spool_cursor_invalid:field_order")
     value = cast(dict[str, object], payload)
@@ -4834,7 +5240,9 @@ def load_hook_spool_cursor(
         "dedup_index_sha256",
         "cursor_body_sha256",
     )
-    if any(not RUNTIME_EVENT_HEX64.fullmatch(cast(str, value[key])) for key in sha_fields):
+    if any(
+        not RUNTIME_EVENT_HEX64.fullmatch(cast(str, value[key])) for key in sha_fields
+    ):
         raise ArchiveGitError("hook_spool_cursor_invalid:hash")
     archive_commit_oid = cast(str, value["archive_commit_oid"])
     if archive_commit_oid and not RUNTIME_EVENT_OID40.fullmatch(archive_commit_oid):
@@ -4869,15 +5277,17 @@ def _parse_spool_index_bytes(
 ) -> dict[str, tuple[str, str, str, str]]:
     """Return event id to SHA/namespace/hook/projection from the canonical index."""
     entries: dict[str, tuple[str, str, str, str]] = {}
-    expected_keys = sorted([
-        "schema",
-        "event_id",
-        "event_sha256",
-        "runtime_namespace",
-        "hook_name",
-        "projection_path",
-        "transaction_id",
-    ])
+    expected_keys = sorted(
+        [
+            "schema",
+            "event_id",
+            "event_sha256",
+            "runtime_namespace",
+            "hook_name",
+            "projection_path",
+            "transaction_id",
+        ]
+    )
     try:
         text = payload.decode("utf-8")
     except UnicodeDecodeError as exc:
@@ -4932,7 +5342,12 @@ def _validate_spool_checkpoint_state(
         raise ArchiveGitError("hook_spool_checkpoint_inconsistent:index_hash")
     projection_root = Path("hook-runs") / context.repo_key
     projection_cache: dict[Path, dict[str, str]] = {}
-    for event_id, (event_sha256, _namespace, _hook_name, serialized_path) in index_entries.items():
+    for event_id, (
+        event_sha256,
+        _namespace,
+        _hook_name,
+        serialized_path,
+    ) in index_entries.items():
         projection_relative = Path(serialized_path)
         try:
             projection_relative.relative_to(projection_root)
@@ -4945,9 +5360,7 @@ def _validate_spool_checkpoint_state(
             or ".." in projection_relative.parts
             or projection_relative.suffix != ".jsonl"
         ):
-            raise ArchiveGitError(
-                "hook_spool_checkpoint_inconsistent:projection_path"
-            )
+            raise ArchiveGitError("hook_spool_checkpoint_inconsistent:projection_path")
         projection_path = context.archive_root / projection_relative
         if not projection_path.is_file() or projection_path.is_symlink():
             raise ArchiveGitError(
@@ -5052,13 +5465,19 @@ def ingest_hook_event_spool(
             raise ArchiveGitError("hook_spool_event_invalid:path_shape")
         runtime_namespace, hook_name, file_name = relative.parts
         payload = snapshot_event.path.read_bytes()
-        if len(payload) != snapshot_event.size or _hash_bytes(payload) != snapshot_event.bytes_sha256:
+        if (
+            len(payload) != snapshot_event.size
+            or _hash_bytes(payload) != snapshot_event.bytes_sha256
+        ):
             raise ArchiveGitError(f"spool_snapshot_changed:{snapshot_event.path}")
         event, canonical = _canonical_spool_event(payload)
         event_id = cast(str, event["hook_run_id"])
         event_sha256 = _hash_bytes(canonical)
         _dedup_key(event_id, event_sha256)
-        if file_name != f"{event_id}.json" or event_sha256 != snapshot_event.bytes_sha256:
+        if (
+            file_name != f"{event_id}.json"
+            or event_sha256 != snapshot_event.bytes_sha256
+        ):
             raise ArchiveGitError("hook_spool_event_invalid:identity")
         if event["source_repo_key"] != context.repo_key:
             raise ArchiveGitError("hook_spool_event_invalid:repo_key")
@@ -5093,7 +5512,9 @@ def ingest_hook_event_spool(
             projection_entries = _projection_event_hashes(existing)
             projection_cache[projection_path] = projection_entries
             projection_bytes[projection_path] = existing
-            projection_original_bytes[projection_path] = existing if projection_exists else None
+            projection_original_bytes[projection_path] = (
+                existing if projection_exists else None
+            )
         projected_sha = projection_entries.get(event_id)
         if projected_sha is not None:
             if projected_sha != event_sha256:
@@ -5114,7 +5535,9 @@ def ingest_hook_event_spool(
         projection_entries[event_id] = event_sha256
 
     source_set_sha256 = _hash_bytes(_canonical_compact_json(source_rows))
-    prior_cursor_sha256 = _hash_bytes(cursor_before) if cursor_before else HOOK_SPOOL_ZERO_SHA256
+    prior_cursor_sha256 = (
+        _hash_bytes(cursor_before) if cursor_before else HOOK_SPOOL_ZERO_SHA256
+    )
     transaction_id = _hash_bytes(
         _canonical_compact_json(
             {
@@ -5133,7 +5556,14 @@ def ingest_hook_event_spool(
         for *_, projection_relative in accepted
     }
     index_bytes_after = index_bytes_before
-    for snapshot_event, event_id, runtime_namespace, hook_name, _canonical, projection_relative in accepted:
+    for (
+        snapshot_event,
+        event_id,
+        runtime_namespace,
+        hook_name,
+        _canonical,
+        projection_relative,
+    ) in accepted:
         index_row = {
             "schema": HOOK_SPOOL_INDEX_SCHEMA,
             "event_id": event_id,
@@ -5177,7 +5607,9 @@ def ingest_hook_event_spool(
                 projection_updates, key=lambda path: path.as_posix().encode("utf-8")
             ):
                 touched.append(projection_path)
-                _atomic_write_bytes(projection_path, projection_updates[projection_path])
+                _atomic_write_bytes(
+                    projection_path, projection_updates[projection_path]
+                )
             touched.append(index_path)
             _atomic_write_bytes(index_path, index_bytes_after)
             touched.append(cursor_path)
@@ -5210,7 +5642,9 @@ def ingest_hook_event_spool(
     )
 
 
-def _archive_blob_at(context: ArchiveContext, commit_oid: str, relative_path: Path) -> bytes:
+def _archive_blob_at(
+    context: ArchiveContext, commit_oid: str, relative_path: Path
+) -> bytes:
     if not commit_oid:
         return b""
     result = git(
@@ -5246,7 +5680,9 @@ def finalize_hook_spool_readback(
         raise ArchiveGitError("archive_readback_mismatch:metadata")
 
     index_relative = ingest_result.dedup_index_path.relative_to(context.archive_root)
-    committed_index = _archive_blob_at(context, receipt.archive_commit_oid, index_relative)
+    committed_index = _archive_blob_at(
+        context, receipt.archive_commit_oid, index_relative
+    )
     index_entries = _parse_spool_index_bytes(committed_index)
     projection_cache: dict[Path, dict[str, str]] = {}
     for event in covered:
@@ -5257,7 +5693,9 @@ def finalize_hook_spool_readback(
         projection_path = Path(indexed[3])
         projection_entries = projection_cache.get(projection_path)
         if projection_entries is None:
-            projection = _archive_blob_at(context, receipt.archive_commit_oid, projection_path)
+            projection = _archive_blob_at(
+                context, receipt.archive_commit_oid, projection_path
+            )
             projection_entries = _projection_event_hashes(projection)
             projection_cache[projection_path] = projection_entries
         if projection_entries.get(event_id) != event.bytes_sha256:
@@ -5357,13 +5795,19 @@ def command_check_clean(context: ArchiveContext, args: argparse.Namespace) -> in
     status = porcelain_status(context)
     summary = archive_status_summary(context)
     print_status_summary(context, summary)
-    clean = summary.branch_matches and not summary.dirty and not summary.foreign_tree_keys
+    clean = (
+        summary.branch_matches and not summary.dirty and not summary.foreign_tree_keys
+    )
     print(f"RUNTIME_LOG_ARCHIVE_NEXT_ACTION={archive_next_action(context, summary)}")
     if args.porcelain:
         for line in status.splitlines():
             print(f"RUNTIME_LOG_ARCHIVE_PORCELAIN={line}")
     print(f"RUNTIME_LOG_ARCHIVE_CLEAN={'yes' if clean else 'no'}")
-    print("RUNTIME_LOG_ARCHIVE_CHECK_CLEAN=pass" if clean else "RUNTIME_LOG_ARCHIVE_CHECK_CLEAN=fail")
+    print(
+        "RUNTIME_LOG_ARCHIVE_CHECK_CLEAN=pass"
+        if clean
+        else "RUNTIME_LOG_ARCHIVE_CHECK_CLEAN=fail"
+    )
     return 0 if clean else 1
 
 
@@ -5383,7 +5827,10 @@ def _legacy_index_contains_inventory(path: Path, inventory_sha256: str) -> bool:
             entry = json.loads(line)
         except json.JSONDecodeError:
             continue
-        if isinstance(entry, dict) and entry.get("inventory_sha256") == inventory_sha256:
+        if (
+            isinstance(entry, dict)
+            and entry.get("inventory_sha256") == inventory_sha256
+        ):
             return True
     return False
 
@@ -5407,9 +5854,7 @@ def _legacy_import_plan(
             continue
         payload = source.read_bytes()
         destination = (
-            (destination_prefix / Path(relative)).as_posix()
-            if should_copy
-            else None
+            (destination_prefix / Path(relative)).as_posix() if should_copy else None
         )
         target = context.archive_root / destination if destination else None
         if target is not None:
@@ -5470,11 +5915,15 @@ def _legacy_import_plan(
     print_context(context)
     print(f"RUNTIME_LOG_ARCHIVE_IMPORT_FAMILY={family}")
     print(f"RUNTIME_LOG_ARCHIVE_IMPORT_ROOT={legacy_root}")
-    print(f"RUNTIME_LOG_ARCHIVE_IMPORT_FILES={sum(1 for record in records if record.destination)}")
+    print(
+        f"RUNTIME_LOG_ARCHIVE_IMPORT_FILES={sum(1 for record in records if record.destination)}"
+    )
     print(f"RUNTIME_LOG_ARCHIVE_IMPORT_NEW_FILES={imported}")
     print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EXISTING_FILES={existing}")
     concrete_records = tuple(record for record in records if record.destination)
-    preserved_records = tuple(record for record in records if record.destination is None)
+    preserved_records = tuple(
+        record for record in records if record.destination is None
+    )
     print(f"RUNTIME_LOG_ARCHIVE_IMPORT_SOURCE_DELETIONS={len(concrete_records)}")
     print(f"RUNTIME_LOG_ARCHIVE_IMPORT_SOURCE_PRESERVED={len(preserved_records)}")
     print(f"RUNTIME_LOG_ARCHIVE_IMPORT_SOURCE_NOT_IMPORTED={len(preserved_records)}")
@@ -5488,13 +5937,21 @@ def _legacy_import_plan(
         print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EXISTING_FILES={existing}")
     else:
         print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_ROOT={legacy_root}")
-        print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_DESTINATION={destination_prefix.as_posix()}")
+        print(
+            f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_DESTINATION={destination_prefix.as_posix()}"
+        )
         print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_FILES={copied_count}")
         print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_NEW_FILES={imported}")
         print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_EXISTING_FILES={existing}")
-        print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_DELETIONS={len(concrete_records)}")
-        print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_PRESERVED={len(preserved_records)}")
-        print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_NOT_IMPORTED={len(preserved_records)}")
+        print(
+            f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_DELETIONS={len(concrete_records)}"
+        )
+        print(
+            f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_PRESERVED={len(preserved_records)}"
+        )
+        print(
+            f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_NOT_IMPORTED={len(preserved_records)}"
+        )
     return LegacyImportPlan(
         family=family,
         legacy_root=legacy_root,
@@ -5531,13 +5988,17 @@ def _finalize_legacy_import(
         print(f"RUNTIME_LOG_ARCHIVE_IMPORT=publication_{receipt.status}")
         return 1
     concrete_records = tuple(record for record in plan.records if record.destination)
-    preserved_records = tuple(record for record in plan.records if record.destination is None)
+    preserved_records = tuple(
+        record for record in plan.records if record.destination is None
+    )
     required_paths = tuple(
         path
         for path in (
             plan.index_path,
-            *(transaction.context.archive_root / record.destination
-              for record in concrete_records)
+            *(
+                transaction.context.archive_root / record.destination
+                for record in concrete_records
+            ),
         )
     )
     _verify_remote_archive_readback(transaction.context, receipt, required_paths)
@@ -5561,11 +6022,19 @@ def _finalize_legacy_import(
     print(f"RUNTIME_LOG_ARCHIVE_IMPORT_SOURCE_DELETIONS={deleted_count}")
     print(f"RUNTIME_LOG_ARCHIVE_IMPORT_SOURCE_PRESERVED={len(preserved_records)}")
     print(f"RUNTIME_LOG_ARCHIVE_IMPORT_SOURCE_NOT_IMPORTED={len(preserved_records)}")
-    print(f"RUNTIME_LOG_ARCHIVE_IMPORT_DELETED_SOURCE={'yes' if deleted_count else 'no'}")
+    print(
+        f"RUNTIME_LOG_ARCHIVE_IMPORT_DELETED_SOURCE={'yes' if deleted_count else 'no'}"
+    )
     if plan.family == "eval-results":
-        print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_DELETIONS={deleted_count}")
-        print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_PRESERVED={len(preserved_records)}")
-        print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_NOT_IMPORTED={len(preserved_records)}")
+        print(
+            f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_DELETIONS={deleted_count}"
+        )
+        print(
+            f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_PRESERVED={len(preserved_records)}"
+        )
+        print(
+            f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_NOT_IMPORTED={len(preserved_records)}"
+        )
         print(
             "RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_DELETED_SOURCE="
             f"{'yes' if deleted_count else 'no'}"
@@ -5665,11 +6134,17 @@ def _import_legacy_prepared(
         else context.canon_root / "agents" / "evals" / "results" / "hook-runs"
     )
     destination_prefix = safe_archive_relative_path(args.destination_prefix)
-    if context.archive_root.resolve() == legacy_root or context.archive_root.resolve() in legacy_root.parents:
+    if (
+        context.archive_root.resolve() == legacy_root
+        or context.archive_root.resolve() in legacy_root.parents
+    ):
         raise ArchiveGitError("legacy root cannot be inside the archive clone")
     sources = (
-        [(source, source.relative_to(legacy_root).as_posix(), True)
-         for source in sorted(legacy_root.rglob("*.jsonl")) if source.is_file()]
+        [
+            (source, source.relative_to(legacy_root).as_posix(), True)
+            for source in sorted(legacy_root.rglob("*.jsonl"))
+            if source.is_file()
+        ]
         if legacy_root.exists()
         else []
     )
@@ -5709,7 +6184,10 @@ def _import_eval_results_prepared(
         else context.canon_root / "agents" / "evals" / "results"
     )
     destination_prefix = safe_archive_relative_path(args.destination_prefix)
-    if context.archive_root.resolve() == legacy_root or context.archive_root.resolve() in legacy_root.parents:
+    if (
+        context.archive_root.resolve() == legacy_root
+        or context.archive_root.resolve() in legacy_root.parents
+    ):
         raise ArchiveGitError("legacy root cannot be inside the archive clone")
     sources: list[tuple[Path, str, bool]] = []
     if legacy_root.exists():
@@ -5730,7 +6208,9 @@ def _import_eval_results_prepared(
     )
 
 
-def command_import_eval_results(context: ArchiveContext, args: argparse.Namespace) -> int:
+def command_import_eval_results(
+    context: ArchiveContext, args: argparse.Namespace
+) -> int:
     """Import legacy eval results and finalize deletion only after readback."""
     with prepare_archive_transaction(context, fetch=True) as transaction:
         plan = _import_eval_results_prepared(transaction, args)
@@ -5749,7 +6229,10 @@ def _eval_bundle_files(spool_root: Path, run_id: str) -> list[tuple[Path, Path]]
         collection = json.loads(collection_path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise ArchiveGitError("eval_collection_invalid") from exc
-    if not isinstance(collection, dict) or collection.get("schema") != "agent_canon.eval_collection.v1":
+    if (
+        not isinstance(collection, dict)
+        or collection.get("schema") != "agent_canon.eval_collection.v1"
+    ):
         raise ArchiveGitError("eval_collection_invalid:schema")
     if collection.get("run_id") != run_id:
         raise ArchiveGitError("eval_collection_invalid:run_id")
@@ -5783,7 +6266,9 @@ def _eval_bundle_files(spool_root: Path, run_id: str) -> list[tuple[Path, Path]]
     # Keep the collection receipt in the archive as durable, source-independent
     # evidence. Producer reports remain under their declared family paths so
     # existing eval consumers can discover them without a new reader contract.
-    pairs.append((collection_path, Path("eval-results") / "collections" / f"{run_id}.json"))
+    pairs.append(
+        (collection_path, Path("eval-results") / "collections" / f"{run_id}.json")
+    )
     return pairs
 
 
@@ -5813,7 +6298,9 @@ def _prepare_eval_bundle(
         target = context.archive_root / relative
         _parent_ensure_directory(target.parent, "eval-archive-destination")
         _parent_copy_file(source, target, "eval-archive-file")
-    return tuple(context.archive_root / relative for _source, relative in pairs), len(new_pairs)
+    return tuple(context.archive_root / relative for _source, relative in pairs), len(
+        new_pairs
+    )
 
 
 def command_archive_eval(context: ArchiveContext, args: argparse.Namespace) -> int:
@@ -5850,7 +6337,9 @@ def command_archive_eval(context: ArchiveContext, args: argparse.Namespace) -> i
             print(f"RUNTIME_LOG_ARCHIVE_EVAL_COMMIT={duplicate.archive_commit_oid}")
             print(f"RUNTIME_LOG_ARCHIVE_EVAL_TREE={duplicate.archive_tree_oid}")
             print(f"RUNTIME_LOG_ARCHIVE_EVAL_REMOTE_REF=refs/heads/{context.branch}")
-            print(f"RUNTIME_LOG_ARCHIVE_EVAL_BLOBS={json.dumps(blobs, sort_keys=True, separators=(',', ':'))}")
+            print(
+                f"RUNTIME_LOG_ARCHIVE_EVAL_BLOBS={json.dumps(blobs, sort_keys=True, separators=(',', ':'))}"
+            )
             return 0
         receipt = publish_prepared_archive(transaction, args)
         blobs: dict[str, str] = {}
@@ -5863,7 +6352,9 @@ def command_archive_eval(context: ArchiveContext, args: argparse.Namespace) -> i
         print(f"RUNTIME_LOG_ARCHIVE_EVAL_COMMIT={receipt.archive_commit_oid}")
         print(f"RUNTIME_LOG_ARCHIVE_EVAL_TREE={receipt.archive_tree_oid}")
         print(f"RUNTIME_LOG_ARCHIVE_EVAL_REMOTE_REF=refs/heads/{context.branch}")
-        print(f"RUNTIME_LOG_ARCHIVE_EVAL_BLOBS={json.dumps(blobs, sort_keys=True, separators=(',', ':'))}")
+        print(
+            f"RUNTIME_LOG_ARCHIVE_EVAL_BLOBS={json.dumps(blobs, sort_keys=True, separators=(',', ':'))}"
+        )
         return 0 if receipt.status == "committed" else 1
 
 
@@ -5899,26 +6390,22 @@ def _source_git_bytes(source_root: Path, args: Sequence[str], code: str) -> byte
         capture_output=True,
     )
     if result.returncode != 0:
-        raise ArchiveGitError(f"{code}:{result.stderr.decode(errors='replace').strip()}")
+        raise ArchiveGitError(
+            f"{code}:{result.stderr.decode(errors='replace').strip()}"
+        )
     return result.stdout
 
 
 def _hex64(value: object, field: str) -> str:
     """Require one lowercase SHA-256 digest."""
-    if (
-        not isinstance(value, str)
-        or not re.fullmatch(r"[0-9a-f]{64}", value)
-    ):
+    if not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value):
         raise ArchiveGitError(f"agent_report_provenance:{field}_invalid")
     return value
 
 
 def _hex40(value: object, field: str) -> str:
     """Require one lowercase Git object ID."""
-    if (
-        not isinstance(value, str)
-        or not re.fullmatch(r"[0-9a-f]{40}", value)
-    ):
+    if not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{40}", value):
         raise ArchiveGitError(f"agent_report_provenance:{field}_invalid")
     return value
 
@@ -5939,7 +6426,9 @@ def _source_tree_digest(
     source_prefix: str,
 ) -> str:
     """Hash the exact Git tree listing used by the existing provenance contract."""
-    return hashlib.sha256(_source_tree_listing(source_root, source_commit, source_prefix)).hexdigest()
+    return hashlib.sha256(
+        _source_tree_listing(source_root, source_commit, source_prefix)
+    ).hexdigest()
 
 
 def _source_tree_listing(
@@ -5981,24 +6470,29 @@ def _validate_redaction_metadata(
         or not isinstance(raw_rule_ids, list)
         or not isinstance(raw_rule_counts, Mapping)
     ):
-        raise ArchiveGitError(f"agent_report_provenance:{field_prefix}_redactions_invalid")
+        raise ArchiveGitError(
+            f"agent_report_provenance:{field_prefix}_redactions_invalid"
+        )
     if any(not isinstance(value, str) or not value for value in raw_rule_ids):
-        raise ArchiveGitError(f"agent_report_provenance:{field_prefix}_rule_ids_invalid")
+        raise ArchiveGitError(
+            f"agent_report_provenance:{field_prefix}_rule_ids_invalid"
+        )
     rule_ids = [cast(str, value) for value in raw_rule_ids]
     if len(set(rule_ids)) != len(rule_ids):
-        raise ArchiveGitError(f"agent_report_provenance:{field_prefix}_rule_ids_invalid")
+        raise ArchiveGitError(
+            f"agent_report_provenance:{field_prefix}_rule_ids_invalid"
+        )
     counts: dict[str, int] = {}
     for key, value in raw_rule_counts.items():
-        if (
-            not isinstance(key, str)
-            or not key
-            or type(value) is not int
-            or value < 0
-        ):
-            raise ArchiveGitError(f"agent_report_provenance:{field_prefix}_rule_counts_invalid")
+        if not isinstance(key, str) or not key or type(value) is not int or value < 0:
+            raise ArchiveGitError(
+                f"agent_report_provenance:{field_prefix}_rule_counts_invalid"
+            )
         counts[key] = value
     if set(counts) != set(rule_ids):
-        raise ArchiveGitError(f"agent_report_provenance:{field_prefix}_rule_counts_invalid")
+        raise ArchiveGitError(
+            f"agent_report_provenance:{field_prefix}_rule_counts_invalid"
+        )
     redactions: list[dict[str, object]] = []
     for index, raw in enumerate(raw_redactions):
         if not isinstance(raw, Mapping):
@@ -6032,9 +6526,13 @@ def _validate_redaction_metadata(
             }
         )
     if sum(counts.values()) != len(redactions):
-        raise ArchiveGitError(f"agent_report_provenance:{field_prefix}_redaction_count_invalid")
+        raise ArchiveGitError(
+            f"agent_report_provenance:{field_prefix}_redaction_count_invalid"
+        )
     if item.get("redaction_count") != len(redactions):
-        raise ArchiveGitError(f"agent_report_provenance:{field_prefix}_redaction_count_invalid")
+        raise ArchiveGitError(
+            f"agent_report_provenance:{field_prefix}_redaction_count_invalid"
+        )
     return redactions, counts
 
 
@@ -6104,7 +6602,9 @@ def _validate_supersession_identity(
             if line.strip()
         ]
     except (UnicodeDecodeError, json.JSONDecodeError, TypeError) as exc:
-        raise ArchiveGitError("agent_report_provenance:superseded_index_invalid") from exc
+        raise ArchiveGitError(
+            "agent_report_provenance:superseded_index_invalid"
+        ) from exc
     if not any(entry.get("snapshot_id") == snapshot_id for entry in entries):
         raise ArchiveGitError("agent_report_provenance:superseded_snapshot_not_found")
     return {
@@ -6154,10 +6654,17 @@ def _validate_prepared_report_provenance(
     if payload.get("source_remote") != actual_source_remote:
         raise ArchiveGitError("agent_report_provenance:source_remote_mismatch")
     if payload.get("source_normalized_remote") != actual_normalized_remote:
-        raise ArchiveGitError("agent_report_provenance:source_normalized_remote_mismatch")
-    if not isinstance(payload.get("source_branch"), str) or not payload["source_branch"]:
+        raise ArchiveGitError(
+            "agent_report_provenance:source_normalized_remote_mismatch"
+        )
+    if (
+        not isinstance(payload.get("source_branch"), str)
+        or not payload["source_branch"]
+    ):
         raise ArchiveGitError("agent_report_provenance:source_branch_invalid")
-    tree_listing = _source_tree_listing(context.source_root, source_commit, source_prefix)
+    tree_listing = _source_tree_listing(
+        context.source_root, source_commit, source_prefix
+    )
     if hashlib.sha256(tree_listing).hexdigest() != source_tree:
         raise ArchiveGitError("agent_report_provenance:source_tree_mismatch")
     source_tree_paths: set[str] = set()
@@ -6168,11 +6675,17 @@ def _validate_prepared_report_provenance(
             _metadata, path_bytes = record.split(b"\t", 1)
             source_tree_paths.add(path_bytes.decode("utf-8"))
         except (UnicodeDecodeError, ValueError) as exc:
-            raise ArchiveGitError("agent_report_provenance:source_tree_invalid") from exc
+            raise ArchiveGitError(
+                "agent_report_provenance:source_tree_invalid"
+            ) from exc
     files_value = payload.get("files")
     if not isinstance(files_value, list) or not files_value:
         raise ArchiveGitError("agent_report_provenance:files_invalid")
-    files = [cast(Mapping[str, object], item) for item in files_value if isinstance(item, Mapping)]
+    files = [
+        cast(Mapping[str, object], item)
+        for item in files_value
+        if isinstance(item, Mapping)
+    ]
     if len(files) != len(files_value) or len(files) != source_file_count:
         raise ArchiveGitError("agent_report_provenance:file_count_invalid")
     prepared_files = iter_report_files(report_dir)
@@ -6180,7 +6693,8 @@ def _validate_prepared_report_provenance(
         path.relative_to(report_dir).as_posix(): path for path in prepared_files
     }
     if set(prepared_by_path) != {
-        _safe_provenance_path(item.get("relative_path"), "relative_path") for item in files
+        _safe_provenance_path(item.get("relative_path"), "relative_path")
+        for item in files
     }:
         raise ArchiveGitError("agent_report_provenance:prepared_tree_mismatch")
     declared_source_paths = {
@@ -6191,9 +6705,15 @@ def _validate_prepared_report_provenance(
     normalized_files: list[dict[str, object]] = []
     aggregate_rule_counts: dict[str, int] = {}
     for index, item in enumerate(files):
-        relative = _safe_provenance_path(item.get("relative_path"), f"files[{index}].relative_path")
-        source_path = _safe_provenance_path(item.get("source_path"), f"files[{index}].source_path")
-        if not (source_path == source_prefix or source_path.startswith(source_prefix + "/")):
+        relative = _safe_provenance_path(
+            item.get("relative_path"), f"files[{index}].relative_path"
+        )
+        source_path = _safe_provenance_path(
+            item.get("source_path"), f"files[{index}].source_path"
+        )
+        if not (
+            source_path == source_prefix or source_path.startswith(source_prefix + "/")
+        ):
             raise ArchiveGitError("agent_report_provenance:source_path_outside_prefix")
         prepared = prepared_by_path[relative]
         archived_bytes = prepared.read_bytes()
@@ -6203,7 +6723,9 @@ def _validate_prepared_report_provenance(
         if item.get("size") != len(archived_bytes):
             raise ArchiveGitError("agent_report_provenance:file_size_mismatch")
         if ARCHIVE_FORBIDDEN_CONTENT.search(archived_bytes):
-            raise ArchiveGitError("agent_report_provenance:prepared_content_not_sanitized")
+            raise ArchiveGitError(
+                "agent_report_provenance:prepared_content_not_sanitized"
+            )
         source_bytes = _source_git_bytes(
             context.source_root,
             ["show", f"{source_commit}:{source_path}"],
@@ -6214,7 +6736,9 @@ def _validate_prepared_report_provenance(
             raise ArchiveGitError("agent_report_provenance:source_sha256_mismatch")
         redactions, rule_counts = _validate_redaction_metadata(item, f"files[{index}]")
         for rule_id, count in rule_counts.items():
-            aggregate_rule_counts[rule_id] = aggregate_rule_counts.get(rule_id, 0) + count
+            aggregate_rule_counts[rule_id] = (
+                aggregate_rule_counts.get(rule_id, 0) + count
+            )
         normalized_files.append(
             {
                 "relative_path": relative,
@@ -6224,7 +6748,9 @@ def _validate_prepared_report_provenance(
                 "size": len(archived_bytes),
                 "redactions": redactions,
                 "redaction_count": len(redactions),
-                "redaction_rule_ids": [str(value) for value in item["redaction_rule_ids"]],
+                "redaction_rule_ids": [
+                    str(value) for value in item["redaction_rule_ids"]
+                ],
                 "redaction_rule_counts": rule_counts,
             }
         )
@@ -6239,7 +6765,9 @@ def _validate_prepared_report_provenance(
     top_rule_counts = payload.get("redaction_rule_counts")
     if not isinstance(top_rule_counts, Mapping):
         raise ArchiveGitError("agent_report_provenance:redaction_rule_counts_invalid")
-    if {str(key): value for key, value in top_rule_counts.items()} != aggregate_rule_counts:
+    if {
+        str(key): value for key, value in top_rule_counts.items()
+    } != aggregate_rule_counts:
         raise ArchiveGitError("agent_report_provenance:redaction_rule_counts_invalid")
     snapshot_payload = {
         "source_commit": source_commit,
@@ -6321,7 +6849,9 @@ def _archive_agent_report_provenance_prepared(
     if not report_dir.is_dir() or report_dir.is_symlink():
         raise ArchiveGitError("agent_report_provenance:prepared_tree_missing")
     provenance_path = args.provenance.resolve()
-    validated = _validate_prepared_report_provenance(context, report_dir, provenance_path)
+    validated = _validate_prepared_report_provenance(
+        context, report_dir, provenance_path
+    )
     run_id = cast(str, validated["run_id"])
     snapshot_id = cast(str, validated["snapshot_id"])
     destination = _agent_report_archive_root(context) / run_id / snapshot_id
@@ -6337,8 +6867,14 @@ def _archive_agent_report_provenance_prepared(
         _parent_ensure_directory(target.parent, "agent-report-file")
         source_bytes = source.read_bytes()
         if target.exists():
-            if target.is_symlink() or not target.is_file() or target.read_bytes() != source_bytes:
-                raise ArchiveGitError(f"agent_report_provenance:destination_conflict:{relative}")
+            if (
+                target.is_symlink()
+                or not target.is_file()
+                or target.read_bytes() != source_bytes
+            ):
+                raise ArchiveGitError(
+                    f"agent_report_provenance:destination_conflict:{relative}"
+                )
             existing += 1
         else:
             _parent_copy_file(source, target, "agent-report-file")
@@ -6397,7 +6933,9 @@ def _archive_agent_report_provenance_prepared(
     print(f"RUNTIME_LOG_ARCHIVE_AGENT_REPORT_FILES={len(output_files)}")
     print(f"RUNTIME_LOG_ARCHIVE_AGENT_REPORT_NEW_FILES={copied}")
     print(f"RUNTIME_LOG_ARCHIVE_AGENT_REPORT_EXISTING_FILES={existing}")
-    print(f"RUNTIME_LOG_ARCHIVE_AGENT_REPORT_INDEX_APPENDED={'yes' if index_appended else 'no'}")
+    print(
+        f"RUNTIME_LOG_ARCHIVE_AGENT_REPORT_INDEX_APPENDED={'yes' if index_appended else 'no'}"
+    )
     print("RUNTIME_LOG_ARCHIVE_AGENT_REPORT_PROVENANCE=pass")
     if not getattr(args, "publish", False):
         print("RUNTIME_LOG_ARCHIVE_AGENT_REPORT=pass")
@@ -6527,7 +7065,9 @@ def _archive_agent_report_prepared(
         source_bytes = source.read_bytes()
         if target.exists():
             if target.read_bytes() != source_bytes:
-                raise ArchiveGitError(f"archive destination has conflicting content: {target}")
+                raise ArchiveGitError(
+                    f"archive destination has conflicting content: {target}"
+                )
             existing += 1
         else:
             _parent_copy_file(source, target, "agent-report-file")
@@ -6562,11 +7102,17 @@ def _archive_agent_report_prepared(
     manifest_text = json.dumps(manifest, indent=2, sort_keys=True) + "\n"
     if manifest_path.exists():
         try:
-            existing_manifest = cast(object, json.loads(manifest_path.read_text(encoding="utf-8")))
+            existing_manifest = cast(
+                object, json.loads(manifest_path.read_text(encoding="utf-8"))
+            )
         except json.JSONDecodeError as exc:
-            raise ArchiveGitError(f"archive manifest is not valid JSON: {manifest_path}") from exc
+            raise ArchiveGitError(
+                f"archive manifest is not valid JSON: {manifest_path}"
+            ) from exc
         existing_manifest_payload = (
-            cast(dict[str, object], existing_manifest) if isinstance(existing_manifest, dict) else {}
+            cast(dict[str, object], existing_manifest)
+            if isinstance(existing_manifest, dict)
+            else {}
         )
         if existing_manifest_payload.get("archive_id") != archive_id:
             raise ArchiveGitError(f"archive manifest conflict: {manifest_path}")
@@ -6597,12 +7143,16 @@ def _archive_agent_report_prepared(
     print(f"RUNTIME_LOG_ARCHIVE_AGENT_REPORT_FILES={len(file_entries)}")
     print(f"RUNTIME_LOG_ARCHIVE_AGENT_REPORT_NEW_FILES={copied}")
     print(f"RUNTIME_LOG_ARCHIVE_AGENT_REPORT_EXISTING_FILES={existing}")
-    print(f"RUNTIME_LOG_ARCHIVE_AGENT_REPORT_INDEX_APPENDED={'yes' if index_appended else 'no'}")
+    print(
+        f"RUNTIME_LOG_ARCHIVE_AGENT_REPORT_INDEX_APPENDED={'yes' if index_appended else 'no'}"
+    )
     print("RUNTIME_LOG_ARCHIVE_AGENT_REPORT=pass")
     return 0
 
 
-def command_archive_agent_report(context: ArchiveContext, args: argparse.Namespace) -> int:
+def command_archive_agent_report(
+    context: ArchiveContext, args: argparse.Namespace
+) -> int:
     """Archive one run bundle under the sole archive transaction lock."""
     with prepare_archive_transaction(context, fetch=True) as transaction:
         return _archive_agent_report_prepared(transaction, args)
@@ -6623,7 +7173,11 @@ class AgentReportArchiveSummary:
 
 def report_root_for_context(context: ArchiveContext, report_root: Path | None) -> Path:
     """Return the source report root for agent run artifacts."""
-    return (report_root.resolve() if report_root else context.source_root / DEFAULT_AGENT_REPORT_ROOT)
+    return (
+        report_root.resolve()
+        if report_root
+        else context.source_root / DEFAULT_AGENT_REPORT_ROOT
+    )
 
 
 def _agent_report_archive_root(context: ArchiveContext) -> Path:
@@ -6667,7 +7221,10 @@ def copy_agent_reports_prepared(
         )
     root = report_root_for_context(context, report_root)
     default_destination = _agent_report_archive_root(context)
-    if context.archive_root.resolve() == root or context.archive_root.resolve() in root.parents:
+    if (
+        context.archive_root.resolve() == root
+        or context.archive_root.resolve() in root.parents
+    ):
         raise ArchiveGitError("agent report root cannot be inside the archive clone")
     if not root.exists():
         return AgentReportArchiveSummary(root, default_destination, 0, 0, 0, 0, 0)
@@ -6679,7 +7236,9 @@ def copy_agent_reports_prepared(
         eligible = [
             path
             for path in run_files
-            if not should_skip_agent_report(path.relative_to(run_dir), path, max_file_bytes)
+            if not should_skip_agent_report(
+                path.relative_to(run_dir), path, max_file_bytes
+            )
         ]
         skipped += len(run_files) - len(eligible)
         if not eligible:
@@ -6688,7 +7247,9 @@ def copy_agent_reports_prepared(
         snapshot_id = report_snapshot_digest(run_dir, eligible)
         destination = default_destination / run_id / snapshot_id
         before = {
-            source.relative_to(run_dir).as_posix(): (destination / source.relative_to(run_dir)).read_bytes()
+            source.relative_to(run_dir).as_posix(): (
+                destination / source.relative_to(run_dir)
+            ).read_bytes()
             for source in eligible
             if (destination / source.relative_to(run_dir)).is_file()
         }
@@ -6700,7 +7261,9 @@ def copy_agent_reports_prepared(
         existing += len(before)
         copied += len(eligible) - len(before)
 
-    return AgentReportArchiveSummary(root, default_destination, files, copied, 0, existing, skipped)
+    return AgentReportArchiveSummary(
+        root, default_destination, files, copied, 0, existing, skipped
+    )
 
 
 def print_agent_report_archive_summary(summary: AgentReportArchiveSummary) -> None:
@@ -6714,7 +7277,9 @@ def print_agent_report_archive_summary(summary: AgentReportArchiveSummary) -> No
     print(f"RUNTIME_LOG_ARCHIVE_AGENT_REPORT_SKIPPED={summary.skipped}")
 
 
-def command_archive_agent_reports(context: ArchiveContext, args: argparse.Namespace) -> int:
+def command_archive_agent_reports(
+    context: ArchiveContext, args: argparse.Namespace
+) -> int:
     """Archive current reports/agents artifacts."""
     with prepare_archive_transaction(context, fetch=True) as transaction:
         destination_prefix = safe_archive_relative_path(args.destination_prefix)
@@ -6742,7 +7307,9 @@ def stage_archive_paths(transaction: PreparedArchiveTransaction) -> None:
         Path("legacy-import"),
         ISSUE_PUBLICATION_ARCHIVE_ROOT,
     ]
-    existing = [path.as_posix() for path in log_paths if (context.archive_root / path).exists()]
+    existing = [
+        path.as_posix() for path in log_paths if (context.archive_root / path).exists()
+    ]
     if existing:
         git(context.archive_root, ["add", "--", *existing])
 
@@ -6817,8 +7384,14 @@ def _verify_remote_agent_report_readback(
 ) -> dict[str, str]:
     """Read back provenance/index and every sanitized report blob from origin."""
     blobs = _verify_remote_archive_readback(context, receipt, required_paths)
-    index_path = context.archive_root / "agent-reports" / context.repo_key / "index.jsonl"
-    remote_index = _archive_blob_at(context, receipt.archive_commit_oid, index_path.relative_to(context.archive_root))
+    index_path = (
+        context.archive_root / "agent-reports" / context.repo_key / "index.jsonl"
+    )
+    remote_index = _archive_blob_at(
+        context,
+        receipt.archive_commit_oid,
+        index_path.relative_to(context.archive_root),
+    )
     expected_line = json.dumps(dict(provenance), sort_keys=True, separators=(",", ":"))
     matching = []
     for line in remote_index.decode("utf-8").splitlines():
@@ -6827,16 +7400,26 @@ def _verify_remote_agent_report_readback(
         try:
             value = json.loads(line)
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            raise ArchiveGitError("agent_report_provenance:remote_index_invalid") from exc
-        if isinstance(value, Mapping) and value.get("snapshot_id") == provenance.get("snapshot_id"):
-            matching.append(json.dumps(dict(value), sort_keys=True, separators=(",", ":")))
+            raise ArchiveGitError(
+                "agent_report_provenance:remote_index_invalid"
+            ) from exc
+        if isinstance(value, Mapping) and value.get("snapshot_id") == provenance.get(
+            "snapshot_id"
+        ):
+            matching.append(
+                json.dumps(dict(value), sort_keys=True, separators=(",", ":"))
+            )
     if matching != [expected_line]:
         raise ArchiveGitError("agent_report_provenance:remote_provenance_mismatch")
     for item in cast(list[Mapping[str, object]], provenance["files"]):
         destination = cast(str, item["destination_path"])
-        remote = _archive_blob_at(context, receipt.archive_commit_oid, Path(destination))
+        remote = _archive_blob_at(
+            context, receipt.archive_commit_oid, Path(destination)
+        )
         if hashlib.sha256(remote).hexdigest() != item["archive_sha256"]:
-            raise ArchiveGitError(f"agent_report_provenance:remote_blob_mismatch:{destination}")
+            raise ArchiveGitError(
+                f"agent_report_provenance:remote_blob_mismatch:{destination}"
+            )
     return blobs
 
 
@@ -6913,7 +7496,9 @@ def _compare_and_push(
                 return False, False, f"conflict:{detail}"
             expected = _remote_ref_oid(context)
         else:
-            fetched = git(context.archive_root, ["fetch", "origin", context.branch], check=False)
+            fetched = git(
+                context.archive_root, ["fetch", "origin", context.branch], check=False
+            )
             if fetched.returncode != 0 and _remote_ref_oid(context):
                 return False, False, "fetch_failed"
             observed = _remote_ref_oid(context)
@@ -6949,7 +7534,9 @@ def publish_prepared_archive(
 ) -> ArchivePublicationReceipt:
     """Stage, commit, optionally pull/push, and read back one prepared archive."""
     context = _require_prepared(transaction)
-    message = getattr(args, "message", None) or f"Append {context.repo_key} runtime logs"
+    message = (
+        getattr(args, "message", None) or f"Append {context.repo_key} runtime logs"
+    )
     no_pull = bool(getattr(args, "no_pull", False))
     no_push = bool(getattr(args, "no_push", False))
 
@@ -7047,7 +7634,9 @@ def command_push(context: ArchiveContext, args: argparse.Namespace) -> int:
     with prepare_archive_transaction(context, fetch=True) as transaction:
         receipt = publish_prepared_archive(transaction, args)
         print_context(context)
-        print(f"RUNTIME_LOG_ARCHIVE_COMMITTED={'yes' if receipt.commit_created else 'no'}")
+        print(
+            f"RUNTIME_LOG_ARCHIVE_COMMITTED={'yes' if receipt.commit_created else 'no'}"
+        )
         print(f"RUNTIME_LOG_ARCHIVE_PUBLICATION_STATUS={receipt.status}")
         print(f"RUNTIME_LOG_ARCHIVE_PUSH_STATUS={receipt.push_status}")
         print(
@@ -7174,9 +7763,6 @@ def main(argv: list[str] | None = None) -> int:
     """Run the runtime log archive Git helper."""
     parser = build_parser()
     args = parser.parse_args(argv)
-    if args.command == "check-hook-hot-path":
-        path = args.path or (args.canon_root / ".codex/hooks/hook_event_log.py")
-        return command_check_hook_hot_path(path.resolve())
     try:
         context = build_context(args)
         if args.command == "append-context-discovery":

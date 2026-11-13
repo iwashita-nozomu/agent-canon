@@ -1,0 +1,666 @@
+{
+  "source": "88a70bddaaacd2f2d5913e7f83dc2756f0ec8fa0",
+  "python": "3.12.3",
+  "source_hash": "62bd8973f5581ae35882a63417a415f0db36389e687377a36930cbd2eccfe518",
+  "cases": [
+    {
+      "name": "empty",
+      "input": {
+        "prompt": ""
+      },
+      "output": {
+        "structural_matches": [],
+        "repair_matches": [],
+        "lane_evidence": []
+      }
+    },
+    {
+      "name": "structural",
+      "input": {
+        "prompt": "parent repo skill discovery .codex .agents"
+      },
+      "output": {
+        "structural_matches": [
+          {
+            "concept": {
+              "name": "repository_skill_discovery_surface",
+              "required_evidence_categories": [
+                "project_owner",
+                "skill_lane_surface"
+              ],
+              "route_skills": [
+                "task-routing",
+                "structure-refactor"
+              ],
+              "evidence_groups": {
+                "project_owner": [
+                  [
+                    ".codex/personal/skills"
+                  ],
+                  [
+                    "parent",
+                    "repo"
+                  ],
+                  [
+                    "parent-repo"
+                  ],
+                  [
+                    "project-owned"
+                  ],
+                  [
+                    "repo-specific"
+                  ],
+                  [
+                    "\u89aa\u30ec\u30dd"
+                  ]
+                ],
+                "skill_lane_surface": [
+                  [
+                    "skill",
+                    "lane"
+                  ],
+                  [
+                    "skill",
+                    "surface"
+                  ],
+                  [
+                    "skill",
+                    "discovery"
+                  ],
+                  [
+                    "automatic",
+                    "discovery"
+                  ],
+                  [
+                    "skill.md"
+                  ],
+                  [
+                    "\u56fa\u6709\u30b9\u30ad\u30eb"
+                  ],
+                  [
+                    "\u30b9\u30ad\u30eb",
+                    "\u7f6e"
+                  ]
+                ],
+                "runtime_boundary_surface": [
+                  [
+                    ".codex",
+                    ".agents"
+                  ],
+                  [
+                    ".codex/config.toml"
+                  ],
+                  [
+                    ".codex/personal/skills"
+                  ],
+                  [
+                    "shared",
+                    "public",
+                    "catalog"
+                  ]
+                ]
+              }
+            },
+            "observed_evidence_categories": [
+              "project_owner",
+              "skill_lane_surface",
+              "runtime_boundary_surface"
+            ],
+            "reason": "structural_concept=repository_skill_discovery_surface;required_evidence=project_owner,skill_lane_surface;observed_evidence=project_owner,skill_lane_surface,runtime_boundary_surface"
+          }
+        ],
+        "repair_matches": [],
+        "lane_evidence": [
+          {
+            "schema": "agent-canon.skill-lane.v1",
+            "lane": "repository_skill_discovery_surface",
+            "route_skills": [
+              "task-routing",
+              "structure-refactor"
+            ],
+            "evidence_categories": [
+              "project_owner",
+              "skill_lane_surface",
+              "runtime_boundary_surface"
+            ],
+            "status": "observed",
+            "source": "prompt_classifier"
+          }
+        ]
+      }
+    },
+    {
+      "name": "missing-owner",
+      "input": {
+        "prompt": "skill discovery surface"
+      },
+      "output": {
+        "structural_matches": [],
+        "repair_matches": [],
+        "lane_evidence": []
+      }
+    },
+    {
+      "name": "repair",
+      "input": {
+        "prompt": "failing tests same-intent repair"
+      },
+      "output": {
+        "structural_matches": [],
+        "repair_matches": [
+          {
+            "concept": {
+              "name": "validation_failure_same_intent_repair",
+              "required_evidence_categories": [
+                "validation_failure"
+              ],
+              "owner_skill": "codex-task-workflow",
+              "secondary_skills": [
+                "test-design"
+              ],
+              "evidence_groups": {
+                "validation_failure": [
+                  [
+                    "failed",
+                    "validation"
+                  ],
+                  [
+                    "validation",
+                    "failure"
+                  ],
+                  [
+                    "validation",
+                    "failing"
+                  ],
+                  [
+                    "failing",
+                    "test"
+                  ],
+                  [
+                    "failing",
+                    "tests"
+                  ],
+                  [
+                    "tests",
+                    "failing"
+                  ],
+                  [
+                    "failed",
+                    "test"
+                  ],
+                  [
+                    "failed",
+                    "tests"
+                  ],
+                  [
+                    "test",
+                    "failure"
+                  ],
+                  [
+                    "tests",
+                    "failure"
+                  ],
+                  [
+                    "failing",
+                    "contract"
+                  ],
+                  [
+                    "cause_classification"
+                  ],
+                  [
+                    "same-intent",
+                    "repair"
+                  ],
+                  [
+                    "preserved-intent",
+                    "repair"
+                  ]
+                ]
+              }
+            },
+            "observed_evidence_categories": [
+              "validation_failure"
+            ],
+            "reason": "structural_concept=validation_failure_same_intent_repair;required_evidence=validation_failure;observed_evidence=validation_failure;repair_contract=classify cause then proceed to owning repair surface;tests_are=validation_control_surface_not_default_work_owner"
+          }
+        ],
+        "lane_evidence": []
+      }
+    },
+    {
+      "name": "same-intent",
+      "input": {
+        "prompt": "validation failure preserved-intent repair"
+      },
+      "output": {
+        "structural_matches": [],
+        "repair_matches": [
+          {
+            "concept": {
+              "name": "validation_failure_same_intent_repair",
+              "required_evidence_categories": [
+                "validation_failure"
+              ],
+              "owner_skill": "codex-task-workflow",
+              "secondary_skills": [
+                "test-design"
+              ],
+              "evidence_groups": {
+                "validation_failure": [
+                  [
+                    "failed",
+                    "validation"
+                  ],
+                  [
+                    "validation",
+                    "failure"
+                  ],
+                  [
+                    "validation",
+                    "failing"
+                  ],
+                  [
+                    "failing",
+                    "test"
+                  ],
+                  [
+                    "failing",
+                    "tests"
+                  ],
+                  [
+                    "tests",
+                    "failing"
+                  ],
+                  [
+                    "failed",
+                    "test"
+                  ],
+                  [
+                    "failed",
+                    "tests"
+                  ],
+                  [
+                    "test",
+                    "failure"
+                  ],
+                  [
+                    "tests",
+                    "failure"
+                  ],
+                  [
+                    "failing",
+                    "contract"
+                  ],
+                  [
+                    "cause_classification"
+                  ],
+                  [
+                    "same-intent",
+                    "repair"
+                  ],
+                  [
+                    "preserved-intent",
+                    "repair"
+                  ]
+                ]
+              }
+            },
+            "observed_evidence_categories": [
+              "validation_failure"
+            ],
+            "reason": "structural_concept=validation_failure_same_intent_repair;required_evidence=validation_failure;observed_evidence=validation_failure;repair_contract=classify cause then proceed to owning repair surface;tests_are=validation_control_surface_not_default_work_owner"
+          }
+        ],
+        "lane_evidence": []
+      }
+    },
+    {
+      "name": "unicode-case",
+      "input": {
+        "prompt": "PARENT REPO SKILL DISCOVERY"
+      },
+      "output": {
+        "structural_matches": [
+          {
+            "concept": {
+              "name": "repository_skill_discovery_surface",
+              "required_evidence_categories": [
+                "project_owner",
+                "skill_lane_surface"
+              ],
+              "route_skills": [
+                "task-routing",
+                "structure-refactor"
+              ],
+              "evidence_groups": {
+                "project_owner": [
+                  [
+                    ".codex/personal/skills"
+                  ],
+                  [
+                    "parent",
+                    "repo"
+                  ],
+                  [
+                    "parent-repo"
+                  ],
+                  [
+                    "project-owned"
+                  ],
+                  [
+                    "repo-specific"
+                  ],
+                  [
+                    "\u89aa\u30ec\u30dd"
+                  ]
+                ],
+                "skill_lane_surface": [
+                  [
+                    "skill",
+                    "lane"
+                  ],
+                  [
+                    "skill",
+                    "surface"
+                  ],
+                  [
+                    "skill",
+                    "discovery"
+                  ],
+                  [
+                    "automatic",
+                    "discovery"
+                  ],
+                  [
+                    "skill.md"
+                  ],
+                  [
+                    "\u56fa\u6709\u30b9\u30ad\u30eb"
+                  ],
+                  [
+                    "\u30b9\u30ad\u30eb",
+                    "\u7f6e"
+                  ]
+                ],
+                "runtime_boundary_surface": [
+                  [
+                    ".codex",
+                    ".agents"
+                  ],
+                  [
+                    ".codex/config.toml"
+                  ],
+                  [
+                    ".codex/personal/skills"
+                  ],
+                  [
+                    "shared",
+                    "public",
+                    "catalog"
+                  ]
+                ]
+              }
+            },
+            "observed_evidence_categories": [
+              "project_owner",
+              "skill_lane_surface"
+            ],
+            "reason": "structural_concept=repository_skill_discovery_surface;required_evidence=project_owner,skill_lane_surface;observed_evidence=project_owner,skill_lane_surface"
+          }
+        ],
+        "repair_matches": [],
+        "lane_evidence": [
+          {
+            "schema": "agent-canon.skill-lane.v1",
+            "lane": "repository_skill_discovery_surface",
+            "route_skills": [
+              "task-routing",
+              "structure-refactor"
+            ],
+            "evidence_categories": [
+              "project_owner",
+              "skill_lane_surface"
+            ],
+            "status": "observed",
+            "source": "prompt_classifier"
+          }
+        ]
+      }
+    },
+    {
+      "name": "project/repository_skill_discovery_surface/complete",
+      "input": {
+        "prompt": ".codex/personal/skills skill lane"
+      },
+      "output": {
+        "structural_matches": [
+          {
+            "concept": {
+              "name": "repository_skill_discovery_surface",
+              "required_evidence_categories": [
+                "project_owner",
+                "skill_lane_surface"
+              ],
+              "route_skills": [
+                "task-routing",
+                "structure-refactor"
+              ],
+              "evidence_groups": {
+                "project_owner": [
+                  [
+                    ".codex/personal/skills"
+                  ],
+                  [
+                    "parent",
+                    "repo"
+                  ],
+                  [
+                    "parent-repo"
+                  ],
+                  [
+                    "project-owned"
+                  ],
+                  [
+                    "repo-specific"
+                  ],
+                  [
+                    "\u89aa\u30ec\u30dd"
+                  ]
+                ],
+                "skill_lane_surface": [
+                  [
+                    "skill",
+                    "lane"
+                  ],
+                  [
+                    "skill",
+                    "surface"
+                  ],
+                  [
+                    "skill",
+                    "discovery"
+                  ],
+                  [
+                    "automatic",
+                    "discovery"
+                  ],
+                  [
+                    "skill.md"
+                  ],
+                  [
+                    "\u56fa\u6709\u30b9\u30ad\u30eb"
+                  ],
+                  [
+                    "\u30b9\u30ad\u30eb",
+                    "\u7f6e"
+                  ]
+                ],
+                "runtime_boundary_surface": [
+                  [
+                    ".codex",
+                    ".agents"
+                  ],
+                  [
+                    ".codex/config.toml"
+                  ],
+                  [
+                    ".codex/personal/skills"
+                  ],
+                  [
+                    "shared",
+                    "public",
+                    "catalog"
+                  ]
+                ]
+              }
+            },
+            "observed_evidence_categories": [
+              "project_owner",
+              "skill_lane_surface",
+              "runtime_boundary_surface"
+            ],
+            "reason": "structural_concept=repository_skill_discovery_surface;required_evidence=project_owner,skill_lane_surface;observed_evidence=project_owner,skill_lane_surface,runtime_boundary_surface"
+          }
+        ],
+        "repair_matches": [],
+        "lane_evidence": [
+          {
+            "schema": "agent-canon.skill-lane.v1",
+            "lane": "repository_skill_discovery_surface",
+            "route_skills": [
+              "task-routing",
+              "structure-refactor"
+            ],
+            "evidence_categories": [
+              "project_owner",
+              "skill_lane_surface",
+              "runtime_boundary_surface"
+            ],
+            "status": "observed",
+            "source": "prompt_classifier"
+          }
+        ]
+      }
+    },
+    {
+      "name": "project/repository_skill_discovery_surface/missing-0",
+      "input": {
+        "prompt": "skill lane"
+      },
+      "output": {
+        "structural_matches": [],
+        "repair_matches": [],
+        "lane_evidence": []
+      }
+    },
+    {
+      "name": "project/repository_skill_discovery_surface/missing-1",
+      "input": {
+        "prompt": ".codex/personal/skills"
+      },
+      "output": {
+        "structural_matches": [],
+        "repair_matches": [],
+        "lane_evidence": []
+      }
+    },
+    {
+      "name": "repair/validation_failure_same_intent_repair/complete",
+      "input": {
+        "prompt": "failed validation"
+      },
+      "output": {
+        "structural_matches": [],
+        "repair_matches": [
+          {
+            "concept": {
+              "name": "validation_failure_same_intent_repair",
+              "required_evidence_categories": [
+                "validation_failure"
+              ],
+              "owner_skill": "codex-task-workflow",
+              "secondary_skills": [
+                "test-design"
+              ],
+              "evidence_groups": {
+                "validation_failure": [
+                  [
+                    "failed",
+                    "validation"
+                  ],
+                  [
+                    "validation",
+                    "failure"
+                  ],
+                  [
+                    "validation",
+                    "failing"
+                  ],
+                  [
+                    "failing",
+                    "test"
+                  ],
+                  [
+                    "failing",
+                    "tests"
+                  ],
+                  [
+                    "tests",
+                    "failing"
+                  ],
+                  [
+                    "failed",
+                    "test"
+                  ],
+                  [
+                    "failed",
+                    "tests"
+                  ],
+                  [
+                    "test",
+                    "failure"
+                  ],
+                  [
+                    "tests",
+                    "failure"
+                  ],
+                  [
+                    "failing",
+                    "contract"
+                  ],
+                  [
+                    "cause_classification"
+                  ],
+                  [
+                    "same-intent",
+                    "repair"
+                  ],
+                  [
+                    "preserved-intent",
+                    "repair"
+                  ]
+                ]
+              }
+            },
+            "observed_evidence_categories": [
+              "validation_failure"
+            ],
+            "reason": "structural_concept=validation_failure_same_intent_repair;required_evidence=validation_failure;observed_evidence=validation_failure;repair_contract=classify cause then proceed to owning repair surface;tests_are=validation_control_surface_not_default_work_owner"
+          }
+        ],
+        "lane_evidence": []
+      }
+    },
+    {
+      "name": "repair/validation_failure_same_intent_repair/missing-0",
+      "input": {
+        "prompt": ""
+      },
+      "output": {
+        "structural_matches": [],
+        "repair_matches": [],
+        "lane_evidence": []
+      }
+    }
+  ]
+}

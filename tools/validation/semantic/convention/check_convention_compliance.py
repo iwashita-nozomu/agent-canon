@@ -10,7 +10,7 @@
 # upstream design ../../../catalog.yaml structured tool catalog
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/tool_drift.rs validates tool/convention drift
 # upstream implementation ./convention_compliance_contracts.toml declares marker contracts
-# upstream implementation ../skills/check_skill_frontmatter.py validates runtime skill frontmatter
+# upstream implementation ../skills/check-skill-frontmatter validates runtime skill frontmatter
 # downstream implementation ../../ci/runners/run_all_checks.sh runs convention compliance gate
 # downstream implementation ../../../../tests/agent_tools/test_check_convention_compliance.py tests verifier  # noqa: E501
 # @dependency-end
@@ -121,7 +121,7 @@ TOOL_GATES = {
         (TOOL_CATALOG_PATH,),
     ),
     "skill_frontmatter": (
-        "tools/validation/semantic/skills/check_skill_frontmatter.py",
+        "tools/runtime/dispatch/agent-canon/src/skill_frontmatter.rs",
         (TOOL_CATALOG_PATH,),
     ),
     "convention_compliance": (
@@ -137,7 +137,7 @@ TOOL_GATES = {
         (TOOL_CATALOG_PATH,),
     ),
     "github_workflow_pr_flow": (
-        "tools/validation/ci/checks/check_github_workflows.py",
+        "tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs",
         (TOOL_CATALOG_PATH,),
     ),
     "bootstrap_container_runtime": (
@@ -200,8 +200,6 @@ MATHEMATICAL_NECESSITY_MARKERS = {
 REVIEW_ISSUE_ROUTING_MARKERS = {
     "documents/conventions/REVIEW_PROCESS.md": (
         "Review Finding Issue Routing",
-        "issue_route",
-        "github_issue",
         "issue_sync.py",
         "private packet",
     ),
@@ -210,7 +208,7 @@ SOURCE_FILE_DEFINITION_ORDER_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
     "source_file_definition_order"
 ]
 HOOK_GUARDRAIL_POLICY_MARKERS = {
-    ".codex/hooks/hook_dispatcher.py": (
+    "tools/runtime/dispatch/agent-canon/src/hook_dispatcher.rs": (
         "HOOK_EVENT_CONTRACTS",
         "HookEventContract",
         "ACTIVE_HOOK_HANDLERS",
@@ -222,8 +220,6 @@ HOOK_GUARDRAIL_POLICY_MARKERS = {
         "validate_projection_bytes",
         "record_hook_invocation",
         "HookLogContext",
-        "RETIRED_CHILD_TOMBSTONES",
-        "MOVED_SOURCE_ABSENCES",
     ),
     "tools/runtime/authority/hook_safety.py": (
         "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY",
@@ -240,7 +236,6 @@ HOOK_GUARDRAIL_POLICY_MARKERS = {
         "active/inactive",
         "legacy `Stop`",
         "fail-open",
-        "retired child tombstones",
         "bounded",
         "redacted",
     ),
@@ -260,32 +255,30 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                 (
                     "workflow family and role candidates",
                     "agents/task_catalog.yaml",
-                    "check_agent_runtime_alignment.py",
+                    "tools/bin/agent-canon check-agent-runtime-alignment",
                 ),
                 (
                     "task bootstrap and CLI entrypoints",
                     "agents/canonical/CLI_ENTRYPOINTS.md",
-                    "bootstrap_agent_run.py",
                 ),
                 (
                     "actual subagent lifecycle and same-role identity",
                     "agents/canonical/CODEX_SUBAGENTS.md",
-                    "workflow_monitor.py",
                 ),
                 (
                     "role behavior and stage conditions",
                     ".codex/agents/*.toml",
-                    "check_agent_runtime_alignment.py",
+                    "tools/bin/agent-canon check-agent-runtime-alignment",
                 ),
                 (
                     "skill routing and public skill surface",
                     "agents/skills/catalog.yaml",
-                    "tools/agent/orchestration/route.py --prompt",
+                    "tools/bin/agent-canon route --prompt",
                 ),
                 (
                     "report and closeout structure",
-                    "tools/runtime/dispatch/agent-canon/src/task_close.rs",
-                    "closeout gate",
+                    "agents/canonical/CODEX_COMPLETION.md",
+                    "Completion Review",
                 ),
                 (
                     "entrypoint responsibility grammar",
@@ -299,12 +292,12 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                 ),
                 (
                     "Python, Rust, and LSP tool dispatch",
-                    "tools/runtime/dispatch/tool_dispatch.py",
+                    "tools/runtime/dispatch/agent-canon/src/tool_dispatch.rs",
                     "tool dispatch tests",
                 ),
                 (
                     "skill and agent installation",
-                    "tools/agent/skills/skill_shim_materializer.py",
+                    "tools/runtime/dispatch/agent-canon/src/catalog/skill_materialization.rs",
                     "skill materializer check",
                 ),
                 (
@@ -337,12 +330,12 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                 (
                     "workflow family and role candidates",
                     "agents/task_catalog.yaml",
-                    "check_agent_runtime_alignment.py",
+                    "tools/bin/agent-canon check-agent-runtime-alignment",
                 ),
                 (
                     "public skill registry",
                     "agents/skills/catalog.yaml",
-                    "check_agent_runtime_alignment.py",
+                    "tools/bin/agent-canon check-agent-runtime-alignment",
                 ),
                 (
                     "AgentCanon update transaction",
@@ -370,28 +363,18 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                     "agents/agents_config.json",
                 ),
                 (
-                    "optional run bundle and actual route evidence",
-                    "bootstrap_agent_run.py",
-                    "workflow_monitor.py",
-                ),
-                (
                     "skill selection",
                     "agents/skills/catalog.yaml",
-                    "python3 tools/agent/orchestration/route.py --prompt",
+                    "tools/bin/agent-canon route --prompt",
                 ),
                 (
                     "implementation guidance and closeout",
                     "agents/skills/codex-task-workflow.md",
                 ),
                 (
-                    "active design packet schema",
-                    "agents/COMMUNICATION_PROTOCOL.md",
-                    "agents/agents_config.json#artifacts.active_design_packet",
-                ),
-                (
                     "closeout authority",
-                    "task_close.rs",
-                    "report_artifact_checks.py",
+                    "agents/canonical/CODEX_COMPLETION.md",
+                    "report_artifact_checks.rs",
                 ),
             ),
         ),

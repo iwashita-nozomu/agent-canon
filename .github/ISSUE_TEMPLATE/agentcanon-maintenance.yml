@@ -5,7 +5,7 @@
 # upstream design ../../documents/runtime/private-feedback-knowledge.md private GitHub Issue transport policy.
 # upstream design ../AGENTS.md GitHub subtree instructions.
 # upstream design ../../templates/documents/README.md canonical template owner.
-# downstream implementation ../../tools/validation/ci/checks/check_github_workflows.py validates GitHub surface conventions.
+# downstream implementation ../../tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs validates GitHub surface conventions.
 # @dependency-end
 
 # Canonical source and checked-in standalone target: update templates/documents/github/issue/agentcanon-maintenance.yml and .github/ISSUE_TEMPLATE/agentcanon-maintenance.yml together.
@@ -44,6 +44,7 @@ body:
       value: |
         ## 発生事象と現在の作業状態
         以下は起票時だけの計画ではなく current snapshot です。branch、commit、PR、validation、blocker が変わるたびに Issue 本文を更新します。
+        原因に必要な入力条件と管理可能な再現ケースを記録します。報告元の実ホスト・絶対path・接続情報の記載や、その実環境での再実行は必須にしません。
   - type: textarea
     id: current_behavior
     attributes:
@@ -107,7 +108,7 @@ body:
     id: reproduction
     attributes:
       label: 再現
-      description: clean state、fixture、branch、期待結果と実結果を含む最小 command を記録します。
+      description: 管理可能な最小fixtureと公開API/CLIを使い、必要な入力条件・command・期待結果と実結果を記録します。
       value: |
         preconditions:
         command:
@@ -183,6 +184,7 @@ body:
     id: required_validation
     attributes:
       label: 必須 validation
+      description: 変更した性質を確認できるfixture、既存test、API/CLI、CIを選びます。特定の実環境への適用・確認は、明示依頼がある場合に別の作業として扱います。
       value: |
         - [ ] targeted local check:
         - [ ] Markdown/math/Mermaid docs check:

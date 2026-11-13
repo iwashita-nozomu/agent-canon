@@ -13,8 +13,7 @@ downstream design ../../agents/skills/md-style-check.md routes Markdown style wo
 # agent-canon CLI
 
 `agent-canon` is the canonical Rust entrypoint for deterministic AgentCanon
-tooling. This page covers the command families that share the wrapper, including
-the read-only TaskClose terminal consumer.
+tooling. This page covers the command families that share the wrapper.
 `agent-canon docs` owns Markdown documentation formatting and adjacent checks.
 `agent-canon test-design` owns resilient test-design diagnostics.
 The host lifecycle invokes `codex-config` after native compilation to project
@@ -24,7 +23,7 @@ stdout, which the host writes to its same-directory temporary file before the
 atomic replacement. This helper does not create a separate host configuration
 route.
 Deterministic prompt-to-skill routing is owned by
-`python3 tools/agent/orchestration/route.py --prompt`.
+`tools/bin/agent-canon route --prompt`.
 
 Use `tools/bin/agent-canon docs -h` as the option contract before opening
 implementation files. The help output lists commands, shared options, and
@@ -37,8 +36,8 @@ examples in a compact text block.
 - Main path: Commands and Legacy Entrypoints.
 - Read this before using `agent-canon docs` or deciding whether a legacy
   Python entrypoint should forward to the Rust wrapper.
-- Boundary: prompt-to-skill routing remains owned by
-  `python3 tools/agent/orchestration/route.py --prompt`.
+- Boundary: prompt-to-skill routing is owned by
+  `tools/bin/agent-canon route --prompt`.
 
 ## Commands
 
@@ -49,11 +48,25 @@ tools/bin/agent-canon docs format <paths...>
 tools/bin/agent-canon docs find-redundant-designs [--design-root <path>] [--delete] [--mutation-capability-json <json>] [--runtime-root <path>] [--output <path>]
 tools/bin/agent-canon docs check-entrypoints [--root <repo-root>] [--format text|json]
 tools/bin/agent-canon docs check-bootstrap [--root <path>] [--static-seed-consumer]
+tools/bin/agent-canon template-bundle export --source-root <root> --source-ref <commit-ish> --profile static-seed --output <directory>
+tools/bin/agent-canon template-bundle committed-tree --source-root <root> --source-ref <commit-ish>
 tools/bin/agent-canon test-design check <test-paths...>
-tools/bin/agent-canon task-close (--run-id <run-id> | --report-dir <path>) [--report-root <path>] [--runtime-root <path>]
+tools/bin/agent-canon render-code-template --root <agent-canon-source> <template-path>
+tools/bin/agent-canon run-accumulated-agent-evals --root <root> --runtime-root <external-root> --run-id <id>
+tools/bin/agent-canon check-agent-runtime-alignment --root <root>
+tools/bin/agent-canon evaluate-codex-agent-roles --root <root> --generate-role-views [--projection live|consumer-static]
+tools/bin/agent-canon evaluate-codex-agent-roles --root <root> --check-role-views [--projection live|consumer-static]
+tools/bin/agent-canon skill-shim-materializer {check,materialize,readback} --root <root> --all
 agent-canon codex-config --source-config <read-only-source-config>
-python3 tools/agent/orchestration/route.py --prompt "<request>" --mode routing-only --format json
+tools/bin/agent-canon route --prompt "<request>" --mode routing-only --format json
 ```
+
+`render-code-template` writes the selected canonical template bytes to stdout;
+the caller selects a destination. `run-accumulated-agent-evals` runs the
+registered native role and workflow producers and captures their output under
+the external runtime owner. `skill-shim-materializer` uses the catalog-derived
+native v3 owner for checks, external readback, or capability-scoped source
+materialization.
 
 `check` invokes the configured `markdownlint-cli2` and offline `lychee` commands
 for the selected Markdown paths, parses each file with Quarto's embedded
@@ -66,6 +79,14 @@ directory; it never rewrites diagram source. When no path is supplied, the
 command checks the repository documentation targets used by the shared docs
 gate.
 
+The native CLI includes default Markdown and link settings. A project's
+`.markdownlint-cli2.jsonc` and `tools/validation/documentation/config/lychee.toml`
+take precedence when present. Absent settings use temporary copies of the
+bundled defaults; the command creates no configuration inside the project.
+Invalid project settings are reported by the provider and remain unchanged.
+The external providers themselves must be installed or supplied by the shared
+runtime.
+
 If the command contract is unclear, run `tools/bin/agent-canon docs -h` first.
 
 `docs check-bootstrap` validates bootstrap-facing documentation and can validate
@@ -74,12 +95,17 @@ an exported static seed or source-hidden consumer root with
 bootstrap-check findings and pass/fail markers without resolving an AgentCanon
 source checkout.
 
+`template-bundle export --profile static-seed` exports the exact allowlisted
+source snapshot. `template-bundle committed-tree` returns the resolved commit
+and complete Git tree entries for native consumers such as the dependency graph
+renderer.
+
 `test-design check` reports missing oracle, brittle coupling, exact
 mock/output/prose assertions, time coupling, unseeded randomness, and
 property/metamorphic candidates. Its detailed contract lives in
 [test_design.md](test_design.md).
 
-`route.py --prompt` returns the full selected `SKILLS`, `ACTIVE_SKILLS` for the
+`agent-canon route --prompt` returns the full selected `SKILLS`, `ACTIVE_SKILLS` for the
 current stage, and `DEFERRED_SKILLS` for dynamic wave triggers. Use it before
 broad skill-selection prose or subagent fan-out.
 
@@ -106,5 +132,6 @@ its report. Its `--delete` mode requires an explicit source mutation capability;
 all deletion grants and the external report destination are admitted before
 source files are removed. `docs find-similar-designs` compares design Markdown
 with the native SequenceMatcher owner and writes its report to the external
-runtime. Organization remains a Python planner; apply requires its explicit
-mutation capability. No documentation tool defaults output to the source checkout.
+runtime. `docs organize-designs` plans placements without source writes; its
+`--apply` mode requires an explicit mutation capability for every target. No
+documentation tool defaults output to the source checkout.

@@ -13,13 +13,15 @@
 // downstream implementation dependency_headers.rs checks selected dependency manifests and typed edge syntax
 // downstream implementation check_merge_structure.rs validates local structural integration readback
 // downstream implementation run_evaluation.rs scores and reports one agent run bundle
-// downstream implementation task_close.rs owns the native coordinated closeout route
 // downstream implementation generated_completeness.rs routes the G2 receipt producer
 // downstream implementation graph.rs routes one-build dependency and runtime-evidence graph commands
-// downstream implementation graph_client.rs exposes the in-process typed graph client API
+// downstream implementation graph_client.rs exposes the in-process typed graph client API and native consumer CLI
+// downstream implementation source_dependency_graph.rs exports tracked-source facts and source target resolution
 // downstream implementation agent_search.rs routes explicit repository-search provider requests
 // upstream implementation lib.rs exposes shared user-home path expansion
 // downstream implementation tool_drift.rs checks tool, workflow, and documentation traces
+// downstream implementation github_workflow_check.rs validates standalone workflows and PR templates
+// downstream implementation python_cli_options.rs resolves unique argparse-compatible option prefixes
 // downstream implementation theorem_graph_board.rs builds formal-proof theorem route summaries
 // downstream implementation ../../../../../tests/tools/test_fix_mermaid.py exercises docs formatter coverage readback through this CLI
 // downstream implementation jit_ir_to_lean.rs routes JIT-canonical JSON to Lean evidence generation
@@ -41,10 +43,18 @@
 // downstream implementation test_design.rs routes test design resilience diagnostics
 // downstream implementation entrypoint_owner_map.rs checks root entrypoint owner-map contracts within docs
 // downstream implementation notebook_quality.rs validates notebook quality as readable runnable demos
+// downstream implementation tool_rejection_preflight.rs predicts optional rejection gates for planned paths
 // downstream implementation result_logs/mod.rs converts and summarizes JSONL result records
+// downstream implementation historical_skill_usage.rs reads archived skill-usage history
+// downstream implementation eval_accumulation_check.rs validates accumulated hook and eval results
+// downstream implementation token_footprints.rs routes token comparison and summary evidence
+// downstream implementation codex_runtime_summary.rs routes bounded Codex runtime summary export
 // downstream implementation lib.rs exposes the selected native Lean proof environment API
 // downstream implementation lsp_code_analysis.rs serves the native LSP CLI and provider API
+// downstream implementation tool_dispatch.rs routes typed catalog commands through the native CLI
+// downstream implementation catalog/skill_routes.rs routes explicit skill capabilities
 // upstream implementation lib.rs exposes native SCIP index and Git dependency summary APIs
+// downstream implementation extract_docx.rs routes the native DOCX extraction command
 // @dependency-end
 
 mod agent_search;
@@ -56,6 +66,7 @@ mod config;
 mod dependency_headers;
 mod dependency_manifest;
 mod file_surface_inventory;
+mod github_workflow_check;
 mod graph;
 pub mod graph_client;
 mod jit_ir_to_lean;
@@ -65,14 +76,15 @@ mod notebook_quality;
 mod numeric_performance;
 mod python_algorithm_contract;
 mod python_ast;
-mod python_cli_integer;
+use agent_canon::python_cli_integer;
+mod python_cli_options;
 mod python_helper_function_inventory;
 mod python_module_groups;
 mod python_structure_hash;
 mod python_structure_hash_impact;
 mod python_structure_hash_report;
 mod python_structure_hash_scope_plan;
-mod python_text;
+use agent_canon::python_text;
 mod responsibility_scope;
 mod result_logs;
 mod rule_inventory;
@@ -86,38 +98,50 @@ pub mod source_dependency_graph;
 mod structured_analysis;
 mod surface_manifest;
 mod test_design;
+mod token_footprints;
 mod tool_drift;
+mod tool_rejection_preflight;
 
 #[cfg(not(test))]
 use agent_canon::runtime_boundary;
 use agent_canon::{
-    catalog, compare_agent_run_paths, entrypoint_composer, generated_completeness, native_release,
-    report_artifact_checks, run_evaluation, stablehlo_value_closure, template_bundle,
-    theorem_graph_board, theorem_graph_circularity_check, tool_proof_coverage,
+    catalog, codex_runtime_summary, compare_agent_run_paths, entrypoint_composer, extract_docx,
+    generated_completeness, native_release, report_artifact_checks, run_evaluation,
+    stablehlo_value_closure, template_bundle, theorem_graph_board, theorem_graph_circularity_check,
+    tool_dispatch, tool_proof_coverage,
 };
 use std::env;
 
 const HELP: &str = "AgentCanon's native command line interface.
 
 Usage: agent-canon <command> [arguments]
+  experiment-registry [--repo-root ROOT] [--registry PATH]
 
 Commands:
+  evaluate-codex-agent-roles [--root ROOT] [--runtime-root PATH] [--accumulate] [--format text|json]
+  check-agent-runtime-alignment [--root ROOT] [--format text|json]
+  evaluate-workflow-selection [--root ROOT] [--manifest PATH] [--accumulate] [--runtime-root PATH]
+  check-skill-tool-invocation-graph [--root ROOT]
+  skill-dependency-map <check|graph> [options]
   knowledge|k <search|read|add|status|sync|capture>
   feedback|f <add|status|sync|capture>
   graph <build|status|query|context> [options]
+  graph-client <status|query|context> --root <repo-root> [options] [--format json]
+  source-dependency-graph [--root <repo-root> --edges-out PATH --manifests-out PATH] | resolve-targets --root ROOT --source FILE --target PATH
   agent-search [search options]
-  check-dependency-headers [--root <repo-root>] [--changed] [--surface <glob>]... [paths...]
+  check-github-workflows [--root <repo-root>]\n  check-dependency-headers [--root <repo-root>] [--changed] [--surface <glob>]... [paths...]
   classify-path-risk [--path PATH]... [--paths-file PATH] [--format text|json|github-output] [--full-confidence]
-  docs <check|format|find-redundant-designs|find-similar-designs|check-bootstrap|check-entrypoints> [options] [paths...]
+  docs <check|format|find-redundant-designs|find-similar-designs|organize-designs|check-bootstrap|check-entrypoints> [options] [paths...]
   codex-config --source-config <path>
   test-design <check> [paths...]
   run-evaluation (--run-id ID|--report-dir PATH) [options]
-  task-close (--run-id ID|--report-dir PATH) [--report-root PATH] [--runtime-root PATH]
+  codex-hook [EVENT|--group EVENT] [--contract|--list]
   materialize-agent-canon-pr-g2 --g1-bundle <path> --source-root <root> --control-parent-root <root> --runtime-root <root> [--output <path>]
   notebook-quality [paths...] [--root <repo-root>] [--changed|--all] [--format text|json]
   generated-artifact-guard [--root <repo-root>]
   check-algorithm-config-partition [--root <repo-root>] [--exclude <pattern>]... [--format text|json] [--fail-on-finding] [--fail-on-default] [paths...]
   responsibility-scope [--root <repo-root>] [--manifest <path>] [--format text|json] [--path <path>]...
+  tool-rejection-preflight [paths...] [--root <repo-root>] [--changed] [--format text|json]
   check-merge-structure --source <ref> [--target <ref>] [--compare-commit <ref>] [--repo-root <path>]
   jit-ir-to-lean --jit-ir <path> --namespace <Lean.Namespace> --out <path>
   log-surface-inventory [--root <repo-root>] [--format text|json] [--output <path>] [--check --baseline <path>]
@@ -125,7 +149,12 @@ Commands:
   theorem-graph-circularity-check --graph <path> [--out <path>] [--format text|json|markdown] [--fail-on-finding]
   numeric-performance [--input <path|->] [--format json]
   compare-agent-run-paths --baseline-run <path> --candidate-run <path> [--report-out <path>]
+  compare-codex-token-footprints [--baseline-session <path> --candidate-session <path>] | [--session-glob <pattern>...]
+  export-codex-runtime-summary [options]
   tool-catalog [--root <repo-root>] [--format text|json|markdown]
+  tool <run|inventory|rust-cli> [options]
+  capability-route [--capability ID] [--mode routing-only|repo-changing] [--format text|json|markdown] [--root PATH]
+  route [--area AREA] [--prompt TEXT|--prompt-file PATH] [options]
   tool-drift [--root <repo-root>] [--contract NAME]... [--format text|json]
   tool-proof-coverage [--root <repo-root>] [--format text|json|markdown] [--tool-id ID]... [--require-lean-verified]
   theorem-graph-board --graph <path> [--out <path>] [--format json|markdown] [--fail-on-open] [--fail-on-unknown]
@@ -136,14 +165,36 @@ Commands:
   git-dependency-diff-summary [options] [pathspecs...]
   jsonl-to-md <input> <output>
   summarize-hlo-jsonl [--top N] [--only-case CASE] <jsonl>
+  historical-skill-usage-read --path <skill_usage.jsonl>
+  eval-accumulation-check [--root ROOT] [--runtime-root ROOT] [--family-registry PATH] [--format text|json] [--compact-out PATH]
   oop-python-rule-inventory|oop-cpp-rule-inventory [--root <repo-root>] [--format text|json|markdown]
   lean-proof-env <init|smoke|agent-smoke|counterexample-smoke|all-smoke|check-file> [options]
   check-semantic-responsibility-contract [paths...] [--root ROOT] [--template TEMPLATE] [--instance INSTANCE] [--artifact-root ARTIFACT_ROOT] [--format text|json]
   check-solid-evidence [paths...] [--root ROOT] [--changed] [--base-ref BASE_REF] [--evidence EVIDENCE] [--exclude EXCLUDE] [--verbose] [--format text|json]
   rust-migration-audit --root <repo-root>
+  check-proof-trace-alignment --trace-module PATH [options]
+  reference-materializer --url URL [--input PATH|--fetch] [options]
+  repo-structure-contract [--root ROOT] [--contract PATH] [options]
+  check-agent-canon-log-policy [--input PATH|--remote URL] [--commit SHA]
+  wiki-publish --wiki-root PATH --source-root PATH --source-commit SHA [options]
+  orphan-lifecycle <inventory|authorize-cleanup> [options]
+  render-code-template [--root SOURCE_ROOT] TEMPLATE
+  skill-shim-materializer <check|materialize|readback> [options]
+  skill-shim-evaluation [options]
+  run-accumulated-agent-evals [options]
+  update-latest-result RESULT_ROOT --variant VARIANT [--result-dir PATH]
+  parent-repository-audit <list|check> --root ROOT [options]
+  html-artifact-access REPORT_PATH [options]
+  sync-experiment-registry-context --topic TOPIC [options]
+  create-experiment-topic <topic> [options]
+  server-readiness [--layout <layout.toml>]
+  environment-dependencies <validate|dry-run|install|boundary|project-install|image-install|image-verify> [options]
+  check-skill-frontmatter [--root ROOT] [--format text|json]
+  chatgpt-codex-route --input <packet.json|->
   rust-migration-plan --root <repo-root> [--limit N] [--format text|json]
   surface-manifest [--root PATH] [--prefix PREFIX] [--manifest PATH] <normalized-snapshot|check-doc|projection-forbidden-roots>
   file-surface-inventory --root <repo-root> [--root-only|--agentcanon-only] [--json-out <path>] [--markdown-out <path>] [--max-markdown-entries N]
+  extract-docx <input.docx> --output-dir <directory>
   semantic-index <operation>
   structured-analysis <operation>
   python-structure-hash --root <repo-root> [paths...]
@@ -154,7 +205,7 @@ Commands:
   helper-function-inventory [paths...] [--root <repo-root>] [--format text|json|markdown]
   python-module-groups-check --root <repo-root> [--contract path]
   compose-consumer-entrypoint --base <path> --specific <path> --output <path> [--source-root <path>]
-  template-bundle <export|verify|native-package|native-verify|native-version> [options]
+  template-bundle <export|committed-tree|verify|native-package|native-verify|native-version> [options]
   native-release <prepare|select-artifacts|publish|compare-reproducible> [options]
 
 Options:
@@ -198,8 +249,12 @@ fn main() {
         std::process::exit(run_evaluation::run_cli(&args[2..]));
     }
 
-    if args.len() >= 2 && args[1] == "task-close" {
-        std::process::exit(agent_canon::task_close::run_cli(&args[2..]));
+    if args.len() >= 2 && args[1] == agent_canon::eval_accumulation_check::SELECTOR {
+        std::process::exit(agent_canon::eval_accumulation_check::run_cli(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "codex-hook" {
+        std::process::exit(agent_canon::hook_dispatcher::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == generated_completeness::SELECTOR {
@@ -214,6 +269,14 @@ fn main() {
         std::process::exit(compare_agent_run_paths::run(&args[2..]));
     }
 
+    if args.len() >= 2 && args[1] == "compare-codex-token-footprints" {
+        std::process::exit(token_footprints::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "export-codex-runtime-summary" {
+        std::process::exit(codex_runtime_summary::run(&args[2..]));
+    }
+
     if args.len() >= 2 && args[1] == stablehlo_value_closure::SELECTOR {
         std::process::exit(stablehlo_value_closure::run(&args[2..]));
     }
@@ -224,6 +287,51 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "tool-catalog" {
         std::process::exit(catalog::tool_catalog::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "render-code-template" {
+        std::process::exit(agent_canon::code_template_rendering::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "skill-shim-materializer" {
+        std::process::exit(catalog::skill_materialization::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "skill-shim-evaluation" {
+        std::process::exit(agent_canon::skill_shim_evaluation::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "run-accumulated-agent-evals" {
+        std::process::exit(agent_canon::eval_accumulation::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "update-latest-result" {
+        std::process::exit(agent_canon::latest_result::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "parent-repository-audit" {
+        std::process::exit(agent_canon::parent_repository_audit::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "html-artifact-access" {
+        std::process::exit(agent_canon::html_artifact_access::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "environment-dependencies" {
+        std::process::exit(agent_canon::environment_dependencies::run_cli(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "check-skill-tool-invocation-graph" {
+        std::process::exit(catalog::skill_dependency_graph::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "skill-dependency-map" {
+        std::process::exit(catalog::skill_dependency_graph::run_graph_cli(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "tool" {
+        std::process::exit(tool_dispatch::run_cli(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "capability-route" {
+        std::process::exit(catalog::skill_routes::run_capability_route(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "route" {
+        std::process::exit(catalog::skill_routes::run_task_route(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "check-github-workflows" {
+        std::process::exit(github_workflow_check::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "tool-drift" {
@@ -289,8 +397,71 @@ fn main() {
         std::process::exit(check_solid_evidence::run(&args[2..]));
     }
 
+    if args.len() >= 2 && args[1] == agent_canon::experiment_registry::SELECTOR {
+        std::process::exit(agent_canon::experiment_registry::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "evaluate-workflow-selection" {
+        std::process::exit(agent_canon::workflow_selection_eval::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "workflow-selection-manifest" {
+        if args.len() != 4 || args[2] != "--manifest" {
+            eprintln!("usage: agent-canon workflow-selection-manifest --manifest PATH");
+            std::process::exit(2);
+        }
+        match agent_canon::workflow_selection_eval::manifest_json(std::path::Path::new(&args[3])) {
+            Ok(manifest) => {
+                println!("{manifest}");
+                std::process::exit(0);
+            }
+            Err(error) => {
+                eprintln!("{error}");
+                std::process::exit(2);
+            }
+        }
+    }
+    if args.len() >= 2 && args[1] == "sync-experiment-registry-context" {
+        std::process::exit(agent_canon::experiment_registry::context::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "create-experiment-topic" {
+        std::process::exit(
+            agent_canon::experiment_registry::create_experiment_topic::run(&args[2..]),
+        );
+    }
     if args.len() >= 2 && args[1] == "rust-migration-audit" {
         std::process::exit(migration_audit::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "check-proof-trace-alignment" {
+        std::process::exit(agent_canon::check_proof_trace_alignment::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "reference-materializer" {
+        std::process::exit(agent_canon::reference_materializer::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "repo-structure-contract" {
+        std::process::exit(agent_canon::repo_structure_contract::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "check-agent-canon-log-policy" {
+        std::process::exit(agent_canon::log_policy::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "wiki-publish" {
+        std::process::exit(agent_canon::wiki_publish::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "orphan-lifecycle" {
+        std::process::exit(agent_canon::orphan_lifecycle::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == agent_canon::codex_agent_role_eval::SELECTOR {
+        std::process::exit(agent_canon::codex_agent_role_eval::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "check-agent-runtime-alignment" {
+        std::process::exit(agent_canon::runtime_alignment::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == agent_canon::server_readiness::SELECTOR {
+        std::process::exit(agent_canon::server_readiness::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "check-skill-frontmatter" {
+        std::process::exit(agent_canon::skill_frontmatter::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "chatgpt-codex-route" {
+        std::process::exit(agent_canon::chatgpt_codex_routing::run_cli(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "rust-migration-plan" {
@@ -309,8 +480,16 @@ fn main() {
         std::process::exit(responsibility_scope::run(&args[2..]));
     }
 
+    if args.len() >= 2 && args[1] == tool_rejection_preflight::SELECTOR {
+        std::process::exit(tool_rejection_preflight::run(&args[2..]));
+    }
+
     if args.len() >= 2 && args[1] == "file-surface-inventory" {
         std::process::exit(file_surface_inventory::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "extract-docx" {
+        std::process::exit(extract_docx::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "docs" {
@@ -331,6 +510,14 @@ fn main() {
         std::process::exit(graph::run(&args[2..]));
     }
 
+    if args.len() >= 2 && args[1] == "graph-client" {
+        std::process::exit(graph_client::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "source-dependency-graph" {
+        std::process::exit(source_dependency_graph::run(&args[2..]));
+    }
+
     if args.len() >= 2 && args[1] == "agent-search" {
         std::process::exit(agent_search::run(&args[2..]));
     }
@@ -345,6 +532,10 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "summarize-hlo-jsonl" {
         std::process::exit(result_logs::run_summary(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == agent_canon::historical_skill_usage::SELECTOR {
+        std::process::exit(agent_canon::historical_skill_usage::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "semantic-index" {

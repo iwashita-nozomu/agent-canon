@@ -3,7 +3,6 @@
 contract template
 responsibility Provides reusable reader-map and lifecycle fields for run artifacts.
 upstream design ../README.md partial expansion and generated artifact boundary.
-downstream implementation ../../../tools/agent/orchestration/agent_team.py expands this partial.
 @dependency-end
 -->
 

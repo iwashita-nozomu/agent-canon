@@ -4,7 +4,7 @@
 # responsibility Projects and validates dependency relations directly from tracked source manifests.
 # upstream design ../../../documents/design/source-owned-dependency-validation.md source-derived graph projection authority
 # upstream design ../../../documents/design/dependency-manifest-design.md dependency graph semantics
-# upstream implementation ./source_dependency_graph.py owns source parsing, canonical binding, and review export
+# upstream implementation ../../runtime/dispatch/agent-canon/src/source_dependency_graph.rs owns source parsing, canonical binding, and review export
 # upstream implementation ../../runtime/artifacts/runtime_artifacts.py owns external graph scratch and TSV publication
 # downstream implementation ./render_dependency_manifest_graph.py renders exported dependency TSV
 # downstream implementation ../../../tests/agent_tools/test_dependency_manifest_tools.py verifies source-derived graph review
@@ -167,7 +167,7 @@ normalize_path_array EDIT_SCOPE_PATHS
 
 CANON_SCRIPT_PATH="$(realpath -m "${BASH_SOURCE[0]}")"
 TOOL_DIR="$(dirname "$CANON_SCRIPT_PATH")"
-SOURCE_GRAPH_TOOL="${TOOL_DIR}/source_dependency_graph.py"
+NATIVE_CLI="${AGENT_CANON_CLI:-${ROOT_DIR}/tools/bin/agent-canon}"
 TEMP_BASE="$(runtime_path tmp/dependency-graph)" || exit $?
 mkdir -p "$TEMP_BASE"
 TEMP_ROOT="$(mktemp -d "$TEMP_BASE/run.XXXXXX")"
@@ -192,7 +192,7 @@ cleanup_dependency_graph_temp() {
 }
 trap cleanup_dependency_graph_temp EXIT
 
-if ! python3 "$SOURCE_GRAPH_TOOL" \
+if ! "$NATIVE_CLI" source-dependency-graph \
   --root "$ROOT_DIR" \
   --edges-out "$all_edges" \
   --manifests-out "$manifest_files"; then

@@ -6,7 +6,7 @@ responsibility Owns experiment run identity, lifecycle state, reproducibility co
 upstream design ../canonical/skills.md skill canon registry
 upstream design structure-planning.md reusable experiment and report structure contract
 upstream design prose-reasoning-graph.md prose graph experiment-plan diagnostics overlay
-downstream implementation ../../tools/validation/semantic/tools/tool_rejection_preflight.py predicts experiment execution surface guardrails
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/tool_rejection_preflight.rs predicts experiment execution surface guardrails
 @dependency-end
 -->
 
@@ -49,7 +49,7 @@ closeout are separate conditional tasks.
 
 When topic setup is part of the request, use the caller's existing creator or
 scaffold. For an AgentCanon experiment topic, its native creator is
-`python3 tools/experiments/lifecycle/create_experiment_topic.py <topic>`; select
+`tools/bin/agent-canon create-experiment-topic <topic>`; select
 supported options only when the topic's actual needs call for them.
 
 ## Topic boundary

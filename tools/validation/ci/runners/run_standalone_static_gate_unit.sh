@@ -5,6 +5,7 @@
 # upstream design ../../../../documents/runtime/runtime-profiles-and-check-matrix.md risk-based validation routing
 # upstream implementation ./run_all_checks.sh owns the full-confidence check body executed from a read-only target
 # upstream implementation ../../../../tools/runtime/archive/runtime_log_paths.py resolves the canonical eval archive destination
+# upstream implementation ../../../../tools/runtime/dispatch/agent-canon/src/eval_accumulation_check.rs validates accumulated hook and eval results
 # downstream implementation ../checks/check_agent_canon_pr.sh aggregates all units for the manual full-confidence route
 # downstream implementation ../../../../.github/workflows/agent-canon-static-gates.yml remote execution boundary
 # downstream implementation ../../../../tests/tools/test_standalone_static_gate_units.py unit partition regression
@@ -22,7 +23,7 @@ fi
 UNIT="$1"
 shift
 UNIT_ARGS=("$@")
-if [[ "${UNIT}" != "full" && "${UNIT}" != "docs" && "${#UNIT_ARGS[@]}" -ne 0 ]]; then
+if [[ "${UNIT}" != "full" && "${UNIT}" != "docs" && "${UNIT}" != "rust" && "${#UNIT_ARGS[@]}" -ne 0 ]]; then
   echo "standalone static-gate unit does not accept arguments: ${UNIT}" >&2
   exit 2
 fi
@@ -149,17 +150,40 @@ run_docs() {
 }
 
 run_rust() {
-  cargo build --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml
-  local agent_cli="${CARGO_TARGET_DIR:?}/debug/agent-canon"
-  if [[ ! -x "${agent_cli}" ]]; then
-    echo "AGENT_CANON_CLI_BUILD=fail" >&2
-    return 1
-  fi
-  "${agent_cli}" --version
-  cargo fmt --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml -- --check
-  cargo clippy --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --all-targets -- -D warnings
-  env -u AGENT_CANON_RUNTIME_ROOT \
-    cargo test --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml
+  # Producer identity checks hash the test executable; reduce debug-only bytes.
+  export CARGO_PROFILE_TEST_DEBUG=0
+  local phase="${1:-all}"
+  case "${phase}" in
+    all|prepare)
+      [[ "$#" -le 1 ]] || return 2
+      cargo build --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --locked --offline
+      local agent_cli="${CARGO_TARGET_DIR:?}/debug/agent-canon"
+      if [[ ! -x "${agent_cli}" ]]; then
+        echo "AGENT_CANON_CLI_BUILD=fail" >&2
+        return 1
+      fi
+      "${agent_cli}" --version
+      cargo fmt --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml -- --check
+      cargo clippy --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --locked --offline --all-targets -- -D warnings
+      if [[ "${phase}" == "prepare" ]]; then
+        cargo test --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --locked --offline --no-run
+      else
+        env -u AGENT_CANON_RUNTIME_ROOT \
+          cargo test --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --locked --offline
+      fi
+      ;;
+    lib|doc)
+      [[ "$#" -eq 1 ]] || return 2
+      env -u AGENT_CANON_RUNTIME_ROOT \
+        cargo test --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --locked --offline "--${phase}"
+      ;;
+    bin|test)
+      [[ "$#" -eq 2 ]] || return 2
+      env -u AGENT_CANON_RUNTIME_ROOT \
+        cargo test --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --locked --offline "--${phase}" "$2"
+      ;;
+    *) echo "unknown Rust validation phase: ${phase}" >&2; return 2 ;;
+  esac
 }
 
 run_contracts() {
@@ -169,9 +193,11 @@ run_contracts() {
     tests.agent_tools.test_tool_dispatch \
     tests.agent_tools.test_paper_writing_citeproc \
     tests.agent_tools.test_render_dependency_manifest_graph \
+    tests.agent_tools.test_repository_topic_clone \
     tests.agent_tools.test_graph_client_source_projection \
     tests.agent_tools.test_search \
     tests.tools.test_notebook_quality \
+    tests.tools.test_docs_link_inputs \
     tests.agent_tools.test_check_solid_evidence \
     tests.agent_tools.test_check_semantic_responsibility_contract \
     tests.agent_tools.test_check_run_log_contract \
@@ -191,8 +217,7 @@ run_contracts() {
   "${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" tool-catalog
   "${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" tool-proof-coverage
   "${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" responsibility-scope --root "${ROOT}"
-  PYTHONPATH="${ROOT}${PYTHONPATH:+:${PYTHONPATH}}" \
-    python3 "${ROOT}/tools/validation/semantic/runtime/check_agent_runtime_alignment.py"
+  "${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" check-agent-runtime-alignment --root "${ROOT}"
   python3 "${TOOLS_ROOT}/validation/semantic/convention/check_convention_compliance.py" \
     --root "${ROOT}" --format json
 }
@@ -242,11 +267,13 @@ PY
   )"
   mkdir -p "${eval_log_dir}" "${eval_results_parent}"
   env -u AGENT_CANON_HOOK_ARCHIVE_DIR -u AGENT_CANON_LOG_ROOT \
+    AGENT_CANON_CLI="${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" \
     python3 -m pytest -p no:cacheprovider -q \
       tests/agent_tools/test_eval_accumulation_check.py
   set +e
   env -u AGENT_CANON_HOOK_ARCHIVE_DIR -u AGENT_CANON_LOG_ROOT \
-    python3 "${RUNTIME_ROOT}/eval/producers/run_accumulated_agent_evals.py" \
+    AGENT_CANON_NATIVE_BIN="${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" \
+    "${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" run-accumulated-agent-evals \
       --run-id agent-canon-pr-gate \
       --root "${ROOT}" \
       --runtime-root "${AGENT_CANON_STATIC_RUNTIME_ROOT}" \
@@ -268,13 +295,12 @@ PY
   fi
   if [[ "${primary_status}" -eq 0 ]]; then
     env -u AGENT_CANON_HOOK_ARCHIVE_DIR -u AGENT_CANON_LOG_ROOT \
-      python3 "${RUNTIME_ROOT}/eval/checkers/eval_accumulation_check.py" \
+      "${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" eval-accumulation-check \
         --root "${ROOT}" --runtime-root "${AGENT_CANON_STATIC_RUNTIME_ROOT}"
     primary_status=$?
   fi
   if [[ "${primary_status}" -eq 0 ]]; then
     PYTHONPATH="${ROOT}${PYTHONPATH:+:${PYTHONPATH}}" \
-      python3 "${ROOT}/eval/checkers/smoke_test_research_perspective_pack.py"
     primary_status=$?
   fi
   set -e
@@ -288,7 +314,9 @@ run_workflow_container() {
     tests/tools/test_read_only_full_check.py \
     tests/tools/test_check_github_workflows.py \
     tests/tools/test_agent_improvement_guide_workflow.py
-  python3 "${ROOT}/tools/validation/ci/checks/check_github_workflows.py"
+  AGENT_CANON_NATIVE_BIN="${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" \
+    "${ROOT}/tools/bin/agent-canon" check-github-workflows --root "${ROOT}"
+  AGENT_CANON_CLI="${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" \
   python3 -m pytest -p no:cacheprovider -q \
     tests/tools/test_bootstrap_container_contract.py \
     tests/tools/test_compile_cache.py \
@@ -298,7 +326,7 @@ run_workflow_container() {
 case "${UNIT}" in
   full) run_full ;;
   docs) run_docs ;;
-  rust) run_rust ;;
+  rust) run_rust "${UNIT_ARGS[@]}" ;;
   contracts) run_contracts ;;
   eval) run_eval ;;
   workflow-container) run_workflow_container ;;

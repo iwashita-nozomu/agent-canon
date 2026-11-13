@@ -2,7 +2,7 @@
 @dependency-start
 contract reference
 responsibility Documents deterministic static-seed export and source-free consumer validation commands.
-upstream implementation ../../tools/runtime/source/export_static_seed.py owns producer export.
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/template_bundle.rs owns producer export.
 upstream implementation ../../tools/runtime/dispatch/agent-canon/src/docs.rs `docs check-bootstrap` owns source-free consumer validation.
 upstream design ../contracts/static-seed-export.md owns seed content and consumer boundaries.
 upstream design ../contracts/static-seed-allowlist.toml owns the sole exact-path allowlist.
@@ -19,9 +19,10 @@ downstream implementation ../../tests/tools/test_check_bootstrap_docs.py exercis
 存在していない directory を指定します。
 
 ```bash
-python3 tools/runtime/source/export_static_seed.py \
+tools/bin/agent-canon template-bundle export \
   --source-root . \
   --source-ref "$(git rev-parse HEAD)" \
+  --profile static-seed \
   --output /tmp/agent-canon-static-seed
 ```
 
@@ -32,12 +33,12 @@ allowlist と payload は同じ commit から読みます。worktree file を直
 role view は export 前に canonical materializer の static mode で生成します。
 
 ```bash
-python3 tools/agent/orchestration/model_profile_registry.py \
+tools/bin/agent-canon evaluate-codex-agent-roles \
   --root . --generate-role-views --projection consumer-static
 ```
 
 この mode は invocation 時だけ存在し、生成 schema や `projection_digest` の field set を変更しません。
-exporter は committed tree の exact bytes を検証してコピーするだけです。
+native exporter は committed tree の exact bytes を検証してコピーするだけです。
 
 成功時は `AGENT_CANON_STATIC_SEED=exported`、失敗時は
 `AGENT_CANON_STATIC_SEED=fail` を出力します。allowlist 外の file、symlink、gitlink、実行可能 file、
@@ -61,6 +62,6 @@ surface の不在だけを consumer tree から検証します。成功時は
 focused validation:
 
 ```bash
-python3 -m unittest tests.agent_tools.test_export_static_seed -v
+AGENT_CANON_CLI="$PWD/tools/bin/agent-canon" python3 -m unittest tests.agent_tools.test_export_static_seed -v
 python3 -m unittest tests.tools.test_check_bootstrap_docs -v
 ```

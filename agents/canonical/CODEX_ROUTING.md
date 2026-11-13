@@ -79,7 +79,7 @@ extension point, use [API surface traversal](../../documents/design/api-surface-
 Check public imports/exports, signatures, nested configuration, examples, and
 actual consumers; retain the source-backed decision in the owning design.
 
-Public failure recording uses [Notes Lifecycle](../../documents/operations/notes-lifecycle.md#failed-verification-record).
+Requested public failure notes use [Notes Lifecycle](../../documents/operations/notes-lifecycle.md#failed-verification-record).
 Select [agent-learning](../skills/agent-learning.md#reader-map) for private
 knowledge/feedback or an agent-behavior learning decision. Stable preferences
 are explicit changes to their canonical owner.

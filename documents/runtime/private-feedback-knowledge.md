@@ -4,7 +4,6 @@ contract agent-runtime
 responsibility Defines the private feedback/knowledge command boundary and its external agent-canon-log storage route.
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/private_feedback.rs owns native private storage and sync semantics
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/runtime_boundary.rs owns handle-relative files and spool locks
-downstream implementation ../../tools/runtime/lifecycle/workflow_monitor.py structured feedback capture
 @dependency-end
 -->
 
@@ -35,7 +34,7 @@ volume:
 
 The root `/var/lib/agent-canon/spool/<run-id>` remains the independent eval
 spool. The host adapter exports only the private-feedback subtree to temporary
-staging under `<install-root>/.runtime/container-state/spool/`. A successful
+staging under `<control-root>/.runtime/container-state/spool/`. A successful
 `k/f add`, `k capture`, or structured runtime-feedback capture creates or
 reuses one typed, body-free request below the private-feedback spool; explicit
 `k/f sync` remains available for retry. Bootstrap invokes the host-shell

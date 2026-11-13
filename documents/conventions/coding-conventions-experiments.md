@@ -41,7 +41,7 @@ upstream design ../experiments/gpu-admission-r5-source-packet.md exact managed G
 - native C++ experiment source と target wiring は selected CMake profile の project owner に従います。
 - topic ごとに `README.md`、`run.py`、`cases.py`、`config.yaml`、`visualization.py`、`result/` を基準にします。
 - `experiments/<topic>/README.md` は、その topic の実験内容、問い、比較対象、標準コマンド、設定正本、可視化 renderer、出力 schema、run_name 規則を持つ正本 entrypoint です。
-- 新規 topic は実験名を固定し、`python3 tools/experiments/lifecycle/create_experiment_topic.py <topic>` を実行します。create tool が `experiments/<topic>/` の scaffold、`README.md`、`provenance.toml`、registry entry を一括配置します。その後、`run.py` の `main::main`、`cases.py`、`config.yaml`、`visualization.py`、`README.md` の順で編集します。
+- 新規 topic は実験名を固定し、`tools/bin/agent-canon create-experiment-topic <topic>` を実行します。create tool が `experiments/<topic>/` の scaffold、`README.md`、`provenance.toml`、registry entry を一括配置します。その後、`run.py` の `main::main`、`cases.py`、`config.yaml`、`visualization.py`、`README.md` の順で編集します。
 - 可視化は `experiments/<topic>/visualization.py` の renderer に置きます。renderer は結果確認と図表化の入口であり、正式 run の起動、細かな test、設定正本の置き場にしません。
 - topic の正本 entrypoint と smoke / formal command は `experiments/registry.toml` に集約します。
 - native target の project entrypoint、manifest location、target name は selected CMake profile と
@@ -104,7 +104,7 @@ upstream design ../experiments/gpu-admission-r5-source-packet.md exact managed G
 .PHONY: experiment-check experiment-smoke experiment-formal
 
 experiment-check:
-  python3 -m tools.validation.ci.checks.check_experiment_registry
+  agent-canon experiment-registry
 
 experiment-smoke:
   python3 -m tools.experiments.execution.run_managed_experiment \

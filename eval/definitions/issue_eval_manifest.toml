@@ -3,7 +3,7 @@
 # responsibility Registers issue-derived AgentCanon behavior eval cases.
 # upstream design ../../documents/codex/prompt-skill-evaluation-checklist.md defines eval taxonomy and close conditions.
 # upstream design ../../agents/skills/issue-finding-report.md defines GitHub-only Issue ownership and reorganization.
-# downstream implementation ../../eval/checkers/eval_accumulation_check.py validates eval accumulation surfaces.
+# downstream implementation ../../tools/runtime/dispatch/agent-canon/src/eval_accumulation_check.rs validates eval accumulation surfaces.
 # @dependency-end
 
 catalog_kind = "agent_canon_issue_eval_manifest"
@@ -236,7 +236,7 @@ forbidden_route = [
   "diagnose only one copied root file while ignoring shared root view state",
 ]
 linked_rules = [
-  "tools/analysis/code/parent_repository_audit.py",
+  "tools/runtime/dispatch/agent-canon/src/parent_repository_audit.rs",
   "tests/agent_tools/test_parent_repository_audit.py",
 ]
 
@@ -258,7 +258,7 @@ forbidden_route = [
 ]
 linked_rules = [
   "documents/contracts/derived-repo-bootstrap-runbook.md",
-  "tools/analysis/code/parent_repository_audit.py",
+  "tools/runtime/dispatch/agent-canon/src/parent_repository_audit.rs",
 ]
 
 [[eval]]

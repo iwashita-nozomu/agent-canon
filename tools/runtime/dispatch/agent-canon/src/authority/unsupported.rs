@@ -1,6 +1,7 @@
 use super::{
     AttestationRequest, AttestedParent, AuthorityError, ChildHandoffReceipt, ChildHandoffRequest,
-    FileMode, NonEmptyTrimmedString, ParentOwnedPathReceipt, ParentRootReject,
+    FileMode, NonEmptyTrimmedString, ParentOwnedNoReplaceOutcome, ParentOwnedPathReceipt,
+    ParentRootReject,
 };
 use std::path::Path;
 
@@ -33,6 +34,13 @@ pub(crate) fn read_parent_owned_file(
     Err(unsupported())
 }
 
+pub(crate) fn remove_parent_owned_file(
+    _: &AttestedParent,
+    _: &ParentOwnedPathReceipt,
+) -> Result<(), AuthorityError> {
+    Err(unsupported())
+}
+
 pub(crate) fn atomic_replace_parent_owned_file(
     _: &AttestedParent,
     _: &ParentOwnedPathReceipt,
@@ -48,6 +56,15 @@ pub(crate) fn write_parent_owned_file(
     _: &[u8],
     _: NonEmptyTrimmedString,
 ) -> Result<ParentOwnedPathReceipt, AuthorityError> {
+    Err(unsupported())
+}
+
+pub(crate) fn publish_parent_owned_file_noreplace(
+    _: &AttestedParent,
+    _: &Path,
+    _: &[u8],
+    _: NonEmptyTrimmedString,
+) -> Result<ParentOwnedNoReplaceOutcome, AuthorityError> {
     Err(unsupported())
 }
 

@@ -1,9 +1,11 @@
 // @dependency-start
 // contract test
-// responsibility Verifies native template rendering, composition, source-bound profile export, native packaging and external artifact boundaries.
+// responsibility Verifies native template rendering, static-seed export, composition, native packaging and external artifact boundaries.
 // upstream implementation code_template_rendering.rs explicit-root code renderer
 // upstream implementation entrypoint_composer.rs consumer root composer
 // upstream implementation template_bundle.rs profile and archive owner
+// upstream design ../../../../../documents/contracts/static-seed-export.md static-seed export contract
+// upstream design ../../../../../documents/contracts/static-seed-allowlist.toml static-seed file set
 // downstream implementation lib.rs library-owned Template test module
 // @dependency-end
 
@@ -12,7 +14,7 @@ use crate::{code_template_rendering, entrypoint_composer, template_bundle};
 use flate2::read::GzDecoder;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -85,7 +87,7 @@ roots = ["templates/agents"]
 roots = ["templates/documents"]
 
 [profiles.codex-user]
-roots = ["ROOT_AGENTS.md", ".codex/hooks.json", ".codex/personal/skills", "agents/skills", "bootstrap.sh", "bootstrap/host/lifecycle/entrypoint.sh", "tools/runtime/container/bootstrap_runtime.py", ".codex/hooks/hook_dispatcher.py", "LICENSE", "tools/agent/templates", "documents/runtime/runtime-profiles-and-check-matrix.json"]
+roots = ["ROOT_AGENTS.md", ".codex/hooks.json", ".codex/personal/skills", "agents/skills", "bootstrap.sh", "bootstrap/host/lifecycle/entrypoint.sh", "tools/runtime/container/bootstrap_runtime.py", "LICENSE", "tools/agent/templates", "documents/runtime/runtime-profiles-and-check-matrix.json"]
 
 [profiles.native-cli]
 roots = ["LICENSE"]
@@ -140,11 +142,6 @@ roots = ["templates/experiments"]
         &source,
         "tools/runtime/container/bootstrap_runtime.py",
         b"# runtime\n",
-    );
-    write(
-        &source,
-        ".codex/hooks/hook_dispatcher.py",
-        b"# dispatcher\n",
     );
     write(
         &source,
@@ -241,6 +238,70 @@ roots = ["templates/experiments"]
 
 fn source_commit(root: &Path) -> String {
     git(root, &["rev-parse", "HEAD"]).trim().to_owned()
+}
+
+fn static_seed_source_fixture(parent: &Path) -> PathBuf {
+    let source = parent.join("static-seed-source");
+    fs::create_dir_all(&source).expect("create static-seed source fixture");
+    git(&source, &["init", "-q", "-b", "main"]);
+    write(
+        &source,
+        "documents/contracts/static-seed-allowlist.toml",
+        b"version = 1\nsource_repository = \"iwashita-nozomu/agent-canon\"\nfiles = [\n  \".codex/agents/worker.toml\",\n  \".codex/config.toml\",\n]\n",
+    );
+    write(
+        &source,
+        ".codex/config.toml",
+        b"[agents.worker]\nconfig_file = \"agents/worker.toml\"\n",
+    );
+    write(
+        &source,
+        ".codex/agents/worker.toml",
+        b"name = \"worker\"\ndeveloper_instructions = \"Implement a bounded change.\"\n",
+    );
+    write(&source, "unlisted.txt", b"not in the static seed\n");
+    git(&source, &["config", "user.name", "Static seed fixture"]);
+    git(
+        &source,
+        &["config", "user.email", "static-seed@example.invalid"],
+    );
+    git(&source, &["add", "--all"]);
+    git(&source, &["commit", "-qm", "static seed fixture"]);
+    source
+}
+
+fn collect_static_seed_tree(
+    root: &Path,
+    current: &Path,
+    files: &mut BTreeSet<String>,
+    directories: &mut BTreeSet<String>,
+) {
+    for entry in fs::read_dir(current).expect("read exported static-seed directory") {
+        let entry = entry.expect("read exported static-seed entry");
+        let path = entry.path();
+        let metadata = fs::symlink_metadata(&path).expect("inspect exported static-seed entry");
+        assert!(
+            !metadata.file_type().is_symlink(),
+            "unexpected symlink: {}",
+            path.display()
+        );
+        let relative = path
+            .strip_prefix(root)
+            .expect("output entry is beneath the exported seed")
+            .to_string_lossy()
+            .replace('\\', "/");
+        if metadata.is_dir() {
+            directories.insert(relative);
+            collect_static_seed_tree(root, &path, files, directories);
+        } else {
+            assert!(
+                metadata.is_file(),
+                "unexpected output entry: {}",
+                path.display()
+            );
+            files.insert(relative);
+        }
+    }
 }
 
 fn repository_root() -> PathBuf {
@@ -518,6 +579,137 @@ fn profile_identity_binds_profile_and_manifest_inputs() {
     assert_eq!(agents["source_commit"], documents["source_commit"]);
     assert_eq!(agents["manifest_digest"], documents["manifest_digest"]);
     assert_ne!(agents["bundle_digest"], documents["bundle_digest"]);
+}
+
+#[test]
+fn committed_tree_preserves_unicode_and_delimiters_in_paths() {
+    let temporary = TemporaryDirectory::new("git-paths");
+    let source = static_seed_source_fixture(temporary.path());
+    let mut names = vec!["nested/日本語 name.toml"];
+    if cfg!(unix) {
+        names.extend(["nested/tab\tname.toml", "nested/line\nname.toml"]);
+    }
+    for name in &names {
+        write(&source, name, b"known bytes\n");
+    }
+    git(&source, &["add", "--all"]);
+    git(&source, &["commit", "-qm", "unusual paths"]);
+    let commit = git(&source, &["rev-parse", "HEAD"]).trim().to_owned();
+    write(&source, names[0], b"uncommitted bytes\n");
+    let value = template_bundle::committed_tree_value(&source, &commit).unwrap();
+    assert_eq!(value["source_commit"], commit);
+    let entries = value["entries"].as_array().unwrap();
+    for name in names {
+        let entry = entries.iter().find(|entry| entry["path"] == name).unwrap();
+        assert_eq!(entry["mode"], "100644");
+        assert_eq!(entry["object_type"], "blob");
+        assert_eq!(
+            entry["object_id"],
+            git(&source, &["rev-parse", &format!("{commit}:{name}")]).trim()
+        );
+    }
+}
+
+#[test]
+fn static_seed_checks_semantic_keys_and_nested_toml_strings() {
+    for (body, expected_error) in [
+        (
+            "# agents/skills/ in a comment\n[extra]\nvalues = [{ name = 'safe' }, ['safe']]\n",
+            None,
+        ),
+        (
+            "[extra]\nvalues = [{ name = ['AgEnTs/SkIlLs/private'] }]\n",
+            Some("forbidden producer prefix"),
+        ),
+        (
+            "[[extra]]\nvalue = { nested = { hooks = 'disabled' } }\n",
+            Some("forbidden key"),
+        ),
+    ] {
+        let temporary = TemporaryDirectory::new("toml-semantics");
+        let source = static_seed_source_fixture(temporary.path());
+        write(&source, ".codex/agents/worker.toml", body.as_bytes());
+        git(&source, &["add", "--all"]);
+        git(&source, &["commit", "-qm", "nested TOML"]);
+        let result = template_bundle::load_static_seed_plan(&source, "HEAD");
+        match expected_error {
+            None => assert!(result.is_ok(), "{result:?}"),
+            Some(message) => assert!(result.unwrap_err().to_string().contains(message)),
+        }
+    }
+}
+
+#[test]
+fn static_seed_plan_can_be_written_after_source_disappears() {
+    let temporary = TemporaryDirectory::new("static-seed-plan");
+    let source = static_seed_source_fixture(temporary.path());
+    let expected_commit = source_commit(&source);
+    let plan = template_bundle::load_static_seed_plan(&source, "HEAD")
+        .expect("load a validated committed static-seed plan");
+    fs::remove_dir_all(&source).expect("hide the source repository after plan loading");
+
+    let output = temporary.path().join("seed");
+    template_bundle::write_static_seed(&plan, &output)
+        .expect("write the plan without reopening the source repository");
+    assert!(!source.exists());
+
+    let mut files = BTreeSet::new();
+    let mut directories = BTreeSet::new();
+    collect_static_seed_tree(&output, &output, &mut files, &mut directories);
+    assert_eq!(
+        files,
+        BTreeSet::from([
+            ".codex/agents/worker.toml".to_owned(),
+            ".codex/config.toml".to_owned(),
+            "agent-canon-static-seed.json".to_owned(),
+        ])
+    );
+    assert_eq!(
+        directories,
+        BTreeSet::from([".codex".to_owned(), ".codex/agents".to_owned()])
+    );
+    assert_eq!(
+        fs::read(output.join(".codex/config.toml")).unwrap(),
+        b"[agents.worker]\nconfig_file = \"agents/worker.toml\"\n"
+    );
+    assert_eq!(
+        fs::read(output.join(".codex/agents/worker.toml")).unwrap(),
+        b"name = \"worker\"\ndeveloper_instructions = \"Implement a bounded change.\"\n"
+    );
+    let provenance: Value =
+        serde_json::from_slice(&fs::read(output.join("agent-canon-static-seed.json")).unwrap())
+            .unwrap();
+    assert_eq!(provenance["schema_version"].as_i64(), Some(1));
+    assert_eq!(provenance["source_commit"], expected_commit);
+    assert_eq!(
+        provenance["source_repository"],
+        "iwashita-nozomu/agent-canon"
+    );
+    assert_eq!(provenance.as_object().unwrap().len(), 3);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        for relative in [
+            ".codex/config.toml",
+            ".codex/agents/worker.toml",
+            "agent-canon-static-seed.json",
+        ] {
+            let mode = fs::symlink_metadata(output.join(relative))
+                .unwrap()
+                .permissions()
+                .mode()
+                & 0o777;
+            assert_eq!(mode, 0o644, "incorrect file mode: {relative}");
+        }
+        for relative in [".", ".codex", ".codex/agents"] {
+            let mode = fs::symlink_metadata(output.join(relative))
+                .unwrap()
+                .permissions()
+                .mode()
+                & 0o777;
+            assert_eq!(mode, 0o755, "incorrect directory mode: {relative}");
+        }
+    }
 }
 
 #[test]

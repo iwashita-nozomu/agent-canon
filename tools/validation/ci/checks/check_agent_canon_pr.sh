@@ -9,11 +9,11 @@
 # upstream implementation ../../../runtime/artifacts/runtime_artifacts.py owns PR scratch, archive, and receipt output boundaries
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/report_artifact_checks.rs rejects regenerated report leftovers before PR check pass
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/generated_completeness.rs materializes the post-check G2 receipt
-# upstream implementation ../../semantic/runtime/check_agent_runtime_alignment.py Codex runtime role alignment eval
+# upstream implementation ../../../runtime/dispatch/agent-canon/src/runtime_alignment.rs native Codex runtime role alignment check
 # upstream implementation ../../semantic/convention/check_convention_compliance.py convention gate wiring eval
 # upstream implementation ../../../runtime/lifecycle/update_lifecycle_contract.py owns G1-G3 receipt identity.
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/main.rs owns the Rust CLI build gate.
-# upstream implementation ./check_github_workflows.py GitHub workflow and PR template checks
+# upstream implementation ../../../runtime/dispatch/agent-canon/src/github_workflow_check.rs GitHub workflow and PR template checks
 # upstream implementation run_python_quality_checks.sh owns shared Python static quality checks
 # @dependency-end
 
@@ -144,7 +144,7 @@ if git remote get-url "${REMOTE_NAME}" >/dev/null 2>&1; then
 fi
 run_direct_agent_checks() {
   run_convention_compliance_gate
-  python3 "${WORKSPACE_ROOT}/tools/validation/semantic/runtime/check_agent_runtime_alignment.py"
+  run_agent_canon check-agent-runtime-alignment --root "${WORKSPACE_ROOT}"
 }
 
 run_convention_compliance_gate() {
@@ -274,7 +274,7 @@ consume_source_correctness_receipt
 echo ""
 
 echo "1️⃣  GitHub workflow and PR template checks"
-python3 "${CANON_CI_ROOT}/checks/check_github_workflows.py"
+run_agent_canon check-github-workflows --root "${WORKSPACE_ROOT}"
 echo ""
 
 echo "2️⃣  changed AgentCanon paths"

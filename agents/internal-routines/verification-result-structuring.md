@@ -42,6 +42,9 @@ Optional document topology planning does not make the applicable steps optional.
 
 ## Reader reconstruction
 
+Apply [terms and translation](#terms-and-translation) when choosing the words
+used to explain the subject and procedure.
+
 Write for an intended reader who has the output and its explicitly identified,
 accessible references, but not the author's chat history, temporary workspace,
 or unstated assumptions. Before writeout, walk through what that reader needs
@@ -92,6 +95,23 @@ reader's task. Progress may identify a specific retained record for unchanged
 conditions, but an independently consumed document or handoff must resolve its
 necessary context without reconstructing a private conversation.
 
+## Terms and translation
+
+1. Read unfamiliar terms against the relevant specification, source definition,
+   or existing project usage. Keep the same term for the same concept and make
+   a changed meaning explicit. If the meaning is unresolved, state that gap.
+2. At first use, briefly explain a necessary term's role in this task. An acronym's
+   English expansion alone may leave that role unclear. When the reader has no
+   reason to learn an internal name, describe the actual action or object instead.
+3. In Japanese, use a conventional Japanese term or retain the established
+   original spelling. Preserve searchable product, API, command, and identifier
+   names. Explain them in ordinary Japanese instead of coining a Japanese name.
+
+Apply these decisions while drafting and rereading. A brief inline explanation
+usually suffices; a glossary is useful only when the document needs repeated
+reference. Use [notation-definition review](notation-definition-review.md) for
+an unresolved definition or inconsistent meaning that needs separate review.
+
 ## Japanese revision
 
 日本語を推敲するときは、動作主・対象・述語を確かめ、操作や結果が追えない抽象語・
@@ -108,6 +128,8 @@ necessary context without reconstructing a private conversation.
 | 「入力が妥当な場合、APIは結果を保存できる」→「入力が妥当なら、APIは結果を保存できる」 | 妥当性の条件と可能性。「必ず保存する」へ変えない |
 | 「実装は完了。検証は明日予定」→「実装は完了しました。検証は明日行う予定です」 | 実装の完了と検証の予定 |
 | 「設定変更後に処理が失敗。変更者は不明」→「設定変更後に処理が失敗しました。変更した担当者は不明です」 | 時間的な順序と不明な主体。担当者や因果を創作しない |
+| 「readbackする」→「保存した内容を読み直し、期待した内容と一致するか確認する」 | 実際の確認内容を説明する。内部の手順名を新しい日本語名へ置き換えない |
+| 「SCIPで定義を探す」→「SCIP（ソースコードの索引を交換するプロトコル）で定義を探す」 | 原語を保ち、読者に必要な役割を初出で説明する |
 
 ## Structure before writeout
 

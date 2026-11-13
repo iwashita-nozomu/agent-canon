@@ -4,12 +4,17 @@
 // responsibility Validates complete environment dependency plans and resolves receipt-bound executable capabilities.
 // upstream implementation artifacts/artifact_identity.rs owns canonical ASCII JSON bytes
 // upstream implementation ../artifacts/artifact_identity.rs provides SHA-256-compatible JSON bytes
-// upstream design ../../../../../../tools/runtime/container/devcontainer_dependencies.py owns manifest and receipt semantics
-// downstream implementation ../main.rs and future LSP/SCIP consumers use verified executable paths
+// upstream design ../../../../../documents/design/rust-agent-tool-migration.md requires native ownership of AgentCanon tools
+// upstream input ../../../../../bootstrap/container/image/dependencies.toml declares the shared dependency plan
+// downstream implementation ../main.rs dispatches the environment-dependencies command
 // downstream test ../../tests/environment_dependencies_native.rs validates plan and executable receipt behavior
 // @dependency-end
 
 use crate::artifacts::artifact_identity::canonical_json_ascii_bytes;
+use crate::authority::{
+    AttestationRequest, AttestedParent, NonEmptyTrimmedString, Nonce128, ParentRootAttestor,
+};
+use crate::python_cli_options::{resolve_long_option_prefix, LongOptionError};
 use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
@@ -23,6 +28,61 @@ const SCHEMA: &str = "agent-canon.tool-dependencies";
 const SCHEMA_VERSION: u64 = 2;
 const RECEIPT_SCHEMA: &str = "agent-canon.tool-dependency-receipt";
 const STRUCTURAL_BINDING_OUTPUT_PREFIX: &str = "agent-canon.executable-binding.structural.v1";
+const ACTIVE_SOURCE_IDENTITY: &str = "active-source";
+const CANONICAL_SNAPSHOT_IDENTITY: &str = "canonical-snapshot";
+const IMAGE_DEPENDENCIES_ROOT: &str = "/usr/local/share/agent-canon/image-dependencies";
+const IMAGE_PLAN_SCHEMA: &str = "agent-canon.image-dependencies";
+const IMAGE_PLAN_SCHEMA_VERSION: u64 = 1;
+const IMAGE_DIRECTORY_MODE: u32 = 0o555;
+const IMAGE_FILE_MODE: u32 = 0o444;
+const NPM_GLOBAL_PREFIX: &str = "/usr/local";
+const NPM_ENV_EXECUTABLE: &str = "/usr/bin/env";
+const RUSTUP_INIT_VERSION: &str = "1.28.2";
+const RUSTUP_INIT_SHA256: &str = "20a06e644b0d9bd2fbdbfd52d42540bdde820ea7df86e92e533c073da0cdd43c";
+const CANONICAL_RUST_SOURCE_FILES: &[&str] = &[
+    "Cargo.lock",
+    "Cargo.toml",
+    "src/dependency_manifest.rs",
+    "src/docs.rs",
+    "src/graph.rs",
+    "src/jit_ir_to_lean.rs",
+    "src/main.rs",
+    "src/migration_audit.rs",
+    "src/python_algorithm_contract.rs",
+    "src/python_module_groups.rs",
+    "src/python_structure_hash.rs",
+    "src/python_structure_hash_impact.rs",
+    "src/python_structure_hash_report.rs",
+    "src/python_structure_hash_scope_plan.rs",
+    "src/runtime_boundary.rs",
+    "src/rust_migration_plan.rs",
+    "src/semantic_index/args.rs",
+    "src/semantic_index/cli.rs",
+    "src/semantic_index/embedding.rs",
+    "src/semantic_index/eval.rs",
+    "src/semantic_index/mod.rs",
+    "src/semantic_index/model.rs",
+    "src/semantic_index/pipeline.rs",
+    "src/semantic_index/query.rs",
+    "src/semantic_index/relations.rs",
+    "src/semantic_index/report.rs",
+    "src/semantic_index/source.rs",
+    "src/semantic_index/storage.rs",
+    "src/semantic_index/tests.rs",
+    "src/structured_analysis.rs",
+    "src/test_design.rs",
+    "src/private_feedback.rs",
+    "tests/python_algorithm_contract_cli.rs",
+];
+const IMAGE_INSTALL_METHODS: [Method; 7] = [
+    Method::AptPackage,
+    Method::AptRepository,
+    Method::NpmGlobal,
+    Method::Pipx,
+    Method::ReleaseAsset,
+    Method::RustToolchain,
+    Method::CargoSourceBuild,
+];
 const NPM_PREFIX: &str = "/usr/local";
 const NPM_SYSTEM_PATH: &str = "/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin";
 const NPM_TRUSTED_DIRS: [&str; 6] = [
@@ -2178,7 +2238,7 @@ fn load_plan(workspace: &Path, manifest: Option<&Path>) -> Result<DependencyPlan
     build_plan(&manifests)
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct ExecutableBinding {
     provided: String,
     lexical_path: String,
@@ -2467,6 +2527,10 @@ fn run_command(
         path: path_override.map(str::to_string),
         cargo_home: None,
         clear_rustup_overrides: false,
+        environment: BTreeMap::new(),
+        clear_environment: false,
+        privileged: false,
+        capture: true,
         operation: operation.to_string(),
         record_id: record_id.to_string(),
     })
@@ -2490,13 +2554,49 @@ fn command_output(output: Output, record_id: &str, operation: &str) -> Result<Co
             stderr.trim()
         )));
     }
-    Ok(CommandOutput { stdout, stderr })
+    Ok(CommandOutput {
+        stdout,
+        stderr,
+        #[cfg(all(test, unix))]
+        success: true,
+    })
 }
 
 #[derive(Debug, Clone)]
 struct CommandOutput {
     stdout: String,
     stderr: String,
+    #[cfg(all(test, unix))]
+    success: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum CommandCapability {
+    Argv,
+    ShellEvaluation,
+    DynamicInterpreter,
+    PackageInstall,
+    NetworkFetch,
+    PrivilegeEscalation,
+    ReadOnlyQuery,
+    ExecutableVerification,
+    Unknown,
+}
+
+impl CommandCapability {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Argv => "argv",
+            Self::ShellEvaluation => "shell-evaluation",
+            Self::DynamicInterpreter => "dynamic-interpreter",
+            Self::PackageInstall => "package-install",
+            Self::NetworkFetch => "network-fetch",
+            Self::PrivilegeEscalation => "privilege-escalation",
+            Self::ReadOnlyQuery => "read-only-query",
+            Self::ExecutableVerification => "executable-verification",
+            Self::Unknown => "unknown",
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -2506,14 +2606,31 @@ struct CommandInvocation {
     path: Option<String>,
     cargo_home: Option<String>,
     clear_rustup_overrides: bool,
+    environment: BTreeMap<String, String>,
+    clear_environment: bool,
+    privileged: bool,
+    capture: bool,
     operation: String,
     record_id: String,
+}
+
+struct DependencyCommandContext<'a> {
+    workspace: &'a Path,
+    method: Option<Method>,
+    variables: &'a BTreeMap<String, String>,
+    privileged: bool,
+    capture: bool,
+    clear_environment: bool,
+    record_id: &'a str,
+    operation: &'a str,
 }
 
 #[cfg(all(test, unix))]
 #[derive(Debug, Default)]
 struct FakeCommandRunner {
     responses: std::cell::RefCell<BTreeMap<Vec<String>, VecDeque<CommandOutput>>>,
+    program_responses: std::cell::RefCell<BTreeMap<String, VecDeque<CommandOutput>>>,
+    downloads: std::cell::RefCell<VecDeque<Vec<u8>>>,
     invocations: std::cell::RefCell<Vec<CommandInvocation>>,
 }
 
@@ -2526,6 +2643,24 @@ impl FakeCommandRunner {
         }
         Self {
             responses: std::cell::RefCell::new(response_map),
+            program_responses: std::cell::RefCell::new(BTreeMap::new()),
+            downloads: std::cell::RefCell::new(VecDeque::new()),
+            invocations: std::cell::RefCell::new(Vec::new()),
+        }
+    }
+
+    fn with_program_responses(
+        responses: impl IntoIterator<Item = (String, CommandOutput)>,
+        downloads: impl IntoIterator<Item = Vec<u8>>,
+    ) -> Self {
+        let mut response_map = BTreeMap::<String, VecDeque<CommandOutput>>::new();
+        for (program, output) in responses {
+            response_map.entry(program).or_default().push_back(output);
+        }
+        Self {
+            responses: std::cell::RefCell::new(BTreeMap::new()),
+            program_responses: std::cell::RefCell::new(response_map),
+            downloads: std::cell::RefCell::new(downloads.into_iter().collect()),
             invocations: std::cell::RefCell::new(Vec::new()),
         }
     }
@@ -2678,10 +2813,27 @@ impl ProbeEnvironment {
     fn execute(&self, invocation: &CommandInvocation) -> Result<CommandOutput> {
         match &self.command_runner {
             CommandRunner::System => {
-                let mut process = Command::new(&invocation.argv[0]);
-                process
-                    .args(&invocation.argv[1..])
-                    .current_dir(&invocation.workspace);
+                let (program, arguments) = if invocation.privileged && !current_user_is_root() {
+                    if !command_exists("sudo") {
+                        return Err(DependencyError::new(
+                            "privileged dependency action requires root or sudo",
+                        ));
+                    }
+                    let mut arguments = vec![invocation.argv[0].clone()];
+                    arguments.extend(invocation.argv.iter().skip(1).cloned());
+                    ("sudo", arguments)
+                } else {
+                    (
+                        invocation.argv[0].as_str(),
+                        invocation.argv.iter().skip(1).cloned().collect(),
+                    )
+                };
+                let mut process = Command::new(program);
+                process.args(&arguments).current_dir(&invocation.workspace);
+                if invocation.clear_environment {
+                    process.env_clear();
+                }
+                process.envs(&invocation.environment);
                 if let Some(path) = &invocation.path {
                     process.env("PATH", path);
                 }
@@ -2691,6 +2843,26 @@ impl ProbeEnvironment {
                 if invocation.clear_rustup_overrides {
                     process.env_remove("RUSTUP_TOOLCHAIN");
                     process.env_remove("ELAN_TOOLCHAIN");
+                }
+                if !invocation.capture {
+                    let status = process.status().map_err(|error| {
+                        DependencyError::new(format!(
+                            "{}: {} command failed to start: {error}",
+                            invocation.record_id, invocation.operation
+                        ))
+                    })?;
+                    if !status.success() {
+                        return Err(DependencyError::new(format!(
+                            "{}: {} command failed with {status}",
+                            invocation.record_id, invocation.operation
+                        )));
+                    }
+                    return Ok(CommandOutput {
+                        stdout: String::new(),
+                        stderr: String::new(),
+                        #[cfg(all(test, unix))]
+                        success: true,
+                    });
                 }
                 let output = process.output().map_err(|error| {
                     DependencyError::new(format!(
@@ -2703,17 +2875,58 @@ impl ProbeEnvironment {
             #[cfg(all(test, unix))]
             CommandRunner::Fake(runner) => {
                 runner.invocations.borrow_mut().push(invocation.clone());
-                runner
+                let program = Path::new(&invocation.argv[0])
+                    .file_name()
+                    .and_then(|value| value.to_str())
+                    .unwrap_or_default();
+                if program == "curl" {
+                    if let Some(bytes) = runner.downloads.borrow_mut().pop_front() {
+                        let output_path = invocation
+                            .argv
+                            .windows(2)
+                            .find(|pair| pair[0] == "--output")
+                            .map(|pair| PathBuf::from(&pair[1]))
+                            .ok_or_else(|| {
+                                DependencyError::new(format!(
+                                    "{}: curl fixture has no output path",
+                                    invocation.record_id
+                                ))
+                            })?;
+                        fs::write(&output_path, bytes).map_err(|error| {
+                            DependencyError::new(format!(
+                                "{}: curl fixture could not write output: {error}",
+                                invocation.record_id
+                            ))
+                        })?;
+                    }
+                }
+                let output = runner
                     .responses
                     .borrow_mut()
                     .get_mut(&invocation.argv)
                     .and_then(VecDeque::pop_front)
+                    .or_else(|| {
+                        runner
+                            .program_responses
+                            .borrow_mut()
+                            .get_mut(program)
+                            .and_then(VecDeque::pop_front)
+                    })
                     .ok_or_else(|| {
                         DependencyError::new(format!(
                             "{}: unexpected test provider command for {}",
                             invocation.record_id, invocation.operation
                         ))
-                    })
+                    })?;
+                if !output.success {
+                    return Err(DependencyError::new(format!(
+                        "{}: {} command failed: {}",
+                        invocation.record_id,
+                        invocation.operation,
+                        output.stderr.trim()
+                    )));
+                }
+                Ok(output)
             }
         }
     }
@@ -3228,6 +3441,10 @@ fn run_rust_command(
         path: Some(path.to_string()),
         cargo_home: Some(cargo_home.to_string()),
         clear_rustup_overrides: true,
+        environment: BTreeMap::new(),
+        clear_environment: false,
+        privileged: false,
+        capture: true,
         operation: operation.to_string(),
         record_id: record_id.to_string(),
     })
@@ -3497,6 +3714,14 @@ fn runtime_architecture() -> Result<String> {
     }
 }
 
+fn release_asset_architecture() -> String {
+    match env::consts::ARCH {
+        "amd64" => "x86_64".to_string(),
+        "arm64" => "aarch64".to_string(),
+        other => other.to_string(),
+    }
+}
+
 /// Resolve one manifest-declared executable from a matching read-only receipt.
 ///
 /// This validates the complete selected plan and receipt identity before any
@@ -3744,9 +3969,4602 @@ fn resolve_verified_executable_with_provider(
     })
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DependencyCommand {
+    Validate,
+    DryRun,
+    Install,
+    Boundary,
+    ProjectInstall,
+    ImageInstall,
+    ImageVerify,
+}
+
+impl DependencyCommand {
+    fn parse(value: &str) -> Option<Self> {
+        Some(match value {
+            "validate" => Self::Validate,
+            "dry-run" => Self::DryRun,
+            "install" => Self::Install,
+            "boundary" => Self::Boundary,
+            "project-install" => Self::ProjectInstall,
+            "image-install" => Self::ImageInstall,
+            "image-verify" => Self::ImageVerify,
+            _ => return None,
+        })
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DependencyOption {
+    Workspace,
+    Manifest,
+    Receipts,
+    FinalBinaryDir,
+    Extras,
+    Records,
+    Format,
+}
+
+const DEPENDENCY_OPTIONS: [(&str, DependencyOption); 7] = [
+    ("--workspace", DependencyOption::Workspace),
+    ("--manifest", DependencyOption::Manifest),
+    ("--receipts", DependencyOption::Receipts),
+    ("--final-binary-dir", DependencyOption::FinalBinaryDir),
+    ("--extras", DependencyOption::Extras),
+    ("--records", DependencyOption::Records),
+    ("--format", DependencyOption::Format),
+];
+
+#[derive(Debug, Clone)]
+struct DependencyCliArgs {
+    command: DependencyCommand,
+    workspace: PathBuf,
+    manifest: Option<PathBuf>,
+    receipts: Option<PathBuf>,
+    final_binary_dir: Option<PathBuf>,
+    extras: String,
+    records: Option<Vec<String>>,
+    format: String,
+}
+
+enum ParsedDependencyCli {
+    Help,
+    Arguments(Box<DependencyCliArgs>),
+}
+
+const DEPENDENCY_USAGE: &str = "usage: agent-canon environment-dependencies [-h] [--workspace WORKSPACE] [--manifest MANIFEST] [--receipts RECEIPTS] [--final-binary-dir FINAL_BINARY_DIR] [--extras EXTRAS] [--records RECORDS [RECORDS ...]] [--format {text,json}] {validate,dry-run,install,boundary,project-install,image-install,image-verify}";
+
+fn parse_dependency_option(value: &str) -> std::result::Result<DependencyOption, String> {
+    resolve_long_option_prefix(value, &DEPENDENCY_OPTIONS).map_err(|error| match error {
+        LongOptionError::Unrecognized => format!("unrecognized arguments: {value}"),
+        LongOptionError::Ambiguous(options) => format!(
+            "ambiguous option: {value} could match {}",
+            options.join(", ")
+        ),
+    })
+}
+
+fn parse_dependency_cli(args: &[String]) -> std::result::Result<ParsedDependencyCli, String> {
+    if args.is_empty() {
+        return Err("the following arguments are required: command".to_string());
+    }
+    if args.iter().any(|arg| arg == "--help" || arg == "-h") {
+        return Ok(ParsedDependencyCli::Help);
+    }
+    let mut parsed = DependencyCliArgs {
+        command: DependencyCommand::Validate,
+        workspace: PathBuf::from("."),
+        manifest: None,
+        receipts: None,
+        final_binary_dir: None,
+        extras: String::new(),
+        records: None,
+        format: "text".to_string(),
+    };
+    let mut command = None;
+    let mut index = 0;
+    while index < args.len() {
+        let token = &args[index];
+        let Some(option_token) = token.strip_prefix("--") else {
+            if command.is_none() && !token.starts_with('-') {
+                command = Some(DependencyCommand::parse(token).ok_or_else(|| {
+                    format!(
+                        "argument command: invalid choice: {:?} (choose from 'validate', 'dry-run', 'install', 'boundary', 'project-install', 'image-install', 'image-verify')",
+                        token
+                    )
+                })?);
+                index += 1;
+                continue;
+            }
+            return Err(format!("unrecognized arguments: {token}"));
+        };
+        let (option_name, inline_value) = option_token
+            .split_once('=')
+            .map_or((format!("--{option_token}"), None), |(name, value)| {
+                (format!("--{name}"), Some(value.to_string()))
+            });
+        let option = parse_dependency_option(&option_name)?;
+        index += 1;
+        if option == DependencyOption::Records {
+            let mut group = Vec::new();
+            if let Some(value) = inline_value {
+                group.push(value);
+            } else {
+                while index < args.len() && !args[index].starts_with('-') {
+                    group.push(args[index].clone());
+                    index += 1;
+                }
+            }
+            if group.is_empty() {
+                return Err(format!(
+                    "argument {option_name}: expected at least one argument"
+                ));
+            }
+            parsed.records.get_or_insert_with(Vec::new).extend(group);
+            continue;
+        }
+        let value = if let Some(value) = inline_value {
+            value
+        } else {
+            let value = args
+                .get(index)
+                .ok_or_else(|| format!("argument {option_name}: expected one argument"))?
+                .clone();
+            index += 1;
+            value
+        };
+        match option {
+            DependencyOption::Workspace => parsed.workspace = PathBuf::from(value),
+            DependencyOption::Manifest => parsed.manifest = Some(PathBuf::from(value)),
+            DependencyOption::Receipts => parsed.receipts = Some(PathBuf::from(value)),
+            DependencyOption::FinalBinaryDir => {
+                parsed.final_binary_dir = Some(PathBuf::from(value))
+            }
+            DependencyOption::Extras => parsed.extras = value,
+            DependencyOption::Format if value == "text" || value == "json" => parsed.format = value,
+            DependencyOption::Format => {
+                return Err(format!(
+                    "argument {option_name}: invalid choice: {:?} (choose from 'text', 'json')",
+                    value
+                ))
+            }
+            DependencyOption::Records => unreachable!("records are parsed above"),
+        }
+    }
+    parsed.command =
+        command.ok_or_else(|| "the following arguments are required: command".to_string())?;
+    Ok(ParsedDependencyCli::Arguments(Box::new(parsed)))
+}
+
+fn dependency_cli_help() -> String {
+    format!(
+        "Typed environment dependency planner and installer.\n\n{DEPENDENCY_USAGE}\n\nValidate, inspect, or install the selected shared-tool dependency plan.\n"
+    )
+}
+
+fn canonical_python_extra(value: &str) -> String {
+    let mut output = String::with_capacity(value.len());
+    let mut separator = false;
+    for character in value.chars() {
+        if matches!(character, '-' | '_' | '.') {
+            if !separator {
+                output.push('-');
+            }
+            separator = true;
+        } else {
+            output.push(character.to_ascii_lowercase());
+            separator = false;
+        }
+    }
+    output
+}
+
+fn parse_python_extras(raw: &str) -> Result<Vec<String>> {
+    let mut extras = Vec::new();
+    let mut seen = BTreeSet::new();
+    for value in raw.split(',') {
+        if value.is_empty()
+            || value.trim() != value
+            || !value
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || b"._-".contains(&byte))
+            || !value.as_bytes()[0].is_ascii_alphanumeric()
+        {
+            return Err(DependencyError::new(
+                "Python extras must be non-empty names without surrounding whitespace",
+            ));
+        }
+        let canonical = canonical_python_extra(value);
+        if !seen.insert(canonical) {
+            return Err(DependencyError::new(format!(
+                "duplicate Python extra: {value}"
+            )));
+        }
+        extras.push(value.to_string());
+    }
+    Ok(extras)
+}
+
+fn validate_project_extras(workspace: &Path, extras: &[String]) -> Result<Vec<String>> {
+    let extras = parse_python_extras(&extras.join(","))?;
+    let pyproject = workspace.join("pyproject.toml");
+    let source = fs::read_to_string(&pyproject).map_err(|_| {
+        DependencyError::new(format!(
+            "project packaging manifest is missing: {}",
+            pyproject.display()
+        ))
+    })?;
+    let document = source.parse::<toml_edit::DocumentMut>().map_err(|_| {
+        DependencyError::new(format!(
+            "cannot parse project packaging manifest: {}",
+            pyproject.display()
+        ))
+    })?;
+    let optional = document
+        .get("project")
+        .and_then(toml_edit::Item::as_table)
+        .and_then(|project| project.get("optional-dependencies"))
+        .and_then(toml_edit::Item::as_table)
+        .ok_or_else(|| {
+            DependencyError::new(format!(
+                "project.optional-dependencies is missing: {}",
+                pyproject.display()
+            ))
+        })?;
+    let available = optional
+        .iter()
+        .filter(|(name, _)| {
+            !name.is_empty()
+                && name
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || b"._-".contains(&byte))
+                && name.as_bytes()[0].is_ascii_alphanumeric()
+        })
+        .map(|(name, _)| canonical_python_extra(name))
+        .collect::<BTreeSet<_>>();
+    let missing = extras
+        .iter()
+        .filter(|extra| !available.contains(&canonical_python_extra(extra)))
+        .cloned()
+        .collect::<Vec<_>>();
+    if !missing.is_empty() {
+        return Err(DependencyError::new(format!(
+            "project extras are not declared in pyproject.toml: {}",
+            missing.join(", ")
+        )));
+    }
+    Ok(extras)
+}
+
+fn select_record_ids(plan: &DependencyPlan, requested: Option<&[String]>) -> Result<Vec<String>> {
+    let Some(requested) = requested else {
+        return Ok(plan.order.clone());
+    };
+    if requested.is_empty() {
+        return Err(DependencyError::new(
+            "--records must select at least one record",
+        ));
+    }
+    let by_id = plan
+        .records
+        .iter()
+        .map(|record| (record.id.as_str(), record))
+        .collect::<BTreeMap<_, _>>();
+    let mut selected = BTreeSet::new();
+    let mut pending = VecDeque::new();
+    for raw in requested {
+        for value in raw.split(',') {
+            let record_id = value.trim();
+            if record_id.is_empty() {
+                return Err(DependencyError::new(
+                    "--records must not contain empty record IDs",
+                ));
+            }
+            if !by_id.contains_key(record_id) {
+                return Err(DependencyError::new(format!(
+                    "unknown dependency record: {record_id}"
+                )));
+            }
+            if selected.insert(record_id.to_string()) {
+                pending.push_back(record_id.to_string());
+            }
+        }
+    }
+    while let Some(record_id) = pending.pop_front() {
+        if let Some((_, providers)) = plan
+            .dependency_providers
+            .iter()
+            .find(|(candidate, _)| candidate == &record_id)
+        {
+            for provider in providers {
+                if selected.insert(provider.clone()) {
+                    pending.push_back(provider.clone());
+                }
+            }
+        }
+    }
+    Ok(plan
+        .order
+        .iter()
+        .filter(|record_id| selected.contains(*record_id))
+        .cloned()
+        .collect())
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct RuntimeIdentity {
+    os_id: String,
+    version_id: String,
+    platform: String,
+}
+
+fn read_runtime_identity() -> Result<RuntimeIdentity> {
+    let os_release = Path::new("/etc/os-release");
+    let text = fs::read_to_string(os_release).map_err(|error| {
+        DependencyError::new(format!(
+            "runtime identity cannot read {}: {error}",
+            os_release.display()
+        ))
+    })?;
+    let mut values = BTreeMap::new();
+    for line in text.lines() {
+        let Some((name, value)) = line.split_once('=') else {
+            continue;
+        };
+        if name == "ID" || name == "VERSION_ID" {
+            values.insert(name, value.trim().trim_matches(['"', '\'']).to_string());
+        }
+    }
+    let os_id = values.get("ID").cloned().unwrap_or_default();
+    let version_id = values.get("VERSION_ID").cloned().unwrap_or_default();
+    let architecture = match env::consts::ARCH {
+        "x86_64" | "amd64" => "amd64",
+        "aarch64" | "arm64" => "arm64",
+        other => other,
+    };
+    let platform = format!("linux/{architecture}");
+    if os_id.is_empty() || version_id.is_empty() || platform == "linux/" {
+        return Err(DependencyError::new(format!(
+            "runtime identity is incomplete: ID={os_id:?} VERSION_ID={version_id:?} platform={platform:?}"
+        )));
+    }
+    Ok(RuntimeIdentity {
+        os_id,
+        version_id,
+        platform,
+    })
+}
+
+fn validate_runtime_identity(plan: &DependencyPlan) -> Result<RuntimeIdentity> {
+    let identity = read_runtime_identity()?;
+    validate_runtime_identity_for(plan, identity)
+}
+
+fn validate_runtime_identity_for(
+    plan: &DependencyPlan,
+    identity: RuntimeIdentity,
+) -> Result<RuntimeIdentity> {
+    if identity.os_id != "ubuntu" || !["22.04", "24.04"].contains(&identity.version_id.as_str()) {
+        return Err(DependencyError::new(format!(
+            "runtime identity requires Ubuntu 22.04 or 24.04: ID={} VERSION_ID={}",
+            identity.os_id, identity.version_id
+        )));
+    }
+    if !["linux/amd64", "linux/arm64"].contains(&identity.platform.as_str()) {
+        return Err(DependencyError::new(format!(
+            "runtime identity requires linux/amd64 or linux/arm64: platform={}",
+            identity.platform
+        )));
+    }
+    for record in &plan.records {
+        if let Some(platform) = &record.platform {
+            if platform != &identity.platform {
+                return Err(DependencyError::new(format!(
+                    "dependency record {} requires {}, but runtime platform is {}; no compatibility fallback is defined",
+                    record.id, platform, identity.platform
+                )));
+            }
+        }
+        if !record.platforms.is_empty() && !record.platforms.contains(&identity.platform) {
+            return Err(DependencyError::new(format!(
+                "dependency record {} does not support {}",
+                record.id, identity.platform
+            )));
+        }
+        if matches!(record.method, Method::AptPackage | Method::AptRepository)
+            && record.source.starts_with("ubuntu:")
+            && record.source != format!("ubuntu:{}", identity.version_id)
+        {
+            return Err(DependencyError::new(format!(
+                "dependency record {} requires canonical source ubuntu:{}, got {}",
+                record.id, identity.version_id, record.source
+            )));
+        }
+    }
+    Ok(identity)
+}
+
+fn image_dependencies_root() -> String {
+    IMAGE_DEPENDENCIES_ROOT.to_string()
+}
+
+#[cfg(unix)]
+fn image_owner_is_root() -> bool {
+    nix::unistd::geteuid().as_raw() == 0
+}
+
+#[cfg(not(unix))]
+fn image_owner_is_root() -> bool {
+    false
+}
+
+fn image_plan_payload(plan: &DependencyPlan, selected_ids: &[String]) -> Result<Value> {
+    let mut records = Vec::new();
+    let mut provider_closure = Vec::new();
+    let mut receipts = Vec::new();
+    for record_id in selected_ids {
+        let record = plan.by_id(record_id).ok_or_else(|| {
+            DependencyError::new(format!("unknown dependency record: {record_id}"))
+        })?;
+        let providers = plan
+            .dependency_providers
+            .iter()
+            .find(|(candidate, _)| candidate == record_id)
+            .map(|(_, providers)| providers.clone())
+            .unwrap_or_default();
+        records.push(record.payload());
+        provider_closure.push(json!([record_id, providers]));
+        receipts.push(format!("receipts/{record_id}.json"));
+    }
+    Ok(json!({
+        "schema": IMAGE_PLAN_SCHEMA,
+        "schema_version": IMAGE_PLAN_SCHEMA_VERSION,
+        "owner": "image-installer",
+        "phase": "image-install",
+        "plan_fingerprint": plan.fingerprint,
+        "source_roles": plan.source_roles,
+        "order": selected_ids,
+        "records": records,
+        "provider_closure": provider_closure,
+        "receipts": receipts,
+    }))
+}
+
+fn image_record_is_safe(record: &DependencyRecord) -> bool {
+    if !IMAGE_INSTALL_METHODS.contains(&record.method) {
+        return false;
+    }
+    if record.method == Method::CargoSourceBuild {
+        return record.locked == Some(true)
+            && record.source_identity.as_deref() == Some(CANONICAL_SNAPSHOT_IDENTITY)
+            && record
+                .cargo_lock_sha256
+                .as_deref()
+                .is_some_and(|value| is_hex(value, 64));
+    }
+    true
+}
+
+fn image_lstat(path: &Path, description: &str) -> Result<fs::Metadata> {
+    let metadata = fs::symlink_metadata(path).map_err(|error| {
+        DependencyError::new(format!(
+            "{description} is unreadable: {}: {error}",
+            path.display()
+        ))
+    })?;
+    if metadata.file_type().is_symlink() {
+        return Err(DependencyError::new(format!(
+            "{description} must not be a symlink: {}",
+            path.display()
+        )));
+    }
+    Ok(metadata)
+}
+
+fn image_node_kind(metadata: &fs::Metadata, directory: bool) -> bool {
+    if directory {
+        metadata.is_dir()
+    } else {
+        metadata.is_file()
+    }
+}
+
+#[cfg(unix)]
+fn image_owner(production: bool) -> (u32, u32) {
+    if production {
+        (0, 0)
+    } else {
+        use std::os::unix::fs::MetadataExt;
+        fs::metadata(".")
+            .map(|metadata| (metadata.uid(), metadata.gid()))
+            .unwrap_or((0, 0))
+    }
+}
+
+#[cfg(not(unix))]
+fn image_owner(_production: bool) -> (u32, u32) {
+    (0, 0)
+}
+
+#[cfg(unix)]
+fn set_image_owner(path: &Path, uid: u32, gid: u32) -> Result<()> {
+    use nix::unistd::{chown, Gid, Uid};
+    chown(path, Some(Uid::from_raw(uid)), Some(Gid::from_raw(gid))).map_err(|error| {
+        DependencyError::new(format!(
+            "image ownership update failed: {}: {error}",
+            path.display()
+        ))
+    })
+}
+
+#[cfg(not(unix))]
+fn set_image_owner(_path: &Path, _uid: u32, _gid: u32) -> Result<()> {
+    Ok(())
+}
+
+fn set_image_mode(path: &Path, mode: u32) -> Result<()> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(path, fs::Permissions::from_mode(mode)).map_err(|error| {
+            DependencyError::new(format!(
+                "image mode update failed: {}: {error}",
+                path.display()
+            ))
+        })
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = (path, mode);
+        Ok(())
+    }
+}
+
+fn validate_image_parent_chain(
+    target: &Path,
+    production: bool,
+    create: bool,
+    owner: (u32, u32),
+) -> Result<()> {
+    let parent = target
+        .parent()
+        .ok_or_else(|| DependencyError::new("image target has no parent"))?;
+    if production && !parent.starts_with("/usr/local/") {
+        return Err(DependencyError::new(format!(
+            "image target escaped canonical root: {}",
+            target.display()
+        )));
+    }
+    let mut current = PathBuf::from("/");
+    for component in parent.components().skip(1) {
+        current.push(component.as_os_str());
+        let metadata = match image_lstat(&current, "image parent") {
+            Ok(metadata) => metadata,
+            Err(_error) if create && !current.exists() => {
+                fs::create_dir(&current).map_err(|create_error| {
+                    DependencyError::new(format!(
+                        "image parent cannot be created safely: {}: {create_error}",
+                        current.display()
+                    ))
+                })?;
+                set_image_owner(&current, owner.0, owner.1)?;
+                set_image_mode(&current, 0o755)?;
+                image_lstat(&current, "image parent")?
+            }
+            Err(error) => return Err(error),
+        };
+        if !metadata.is_dir() {
+            return Err(DependencyError::new(format!(
+                "image parent must be a directory: {}",
+                current.display()
+            )));
+        }
+        #[cfg(unix)]
+        if production {
+            use std::os::unix::fs::MetadataExt;
+            if metadata.uid() != owner.0
+                || metadata.gid() != owner.1
+                || metadata.mode() & 0o022 != 0
+            {
+                return Err(DependencyError::new(format!(
+                    "image parent ownership or mode is unsafe: {}",
+                    current.display()
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn freeze_image_tree(root: &Path, owner: (u32, u32)) -> Result<()> {
+    let mut pending = vec![root.to_path_buf()];
+    let mut nodes = Vec::<(PathBuf, bool)>::new();
+    while let Some(path) = pending.pop() {
+        let metadata = image_lstat(&path, "image staging path")?;
+        if metadata.is_dir() {
+            for child in fs::read_dir(&path).map_err(|error| {
+                DependencyError::new(format!(
+                    "image staging directory is unreadable: {}: {error}",
+                    path.display()
+                ))
+            })? {
+                pending.push(
+                    child
+                        .map_err(|error| DependencyError::new(error.to_string()))?
+                        .path(),
+                );
+            }
+        } else if !metadata.is_file() {
+            return Err(DependencyError::new(format!(
+                "image staging node is not regular: {}",
+                path.display()
+            )));
+        }
+        nodes.push((path, metadata.is_dir()));
+    }
+    nodes.sort_by_key(|(path, _)| std::cmp::Reverse(path.components().count()));
+    for (path, directory) in nodes {
+        set_image_owner(&path, owner.0, owner.1)?;
+        set_image_mode(
+            &path,
+            if directory {
+                IMAGE_DIRECTORY_MODE
+            } else {
+                IMAGE_FILE_MODE
+            },
+        )?;
+    }
+    Ok(())
+}
+
+fn assert_frozen_image_node(
+    path: &Path,
+    directory: bool,
+    owner: (u32, u32),
+    description: &str,
+) -> Result<()> {
+    let metadata = image_lstat(path, description)?;
+    if !image_node_kind(&metadata, directory) {
+        return Err(DependencyError::new(format!(
+            "{description} has the wrong type: {}",
+            path.display()
+        )));
+    }
+    #[cfg(not(unix))]
+    let _ = owner;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        let expected_mode = if directory {
+            IMAGE_DIRECTORY_MODE
+        } else {
+            IMAGE_FILE_MODE
+        };
+        if metadata.uid() != owner.0
+            || metadata.gid() != owner.1
+            || metadata.mode() & 0o7777 != expected_mode
+        {
+            return Err(DependencyError::new(format!(
+                "{description} ownership or mode is unsafe: {}",
+                path.display()
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn image_target() -> (PathBuf, bool) {
+    (PathBuf::from(IMAGE_DEPENDENCIES_ROOT), true)
+}
+
+fn image_target_exists(path: &Path) -> bool {
+    fs::symlink_metadata(path).is_ok()
+}
+
+struct ImageInstallContext<'a> {
+    target: &'a Path,
+    production: bool,
+    runtime_identity: Option<RuntimeIdentity>,
+}
+
+fn image_receipt_path(receipts: &Path, record_id: &str) -> Result<PathBuf> {
+    if !matches(r"^[a-z0-9][a-z0-9._-]*$", record_id) {
+        return Err(DependencyError::new(format!(
+            "invalid receipt record id: {record_id}"
+        )));
+    }
+    Ok(receipts.join(format!("{record_id}.json")))
+}
+
+fn current_user_is_root() -> bool {
+    #[cfg(unix)]
+    {
+        nix::unistd::geteuid().as_raw() == 0
+    }
+    #[cfg(not(unix))]
+    {
+        false
+    }
+}
+
+fn dependency_tool_environment(
+    workspace: &Path,
+    image_owned: bool,
+    parent_root: Option<&Path>,
+    extra: &BTreeMap<String, String>,
+) -> Result<BTreeMap<String, String>> {
+    let mut environment = if image_owned {
+        env::vars().collect::<BTreeMap<_, _>>()
+    } else {
+        let parent_root = parent_root
+            .ok_or_else(|| DependencyError::new("parent-root-attestation is required"))?;
+        let runtime = env::var_os("AGENT_CANON_RUNTIME_ROOT")
+            .filter(|value| !value.is_empty())
+            .map(PathBuf::from)
+            .ok_or_else(|| DependencyError::new("dependency-install: runtime_root_required"))?;
+        crate::runtime_boundary::root_capability_environment(
+            workspace,
+            &runtime,
+            None,
+            Some(parent_root),
+        )
+        .map_err(|error| {
+            DependencyError::new(format!("dependency-install: runtime_root_invalid:{error}"))
+        })?
+    };
+    let home = environment
+        .get("HOME")
+        .map(PathBuf::from)
+        .or_else(|| env::var_os("HOME").map(PathBuf::from))
+        .unwrap_or_else(|| home_directory().unwrap_or_else(|_| PathBuf::from("/")));
+    let cargo_home = environment
+        .get("CARGO_HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| {
+            parent_root
+                .map(|root| root.join(".agent-canon/cargo-home"))
+                .unwrap_or_else(|| home.join(".cargo"))
+        });
+    let rustup_home = environment
+        .get("RUSTUP_HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| {
+            parent_root
+                .map(|root| root.join(".agent-canon/rustup-home"))
+                .unwrap_or_else(|| home.join(".rustup"))
+        });
+    let elan_home = environment
+        .get("ELAN_HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| {
+            parent_root
+                .map(|root| root.join(".agent-canon/elan-home"))
+                .unwrap_or_else(|| home.join(".elan"))
+        });
+    let local_bin = parent_root
+        .map(|root| root.join(".agent-canon/local-bin"))
+        .unwrap_or_else(|| home.join(".local/bin"));
+    let mut path = vec![
+        cargo_home.join("bin").to_string_lossy().to_string(),
+        elan_home.join("bin").to_string_lossy().to_string(),
+        local_bin.to_string_lossy().to_string(),
+    ];
+    let inherited_path = environment
+        .get("PATH")
+        .map(|value| PathBuf::from(value.as_str()))
+        .or_else(|| env::var_os("PATH").map(PathBuf::from));
+    if let Some(inherited) = inherited_path {
+        // PATH is already a list. Split it before joining so each directory
+        // remains one segment and Unix does not reject the separator.
+        path.extend(env::split_paths(&inherited).map(|entry| entry.to_string_lossy().into_owned()));
+    }
+    environment.remove("CARGO_TARGET_DIR");
+    environment.insert("HOME".to_string(), home.to_string_lossy().to_string());
+    environment.insert(
+        "CARGO_HOME".to_string(),
+        cargo_home.to_string_lossy().to_string(),
+    );
+    environment.insert(
+        "RUSTUP_HOME".to_string(),
+        rustup_home.to_string_lossy().to_string(),
+    );
+    environment.insert(
+        "ELAN_HOME".to_string(),
+        elan_home.to_string_lossy().to_string(),
+    );
+    let joined_path = env::join_paths(path.iter()).map_err(|error| {
+        DependencyError::new(format!("dependency PATH cannot be joined: {error}"))
+    })?;
+    environment.insert(
+        "PATH".to_string(),
+        joined_path.to_string_lossy().to_string(),
+    );
+    environment.remove("RUSTUP_TOOLCHAIN");
+    environment.remove("ELAN_TOOLCHAIN");
+    environment.extend(extra.clone());
+    Ok(environment)
+}
+
+fn dependency_command(
+    probe: &ProbeEnvironment,
+    argv: &[String],
+    context: &DependencyCommandContext<'_>,
+) -> Result<Option<CommandOutput>> {
+    let phase = if context.operation.starts_with("verify-") {
+        "image-verify"
+    } else {
+        "image-install"
+    };
+    let owner = if phase == "image-verify" {
+        "typed-verifier"
+    } else {
+        "image-installer"
+    };
+    classify_dependency_command(
+        argv,
+        phase,
+        owner,
+        context.operation,
+        context.method,
+        context.privileged,
+    )
+    .map_err(|(capability, detail)| {
+        DependencyError::new(format!(
+            "command-boundary-{}: {detail}",
+            capability.as_str()
+        ))
+    })?;
+    let path = context.variables.get("PATH").cloned();
+    let cargo_home = context.variables.get("CARGO_HOME").cloned();
+    let output = probe.execute(&CommandInvocation {
+        argv: argv.to_vec(),
+        workspace: context.workspace.to_path_buf(),
+        path,
+        cargo_home,
+        clear_rustup_overrides: true,
+        environment: context.variables.clone(),
+        clear_environment: context.clear_environment,
+        privileged: context.privileged,
+        capture: context.capture,
+        operation: context.operation.to_string(),
+        record_id: context.record_id.to_string(),
+    })?;
+    if context.capture {
+        Ok(Some(output))
+    } else {
+        Ok(None)
+    }
+}
+
+fn classify_dependency_command(
+    argv: &[String],
+    phase: &str,
+    owner: &str,
+    operation: &str,
+    method: Option<Method>,
+    privileged: bool,
+) -> std::result::Result<BTreeSet<CommandCapability>, (CommandCapability, String)> {
+    let fail = |capability, detail: &str| Err((capability, detail.to_string()));
+    if !matches!(phase, "image-install" | "image-verify")
+        || !matches!(owner, "image-installer" | "typed-verifier")
+        || operation.is_empty()
+    {
+        return fail(CommandCapability::Unknown, "invalid command provenance");
+    }
+    if (phase == "image-install" && owner != "image-installer")
+        || (phase == "image-verify" && owner != "typed-verifier")
+    {
+        return fail(
+            CommandCapability::Unknown,
+            "command phase and owner disagree",
+        );
+    }
+    let method_matches = match operation {
+        "install-apt-package" => matches!(method, Some(Method::AptPackage)),
+        "install-apt-repository"
+        | "install-apt-repository-key"
+        | "install-apt-repository-source"
+        | "download-apt-key"
+        | "download-apt-package"
+        | "download-packages-index"
+        | "verify-apt-repository-key" => matches!(method, Some(Method::AptRepository)),
+        "verify-apt-package" => matches!(method, Some(Method::AptPackage | Method::AptRepository)),
+        "install-npm-global" | "verify-npm-package" => matches!(method, Some(Method::NpmGlobal)),
+        "install-pipx" | "verify-pipx-package" | "verify-pipx-executable" => {
+            matches!(method, Some(Method::Pipx))
+        }
+        "install-release-asset" | "download-release-asset" => {
+            matches!(method, Some(Method::ReleaseAsset))
+        }
+        "install-rust-toolchain"
+        | "verify-rust-active"
+        | "verify-rust-installed"
+        | "verify-rust-components"
+        | "verify-rust-tool-version" => matches!(method, Some(Method::RustToolchain)),
+        "install-lean-toolchain"
+        | "verify-lean-active"
+        | "verify-lean-installed"
+        | "verify-lean-toolchain"
+        | "verify-lean-tool-version" => matches!(method, Some(Method::LeanToolchain)),
+        "install-cargo-source-build" | "verify-cargo-binary" | "verify-cargo-source-identity" => {
+            matches!(method, Some(Method::CargoSourceBuild))
+        }
+        "install-browser" | "verify-browser-executable" => {
+            matches!(method, Some(Method::BrowserInstall))
+        }
+        _ => true,
+    };
+    if !method_matches && method.is_some() {
+        return fail(
+            CommandCapability::Unknown,
+            "operation and method provenance disagree",
+        );
+    }
+    if phase == "image-verify" && !operation.starts_with("verify-") {
+        return fail(
+            CommandCapability::Unknown,
+            "image verification operation is not a verifier operation",
+        );
+    }
+    if phase == "image-install"
+        && !(operation.starts_with("install-")
+            || operation.starts_with("download-")
+            || operation.starts_with("verify-"))
+    {
+        return fail(
+            CommandCapability::Unknown,
+            "image install operation is not owner-declared",
+        );
+    }
+    if argv.is_empty()
+        || argv
+            .iter()
+            .any(|argument| argument.is_empty() || has_control(argument))
+    {
+        return fail(
+            CommandCapability::Unknown,
+            "argv contains an empty or control-character token",
+        );
+    }
+    let mut effective = argv;
+    if basename(&effective[0]) == "env" {
+        let mut index = 1;
+        while index < effective.len()
+            && effective[index].contains('=')
+            && !effective[index].starts_with('-')
+        {
+            index += 1;
+        }
+        if index >= effective.len() || effective[index] == "-S" {
+            return fail(CommandCapability::Unknown, "env child selection is dynamic");
+        }
+        if effective[index] == "--" {
+            index += 1;
+        }
+        if index >= effective.len() {
+            return fail(CommandCapability::Unknown, "env has no command target");
+        }
+        effective = &effective[index..];
+        let mut capabilities =
+            classify_dependency_command(effective, phase, owner, operation, method, privileged)?;
+        if privileged {
+            capabilities.insert(CommandCapability::PrivilegeEscalation);
+        }
+        return validate_dependency_capabilities(capabilities, phase);
+    }
+    let executable = basename(&effective[0]);
+    let args = &effective[1..];
+    let mut capabilities = BTreeSet::from([CommandCapability::Argv]);
+    if ["bash", "dash", "fish", "ksh", "sh", "tcsh", "zsh"].contains(&executable) {
+        return fail(
+            CommandCapability::ShellEvaluation,
+            "shell executable is an execution boundary",
+        );
+    }
+    if ["sudo", "doas", "su", "runuser"].contains(&executable) {
+        return fail(
+            CommandCapability::PrivilegeEscalation,
+            "explicit privilege wrapper is not an owned command",
+        );
+    }
+    if executable == "eval" {
+        return fail(
+            CommandCapability::DynamicInterpreter,
+            "eval is a dynamic child-command edge",
+        );
+    }
+    let interpreter_probes: &[(&str, &[&str])] = &[
+        ("python", &["--version", "-V", "--help"]),
+        ("python3", &["--version", "-V", "--help"]),
+        ("pypy", &["--version", "-V", "--help"]),
+        ("node", &["--version", "-v", "--help"]),
+        ("nodejs", &["--version", "-v", "--help"]),
+        ("perl", &["--version", "-v", "--help"]),
+        ("ruby", &["--version", "-v", "--help"]),
+    ];
+    if let Some((_, probes)) = interpreter_probes
+        .iter()
+        .find(|(name, _)| *name == executable)
+    {
+        if args.len() == 1 && probes.contains(&args[0].as_str()) {
+            capabilities.insert(CommandCapability::ReadOnlyQuery);
+        } else {
+            let dynamic = args.iter().any(|argument| {
+                ["-c", "-e", "-E", "-m", "-p", "--eval", "--print", "-"]
+                    .contains(&argument.as_str())
+            });
+            return fail(
+                if dynamic {
+                    CommandCapability::DynamicInterpreter
+                } else {
+                    CommandCapability::Unknown
+                },
+                "interpreter command graph is not a fixed identity probe",
+            );
+        }
+    } else if executable == "xargs"
+        || executable == "find"
+            && args
+                .iter()
+                .any(|argument| ["-exec", "-execdir"].contains(&argument.as_str()))
+    {
+        return fail(
+            CommandCapability::DynamicInterpreter,
+            "child-command selector is dynamic",
+        );
+    } else if ["timeout", "nice", "stdbuf"].contains(&executable) {
+        return fail(
+            CommandCapability::Unknown,
+            "wrapper grammar is not declared by the owner operation",
+        );
+    } else if [
+        "apt",
+        "apt-get",
+        "aptitude",
+        "pip",
+        "pipx",
+        "cargo",
+        "playwright",
+    ]
+    .contains(&executable)
+    {
+        let mutations = [
+            "install",
+            "update",
+            "upgrade",
+            "remove",
+            "uninstall",
+            "purge",
+            "add",
+            "default",
+            "build",
+            "fetch",
+            "sync",
+            "download",
+            "init",
+        ];
+        if executable == "pipx"
+            && args.first().is_some_and(|value| value == "runpip")
+            && args.len() >= 4
+            && args[2] == "show"
+        {
+            capabilities.insert(CommandCapability::ReadOnlyQuery);
+        } else if args.iter().any(|value| mutations.contains(&value.as_str())) {
+            capabilities.insert(CommandCapability::PackageInstall);
+            capabilities.insert(CommandCapability::NetworkFetch);
+        } else {
+            return fail(
+                CommandCapability::Unknown,
+                "package-manager command shape is not owner-declared",
+            );
+        }
+    } else if executable == "npm" {
+        if argv_starts_with(args, &["ls", "--global"])
+            && argv_contains(args, "--json")
+            && argv_contains(args, "--depth=0")
+        {
+            capabilities.insert(CommandCapability::ReadOnlyQuery);
+        } else if args.first().is_some_and(|value| {
+            ["install", "update", "uninstall", "exec", "publish"].contains(&value.as_str())
+        }) {
+            capabilities.insert(CommandCapability::PackageInstall);
+            capabilities.insert(CommandCapability::NetworkFetch);
+        } else if argv_equals(args, &["--version"]) {
+            capabilities.insert(CommandCapability::ReadOnlyQuery);
+        } else {
+            return fail(
+                CommandCapability::Unknown,
+                "npm command shape is not owner-declared",
+            );
+        }
+    } else if ["rustup", "elan"].contains(&executable) {
+        let read_only = if executable == "rustup" {
+            argv_starts_with(args, &["show", "active-toolchain"])
+                || argv_starts_with(args, &["toolchain", "list"])
+                || argv_starts_with(args, &["component", "list"])
+                || args.first().is_some_and(|value| value == "run")
+                    && args.len() == 4
+                    && args.last().is_some_and(|value| value == "--version")
+        } else {
+            args.first().is_some_and(|value| value == "show")
+                || argv_starts_with(args, &["toolchain", "list"])
+                || args.first().is_some_and(|value| value == "run")
+                    && args.len() == 4
+                    && args.last().is_some_and(|value| value == "--version")
+        };
+        if read_only {
+            capabilities.insert(CommandCapability::ReadOnlyQuery);
+        } else if args
+            .iter()
+            .any(|value| ["install", "uninstall", "add", "default"].contains(&value.as_str()))
+        {
+            capabilities.insert(CommandCapability::PackageInstall);
+            capabilities.insert(CommandCapability::NetworkFetch);
+        } else {
+            return fail(
+                CommandCapability::Unknown,
+                "toolchain command shape is not owner-declared",
+            );
+        }
+    } else if executable == "gpg" {
+        if argv_starts_with(args, &["--show-keys", "--with-colons"]) {
+            capabilities.insert(CommandCapability::ReadOnlyQuery);
+        } else {
+            capabilities.insert(CommandCapability::PackageInstall);
+        }
+    } else if ["curl", "wget", "aria2c"].contains(&executable) {
+        if argv_equals(args, &["--version"])
+            || argv_equals(args, &["-V"])
+            || argv_equals(args, &["--help"])
+        {
+            capabilities.insert(CommandCapability::ReadOnlyQuery);
+        } else {
+            capabilities.insert(CommandCapability::NetworkFetch);
+        }
+    } else if executable == "install" || executable == "rustup-init" || executable == "elan-init" {
+        capabilities.insert(CommandCapability::PackageInstall);
+    } else if executable == "dpkg-query" {
+        if args
+            .first()
+            .is_some_and(|value| ["--show", "--listfiles"].contains(&value.as_str()))
+        {
+            capabilities.insert(CommandCapability::ReadOnlyQuery);
+        } else {
+            return fail(
+                CommandCapability::Unknown,
+                "dpkg-query command shape is not owner-declared",
+            );
+        }
+    } else if executable == "xz" && argv_starts_with(args, &["--decompress", "--stdout"]) {
+        capabilities.insert(CommandCapability::ReadOnlyQuery);
+    } else {
+        capabilities.insert(CommandCapability::ExecutableVerification);
+    }
+    if privileged {
+        capabilities.insert(CommandCapability::PrivilegeEscalation);
+    }
+    validate_dependency_capabilities(capabilities, phase)
+}
+
+fn validate_dependency_capabilities(
+    capabilities: BTreeSet<CommandCapability>,
+    phase: &str,
+) -> std::result::Result<BTreeSet<CommandCapability>, (CommandCapability, String)> {
+    let denied = if phase == "image-verify" {
+        [
+            CommandCapability::ShellEvaluation,
+            CommandCapability::DynamicInterpreter,
+            CommandCapability::Unknown,
+            CommandCapability::PackageInstall,
+            CommandCapability::NetworkFetch,
+            CommandCapability::PrivilegeEscalation,
+        ]
+        .into_iter()
+        .collect::<BTreeSet<_>>()
+    } else {
+        [
+            CommandCapability::ShellEvaluation,
+            CommandCapability::DynamicInterpreter,
+            CommandCapability::Unknown,
+        ]
+        .into_iter()
+        .collect::<BTreeSet<_>>()
+    };
+    let Some(capability) = [
+        CommandCapability::ShellEvaluation,
+        CommandCapability::DynamicInterpreter,
+        CommandCapability::PackageInstall,
+        CommandCapability::NetworkFetch,
+        CommandCapability::PrivilegeEscalation,
+        CommandCapability::Unknown,
+    ]
+    .into_iter()
+    .find(|capability| denied.contains(capability) && capabilities.contains(capability)) else {
+        return Ok(capabilities);
+    };
+    Err((
+        capability,
+        format!("{} is not allowed in {phase}", capability.as_str()),
+    ))
+}
+
+fn basename(value: &str) -> &str {
+    value.rsplit('/').next().unwrap_or(value)
+}
+
+fn argv_starts_with(argv: &[String], prefix: &[&str]) -> bool {
+    argv.len() >= prefix.len()
+        && argv
+            .iter()
+            .zip(prefix)
+            .all(|(actual, expected)| actual.as_str() == *expected)
+}
+
+fn argv_contains(argv: &[String], value: &str) -> bool {
+    argv.iter().any(|argument| argument.as_str() == value)
+}
+
+fn argv_equals(argv: &[String], expected: &[&str]) -> bool {
+    argv.len() == expected.len()
+        && argv
+            .iter()
+            .zip(expected)
+            .all(|(actual, expected)| actual.as_str() == *expected)
+}
+
+fn install_project_extras(workspace: &Path, raw_extras: &str) -> Result<Vec<String>> {
+    let extras = validate_project_extras(workspace, &[raw_extras.to_string()])?;
+    let requirement = format!("{}[{}]", workspace.display(), extras.join(","));
+    for arguments in [
+        vec!["-m", "pip", "install", "--editable", requirement.as_str()],
+        vec!["-m", "pip", "check"],
+    ] {
+        let status = Command::new("python3")
+            .args(arguments.iter())
+            .current_dir(workspace)
+            .status()
+            .map_err(|error| {
+                DependencyError::new(format!("project extras command failed to start: {error}"))
+            })?;
+        if !status.success() {
+            return Err(DependencyError::new(format!(
+                "project extras command failed with {status}"
+            )));
+        }
+    }
+    Ok(extras)
+}
+
+fn command_exists(executable: &str) -> bool {
+    let path = env::var_os("PATH").unwrap_or_default();
+    env::split_paths(&path)
+        .map(|directory| directory.join(executable))
+        .any(|path| path.is_file())
+}
+
+fn attest_dependency_parent(workspace: &Path) -> Result<AttestedParent> {
+    let purpose = NonEmptyTrimmedString::new("dependency-install").map_err(|error| {
+        DependencyError::new(format!(
+            "parent-root-attestation:{}:{}",
+            error.reject,
+            error.detail()
+        ))
+    })?;
+    let nonce = Nonce128::generate().map_err(|error| {
+        DependencyError::new(format!(
+            "parent-root-attestation:{}:{}",
+            error.reject,
+            error.detail()
+        ))
+    })?;
+    let request = AttestationRequest {
+        cwd: workspace.to_path_buf(),
+        explicit_root: Some(workspace.to_path_buf()),
+        source_root: None,
+        clone_root: None,
+        topic_marker: None,
+        gitmodules: None,
+        owner_evidence: None,
+        expected_remote: None,
+        expected_module_digest: None,
+        child_handoff_token: None,
+        purpose,
+        nonce,
+    };
+    ParentRootAttestor::new().attest(&request).map_err(|error| {
+        DependencyError::new(format!(
+            "parent-root-attestation:{}:{}",
+            error.reject,
+            error.detail()
+        ))
+    })
+}
+
+struct Installer {
+    image_owned: bool,
+    image_owned_root: Option<PathBuf>,
+    parent_attestation: Option<AttestedParent>,
+    install_workspace: Option<PathBuf>,
+    resolved_package_versions: BTreeMap<String, String>,
+    probe: ProbeEnvironment,
+    active_method: Option<Method>,
+}
+
+impl Installer {
+    fn new(image_owned: bool, image_owned_root: Option<PathBuf>) -> Self {
+        Self {
+            image_owned,
+            image_owned_root,
+            parent_attestation: None,
+            install_workspace: None,
+            resolved_package_versions: BTreeMap::new(),
+            probe: ProbeEnvironment::system(),
+            active_method: None,
+        }
+    }
+
+    #[cfg(all(test, unix))]
+    fn with_probe(
+        image_owned: bool,
+        image_owned_root: Option<PathBuf>,
+        probe: ProbeEnvironment,
+    ) -> Self {
+        Self {
+            image_owned,
+            image_owned_root,
+            parent_attestation: None,
+            install_workspace: None,
+            resolved_package_versions: BTreeMap::new(),
+            probe,
+            active_method: None,
+        }
+    }
+
+    fn install(
+        &mut self,
+        plan: &DependencyPlan,
+        workspace: &Path,
+        receipts: &Path,
+        requested: Option<&[String]>,
+        final_binary_dir: Option<&Path>,
+    ) -> Result<Vec<String>> {
+        self.install_workspace = Some(workspace.to_path_buf());
+        if self.image_owned {
+            let image_root = self.image_owned_root.as_deref().ok_or_else(|| {
+                DependencyError::new("image-owned install requires an image root")
+            })?;
+            let receipt_root =
+                crate::path_resolution::resolve_non_strict(receipts).map_err(|error| {
+                    DependencyError::new(format!("image receipt path is invalid: {error}"))
+                })?;
+            if !receipt_root.starts_with(image_root) {
+                return Err(DependencyError::new(
+                    "image-owned receipts must remain under the image root",
+                ));
+            }
+            fs::create_dir_all(&receipt_root).map_err(|error| {
+                DependencyError::new(format!("image receipt directory is unavailable: {error}"))
+            })?;
+        } else {
+            self.parent_attestation = Some(attest_dependency_parent(workspace)?);
+        }
+        let selected = select_record_ids(plan, requested)?;
+        let by_id = plan
+            .records
+            .iter()
+            .map(|record| (record.id.as_str(), record))
+            .collect::<BTreeMap<_, _>>();
+        let unknown = selected
+            .iter()
+            .filter(|record_id| !by_id.contains_key(record_id.as_str()))
+            .cloned()
+            .collect::<Vec<_>>();
+        if !unknown.is_empty() {
+            return Err(DependencyError::new(format!(
+                "selected dependency records are not in the plan: {}",
+                unknown.join(", ")
+            )));
+        }
+        if self.image_owned
+            && final_binary_dir.is_none()
+            && selected.iter().any(|record_id| {
+                by_id
+                    .get(record_id.as_str())
+                    .is_some_and(|record| record.method == Method::CargoSourceBuild)
+            })
+        {
+            return Err(DependencyError::new(
+                "image-owned Cargo install requires a final binary directory",
+            ));
+        }
+        let mut completed = Vec::new();
+        let mut unavailable = BTreeSet::new();
+        for record_id in &selected {
+            let record = by_id
+                .get(record_id.as_str())
+                .copied()
+                .expect("selected record was checked");
+            self.active_method = Some(record.method);
+            self.resolved_package_versions.remove(record_id);
+            let receipt = image_receipt_path(receipts, record_id)?;
+            let active_source = record.method == Method::CargoSourceBuild
+                && record.source_identity.as_deref() == Some(ACTIVE_SOURCE_IDENTITY);
+            let blockers = plan
+                .dependency_providers
+                .iter()
+                .find(|(candidate, _)| candidate == record_id)
+                .map(|(_, providers)| {
+                    providers
+                        .iter()
+                        .filter(|provider| unavailable.contains(provider.as_str()))
+                        .cloned()
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default();
+            if !blockers.is_empty() {
+                let error = DependencyError::new(format!(
+                    "dependency unavailable: {record_id} depends on {}",
+                    blockers.join(", ")
+                ));
+                self.remove_receipt(&receipt)?;
+                unavailable.insert(record_id.clone());
+                if record.failure_policy == "warn" {
+                    eprintln!("DEPENDENCY_RECORD_WARN={record_id}:{error}");
+                    continue;
+                }
+                return Err(error);
+            }
+            let receipt_exists = self.receipt_exists(&receipt)?;
+            let cache_match = !active_source && self.receipt_matches(&receipt, plan, record)?;
+            let repair = receipt_exists;
+            if cache_match
+                && (self.image_owned
+                    || self
+                        .verify_cached_receipt(&receipt, record, workspace)
+                        .is_ok())
+            {
+                completed.push(record_id.clone());
+                continue;
+            }
+            self.remove_receipt(&receipt)?;
+            let install_result = (|| -> Result<()> {
+                self.install_record(record, workspace, repair)?;
+                if !self.image_owned {
+                    if let Some(version) = self.verify_record(record, workspace, None, false)? {
+                        self.resolved_package_versions
+                            .insert(record.id.clone(), version);
+                    }
+                }
+                let source_identity = if record.method == Method::CargoSourceBuild
+                    && record.source_identity.as_deref() == Some(CANONICAL_SNAPSHOT_IDENTITY)
+                {
+                    Some(CANONICAL_SNAPSHOT_IDENTITY.to_string())
+                } else if record.method == Method::CargoSourceBuild && record.commit.is_some() {
+                    Some(self.cargo_source_identity(record, workspace)?)
+                } else {
+                    None
+                };
+                if self.image_owned
+                    && record.method == Method::AptPackage
+                    && record.version.is_none()
+                {
+                    let version = apt_package_version(&self.probe, record, None, workspace, false)?;
+                    self.resolved_package_versions
+                        .insert(record.id.clone(), version);
+                }
+                if active_source {
+                    return Ok(());
+                }
+                let bindings = if self.image_owned {
+                    self.structural_bindings(record)?
+                } else {
+                    executable_bindings(&self.probe, record, false, workspace)?
+                };
+                let final_binary = if record.method == Method::CargoSourceBuild {
+                    final_binary_dir
+                        .map(|directory| self.publish_final_binary(record, workspace, directory))
+                        .transpose()?
+                } else {
+                    None
+                };
+                self.write_receipt(
+                    &receipt,
+                    plan,
+                    record,
+                    source_identity.as_deref(),
+                    &bindings,
+                    final_binary.as_deref(),
+                )?;
+                Ok(())
+            })();
+            if let Err(error) = install_result {
+                self.remove_receipt(&receipt)?;
+                unavailable.insert(record_id.clone());
+                if record.failure_policy == "warn" {
+                    eprintln!("DEPENDENCY_RECORD_WARN={record_id}:{error}");
+                    continue;
+                }
+                return Err(DependencyError::new(format!(
+                    "dependency record failed: {record_id}: {error}"
+                )));
+            }
+            completed.push(record_id.clone());
+        }
+        Ok(completed)
+    }
+
+    fn receipt_exists(&self, path: &Path) -> Result<bool> {
+        if self.image_owned {
+            return Ok(fs::symlink_metadata(path).is_ok());
+        }
+        let Some(attested) = &self.parent_attestation else {
+            return Ok(false);
+        };
+        let purpose = NonEmptyTrimmedString::new("dependency-receipt")
+            .map_err(|error| DependencyError::new(error.to_string()))?;
+        let receipt = attested
+            .resolve_parent_owned_path(path, purpose)
+            .map_err(|error| {
+                DependencyError::new(format!(
+                    "parent-root-receipt:{}:{}",
+                    error.reject,
+                    error.detail()
+                ))
+            })?;
+        Ok(attested.read_parent_owned_file(&receipt).is_ok())
+    }
+
+    fn remove_receipt(&self, path: &Path) -> Result<()> {
+        if self.image_owned {
+            match fs::symlink_metadata(path) {
+                Ok(metadata) if metadata.is_file() || metadata.file_type().is_symlink() => {
+                    fs::remove_file(path).map_err(|error| {
+                        DependencyError::new(format!(
+                            "image receipt could not be removed: {}: {error}",
+                            path.display()
+                        ))
+                    })
+                }
+                Ok(_) => Err(DependencyError::new(format!(
+                    "image receipt is not a regular file: {}",
+                    path.display()
+                ))),
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+                Err(error) => Err(DependencyError::new(format!(
+                    "image receipt could not be inspected: {}: {error}",
+                    path.display()
+                ))),
+            }
+        } else {
+            let attested = self
+                .parent_attestation
+                .as_ref()
+                .ok_or_else(|| DependencyError::new("parent-root-attestation is required"))?;
+            let purpose = NonEmptyTrimmedString::new("dependency-receipt")
+                .map_err(|error| DependencyError::new(error.to_string()))?;
+            let receipt = attested
+                .resolve_parent_owned_path(path, purpose)
+                .map_err(|error| {
+                    DependencyError::new(format!(
+                        "parent-root-receipt:{}:{}",
+                        error.reject,
+                        error.detail()
+                    ))
+                })?;
+            attested
+                .remove_parent_owned_file(&receipt)
+                .map_err(|error| {
+                    DependencyError::new(format!(
+                        "parent-root-receipt:{}:{}",
+                        error.reject,
+                        error.detail()
+                    ))
+                })
+        }
+    }
+
+    fn read_receipt(&self, path: &Path) -> Result<Vec<u8>> {
+        if self.image_owned {
+            return fs::read(path).map_err(|error| DependencyError::new(error.to_string()));
+        }
+        let attested = self
+            .parent_attestation
+            .as_ref()
+            .ok_or_else(|| DependencyError::new("parent-root-attestation is required"))?;
+        let purpose = NonEmptyTrimmedString::new("dependency-receipt")
+            .map_err(|error| DependencyError::new(error.to_string()))?;
+        let receipt = attested
+            .resolve_parent_owned_path(path, purpose)
+            .map_err(|error| {
+                DependencyError::new(format!(
+                    "parent-root-receipt:{}:{}",
+                    error.reject,
+                    error.detail()
+                ))
+            })?;
+        attested.read_parent_owned_file(&receipt).map_err(|error| {
+            DependencyError::new(format!(
+                "parent-root-receipt:{}:{}",
+                error.reject,
+                error.detail()
+            ))
+        })
+    }
+
+    fn receipt_matches(
+        &self,
+        path: &Path,
+        plan: &DependencyPlan,
+        record: &DependencyRecord,
+    ) -> Result<bool> {
+        if record.method == Method::CargoSourceBuild
+            && record.source_identity.as_deref() == Some(ACTIVE_SOURCE_IDENTITY)
+        {
+            return Ok(false);
+        }
+        let Ok(bytes) = self.read_receipt(path) else {
+            return Ok(false);
+        };
+        let Ok(payload) = serde_json::from_slice::<Value>(&bytes) else {
+            return Ok(false);
+        };
+        let Some(object) = payload.as_object() else {
+            return Ok(false);
+        };
+        let status = object
+            .get("status")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        let image_owned = status == "installed";
+        let expected_names = executable_binding_names(record, image_owned)
+            .into_iter()
+            .collect::<BTreeSet<_>>();
+        let Some(bindings) = object.get("executable_bindings").and_then(Value::as_object) else {
+            return Ok(false);
+        };
+        if bindings.keys().cloned().collect::<BTreeSet<_>>() != expected_names {
+            return Ok(false);
+        }
+        for (name, binding) in bindings {
+            let Some(binding) = binding.as_object() else {
+                return Ok(false);
+            };
+            let lexical = binding
+                .get("lexical_path")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            let absolute = binding
+                .get("absolute_path")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            let output = binding
+                .get("verification_output")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            if binding.get("provided").and_then(Value::as_str) != Some(name.as_str())
+                || normalized_absolute_path(lexical, "lexical_path").is_err()
+                || normalized_absolute_path(absolute, "absolute_path").is_err()
+                || output.is_empty()
+            {
+                return Ok(false);
+            }
+        }
+        let expected_resolved = match self.resolved_apt_package_version(record, &payload) {
+            Ok(value) => value,
+            Err(_) => return Ok(false),
+        };
+        let _ = expected_resolved;
+        Ok(
+            object.get("schema").and_then(Value::as_str) == Some(RECEIPT_SCHEMA)
+                && object.get("record_id").and_then(Value::as_str) == Some(record.id.as_str())
+                && (status == "installed" || status == "pass")
+                && object.get("owner").and_then(Value::as_str) == Some("image-installer")
+                && object.get("phase").and_then(Value::as_str) == Some("image-install")
+                && object.get("manifest_version")
+                    == Some(
+                        &record
+                            .version
+                            .as_ref()
+                            .map_or(Value::Null, |value| Value::String(value.clone())),
+                    )
+                && object.get("plan_fingerprint").and_then(Value::as_str)
+                    == Some(plan.fingerprint.as_str())
+                && record.fingerprint().ok().as_deref()
+                    == object.get("record_fingerprint").and_then(Value::as_str)
+                && object.get("verification") == Some(&record.verification.payload())
+                && repository_packages_payload(record)
+                    .ok()
+                    .map(|value| {
+                        if value.is_null() {
+                            object.get("repository_packages").is_none()
+                        } else {
+                            object.get("repository_packages") == Some(&value)
+                        }
+                    })
+                    .unwrap_or(false)
+                && repository_package_payload(record)
+                    .ok()
+                    .map(|value| {
+                        if value.is_null() {
+                            object.get("repository_package").is_none()
+                        } else {
+                            object.get("repository_package") == Some(&value)
+                        }
+                    })
+                    .unwrap_or(false)
+                && (record.source_tree_sha256.is_none()
+                    || object.get("source_tree_sha256").and_then(Value::as_str)
+                        == record.source_tree_sha256.as_deref())
+                && object.get("cargo_lock_sha256").and_then(Value::as_str)
+                    == record.cargo_lock_sha256.as_deref()
+                && (record.method != Method::CargoSourceBuild
+                    || object
+                        .get("source_identity")
+                        .and_then(Value::as_str)
+                        .is_some()),
+        )
+    }
+
+    fn tool_paths(
+        &self,
+        workspace: &Path,
+        extra: &BTreeMap<String, String>,
+    ) -> Result<BTreeMap<String, String>> {
+        let parent_root = self
+            .parent_attestation
+            .as_ref()
+            .map(|parent| parent.parent_root().path());
+        dependency_tool_environment(workspace, self.image_owned, parent_root, extra)
+    }
+
+    fn run(
+        &self,
+        argv: &[String],
+        workspace: &Path,
+        variables: &BTreeMap<String, String>,
+        privileged: bool,
+        record_id: &str,
+        operation: &str,
+    ) -> Result<()> {
+        dependency_command(
+            &self.probe,
+            argv,
+            &DependencyCommandContext {
+                workspace,
+                method: self.active_method,
+                variables,
+                privileged,
+                capture: false,
+                clear_environment: !self.image_owned,
+                record_id,
+                operation,
+            },
+        )?;
+        Ok(())
+    }
+
+    fn capture(
+        &self,
+        argv: &[String],
+        workspace: &Path,
+        variables: &BTreeMap<String, String>,
+        record_id: &str,
+        operation: &str,
+    ) -> Result<CommandOutput> {
+        dependency_command(
+            &self.probe,
+            argv,
+            &DependencyCommandContext {
+                workspace,
+                method: self.active_method,
+                variables,
+                privileged: false,
+                capture: true,
+                clear_environment: !self.image_owned,
+                record_id,
+                operation,
+            },
+        )?
+        .ok_or_else(|| DependencyError::new("dependency command output was not captured"))
+    }
+
+    fn verify_cached_receipt(
+        &self,
+        path: &Path,
+        record: &DependencyRecord,
+        workspace: &Path,
+    ) -> Result<()> {
+        let payload: Value = serde_json::from_slice(&self.read_receipt(path)?)
+            .map_err(|_| DependencyError::new(format!("{}: receipt is malformed", record.id)))?;
+        let bindings = payload
+            .get("executable_bindings")
+            .and_then(Value::as_object)
+            .ok_or_else(|| {
+                DependencyError::new(format!(
+                    "{}: executable receipt bindings are stale",
+                    record.id
+                ))
+            })?
+            .iter()
+            .map(|(name, value)| Ok((name.clone(), ExecutableBinding::from_receipt(value, name)?)))
+            .collect::<Result<BTreeMap<_, _>>>()?;
+        let resolved_version = self.resolved_apt_package_version(record, &payload)?;
+        self.verify_record(record, workspace, resolved_version.as_deref(), false)?;
+        if !bindings.is_empty() {
+            let live = executable_bindings(&self.probe, record, false, workspace)?;
+            if live != bindings {
+                return Err(DependencyError::new(format!(
+                    "{}: executable receipt path or output drift",
+                    record.id
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    fn verify_record(
+        &self,
+        record: &DependencyRecord,
+        workspace: &Path,
+        expected_resolved_version: Option<&str>,
+        allow_network: bool,
+    ) -> Result<Option<String>> {
+        let probe = &self.probe;
+        match record.method {
+            Method::AptPackage => {
+                apt_package_version(probe, record, expected_resolved_version, workspace, true)
+                    .map(Some)
+            }
+            Method::AptRepository => {
+                self.verify_apt_repository(record, workspace, allow_network)?;
+                Ok(None)
+            }
+            Method::NpmGlobal => {
+                verify_npm_package(probe, record, workspace)?;
+                Ok(None)
+            }
+            Method::Pipx => {
+                self.verify_pipx_package(record, workspace)?;
+                Ok(None)
+            }
+            Method::ReleaseAsset => {
+                verify_absolute_executable(probe, record, workspace).map(|_| None)
+            }
+            Method::RustToolchain => {
+                verify_rust_toolchain(probe, record, workspace)?;
+                Ok(None)
+            }
+            Method::LeanToolchain => {
+                self.verify_lean_toolchain(record, workspace)?;
+                Ok(None)
+            }
+            Method::CargoSourceBuild => {
+                self.verify_cargo_binary(record, None, workspace)?;
+                Ok(None)
+            }
+            Method::BrowserInstall => {
+                self.verify_browser_executable(record, workspace)?;
+                Ok(None)
+            }
+        }
+    }
+
+    fn verify_apt_repository(
+        &self,
+        record: &DependencyRecord,
+        workspace: &Path,
+        allow_network: bool,
+    ) -> Result<()> {
+        apt_package_version(&self.probe, record, None, workspace, true)?;
+        let expected_fingerprint = record.key_fingerprint.as_deref().ok_or_else(|| {
+            DependencyError::new(format!("{}: apt key fingerprint is missing", record.id))
+        })?;
+        let keyring = PathBuf::from("/etc/apt/keyrings").join(format!("{}.gpg", record.id));
+        let source_list =
+            PathBuf::from("/etc/apt/sources.list.d").join(format!("{}.list", record.id));
+        if !keyring.is_file()
+            || fs::symlink_metadata(&keyring)
+                .is_ok_and(|metadata| metadata.file_type().is_symlink())
+            || !source_list.is_file()
+            || fs::symlink_metadata(&source_list)
+                .is_ok_and(|metadata| metadata.file_type().is_symlink())
+        {
+            return Err(DependencyError::new(format!(
+                "{}: apt repository artifact is missing",
+                record.id
+            )));
+        }
+        let variables = self.tool_paths(workspace, &BTreeMap::new())?;
+        let output = self.capture(
+            &[
+                "gpg".to_string(),
+                "--show-keys".to_string(),
+                "--with-colons".to_string(),
+                keyring.to_string_lossy().to_string(),
+            ],
+            workspace,
+            &variables,
+            &record.id,
+            "verify-apt-repository-key",
+        )?;
+        let fingerprints = output
+            .stdout
+            .lines()
+            .filter_map(|line| {
+                let fields = line.split(':').collect::<Vec<_>>();
+                (fields.first() == Some(&"fpr") && fields.len() > 9)
+                    .then(|| fields[9].to_ascii_uppercase())
+            })
+            .collect::<BTreeSet<_>>();
+        if !fingerprints.contains(&expected_fingerprint.to_ascii_uppercase()) {
+            return Err(DependencyError::new(format!(
+                "{}: apt repository key is stale",
+                record.id
+            )));
+        }
+        let suite = record.repository_suite.as_deref().ok_or_else(|| {
+            DependencyError::new(format!("{}: repository suite is missing", record.id))
+        })?;
+        let expected_source = format!(
+            "deb [signed-by={}] {} {} {}\n",
+            keyring.display(),
+            record.source,
+            suite,
+            record.repository_components.join(" ")
+        );
+        let observed_source = fs::read_to_string(&source_list).map_err(|_| {
+            DependencyError::new(format!(
+                "{}: apt repository source is unreadable",
+                record.id
+            ))
+        })?;
+        if observed_source != expected_source {
+            return Err(DependencyError::new(format!(
+                "{}: apt repository source is stale",
+                record.id
+            )));
+        }
+        if allow_network {
+            self.verify_repository_packages_digest(
+                record,
+                workspace,
+                &self.temporary_parent(workspace, "apt-packages")?,
+            )?;
+        }
+        Ok(())
+    }
+
+    fn verify_pipx_package(&self, record: &DependencyRecord, workspace: &Path) -> Result<()> {
+        let version = record.version.as_deref().ok_or_else(|| {
+            DependencyError::new(format!("{}: pipx package version is missing", record.id))
+        })?;
+        let variables = self.tool_paths(workspace, &BTreeMap::new())?;
+        let output = self.capture(
+            &[
+                "pipx".to_string(),
+                "runpip".to_string(),
+                record.package.clone(),
+                "show".to_string(),
+                record.package.clone(),
+            ],
+            workspace,
+            &variables,
+            &record.id,
+            "verify-pipx-package",
+        )?;
+        let mut name = None;
+        let mut observed_version = None;
+        for line in output.stdout.lines() {
+            if let Some((key, value)) = line.split_once(':') {
+                if key == "Name" {
+                    name = Some(canonical_python_extra(value.trim()));
+                }
+                if key == "Version" {
+                    observed_version = Some(value.trim().to_string());
+                }
+            }
+        }
+        if name.as_deref() != Some(canonical_python_extra(&record.package).as_str())
+            || observed_version.as_deref() != Some(version)
+        {
+            return Err(DependencyError::new(format!(
+                "{}: pipx package/version mismatch",
+                record.id
+            )));
+        }
+        let executable = record.verification.executable.as_deref().ok_or_else(|| {
+            DependencyError::new(format!("{}: pipx executable is missing", record.id))
+        })?;
+        let mut argv = vec![executable.to_string()];
+        argv.extend(record.verification.args.iter().cloned());
+        let output = self.capture(
+            &argv,
+            workspace,
+            &variables,
+            &record.id,
+            "verify-pipx-executable",
+        )?;
+        let token = record
+            .verification
+            .output_contains
+            .as_deref()
+            .ok_or_else(|| {
+                DependencyError::new(format!("{}: pipx output contract is missing", record.id))
+            })?;
+        require_output(&output, token, &record.id)?;
+        Ok(())
+    }
+
+    fn verify_lean_toolchain(&self, record: &DependencyRecord, workspace: &Path) -> Result<()> {
+        let version = record.version.as_deref().ok_or_else(|| {
+            DependencyError::new(format!("{}: Lean toolchain version is missing", record.id))
+        })?;
+        let variables = self.tool_paths(workspace, &BTreeMap::new())?;
+        let active = self.capture(
+            &["elan".to_string(), "show".to_string()],
+            workspace,
+            &variables,
+            &record.id,
+            "verify-lean-active",
+        )?;
+        let installed = self.capture(
+            &[
+                "elan".to_string(),
+                "toolchain".to_string(),
+                "list".to_string(),
+            ],
+            workspace,
+            &variables,
+            &record.id,
+            "verify-lean-installed",
+        )?;
+        if !active.stdout.contains(version)
+            || !installed
+                .stdout
+                .lines()
+                .any(|line| line.split_whitespace().next() == Some(version))
+        {
+            return Err(DependencyError::new(format!(
+                "{}: Lean toolchain is stale",
+                record.id
+            )));
+        }
+        for tool in ["lean", "lake"] {
+            self.capture(
+                &[
+                    "elan".to_string(),
+                    "run".to_string(),
+                    version.to_string(),
+                    tool.to_string(),
+                    "--version".to_string(),
+                ],
+                workspace,
+                &variables,
+                &record.id,
+                "verify-lean-toolchain",
+            )?;
+        }
+        Ok(())
+    }
+
+    fn verify_browser_executable(&self, record: &DependencyRecord, workspace: &Path) -> Result<()> {
+        let cache = record.browser_cache_path.as_deref().ok_or_else(|| {
+            DependencyError::new(format!("{}: browser cache path is missing", record.id))
+        })?;
+        let cache_path = Path::new(cache);
+        if !cache_path.is_dir()
+            || fs::symlink_metadata(cache_path)
+                .is_ok_and(|metadata| metadata.file_type().is_symlink())
+        {
+            return Err(DependencyError::new(format!(
+                "{}: browser cache is missing",
+                record.id
+            )));
+        }
+        let mut candidates = Vec::new();
+        for pattern in &record.verification.executable_globs {
+            let full_pattern = cache_path.join(pattern).to_string_lossy().to_string();
+            let paths =
+                crate::path_resolution::python_glob_paths(&full_pattern).map_err(|error| {
+                    DependencyError::new(format!(
+                        "{}: browser executable glob is invalid: {error}",
+                        record.id
+                    ))
+                })?;
+            for candidate in paths {
+                if candidate.is_symlink() || !candidate.is_file() || !is_executable(&candidate) {
+                    continue;
+                }
+                let resolved = fs::canonicalize(&candidate)
+                    .map_err(|error| DependencyError::new(error.to_string()))?;
+                let root = fs::canonicalize(cache_path)
+                    .map_err(|error| DependencyError::new(error.to_string()))?;
+                if resolved.starts_with(root) {
+                    candidates.push(candidate);
+                }
+            }
+        }
+        candidates.sort();
+        let candidate = candidates.first().ok_or_else(|| {
+            DependencyError::new(format!(
+                "{}: browser executable is missing from cache",
+                record.id
+            ))
+        })?;
+        let mut argv = vec![candidate.to_string_lossy().to_string()];
+        argv.extend(record.verification.args.iter().cloned());
+        let mut variables = self.tool_paths(workspace, &BTreeMap::new())?;
+        variables.insert("PLAYWRIGHT_BROWSERS_PATH".to_string(), cache.to_string());
+        let output = self.capture(
+            &argv,
+            workspace,
+            &variables,
+            &record.id,
+            "verify-browser-executable",
+        )?;
+        let token = record
+            .verification
+            .output_contains
+            .as_deref()
+            .ok_or_else(|| {
+                DependencyError::new(format!("{}: browser output contract is missing", record.id))
+            })?;
+        require_output(&output, token, &record.id)
+    }
+
+    fn resolved_apt_package_version(
+        &self,
+        record: &DependencyRecord,
+        payload: &Value,
+    ) -> Result<Option<String>> {
+        if record.method != Method::AptPackage || record.version.is_some() {
+            return Ok(None);
+        }
+        let value = payload
+            .get("resolved_package_version")
+            .and_then(Value::as_str)
+            .filter(|value| matches(r"^[A-Za-z0-9][A-Za-z0-9.+:~_-]*$", value))
+            .ok_or_else(|| {
+                DependencyError::new(format!(
+                    "{}: resolved dpkg package version is missing or invalid",
+                    record.id
+                ))
+            })?;
+        Ok(Some(value.to_string()))
+    }
+
+    fn structural_bindings(
+        &self,
+        record: &DependencyRecord,
+    ) -> Result<BTreeMap<String, ExecutableBinding>> {
+        let mut bindings = BTreeMap::new();
+        for executable in executable_binding_names(record, true) {
+            let path = configured_executable_path(&self.probe, record, &executable, true)?;
+            bindings.insert(
+                executable.clone(),
+                ExecutableBinding {
+                    provided: executable.clone(),
+                    lexical_path: path.to_string_lossy().to_string(),
+                    absolute_path: path.to_string_lossy().to_string(),
+                    verification_output: format!(
+                        "{STRUCTURAL_BINDING_OUTPUT_PREFIX}:{}:{executable}",
+                        record.method.as_str()
+                    ),
+                },
+            );
+        }
+        Ok(bindings)
+    }
+
+    fn cargo_source(&self, record: &DependencyRecord, workspace: &Path) -> Result<PathBuf> {
+        let source = crate::path_resolution::resolve_non_strict(&workspace.join(&record.source))
+            .map_err(|error| {
+                DependencyError::new(format!(
+                    "{}: cannot resolve Cargo source: {error}",
+                    record.id
+                ))
+            })?;
+        if !source.starts_with(workspace) {
+            return Err(DependencyError::new(format!(
+                "{}: cargo source escapes workspace",
+                record.id
+            )));
+        }
+        if !source.is_dir() {
+            return Err(DependencyError::new(format!(
+                "{}: cargo source is missing: {}",
+                record.id,
+                source.display()
+            )));
+        }
+        Ok(source)
+    }
+
+    fn cargo_snapshot(&self, source: &Path) -> Result<(String, String)> {
+        let expected = CANONICAL_RUST_SOURCE_FILES
+            .iter()
+            .copied()
+            .collect::<BTreeSet<_>>();
+        for relative in CANONICAL_RUST_SOURCE_FILES {
+            let path = source.join(relative);
+            let metadata = fs::symlink_metadata(&path).map_err(|_| {
+                DependencyError::new(format!("cargo source snapshot file is missing: {relative}"))
+            })?;
+            if metadata.file_type().is_symlink() || !metadata.is_file() {
+                return Err(DependencyError::new(format!(
+                    "cargo source snapshot file is missing: {relative}"
+                )));
+            }
+        }
+        let mut actual = BTreeSet::new();
+        let mut pending = vec![source.to_path_buf()];
+        while let Some(directory) = pending.pop() {
+            for entry in fs::read_dir(&directory).map_err(|error| {
+                DependencyError::new(format!(
+                    "cargo source snapshot directory is unreadable: {}: {error}",
+                    directory.display()
+                ))
+            })? {
+                let entry = entry.map_err(|error| DependencyError::new(error.to_string()))?;
+                let path = entry.path();
+                let relative = path
+                    .strip_prefix(source)
+                    .map_err(|_| DependencyError::new("Cargo snapshot path escaped source"))?;
+                let relative_text = relative.to_string_lossy().replace('\\', "/");
+                if relative.components().any(|component| {
+                    component.as_os_str() == "target" || component.as_os_str() == ".git"
+                }) {
+                    continue;
+                }
+                let metadata = fs::symlink_metadata(&path).map_err(|error| {
+                    DependencyError::new(format!(
+                        "cargo source snapshot path is unreadable: {}: {error}",
+                        path.display()
+                    ))
+                })?;
+                if metadata.file_type().is_symlink() {
+                    continue;
+                }
+                if metadata.is_dir() {
+                    pending.push(path);
+                } else if metadata.is_file() {
+                    actual.insert(relative_text);
+                }
+            }
+        }
+        let expected_text = expected
+            .into_iter()
+            .map(str::to_string)
+            .collect::<BTreeSet<_>>();
+        if actual != expected_text {
+            let missing = expected_text
+                .difference(&actual)
+                .cloned()
+                .collect::<Vec<_>>();
+            let extra = actual
+                .difference(&expected_text)
+                .cloned()
+                .collect::<Vec<_>>();
+            return Err(DependencyError::new(format!(
+                "cargo source snapshot inventory mismatch: missing={missing:?} extra={extra:?}"
+            )));
+        }
+        let mut digest = Sha256::new();
+        for relative in CANONICAL_RUST_SOURCE_FILES {
+            let bytes = fs::read(source.join(relative)).map_err(|error| {
+                DependencyError::new(format!(
+                    "cargo source snapshot file is unreadable: {relative}: {error}"
+                ))
+            })?;
+            let blob = sha256_hex(&bytes);
+            digest.update(relative.as_bytes());
+            digest.update([0]);
+            digest.update(blob.as_bytes());
+            digest.update([0]);
+        }
+        let source_digest = format!("{:x}", digest.finalize());
+        let lock_digest =
+            sha256_hex(&fs::read(source.join("Cargo.lock")).map_err(|error| {
+                DependencyError::new(format!("Cargo.lock is unreadable: {error}"))
+            })?);
+        Ok((source_digest, lock_digest))
+    }
+
+    fn verify_canonical_snapshot(
+        &self,
+        record: &DependencyRecord,
+        workspace: &Path,
+    ) -> Result<(String, String)> {
+        let source = self.cargo_source(record, workspace)?;
+        let (source_digest, lock_digest) = self.cargo_snapshot(&source)?;
+        if record
+            .source_tree_sha256
+            .as_deref()
+            .is_some_and(|expected| expected != source_digest)
+            || record.cargo_lock_sha256.as_deref() != Some(lock_digest.as_str())
+        {
+            return Err(DependencyError::new(format!(
+                "{}: immutable source snapshot mismatch {source_digest}!={:?} or {lock_digest}!={:?}",
+                record.id, record.source_tree_sha256, record.cargo_lock_sha256
+            )));
+        }
+        Ok((source_digest, lock_digest))
+    }
+
+    fn cargo_source_identity(&self, record: &DependencyRecord, workspace: &Path) -> Result<String> {
+        let commit = record.commit.as_deref().ok_or_else(|| {
+            DependencyError::new(format!(
+                "{}: active-source records have no Git source identity",
+                record.id
+            ))
+        })?;
+        let source = self.cargo_source(record, workspace)?;
+        let output = Command::new("git")
+            .args([
+                "-C",
+                source.to_string_lossy().as_ref(),
+                "rev-parse",
+                "--verify",
+                "HEAD",
+            ])
+            .current_dir(workspace)
+            .output()
+            .map_err(|error| {
+                DependencyError::new(format!(
+                    "{}: cannot read cargo source commit from {}: {error}",
+                    record.id,
+                    source.display()
+                ))
+            })?;
+        if !output.status.success() {
+            return Err(DependencyError::new(format!(
+                "{}: cannot read cargo source commit from {}",
+                record.id,
+                source.display()
+            )));
+        }
+        let observed = String::from_utf8(output.stdout)
+            .map_err(|error| {
+                DependencyError::new(format!(
+                    "{}: cargo source commit is not UTF-8: {error}",
+                    record.id
+                ))
+            })?
+            .trim()
+            .to_ascii_lowercase();
+        if observed.is_empty() {
+            return Ok(commit.to_ascii_lowercase());
+        }
+        if !matches(r"^[0-9a-f]{40}$", &observed) {
+            return Err(DependencyError::new(format!(
+                "{}: cargo source identity is not a full commit: {observed:?}",
+                record.id
+            )));
+        }
+        if observed != commit.to_ascii_lowercase() {
+            return Err(DependencyError::new(format!(
+                "{}: cargo source commit mismatch {observed}!={commit}",
+                record.id
+            )));
+        }
+        Ok(observed)
+    }
+
+    fn cargo_binary_path(&self, record: &DependencyRecord, source: &Path) -> Result<PathBuf> {
+        let relative = record.verification.path.as_deref().ok_or_else(|| {
+            DependencyError::new(format!("{}: cargo verification path is missing", record.id))
+        })?;
+        let path = Path::new(relative);
+        let components = path.components().collect::<Vec<_>>();
+        if path.is_absolute()
+            || components.len() < 2
+            || components[0].as_os_str() != "target"
+            || components.iter().any(|part| {
+                matches!(
+                    part,
+                    std::path::Component::ParentDir | std::path::Component::CurDir
+                )
+            })
+        {
+            return Err(DependencyError::new(format!(
+                "{}: cargo binary path is unsafe",
+                record.id
+            )));
+        }
+        let target_root = if self.image_owned {
+            env::var_os("AGENT_CANON_CARGO_TARGET_DIR").map(PathBuf::from)
+        } else {
+            None
+        };
+        let candidate = target_root
+            .unwrap_or_else(|| source.to_path_buf())
+            .join(path);
+        crate::path_resolution::resolve_non_strict(&candidate).map_err(|error| {
+            DependencyError::new(format!(
+                "{}: cargo binary path is invalid: {error}",
+                record.id
+            ))
+        })
+    }
+
+    fn install_rust_toolchain(
+        &self,
+        record: &DependencyRecord,
+        workspace: &Path,
+        repair: bool,
+        variables: &BTreeMap<String, String>,
+    ) -> Result<()> {
+        let version = record.version.as_deref().ok_or_else(|| {
+            DependencyError::new(format!("{}: rust toolchain version is missing", record.id))
+        })?;
+        self.run(
+            &[
+                "/usr/local/bin/rustup-init".to_string(),
+                "-y".to_string(),
+                "--default-toolchain".to_string(),
+                "none".to_string(),
+                "--profile".to_string(),
+                "minimal".to_string(),
+                "--no-modify-path".to_string(),
+            ],
+            workspace,
+            variables,
+            false,
+            &record.id,
+            "install-rust-toolchain",
+        )?;
+        if repair && !self.image_owned {
+            let list = self.capture(
+                &[
+                    "rustup".to_string(),
+                    "toolchain".to_string(),
+                    "list".to_string(),
+                ],
+                workspace,
+                variables,
+                &record.id,
+                "verify-rust-installed",
+            )?;
+            let installed = list.stdout.lines().any(|line| {
+                line.split_whitespace().next().is_some_and(|value| {
+                    value == version || value.starts_with(&format!("{version}-"))
+                })
+            });
+            if installed {
+                self.run(
+                    &[
+                        "rustup".to_string(),
+                        "toolchain".to_string(),
+                        "uninstall".to_string(),
+                        version.to_string(),
+                    ],
+                    workspace,
+                    variables,
+                    false,
+                    &record.id,
+                    "install-rust-toolchain",
+                )?;
+            }
+        }
+        self.run(
+            &[
+                "rustup".to_string(),
+                "toolchain".to_string(),
+                "install".to_string(),
+                version.to_string(),
+                "--profile".to_string(),
+                "minimal".to_string(),
+            ],
+            workspace,
+            variables,
+            false,
+            &record.id,
+            "install-rust-toolchain",
+        )?;
+        if !record.components.is_empty() {
+            let mut argv = vec![
+                "rustup".to_string(),
+                "component".to_string(),
+                "add".to_string(),
+            ];
+            argv.extend(record.components.iter().cloned());
+            argv.extend(["--toolchain".to_string(), version.to_string()]);
+            self.run(
+                &argv,
+                workspace,
+                variables,
+                false,
+                &record.id,
+                "install-rust-toolchain",
+            )?;
+        }
+        self.run(
+            &[
+                "rustup".to_string(),
+                "default".to_string(),
+                version.to_string(),
+            ],
+            workspace,
+            variables,
+            false,
+            &record.id,
+            "install-rust-toolchain",
+        )
+    }
+
+    fn install_lean_toolchain(
+        &self,
+        record: &DependencyRecord,
+        workspace: &Path,
+        repair: bool,
+        variables: &BTreeMap<String, String>,
+    ) -> Result<()> {
+        let version = record.version.as_deref().ok_or_else(|| {
+            DependencyError::new(format!("{}: Lean toolchain version is missing", record.id))
+        })?;
+        self.run(
+            &[
+                "/usr/local/bin/elan-init".to_string(),
+                "-y".to_string(),
+                "--default-toolchain".to_string(),
+                version.to_string(),
+                "--no-modify-path".to_string(),
+            ],
+            workspace,
+            variables,
+            false,
+            &record.id,
+            "install-lean-toolchain",
+        )?;
+        let list = self.capture(
+            &[
+                "elan".to_string(),
+                "toolchain".to_string(),
+                "list".to_string(),
+            ],
+            workspace,
+            variables,
+            &record.id,
+            "verify-lean-installed",
+        )?;
+        let mut has_exact = list
+            .stdout
+            .lines()
+            .any(|line| line.split_whitespace().next() == Some(version));
+        if repair && has_exact {
+            self.run(
+                &[
+                    "elan".to_string(),
+                    "toolchain".to_string(),
+                    "uninstall".to_string(),
+                    version.to_string(),
+                ],
+                workspace,
+                variables,
+                false,
+                &record.id,
+                "install-lean-toolchain",
+            )?;
+            has_exact = false;
+        }
+        if !has_exact {
+            self.run(
+                &[
+                    "elan".to_string(),
+                    "toolchain".to_string(),
+                    "install".to_string(),
+                    version.to_string(),
+                ],
+                workspace,
+                variables,
+                false,
+                &record.id,
+                "install-lean-toolchain",
+            )?;
+        }
+        self.run(
+            &[
+                "elan".to_string(),
+                "default".to_string(),
+                version.to_string(),
+            ],
+            workspace,
+            variables,
+            false,
+            &record.id,
+            "install-lean-toolchain",
+        )
+    }
+
+    fn install_cargo_source(
+        &self,
+        record: &DependencyRecord,
+        workspace: &Path,
+        base_env: &BTreeMap<String, String>,
+    ) -> Result<()> {
+        let source = self.cargo_source(record, workspace)?;
+        if record.source_identity.as_deref() == Some(CANONICAL_SNAPSHOT_IDENTITY) {
+            self.verify_canonical_snapshot(record, workspace)?;
+        }
+        let source_before = if record.commit.is_some() {
+            Some(self.cargo_source_identity(record, workspace)?)
+        } else {
+            None
+        };
+        let mut variables = base_env.clone();
+        let target = if self.image_owned {
+            env::var_os("AGENT_CANON_CARGO_TARGET_DIR").map(PathBuf::from)
+        } else {
+            None
+        };
+        let target = target.unwrap_or_else(|| source.join("target"));
+        variables.insert(
+            "CARGO_TARGET_DIR".to_string(),
+            target.to_string_lossy().to_string(),
+        );
+        self.run(
+            &[
+                "cargo".to_string(),
+                "build".to_string(),
+                "--release".to_string(),
+                "--locked".to_string(),
+                "--manifest-path".to_string(),
+                source.join("Cargo.toml").to_string_lossy().to_string(),
+            ],
+            workspace,
+            &variables,
+            false,
+            &record.id,
+            "install-cargo-source-build",
+        )?;
+        if let Some(before) = source_before {
+            let after = self.cargo_source_identity(record, workspace)?;
+            if before != after {
+                return Err(DependencyError::new(format!(
+                    "{}: source identity changed during build {before}!={after}",
+                    record.id
+                )));
+            }
+        }
+        if record.source_identity.as_deref() == Some(CANONICAL_SNAPSHOT_IDENTITY) {
+            self.verify_canonical_snapshot(record, workspace)?;
+        }
+        Ok(())
+    }
+
+    fn install_browser(
+        &self,
+        record: &DependencyRecord,
+        workspace: &Path,
+        variables: &BTreeMap<String, String>,
+    ) -> Result<()> {
+        let browser = record
+            .browser
+            .as_deref()
+            .ok_or_else(|| DependencyError::new(format!("{}: browser is missing", record.id)))?;
+        let cache = record.browser_cache_path.as_deref().ok_or_else(|| {
+            DependencyError::new(format!("{}: browser cache path is missing", record.id))
+        })?;
+        let cache_path = Path::new(cache);
+        if fs::symlink_metadata(cache_path)
+            .is_ok_and(|metadata| metadata.file_type().is_symlink() || !metadata.is_dir())
+        {
+            return Err(DependencyError::new(format!(
+                "{}: browser cache path is not a directory",
+                record.id
+            )));
+        }
+        self.run(
+            &[
+                "install".to_string(),
+                "-d".to_string(),
+                "-m".to_string(),
+                "0775".to_string(),
+                cache.to_string(),
+            ],
+            workspace,
+            variables,
+            true,
+            &record.id,
+            "install-browser",
+        )?;
+        self.run(
+            &[
+                "env".to_string(),
+                format!("PLAYWRIGHT_BROWSERS_PATH={cache}"),
+                "playwright".to_string(),
+                "install".to_string(),
+                "--with-deps".to_string(),
+                browser.to_string(),
+            ],
+            workspace,
+            variables,
+            true,
+            &record.id,
+            "install-browser",
+        )
+    }
+
+    fn publish_final_binary(
+        &self,
+        record: &DependencyRecord,
+        workspace: &Path,
+        final_binary_dir: &Path,
+    ) -> Result<PathBuf> {
+        if !self.image_owned || record.method != Method::CargoSourceBuild {
+            return Err(DependencyError::new(format!(
+                "{}: final binary publication is image Cargo-only",
+                record.id
+            )));
+        }
+        let final_dir =
+            crate::path_resolution::resolve_non_strict(final_binary_dir).map_err(|error| {
+                DependencyError::new(format!(
+                    "{}: final binary directory is invalid: {error}",
+                    record.id
+                ))
+            })?;
+        if final_dir != Path::new("/usr/local/bin") {
+            return Err(DependencyError::new(format!(
+                "{}: final binary directory is not the image PATH",
+                record.id
+            )));
+        }
+        let source = self.cargo_source(record, workspace)?;
+        let binary = self.cargo_binary_path(record, &source)?;
+        if !binary.is_file() || !is_executable(&binary) {
+            return Err(DependencyError::new(format!(
+                "{}: Cargo build binary is missing: {}",
+                record.id,
+                binary.display()
+            )));
+        }
+        let name = Path::new(record.verification.path.as_deref().unwrap_or_default())
+            .file_name()
+            .and_then(|value| value.to_str())
+            .filter(|value| !value.is_empty() && *value != "." && *value != "..")
+            .ok_or_else(|| {
+                DependencyError::new(format!("{}: final binary name is unsafe", record.id))
+            })?;
+        let final_binary = final_dir.join(name);
+        let variables = self.tool_paths(workspace, &BTreeMap::new())?;
+        let argv = vec![
+            "install".to_string(),
+            "-m".to_string(),
+            "0555".to_string(),
+            binary.to_string_lossy().to_string(),
+            final_binary.to_string_lossy().to_string(),
+        ];
+        self.run(
+            &argv,
+            workspace,
+            &variables,
+            true,
+            &record.id,
+            "install-cargo-source-build",
+        )?;
+        Ok(final_binary)
+    }
+
+    fn verify_cargo_binary(
+        &self,
+        record: &DependencyRecord,
+        payload: Option<&Value>,
+        workspace: &Path,
+    ) -> Result<()> {
+        if record.source_identity.as_deref() == Some(CANONICAL_SNAPSHOT_IDENTITY) {
+            self.verify_canonical_snapshot(record, workspace)?;
+        }
+        if record.commit.is_some() {
+            self.cargo_source_identity(record, workspace)?;
+        }
+        let source = self.cargo_source(record, workspace)?;
+        let binary = self.cargo_binary_path(record, &source)?;
+        let configured_target = if self.image_owned {
+            env::var_os("AGENT_CANON_CARGO_TARGET_DIR").map(PathBuf::from)
+        } else {
+            None
+        };
+        let allowed_root = configured_target.unwrap_or_else(|| source.join("target"));
+        if !binary.starts_with(&allowed_root) {
+            return Err(DependencyError::new(format!(
+                "{}: cargo binary escapes its target",
+                record.id
+            )));
+        }
+        if !binary.is_file() || !is_executable(&binary) {
+            return Err(DependencyError::new(format!(
+                "{}: cargo binary is missing: {}",
+                record.id,
+                binary.display()
+            )));
+        }
+        if self.image_owned {
+            let payload = payload.ok_or_else(|| {
+                DependencyError::new(format!("{}: Cargo image receipt is missing", record.id))
+            })?;
+            self.verify_final_binary_receipt(payload, record)?;
+        }
+        let token = record
+            .verification
+            .output_contains
+            .as_deref()
+            .ok_or_else(|| {
+                DependencyError::new(format!(
+                    "{}: cargo executable output contract is missing",
+                    record.id
+                ))
+            })?;
+        let mut argv = vec![binary.to_string_lossy().to_string()];
+        argv.extend(record.verification.args.iter().cloned());
+        let variables = self.tool_paths(workspace, &BTreeMap::new())?;
+        let output = self.capture(
+            &argv,
+            workspace,
+            &variables,
+            &record.id,
+            "verify-cargo-binary",
+        )?;
+        require_output(&output, token, &record.id)
+    }
+
+    fn install_record(
+        &mut self,
+        record: &DependencyRecord,
+        workspace: &Path,
+        repair: bool,
+    ) -> Result<()> {
+        self.active_method = Some(record.method);
+        let base_env = self.tool_paths(workspace, &BTreeMap::new())?;
+        match record.method {
+            Method::AptPackage => {
+                let package = record.version.as_ref().map_or_else(
+                    || record.package.clone(),
+                    |version| format!("{}={version}", record.package),
+                );
+                let mut argv = vec![
+                    "apt-get".to_string(),
+                    "install".to_string(),
+                    "-y".to_string(),
+                    "--no-install-recommends".to_string(),
+                    "--no-remove".to_string(),
+                    package,
+                ];
+                if repair {
+                    argv.insert(2, "--reinstall".to_string());
+                }
+                self.run(
+                    &argv,
+                    workspace,
+                    &base_env,
+                    true,
+                    &record.id,
+                    "install-apt-package",
+                )?;
+            }
+            Method::AptRepository => {
+                self.install_apt_repository(record, workspace, repair, &base_env)?;
+                if repository_package_payload(record)?.is_null() {
+                    let version = record.version.as_deref().ok_or_else(|| {
+                        DependencyError::new(format!(
+                            "{}: apt repository package version is missing",
+                            record.id
+                        ))
+                    })?;
+                    let mut argv = vec![
+                        "apt-get".to_string(),
+                        "install".to_string(),
+                        "-y".to_string(),
+                        "--no-install-recommends".to_string(),
+                        "--no-remove".to_string(),
+                        format!("{}={version}", record.package),
+                    ];
+                    if repair {
+                        argv.insert(2, "--reinstall".to_string());
+                    }
+                    self.run(
+                        &argv,
+                        workspace,
+                        &base_env,
+                        true,
+                        &record.id,
+                        "install-apt-repository",
+                    )?;
+                }
+            }
+            Method::NpmGlobal => {
+                let version = record.version.as_deref().ok_or_else(|| {
+                    DependencyError::new(format!("{}: npm version is missing", record.id))
+                })?;
+                let argv = vec![
+                    NPM_ENV_EXECUTABLE.to_string(),
+                    format!("PATH={NPM_SYSTEM_PATH}"),
+                    "/usr/bin/npm".to_string(),
+                    "install".to_string(),
+                    "--force".to_string(),
+                    "--global".to_string(),
+                    "--prefix".to_string(),
+                    NPM_GLOBAL_PREFIX.to_string(),
+                    format!("{}@{version}", record.package),
+                ];
+                self.run(
+                    &argv,
+                    workspace,
+                    &base_env,
+                    true,
+                    &record.id,
+                    "install-npm-global",
+                )?;
+            }
+            Method::Pipx => {
+                let version = record.version.as_deref().ok_or_else(|| {
+                    DependencyError::new(format!("{}: pipx version is missing", record.id))
+                })?;
+                let mut argv = vec![
+                    "pipx".to_string(),
+                    "install".to_string(),
+                    "--index-url".to_string(),
+                    record.source.clone(),
+                    format!("{}=={version}", record.package),
+                ];
+                if repair {
+                    argv.insert(2, "--force".to_string());
+                }
+                self.run(
+                    &argv,
+                    workspace,
+                    &base_env,
+                    false,
+                    &record.id,
+                    "install-pipx",
+                )?;
+            }
+            Method::ReleaseAsset => {
+                self.install_release_asset(record, workspace, repair, &base_env)?
+            }
+            Method::RustToolchain => {
+                self.install_rust_toolchain(record, workspace, repair, &base_env)?
+            }
+            Method::LeanToolchain => {
+                self.install_lean_toolchain(record, workspace, repair, &base_env)?
+            }
+            Method::CargoSourceBuild => self.install_cargo_source(record, workspace, &base_env)?,
+            Method::BrowserInstall => self.install_browser(record, workspace, &base_env)?,
+        }
+        Ok(())
+    }
+
+    fn install_apt_repository(
+        &self,
+        record: &DependencyRecord,
+        workspace: &Path,
+        repair: bool,
+        variables: &BTreeMap<String, String>,
+    ) -> Result<()> {
+        let key_url = record.key_url.as_deref().ok_or_else(|| {
+            DependencyError::new(format!("{}: repository key URL is missing", record.id))
+        })?;
+        let expected_fingerprint = record.key_fingerprint.as_deref().ok_or_else(|| {
+            DependencyError::new(format!(
+                "{}: repository key fingerprint is missing",
+                record.id
+            ))
+        })?;
+        let temporary = tempfile::Builder::new()
+            .prefix(&format!("agent-canon-{}-", record.id))
+            .tempdir_in(self.temporary_parent(workspace, "apt-repository")?)
+            .map_err(|error| {
+                DependencyError::new(format!(
+                    "{}: apt repository staging failed: {error}",
+                    record.id
+                ))
+            })?;
+        let raw_key = temporary.path().join("key.raw");
+        let keyring = temporary.path().join(format!("{}.gpg", record.id));
+        self.download(key_url, &raw_key, workspace, &record.id, "download-apt-key")?;
+        let fingerprint = self.capture(
+            &[
+                "gpg".to_string(),
+                "--show-keys".to_string(),
+                "--with-colons".to_string(),
+                raw_key.to_string_lossy().to_string(),
+            ],
+            workspace,
+            variables,
+            &record.id,
+            "verify-apt-repository-key",
+        )?;
+        let observed = fingerprint
+            .stdout
+            .lines()
+            .filter_map(|line| {
+                let fields = line.split(':').collect::<Vec<_>>();
+                (fields.first() == Some(&"fpr") && fields.len() > 9)
+                    .then(|| fields[9].to_ascii_uppercase())
+            })
+            .collect::<BTreeSet<_>>();
+        if !observed.contains(&expected_fingerprint.to_ascii_uppercase()) {
+            return Err(DependencyError::new(format!(
+                "{}: apt key fingerprint mismatch",
+                record.id
+            )));
+        }
+        self.run(
+            &[
+                "gpg".to_string(),
+                "--dearmor".to_string(),
+                "--output".to_string(),
+                keyring.to_string_lossy().to_string(),
+                raw_key.to_string_lossy().to_string(),
+            ],
+            workspace,
+            variables,
+            false,
+            &record.id,
+            "install-apt-repository-key",
+        )?;
+        let key_destination = PathBuf::from("/etc/apt/keyrings").join(format!("{}.gpg", record.id));
+        self.run(
+            &[
+                "install".to_string(),
+                "-D".to_string(),
+                "-m".to_string(),
+                "0644".to_string(),
+                keyring.to_string_lossy().to_string(),
+                key_destination.to_string_lossy().to_string(),
+            ],
+            workspace,
+            variables,
+            true,
+            &record.id,
+            "install-apt-repository-key",
+        )?;
+        let suite = record.repository_suite.as_deref().ok_or_else(|| {
+            DependencyError::new(format!("{}: repository suite is not declared", record.id))
+        })?;
+        let source_line = format!(
+            "deb [signed-by={}] {} {} {}\n",
+            key_destination.display(),
+            record.source,
+            suite,
+            record.repository_components.join(" ")
+        );
+        self.verify_repository_packages_digest(record, workspace, temporary.path())?;
+        let source_path = temporary.path().join("repository.list");
+        fs::write(&source_path, source_line).map_err(|error| {
+            DependencyError::new(format!(
+                "{}: apt repository source could not be staged: {error}",
+                record.id
+            ))
+        })?;
+        let source_destination =
+            PathBuf::from("/etc/apt/sources.list.d").join(format!("{}.list", record.id));
+        self.run(
+            &[
+                "install".to_string(),
+                "-D".to_string(),
+                "-m".to_string(),
+                "0644".to_string(),
+                source_path.to_string_lossy().to_string(),
+                source_destination.to_string_lossy().to_string(),
+            ],
+            workspace,
+            variables,
+            true,
+            &record.id,
+            "install-apt-repository-source",
+        )?;
+        self.run(
+            &["apt-get".to_string(), "update".to_string()],
+            workspace,
+            variables,
+            true,
+            &record.id,
+            "install-apt-repository",
+        )?;
+        if let Some((url, checksum)) = repository_package_identity(record)? {
+            let filename = repository_package_filename(record, &url)?;
+            let package_path = temporary.path().join(filename);
+            self.download(
+                &url,
+                &package_path,
+                workspace,
+                &record.id,
+                "download-apt-package",
+            )?;
+            let observed = sha256_hex(&fs::read(&package_path).map_err(|error| {
+                DependencyError::new(format!("{}: apt package read failed: {error}", record.id))
+            })?);
+            if observed != checksum {
+                return Err(DependencyError::new(format!(
+                    "{}: immutable apt package SHA256 mismatch {observed}!={checksum}",
+                    record.id
+                )));
+            }
+            let mut argv = vec![
+                "apt-get".to_string(),
+                "install".to_string(),
+                "-y".to_string(),
+                "--no-install-recommends".to_string(),
+                "--no-remove".to_string(),
+                package_path.to_string_lossy().to_string(),
+            ];
+            if repair {
+                argv.insert(2, "--reinstall".to_string());
+            }
+            self.run(
+                &argv,
+                workspace,
+                variables,
+                true,
+                &record.id,
+                "install-apt-repository",
+            )?;
+        }
+        Ok(())
+    }
+
+    fn verify_repository_packages_digest(
+        &self,
+        record: &DependencyRecord,
+        workspace: &Path,
+        temporary: &Path,
+    ) -> Result<()> {
+        let payload = repository_packages_payload(record)?;
+        let Some(url) = payload.get("url").and_then(Value::as_str) else {
+            return Ok(());
+        };
+        let checksum = payload
+            .get("sha256")
+            .and_then(Value::as_str)
+            .ok_or_else(|| {
+                DependencyError::new(format!("{}: Packages index SHA256 is missing", record.id))
+            })?;
+        let path = temporary.join(format!("{}-Packages", record.id));
+        self.download(url, &path, workspace, &record.id, "download-packages-index")
+            .map_err(|error| {
+                DependencyError::new(format!(
+                    "{}: Packages index download failed: {url}: {error}",
+                    record.id
+                ))
+            })?;
+        let observed = sha256_hex(&fs::read(&path).map_err(|error| {
+            DependencyError::new(format!(
+                "{}: Packages index read failed: {url}: {error}",
+                record.id
+            ))
+        })?);
+        let _ = fs::remove_file(&path);
+        if observed != checksum {
+            return Err(DependencyError::new(format!(
+                "{}: Packages index SHA256 mismatch {observed}!={checksum} ({url})",
+                record.id
+            )));
+        }
+        Ok(())
+    }
+
+    fn install_release_asset(
+        &self,
+        record: &DependencyRecord,
+        workspace: &Path,
+        repair: bool,
+        variables: &BTreeMap<String, String>,
+    ) -> Result<()> {
+        let destination = record.destination.as_deref().ok_or_else(|| {
+            DependencyError::new(format!("{}: release destination is missing", record.id))
+        })?;
+        let architecture = release_asset_architecture();
+        let asset = if record.assets.is_empty() {
+            record.asset.clone().ok_or_else(|| {
+                DependencyError::new(format!("{}: release asset is missing", record.id))
+            })?
+        } else {
+            record
+                .assets
+                .iter()
+                .find(|(key, _)| key == &architecture)
+                .map(|(_, value)| value.clone())
+                .ok_or_else(|| {
+                    DependencyError::new(format!(
+                        "{}: no release asset for architecture {architecture}",
+                        record.id
+                    ))
+                })?
+        };
+        validate_safe_asset_path(&asset, &format!("{}.asset", record.id))?;
+        let url = if record.source.ends_with(&asset) {
+            record.source.clone()
+        } else {
+            format!("{}/{}", record.source.trim_end_matches('/'), asset)
+        };
+        let temporary = tempfile::Builder::new()
+            .prefix(&format!("agent-canon-{}-", record.id))
+            .tempdir_in(self.temporary_parent(workspace, "release-asset")?)
+            .map_err(|error| {
+                DependencyError::new(format!("{}: release staging failed: {error}", record.id))
+            })?;
+        let archive = temporary.path().join(&asset);
+        if let Some(parent) = archive.parent() {
+            fs::create_dir_all(parent).map_err(|error| {
+                DependencyError::new(format!("{}: release staging failed: {error}", record.id))
+            })?;
+        }
+        self.download(
+            &url,
+            &archive,
+            workspace,
+            &record.id,
+            "download-release-asset",
+        )?;
+        let checksum = if record.checksums.is_empty() {
+            record.checksum.as_deref().ok_or_else(|| {
+                DependencyError::new(format!("{}: release checksum is missing", record.id))
+            })?
+        } else {
+            record
+                .checksums
+                .iter()
+                .find(|(key, _)| key == &architecture)
+                .map(|(_, value)| value.as_str())
+                .ok_or_else(|| {
+                    DependencyError::new(format!(
+                        "{}: no release checksum for architecture {architecture}",
+                        record.id
+                    ))
+                })?
+        };
+        let observed = sha256_hex(&fs::read(&archive).map_err(|error| {
+            DependencyError::new(format!(
+                "{}: release asset is unreadable: {error}",
+                record.id
+            ))
+        })?);
+        if observed != checksum {
+            return Err(DependencyError::new(format!(
+                "{}: release checksum mismatch",
+                record.id
+            )));
+        }
+        let candidate = if record.extract.as_deref() == Some("none") {
+            archive.clone()
+        } else {
+            let extracted = temporary.path().join("extract");
+            safe_extract_archive(
+                &archive,
+                &extracted,
+                record.archive_format.as_deref().unwrap_or_default(),
+            )?;
+            let expected = extracted.join(destination.trim_start_matches('/'));
+            if expected.is_file()
+                && !fs::symlink_metadata(&expected)
+                    .is_ok_and(|metadata| metadata.file_type().is_symlink())
+            {
+                expected
+            } else {
+                let name = Path::new(destination)
+                    .file_name()
+                    .and_then(|value| value.to_str())
+                    .unwrap_or_default();
+                let matches = find_regular_named(&extracted, name)?;
+                if matches.len() != 1 {
+                    return Err(DependencyError::new(format!(
+                        "{}: extracted destination not found",
+                        record.id
+                    )));
+                }
+                matches[0].clone()
+            }
+        };
+        if record.archive_format.as_deref() == Some("deb") {
+            let mut argv = vec![
+                "apt-get".to_string(),
+                "install".to_string(),
+                "-y".to_string(),
+                "--no-install-recommends".to_string(),
+                "--no-remove".to_string(),
+                candidate.to_string_lossy().to_string(),
+            ];
+            if repair {
+                argv.insert(2, "--reinstall".to_string());
+            }
+            self.run(
+                &argv,
+                workspace,
+                variables,
+                true,
+                &record.id,
+                "install-release-asset",
+            )
+        } else {
+            self.run(
+                &[
+                    "install".to_string(),
+                    "-D".to_string(),
+                    "-m".to_string(),
+                    "0755".to_string(),
+                    candidate.to_string_lossy().to_string(),
+                    destination.to_string(),
+                ],
+                workspace,
+                variables,
+                true,
+                &record.id,
+                "install-release-asset",
+            )
+        }
+    }
+
+    fn temporary_parent(&self, workspace: &Path, purpose: &str) -> Result<PathBuf> {
+        if self.image_owned {
+            return Ok(PathBuf::from("/tmp"));
+        }
+        let runtime = env::var_os("AGENT_CANON_RUNTIME_ROOT")
+            .filter(|value| !value.is_empty())
+            .map(PathBuf::from)
+            .ok_or_else(|| {
+                DependencyError::new(format!("dependency-{purpose}: runtime_root_required"))
+            })?;
+        crate::runtime_boundary::RuntimeArtifactBoundary::for_source(
+            workspace,
+            Some(&runtime),
+            true,
+        )
+        .map_err(|error| {
+            DependencyError::new(format!(
+                "dependency-{purpose}: runtime_root_invalid:{error}"
+            ))
+        })?
+        .ensure_directory(&Path::new("tmp").join("dependencies").join(purpose))
+        .map_err(|error| {
+            DependencyError::new(format!(
+                "dependency-{purpose}: runtime_root_invalid:{error}"
+            ))
+        })
+    }
+
+    fn write_receipt(
+        &self,
+        path: &Path,
+        plan: &DependencyPlan,
+        record: &DependencyRecord,
+        source_identity: Option<&str>,
+        bindings: &BTreeMap<String, ExecutableBinding>,
+        final_binary_path: Option<&Path>,
+    ) -> Result<()> {
+        let bindings_payload = bindings
+            .iter()
+            .map(|(name, binding)| {
+                (
+                    name.clone(),
+                    json!({
+                        "provided": binding.provided,
+                        "lexical_path": binding.lexical_path,
+                        "absolute_path": binding.absolute_path,
+                        "verification_output": binding.verification_output,
+                    }),
+                )
+            })
+            .collect::<serde_json::Map<_, _>>();
+        let mut payload = json!({
+            "schema": RECEIPT_SCHEMA,
+            "status": if self.image_owned { "installed" } else { "pass" },
+            "owner": "image-installer",
+            "phase": "image-install",
+            "record_id": record.id,
+            "manifest_version": record.version,
+            "record_fingerprint": record.fingerprint()?,
+            "plan_fingerprint": plan.fingerprint,
+            "verification": record.verification.payload(),
+            "source_identity": source_identity,
+            "executable_bindings": bindings_payload,
+        });
+        let fields = payload
+            .as_object_mut()
+            .expect("receipt payload is an object");
+        if record.method == Method::AptPackage && record.version.is_none() {
+            let version = self
+                .resolved_package_versions
+                .get(&record.id)
+                .ok_or_else(|| {
+                    DependencyError::new(format!(
+                        "{}: unpinned apt package lacks observed dpkg version",
+                        record.id
+                    ))
+                })?;
+            fields.insert(
+                "resolved_package_version".to_string(),
+                Value::String(version.clone()),
+            );
+        }
+        let repository_packages = repository_packages_payload(record)?;
+        if !repository_packages.is_null() {
+            fields.insert("repository_packages".to_string(), repository_packages);
+        }
+        let repository_package = repository_package_payload(record)?;
+        if !repository_package.is_null() {
+            fields.insert("repository_package".to_string(), repository_package);
+        }
+        if record.method == Method::CargoSourceBuild
+            && record.source_identity.as_deref() == Some(CANONICAL_SNAPSHOT_IDENTITY)
+        {
+            let workspace = self
+                .install_workspace
+                .as_deref()
+                .ok_or_else(|| DependencyError::new("Cargo receipt lacks an install workspace"))?;
+            let source = self.cargo_source(record, workspace)?;
+            let (source_digest, lock_digest) = self.cargo_snapshot(&source)?;
+            let binary = self.cargo_binary_path(record, &source)?;
+            let binary_path = final_binary_path.unwrap_or(&binary);
+            let binary_bytes = fs::read(&binary).map_err(|error| {
+                DependencyError::new(format!(
+                    "{}: Cargo build binary is unreadable: {error}",
+                    record.id
+                ))
+            })?;
+            fields.insert(
+                "source_tree_sha256".to_string(),
+                Value::String(source_digest),
+            );
+            fields.insert("cargo_lock_sha256".to_string(), Value::String(lock_digest));
+            fields.insert(
+                "binary_path".to_string(),
+                Value::String(binary_path.to_string_lossy().to_string()),
+            );
+            fields.insert(
+                "binary_sha256".to_string(),
+                Value::String(sha256_hex(&binary_bytes)),
+            );
+            fields.insert(
+                "rustup_init_version".to_string(),
+                Value::String(RUSTUP_INIT_VERSION.to_string()),
+            );
+            fields.insert(
+                "rustup_init_sha256".to_string(),
+                Value::String(RUSTUP_INIT_SHA256.to_string()),
+            );
+            if final_binary_path.is_some() {
+                fields.insert(
+                    "build_binary_path".to_string(),
+                    Value::String(binary.to_string_lossy().to_string()),
+                );
+            }
+        }
+        let mut bytes = serde_json::to_vec_pretty(&payload).map_err(|error| {
+            DependencyError::new(format!("serialize dependency receipt: {error}"))
+        })?;
+        bytes.push(b'\n');
+        if self.image_owned {
+            let image_root = self.image_owned_root.as_deref().ok_or_else(|| {
+                DependencyError::new("image-owned receipt publication lacks an image root")
+            })?;
+            let parent = crate::path_resolution::resolve_non_strict(
+                path.parent()
+                    .ok_or_else(|| DependencyError::new("dependency receipt has no parent"))?,
+            )
+            .map_err(|error| {
+                DependencyError::new(format!("image receipt parent is invalid: {error}"))
+            })?;
+            if !parent.starts_with(image_root) {
+                return Err(DependencyError::new("image-owned receipt escaped its root"));
+            }
+            fs::create_dir_all(&parent).map_err(|error| {
+                DependencyError::new(format!("image receipt directory is unavailable: {error}"))
+            })?;
+            fs::write(path, bytes).map_err(|error| {
+                DependencyError::new(format!("image receipt could not be written: {error}"))
+            })?;
+            return Ok(());
+        }
+        let attested = self.parent_attestation.as_ref().ok_or_else(|| {
+            DependencyError::new("parent-root-attestation is required before receipt publication")
+        })?;
+        let purpose = NonEmptyTrimmedString::new("dependency-receipt")
+            .map_err(|error| DependencyError::new(error.to_string()))?;
+        attested
+            .write_parent_owned_file(path, &bytes, purpose)
+            .map_err(|error| {
+                DependencyError::new(format!(
+                    "parent-root-receipt:{}:{}",
+                    error.reject,
+                    error.detail()
+                ))
+            })?;
+        Ok(())
+    }
+
+    fn verify_installed_receipt(
+        &self,
+        record: &DependencyRecord,
+        payload: &Value,
+        workspace: &Path,
+    ) -> Result<()> {
+        let raw_bindings = payload
+            .get("executable_bindings")
+            .and_then(Value::as_object)
+            .ok_or_else(|| {
+                DependencyError::new(format!(
+                    "{}: installed executable bindings are stale",
+                    record.id
+                ))
+            })?;
+        let bindings = raw_bindings
+            .iter()
+            .map(|(name, value)| Ok((name.clone(), ExecutableBinding::from_receipt(value, name)?)))
+            .collect::<Result<BTreeMap<_, _>>>()?;
+        if record.verification.kind == VerificationKind::CargoBinary {
+            self.verify_cargo_binary(record, Some(payload), workspace)?;
+            return Ok(());
+        }
+        verify_installed_receipt(&self.probe, record, payload, &bindings, workspace)?;
+        Ok(())
+    }
+
+    fn verify_final_binary_receipt(
+        &self,
+        payload: &Value,
+        record: &DependencyRecord,
+    ) -> Result<()> {
+        let spec_path = record.verification.path.as_deref().ok_or_else(|| {
+            DependencyError::new(format!("{}: Cargo verification path is missing", record.id))
+        })?;
+        let name = Path::new(spec_path)
+            .file_name()
+            .and_then(|value| value.to_str())
+            .ok_or_else(|| {
+                DependencyError::new(format!("{}: Cargo final binary path is invalid", record.id))
+            })?;
+        let expected = Path::new("/usr/local/bin").join(name);
+        let final_value = payload
+            .get("binary_path")
+            .and_then(Value::as_str)
+            .ok_or_else(|| {
+                DependencyError::new(format!(
+                    "{}: final binary receipt binding is malformed",
+                    record.id
+                ))
+            })?;
+        let digest = payload
+            .get("binary_sha256")
+            .and_then(Value::as_str)
+            .ok_or_else(|| {
+                DependencyError::new(format!(
+                    "{}: final binary receipt binding is malformed",
+                    record.id
+                ))
+            })?;
+        if final_value != expected.to_string_lossy() || !is_hex(digest, 64) {
+            return Err(DependencyError::new(format!(
+                "{}: final binary receipt binding is malformed",
+                record.id
+            )));
+        }
+        let path = Path::new(final_value);
+        if !path.is_file() || !is_executable(path) {
+            return Err(DependencyError::new(format!(
+                "{}: final image binary is missing: {final_value}",
+                record.id
+            )));
+        }
+        let observed =
+            sha256_hex(&fs::read(path).map_err(|error| DependencyError::new(error.to_string()))?);
+        if observed != digest {
+            return Err(DependencyError::new(format!(
+                "{}: final binary digest mismatch {observed}!={digest}",
+                record.id
+            )));
+        }
+        Ok(())
+    }
+
+    fn download(
+        &self,
+        url: &str,
+        destination: &Path,
+        workspace: &Path,
+        record_id: &str,
+        operation: &str,
+    ) -> Result<()> {
+        validate_url(url, &format!("{record_id}.{operation}"), false)?;
+        let variables = self.tool_paths(workspace, &BTreeMap::new())?;
+        let allowed_protocol = if url.starts_with("file://") {
+            "=file"
+        } else {
+            "=https"
+        };
+        let argv = vec![
+            "curl".to_string(),
+            "--fail".to_string(),
+            "--location".to_string(),
+            "--silent".to_string(),
+            "--show-error".to_string(),
+            "--proto".to_string(),
+            allowed_protocol.to_string(),
+            "--proto-redir".to_string(),
+            allowed_protocol.to_string(),
+            "--output".to_string(),
+            destination.to_string_lossy().to_string(),
+            url.to_string(),
+        ];
+        self.run(&argv, workspace, &variables, false, record_id, operation)
+    }
+}
+
+fn repository_package_identity(record: &DependencyRecord) -> Result<Option<(String, String)>> {
+    let payload = repository_package_payload(record)?;
+    if payload.is_null() {
+        return Ok(None);
+    }
+    let object = payload.as_object().ok_or_else(|| {
+        DependencyError::new(format!(
+            "{}: repository package identity is malformed",
+            record.id
+        ))
+    })?;
+    let url = object.get("url").and_then(Value::as_str).ok_or_else(|| {
+        DependencyError::new(format!("{}: repository package URL is missing", record.id))
+    })?;
+    let checksum = object
+        .get("sha256")
+        .and_then(Value::as_str)
+        .ok_or_else(|| {
+            DependencyError::new(format!(
+                "{}: repository package checksum is missing",
+                record.id
+            ))
+        })?;
+    Ok(Some((url.to_string(), checksum.to_string())))
+}
+
+fn repository_package_filename(record: &DependencyRecord, url: &str) -> Result<String> {
+    let path = url.split(['?', '#']).next().unwrap_or_default();
+    let filename = path.rsplit('/').next().unwrap_or_default();
+    if !matches(r"^[A-Za-z0-9][A-Za-z0-9.+_~-]*\.deb$", filename) {
+        return Err(DependencyError::new(format!(
+            "{}: immutable apt package URL has an unsafe filename",
+            record.id
+        )));
+    }
+    Ok(filename.to_string())
+}
+
+fn validate_safe_asset_path(value: &str, field: &str) -> Result<()> {
+    let path = Path::new(value);
+    if path.is_absolute() || value.is_empty() || value.contains('\\') || value.starts_with('/') {
+        return Err(DependencyError::new(format!(
+            "{field} must be a safe relative asset path"
+        )));
+    }
+    for component in path.components() {
+        let std::path::Component::Normal(component) = component else {
+            return Err(DependencyError::new(format!(
+                "{field} must be a safe relative asset path"
+            )));
+        };
+        let component = component.to_string_lossy();
+        if !matches(r"^[A-Za-z0-9][A-Za-z0-9._-]*$", &component) {
+            return Err(DependencyError::new(format!(
+                "{field} has an unsupported asset path"
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn safe_archive_target(root: &Path, member: &Path) -> Result<PathBuf> {
+    let root = fs::canonicalize(root).map_err(|error| {
+        DependencyError::new(format!("archive extraction root is unavailable: {error}"))
+    })?;
+    let candidate =
+        crate::path_resolution::resolve_non_strict(&root.join(member)).map_err(|error| {
+            DependencyError::new(format!("archive member path is invalid: {error}"))
+        })?;
+    if !candidate.starts_with(&root) {
+        return Err(DependencyError::new(format!(
+            "archive member escapes extraction root: {}",
+            member.display()
+        )));
+    }
+    Ok(candidate)
+}
+
+fn safe_extract_archive(archive: &Path, destination: &Path, format: &str) -> Result<()> {
+    fs::create_dir_all(destination).map_err(|error| {
+        DependencyError::new(format!("archive extraction root is unavailable: {error}"))
+    })?;
+    match format {
+        "zip" => safe_extract_zip(archive, destination),
+        "tar" => safe_extract_tar_reader(
+            fs::File::open(archive)
+                .map_err(|error| DependencyError::new(format!("archive is unreadable: {error}")))?,
+            destination,
+        ),
+        "tar.gz" | "tar.xz" | "tar.bz2" => {
+            let temp_dir = tempfile::Builder::new()
+                .prefix("agent-canon-archive-")
+                .tempdir_in(destination.parent().unwrap_or_else(|| Path::new("/tmp")))
+                .map_err(|error| {
+                    DependencyError::new(format!("archive staging is unavailable: {error}"))
+                })?;
+            let tar_path = temp_dir.path().join("payload.tar");
+            match format {
+                "tar.gz" => {
+                    let source = fs::File::open(archive).map_err(|error| {
+                        DependencyError::new(format!("archive is unreadable: {error}"))
+                    })?;
+                    let mut decoder = flate2::read::GzDecoder::new(source);
+                    let mut target = fs::File::create(&tar_path).map_err(|error| {
+                        DependencyError::new(format!("archive staging failed: {error}"))
+                    })?;
+                    std::io::copy(&mut decoder, &mut target).map_err(|error| {
+                        DependencyError::new(format!("archive decompression failed: {error}"))
+                    })?;
+                }
+                "tar.bz2" => {
+                    let source = fs::File::open(archive).map_err(|error| {
+                        DependencyError::new(format!("archive is unreadable: {error}"))
+                    })?;
+                    let mut decoder = bzip2::read::BzDecoder::new(source);
+                    let mut target = fs::File::create(&tar_path).map_err(|error| {
+                        DependencyError::new(format!("archive staging failed: {error}"))
+                    })?;
+                    std::io::copy(&mut decoder, &mut target).map_err(|error| {
+                        DependencyError::new(format!("archive decompression failed: {error}"))
+                    })?;
+                }
+                "tar.xz" => {
+                    let output = fs::File::create(&tar_path).map_err(|error| {
+                        DependencyError::new(format!("archive staging failed: {error}"))
+                    })?;
+                    let status = Command::new("xz")
+                        .args(["--decompress", "--stdout"])
+                        .arg(archive)
+                        .stdout(std::process::Stdio::from(output))
+                        .status()
+                        .map_err(|error| {
+                            DependencyError::new(format!("xz command failed to start: {error}"))
+                        })?;
+                    if !status.success() {
+                        return Err(DependencyError::new(format!(
+                            "xz archive decompression failed with {status}"
+                        )));
+                    }
+                }
+                _ => unreachable!(),
+            }
+            safe_extract_tar_reader(
+                fs::File::open(&tar_path).map_err(|error| {
+                    DependencyError::new(format!("archive staging is unreadable: {error}"))
+                })?,
+                destination,
+            )
+        }
+        other => Err(DependencyError::new(format!(
+            "unsupported archive format: {other}"
+        ))),
+    }
+}
+
+fn safe_extract_tar_reader<R: std::io::Read>(reader: R, destination: &Path) -> Result<()> {
+    let mut archive = tar::Archive::new(reader);
+    let entries = archive
+        .entries()
+        .map_err(|error| DependencyError::new(format!("archive is unreadable: {error}")))?;
+    for entry in entries {
+        let mut entry = entry.map_err(|error| {
+            DependencyError::new(format!("archive member is unreadable: {error}"))
+        })?;
+        let member = entry
+            .path()
+            .map_err(|error| {
+                DependencyError::new(format!("archive member path is unreadable: {error}"))
+            })?
+            .into_owned();
+        let target = safe_archive_target(destination, &member)?;
+        let kind = entry.header().entry_type();
+        if kind.is_dir() {
+            fs::create_dir_all(&target).map_err(|error| {
+                DependencyError::new(format!("archive directory could not be created: {error}"))
+            })?;
+            continue;
+        }
+        if !kind.is_file() {
+            return Err(DependencyError::new(format!(
+                "unsafe archive member: {}",
+                member.display()
+            )));
+        }
+        let parent = target
+            .parent()
+            .ok_or_else(|| DependencyError::new("archive member has no parent"))?;
+        fs::create_dir_all(parent).map_err(|error| {
+            DependencyError::new(format!("archive directory could not be created: {error}"))
+        })?;
+        let mut output = fs::File::create(&target).map_err(|error| {
+            DependencyError::new(format!("archive member could not be created: {error}"))
+        })?;
+        std::io::copy(&mut entry, &mut output).map_err(|error| {
+            DependencyError::new(format!("archive member could not be copied: {error}"))
+        })?;
+        if let Ok(mode) = entry.header().mode() {
+            set_image_mode(&target, mode & 0o777)?;
+        }
+    }
+    Ok(())
+}
+
+fn safe_extract_zip(archive: &Path, destination: &Path) -> Result<()> {
+    fs::create_dir_all(destination).map_err(|error| {
+        DependencyError::new(format!("archive extraction root is unavailable: {error}"))
+    })?;
+    let file = fs::File::open(archive)
+        .map_err(|error| DependencyError::new(format!("archive is unreadable: {error}")))?;
+    let mut archive = zip::ZipArchive::new(file)
+        .map_err(|error| DependencyError::new(format!("archive is unreadable: {error}")))?;
+    for index in 0..archive.len() {
+        let mut member = archive.by_index(index).map_err(|error| {
+            DependencyError::new(format!("archive member is unreadable: {error}"))
+        })?;
+        let name = member
+            .name()
+            .map_err(|error| {
+                DependencyError::new(format!("archive member name is unreadable: {error}"))
+            })?
+            .to_string();
+        if name.is_empty() {
+            return Err(DependencyError::new(
+                "unsafe archive member: empty ZIP name",
+            ));
+        }
+        let path = safe_archive_target(destination, Path::new(&name))?;
+        let mode = member.unix_mode().unwrap_or(0);
+        let file_type = mode & 0o170000;
+        let allowed = if member.is_dir() {
+            file_type == 0 || file_type == 0o040000
+        } else {
+            file_type == 0 || file_type == 0o100000
+        };
+        if !allowed {
+            return Err(DependencyError::new(format!(
+                "unsafe archive member: {name}"
+            )));
+        }
+        if member.is_dir() {
+            fs::create_dir_all(&path).map_err(|error| {
+                DependencyError::new(format!("archive directory could not be created: {error}"))
+            })?;
+            continue;
+        }
+        let parent = path
+            .parent()
+            .ok_or_else(|| DependencyError::new("archive member has no parent"))?;
+        fs::create_dir_all(parent).map_err(|error| {
+            DependencyError::new(format!("archive directory could not be created: {error}"))
+        })?;
+        let mut output = fs::File::create(&path).map_err(|error| {
+            DependencyError::new(format!("archive member could not be created: {error}"))
+        })?;
+        std::io::copy(&mut member, &mut output).map_err(|error| {
+            DependencyError::new(format!("archive member could not be copied: {error}"))
+        })?;
+        if mode & 0o777 != 0 {
+            set_image_mode(&path, mode & 0o777)?;
+        }
+    }
+    Ok(())
+}
+
+fn find_regular_named(root: &Path, name: &str) -> Result<Vec<PathBuf>> {
+    let mut pending = vec![root.to_path_buf()];
+    let mut matches = Vec::new();
+    while let Some(directory) = pending.pop() {
+        for entry in fs::read_dir(&directory).map_err(|error| {
+            DependencyError::new(format!(
+                "archive extraction directory is unreadable: {error}"
+            ))
+        })? {
+            let entry = entry.map_err(|error| {
+                DependencyError::new(format!("archive extraction entry is unreadable: {error}"))
+            })?;
+            let path = entry.path();
+            let metadata = fs::symlink_metadata(&path).map_err(|error| {
+                DependencyError::new(format!("archive extraction entry is unreadable: {error}"))
+            })?;
+            if metadata.file_type().is_symlink() {
+                continue;
+            }
+            if metadata.is_dir() {
+                pending.push(path);
+            } else if metadata.is_file()
+                && path.file_name().and_then(|value| value.to_str()) == Some(name)
+            {
+                matches.push(path);
+            }
+        }
+    }
+    Ok(matches)
+}
+
+fn verify_frozen_image_layout(
+    target: &Path,
+    selected_ids: Option<&[String]>,
+    production: bool,
+    owner: (u32, u32),
+) -> Result<(PathBuf, PathBuf)> {
+    validate_image_parent_chain(target, production, false, owner)
+        .map_err(|error| DependencyError::new(format!("image-verify rebuild-required: {error}")))?;
+    assert_frozen_image_node(target, true, owner, "image dependency root")
+        .map_err(|error| DependencyError::new(format!("image-verify rebuild-required: {error}")))?;
+    let entries = fs::read_dir(target)
+        .map_err(|error| DependencyError::new(format!("image-verify rebuild-required: {error}")))?
+        .filter_map(|entry| {
+            entry
+                .ok()
+                .map(|entry| entry.file_name().to_string_lossy().to_string())
+        })
+        .collect::<BTreeSet<_>>();
+    if entries != BTreeSet::from(["plan.json".to_string(), "receipts".to_string()]) {
+        return Err(DependencyError::new(
+            "image-verify rebuild-required: image root contents mismatch",
+        ));
+    }
+    let plan_path = target.join("plan.json");
+    let receipts = target.join("receipts");
+    assert_frozen_image_node(&plan_path, false, owner, "image plan")
+        .map_err(|error| DependencyError::new(format!("image-verify rebuild-required: {error}")))?;
+    assert_frozen_image_node(&receipts, true, owner, "image receipts")
+        .map_err(|error| DependencyError::new(format!("image-verify rebuild-required: {error}")))?;
+    let receipt_entries = fs::read_dir(&receipts)
+        .map_err(|error| DependencyError::new(format!("image-verify rebuild-required: {error}")))?
+        .map(|entry| {
+            entry.map_err(|error| {
+                DependencyError::new(format!("image-verify rebuild-required: {error}"))
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+    if let Some(selected_ids) = selected_ids {
+        let expected = selected_ids
+            .iter()
+            .map(|record_id| format!("{record_id}.json"))
+            .collect::<BTreeSet<_>>();
+        let actual = receipt_entries
+            .iter()
+            .map(|entry| entry.file_name().to_string_lossy().to_string())
+            .collect::<BTreeSet<_>>();
+        if actual != expected {
+            return Err(DependencyError::new(
+                "image-verify rebuild-required: receipt set mismatch",
+            ));
+        }
+    }
+    for entry in receipt_entries {
+        assert_frozen_image_node(&entry.path(), false, owner, "image receipt").map_err(
+            |error| DependencyError::new(format!("image-verify rebuild-required: {error}")),
+        )?;
+    }
+    Ok((plan_path, receipts))
+}
+
+fn image_install_plan(
+    plan: &DependencyPlan,
+    workspace: &Path,
+    requested: Option<&[String]>,
+    final_binary_dir: Option<&Path>,
+) -> Result<Vec<String>> {
+    let (target, production) = image_target();
+    let image_root = target
+        .parent()
+        .ok_or_else(|| DependencyError::new("image target has no parent"))?
+        .to_path_buf();
+    image_install_plan_at(
+        plan,
+        workspace,
+        requested,
+        final_binary_dir,
+        Installer::new(true, Some(image_root)),
+        ImageInstallContext {
+            target: &target,
+            production,
+            runtime_identity: None,
+        },
+    )
+}
+
+fn image_install_plan_at(
+    plan: &DependencyPlan,
+    workspace: &Path,
+    requested: Option<&[String]>,
+    final_binary_dir: Option<&Path>,
+    mut installer: Installer,
+    context: ImageInstallContext<'_>,
+) -> Result<Vec<String>> {
+    let ImageInstallContext {
+        target,
+        production,
+        runtime_identity,
+    } = context;
+    if production && !image_owner_is_root() {
+        return Err(DependencyError::new("image-install requires euid=0"));
+    }
+    if production {
+        if let Some(final_binary_dir) = final_binary_dir {
+            if fs::canonicalize(final_binary_dir).ok().as_deref()
+                != Some(Path::new("/usr/local/bin"))
+            {
+                return Err(DependencyError::new(
+                    "image final binary directory is not /usr/local/bin",
+                ));
+            }
+        }
+    }
+    if image_target_exists(target) {
+        return Err(DependencyError::new(format!(
+            "image dependency root already exists; rebuild-required: {}",
+            target.display()
+        )));
+    }
+    let selected_ids = select_record_ids(plan, requested)?;
+    let by_id = plan
+        .records
+        .iter()
+        .map(|record| (record.id.as_str(), record))
+        .collect::<BTreeMap<_, _>>();
+    let image_unsafe = selected_ids
+        .iter()
+        .filter(|record_id| {
+            by_id
+                .get(record_id.as_str())
+                .is_none_or(|record| !image_record_is_safe(record))
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    if !image_unsafe.is_empty() {
+        return Err(DependencyError::new(format!(
+            "image-install contains methods outside the image-safe whitelist: {}",
+            image_unsafe.join(", ")
+        )));
+    }
+    match runtime_identity {
+        Some(identity) => {
+            validate_runtime_identity_for(plan, identity)?;
+        }
+        None => {
+            validate_runtime_identity(plan)?;
+        }
+    }
+    let owner = image_owner(production);
+    validate_image_parent_chain(target, production, true, owner)?;
+    let parent = target
+        .parent()
+        .ok_or_else(|| DependencyError::new("image target has no parent"))?;
+    let staging = tempfile::Builder::new()
+        .prefix(".agent-canon-image-")
+        .tempdir_in(parent)
+        .map_err(|error| {
+            DependencyError::new(format!("image staging directory is unavailable: {error}"))
+        })?;
+    let receipts = staging.path().join("receipts");
+    let completed = installer.install(
+        plan,
+        workspace,
+        &receipts,
+        Some(&selected_ids),
+        final_binary_dir,
+    )?;
+    let expected = selected_ids.iter().cloned().collect::<BTreeSet<_>>();
+    let actual = completed.iter().cloned().collect::<BTreeSet<_>>();
+    if actual != expected {
+        return Err(DependencyError::new(format!(
+            "image-install did not complete the selected record closure: expected={expected:?} completed={actual:?}"
+        )));
+    }
+    let missing_receipts = selected_ids
+        .iter()
+        .filter_map(|record_id| match image_receipt_path(&receipts, record_id) {
+            Ok(path) if path.is_file() => None,
+            Ok(_) | Err(_) => Some(record_id.clone()),
+        })
+        .collect::<Vec<_>>();
+    if !missing_receipts.is_empty() {
+        return Err(DependencyError::new(format!(
+            "image-install requires immutable receipts for: {}",
+            missing_receipts.join(", ")
+        )));
+    }
+    let contents = fs::read_dir(staging.path())
+        .map_err(|error| {
+            DependencyError::new(format!("image staging contents are unreadable: {error}"))
+        })?
+        .map(|entry| {
+            entry
+                .map_err(|error| DependencyError::new(error.to_string()))
+                .map(|entry| entry.file_name().to_string_lossy().to_string())
+        })
+        .collect::<Result<BTreeSet<_>>>()?;
+    if contents != BTreeSet::from(["receipts".to_string()]) {
+        return Err(DependencyError::new(
+            "image-install staging contents are unexpected",
+        ));
+    }
+    let payload = image_plan_payload(plan, &selected_ids)?;
+    let mut bytes = serde_json::to_vec_pretty(&payload)
+        .map_err(|error| DependencyError::new(format!("serialize image plan: {error}")))?;
+    bytes.push(b'\n');
+    let plan_path = staging.path().join("plan.json");
+    fs::write(&plan_path, bytes).map_err(|error| {
+        DependencyError::new(format!("image plan could not be written: {error}"))
+    })?;
+    freeze_image_tree(staging.path(), owner)?;
+    if image_target_exists(target) {
+        return Err(DependencyError::new(format!(
+            "image dependency root already exists; rebuild-required: {}",
+            target.display()
+        )));
+    }
+    fs::rename(staging.path(), target).map_err(|error| {
+        DependencyError::new(format!(
+            "image dependency root could not be published: {error}"
+        ))
+    })?;
+    Ok(completed)
+}
+
+fn image_verify_plan(
+    plan: &DependencyPlan,
+    workspace: &Path,
+    requested: Option<&[String]>,
+) -> Result<Vec<String>> {
+    let (target, production) = image_target();
+    let image_root = target
+        .parent()
+        .ok_or_else(|| DependencyError::new("image target has no parent"))?
+        .to_path_buf();
+    image_verify_plan_at(
+        plan,
+        workspace,
+        requested,
+        &target,
+        production,
+        Installer::new(true, Some(image_root)),
+    )
+}
+
+fn image_verify_plan_at(
+    plan: &DependencyPlan,
+    workspace: &Path,
+    requested: Option<&[String]>,
+    target: &Path,
+    production: bool,
+    mut installer: Installer,
+) -> Result<Vec<String>> {
+    let owner = image_owner(production);
+    let (plan_path, _) = verify_frozen_image_layout(target, None, production, owner)?;
+    let stored_bytes = fs::read(&plan_path).map_err(|error| {
+        DependencyError::new(format!(
+            "image-verify rebuild-required: unreadable plan: {error}"
+        ))
+    })?;
+    let stored: Value = serde_json::from_slice(&stored_bytes).map_err(|error| {
+        DependencyError::new(format!(
+            "image-verify rebuild-required: unreadable plan: {error}"
+        ))
+    })?;
+    let selected_ids = if let Some(requested) = requested {
+        select_record_ids(plan, Some(requested)).map_err(|error| {
+            DependencyError::new(format!(
+                "image-verify rebuild-required: image selection is invalid: {error}"
+            ))
+        })?
+    } else {
+        let stored_order = stored
+            .get("order")
+            .and_then(Value::as_array)
+            .ok_or_else(|| {
+                DependencyError::new("image-verify rebuild-required: image selection is malformed")
+            })?;
+        let records = stored_order
+            .iter()
+            .map(|value| {
+                value.as_str().map(str::to_string).ok_or_else(|| {
+                    DependencyError::new(
+                        "image-verify rebuild-required: image selection is malformed",
+                    )
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
+        select_record_ids(plan, Some(&records)).map_err(|error| {
+            DependencyError::new(format!(
+                "image-verify rebuild-required: image selection is invalid: {error}"
+            ))
+        })?
+    };
+    let expected = image_plan_payload(plan, &selected_ids)?;
+    if stored != expected {
+        return Err(DependencyError::new(
+            "image-verify rebuild-required: image plan mismatch",
+        ));
+    }
+    let (_, receipts) = verify_frozen_image_layout(target, Some(&selected_ids), production, owner)?;
+    for record_id in &selected_ids {
+        let path = image_receipt_path(&receipts, record_id)?;
+        let bytes = fs::read(&path).map_err(|_| {
+            DependencyError::new(format!(
+                "image-verify rebuild-required: unreadable receipt: {record_id}"
+            ))
+        })?;
+        let payload: Value = serde_json::from_slice(&bytes).map_err(|_| {
+            DependencyError::new(format!(
+                "image-verify rebuild-required: unreadable receipt: {record_id}"
+            ))
+        })?;
+        if !payload.is_object() {
+            return Err(DependencyError::new(format!(
+                "image-verify rebuild-required: receipt is malformed: {record_id}"
+            )));
+        }
+        let record = plan.by_id(record_id).expect("selected record exists");
+        installer.active_method = Some(record.method);
+        if payload.get("status").and_then(Value::as_str) != Some("installed")
+            || !installer.receipt_matches(&path, plan, record)?
+        {
+            return Err(DependencyError::new(format!(
+                "image-verify rebuild-required: stale or non-installed receipt: {record_id}"
+            )));
+        }
+        installer
+            .verify_installed_receipt(record, &payload, workspace)
+            .map_err(|error| {
+                DependencyError::new(format!(
+                    "image-verify rebuild-required: live verification failed: {record_id}: {error}"
+                ))
+            })?;
+    }
+    Ok(selected_ids)
+}
+
+fn install_plan(plan: &DependencyPlan, workspace: &Path, receipts: &Path) -> Result<Vec<String>> {
+    validate_runtime_identity(plan)?;
+    Installer::new(false, None).install(plan, workspace, receipts, None, None)
+}
+
+#[derive(Debug, Clone)]
+struct BoundaryFinding {
+    category: String,
+    path: String,
+    detail: String,
+}
+
+impl BoundaryFinding {
+    fn render(&self) -> String {
+        format!(
+            "AGENT_CANON_RUNTIME_BOUNDARY_FINDING={}:{}:{}",
+            self.category, self.path, self.detail
+        )
+    }
+}
+
+fn environment_boundary_report(workspace: &Path) -> (Vec<String>, Vec<BoundaryFinding>) {
+    let mut checked = Vec::new();
+    let mut findings = Vec::new();
+    let required = [
+        ("bootstrap.sh", true),
+        ("bootstrap/container/image/dependencies.toml", false),
+        ("bootstrap/container/image/Dockerfile", false),
+        ("bootstrap/container/lifecycle/entrypoint.sh", true),
+        (
+            "tools/runtime/dispatch/agent-canon/src/environment_dependencies.rs",
+            false,
+        ),
+        (
+            "tools/runtime/dispatch/agent-canon/src/bootstrap_runtime.rs",
+            false,
+        ),
+        (
+            "tools/runtime/dispatch/agent-canon/src/runtime_boundary.rs",
+            false,
+        ),
+        ("CONTAINER_OPERATIONS.md", false),
+    ];
+    for (relative, executable) in required {
+        checked.push(relative.to_string());
+        let path = workspace.join(relative);
+        if !path.is_file() {
+            findings.push(BoundaryFinding {
+                category: "bootstrap-runtime".to_string(),
+                path: relative.to_string(),
+                detail: "missing-file".to_string(),
+            });
+            continue;
+        }
+        if executable && !is_executable(&path) {
+            findings.push(BoundaryFinding {
+                category: "bootstrap-runtime".to_string(),
+                path: relative.to_string(),
+                detail: "not-executable".to_string(),
+            });
+        }
+    }
+    (checked, findings)
+}
+
+fn is_executable(path: &Path) -> bool {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::metadata(path)
+            .map(|metadata| metadata.permissions().mode() & 0o111 != 0)
+            .unwrap_or(false)
+    }
+    #[cfg(not(unix))]
+    {
+        path.is_file()
+    }
+}
+
+fn resolve_cli_workspace(path: &Path) -> Result<PathBuf> {
+    let absolute = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        env::current_dir()
+            .map_err(|error| DependencyError::new(format!("resolve workspace: {error}")))?
+            .join(path)
+    };
+    crate::path_resolution::resolve_non_strict(&absolute).map_err(|error| {
+        DependencyError::new(format!("resolve workspace {}: {error}", absolute.display()))
+    })
+}
+
+fn dependency_dry_run(plan: &DependencyPlan) -> Value {
+    let by_id = plan
+        .records
+        .iter()
+        .map(|record| (record.id.as_str(), record))
+        .collect::<BTreeMap<_, _>>();
+    let actions = plan
+        .order
+        .iter()
+        .filter_map(|record_id| by_id.get(record_id.as_str()))
+        .map(|record| {
+            let environment = if record.method == Method::BrowserInstall {
+                json!({"PLAYWRIGHT_BROWSERS_PATH": record.browser_cache_path})
+            } else {
+                json!({})
+            };
+            json!({
+                "id": record.id,
+                "method": record.method.as_str(),
+                "verification": record.verification.payload(),
+                "environment": environment,
+            })
+        })
+        .collect::<Vec<_>>();
+    json!({
+        "schema": "agent-canon.tool-dependency-dry-run",
+        "plan_fingerprint": plan.fingerprint,
+        "order": plan.order,
+        "actions": actions,
+    })
+}
+
+#[derive(Debug)]
+struct DependencyCliOutput {
+    payload: Value,
+    exit_status: i32,
+    sources: Option<Vec<String>>,
+    order: Option<Vec<String>>,
+    completed: Option<Vec<String>>,
+    boundary_findings: Vec<BoundaryFinding>,
+}
+
+fn dependency_cli_output(args: &DependencyCliArgs) -> Result<DependencyCliOutput> {
+    let workspace = resolve_cli_workspace(&args.workspace)?;
+    if args.command != DependencyCommand::ImageInstall
+        && args.command != DependencyCommand::ImageVerify
+        && args.records.is_some()
+    {
+        return Err(DependencyError::new(
+            "--records is only supported by image-install and image-verify",
+        ));
+    }
+    if args.command == DependencyCommand::Boundary {
+        let (checked, findings) = environment_boundary_report(&workspace);
+        let status = if findings.is_empty() { "pass" } else { "fail" };
+        return Ok(DependencyCliOutput {
+            payload: json!({
+                "status": status,
+                "checked": checked,
+                "findings": findings.iter().map(|finding| json!({
+                    "category": finding.category,
+                    "path": finding.path,
+                    "detail": finding.detail,
+                })).collect::<Vec<_>>(),
+            }),
+            exit_status: i32::from(!findings.is_empty()),
+            sources: None,
+            order: None,
+            completed: None,
+            boundary_findings: findings,
+        });
+    }
+    if args.command == DependencyCommand::ProjectInstall {
+        let installed = install_project_extras(&workspace, &args.extras)?;
+        return Ok(DependencyCliOutput {
+            payload: json!({"status": "pass", "extras": installed}),
+            exit_status: 0,
+            sources: None,
+            order: None,
+            completed: None,
+            boundary_findings: Vec::new(),
+        });
+    }
+    let plan = load_plan(&workspace, args.manifest.as_deref())?;
+    match args.command {
+        DependencyCommand::Validate => Ok(DependencyCliOutput {
+            payload: json!({
+                "status": "pass",
+                "sources": plan.sources.iter().map(|source| source.display().to_string()).collect::<Vec<_>>(),
+                "order": plan.order,
+                "plan_fingerprint": plan.fingerprint,
+            }),
+            exit_status: 0,
+            sources: Some(
+                plan.sources
+                    .iter()
+                    .map(|source| source.display().to_string())
+                    .collect(),
+            ),
+            order: Some(plan.order.clone()),
+            completed: None,
+            boundary_findings: Vec::new(),
+        }),
+        DependencyCommand::DryRun => Ok(DependencyCliOutput {
+            payload: dependency_dry_run(&plan),
+            exit_status: 0,
+            sources: None,
+            order: Some(plan.order.clone()),
+            completed: None,
+            boundary_findings: Vec::new(),
+        }),
+        DependencyCommand::Install => {
+            let receipts = args
+                .receipts
+                .as_deref()
+                .map(resolve_cli_workspace)
+                .transpose()?
+                .unwrap_or_else(|| workspace.join(".agent-canon/dependency-receipts"));
+            let completed = install_plan(&plan, &workspace, &receipts)?;
+            Ok(DependencyCliOutput {
+                payload: json!({
+                    "status": "pass",
+                    "completed": completed,
+                    "plan_fingerprint": plan.fingerprint,
+                }),
+                exit_status: 0,
+                sources: None,
+                order: None,
+                completed: Some(completed),
+                boundary_findings: Vec::new(),
+            })
+        }
+        DependencyCommand::ImageInstall => {
+            let records = args.records.as_deref();
+            let completed =
+                image_install_plan(&plan, &workspace, records, args.final_binary_dir.as_deref())?;
+            Ok(DependencyCliOutput {
+                payload: json!({
+                    "status": "pass",
+                    "completed": completed,
+                    "image_root": image_dependencies_root(),
+                    "plan_fingerprint": plan.fingerprint,
+                }),
+                exit_status: 0,
+                sources: None,
+                order: None,
+                completed: Some(completed),
+                boundary_findings: Vec::new(),
+            })
+        }
+        DependencyCommand::ImageVerify => {
+            let verified = image_verify_plan(&plan, &workspace, args.records.as_deref())?;
+            Ok(DependencyCliOutput {
+                payload: json!({
+                    "status": "pass",
+                    "verified": verified,
+                    "image_root": image_dependencies_root(),
+                    "plan_fingerprint": plan.fingerprint,
+                }),
+                exit_status: 0,
+                sources: None,
+                order: None,
+                completed: None,
+                boundary_findings: Vec::new(),
+            })
+        }
+        DependencyCommand::Boundary | DependencyCommand::ProjectInstall => {
+            unreachable!("handled before dependency plan loading")
+        }
+    }
+}
+
+/// Run the native CLI for typed environment dependency plans and installation.
+pub fn run_cli(args: &[String]) -> i32 {
+    let parsed = match parse_dependency_cli(args) {
+        Ok(ParsedDependencyCli::Help) => {
+            print!("{}", dependency_cli_help());
+            return 0;
+        }
+        Ok(ParsedDependencyCli::Arguments(parsed)) => parsed,
+        Err(error) => {
+            eprintln!("{DEPENDENCY_USAGE}");
+            eprintln!("agent-canon environment-dependencies: error: {error}");
+            return 2;
+        }
+    };
+    match dependency_cli_output(&parsed) {
+        Ok(output) => {
+            if parsed.format == "json" {
+                match serde_json::to_string_pretty(&output.payload) {
+                    Ok(value) => println!("{value}"),
+                    Err(error) => {
+                        eprintln!("AGENT_CANON_TOOL_DEPENDENCY_ERROR={error}");
+                        return 1;
+                    }
+                }
+            } else {
+                let status = output
+                    .payload
+                    .get("status")
+                    .and_then(Value::as_str)
+                    .unwrap_or("pass");
+                println!("AGENT_CANON_TOOL_DEPENDENCY={status}");
+                if parsed.command == DependencyCommand::ImageInstall {
+                    println!("AGENT_CANON_IMAGE_INSTALL=pass");
+                }
+                if parsed.command == DependencyCommand::ImageVerify {
+                    println!("AGENT_CANON_IMAGE_VERIFY=pass");
+                }
+                for finding in &output.boundary_findings {
+                    println!("{}", finding.render());
+                }
+                if let Some(sources) = &output.sources {
+                    println!("AGENT_CANON_TOOL_DEPENDENCY_SOURCES={}", sources.join(","));
+                }
+                if let Some(order) = &output.order {
+                    println!("AGENT_CANON_TOOL_DEPENDENCY_ORDER={}", order.join(","));
+                }
+                if let Some(completed) = &output.completed {
+                    println!(
+                        "AGENT_CANON_TOOL_DEPENDENCY_COMPLETED={}",
+                        completed.join(",")
+                    );
+                }
+            }
+            output.exit_status
+        }
+        Err(error) => {
+            if parsed.command == DependencyCommand::ImageVerify {
+                if parsed.format == "json" {
+                    println!(
+                        "{}",
+                        json!({"status": "rebuild-required", "error": error.to_string()})
+                    );
+                } else {
+                    eprintln!("AGENT_CANON_IMAGE_VERIFY=rebuild-required");
+                }
+            }
+            eprintln!("AGENT_CANON_TOOL_DEPENDENCY_ERROR={error}");
+            1
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Write;
+    #[cfg(target_os = "linux")]
+    use std::os::unix::fs::PermissionsExt;
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -3766,7 +8584,7 @@ mod tests {
                 std::process::id()
             ));
             fs::create_dir_all(&path).expect("temporary root is created");
-            Self(path)
+            Self(path.canonicalize().expect("temporary root is canonical"))
         }
 
         fn write_manifest(&self, relative: &str, text: &str) -> PathBuf {
@@ -3782,6 +8600,45 @@ mod tests {
         fn drop(&mut self) {
             let _ = fs::remove_dir_all(&self.0);
         }
+    }
+
+    #[cfg(target_os = "linux")]
+    fn initialize_git_checkout(path: &Path) {
+        fs::create_dir_all(path).expect("Git checkout directory is created");
+        let init = Command::new("git")
+            .args(["init", "-q", "-b", "main"])
+            .arg(path)
+            .output()
+            .expect("Git is available for the controlled receipt fixture");
+        assert!(init.status.success(), "initialize fixture Git checkout");
+        let remote = Command::new("git")
+            .args(["-C"])
+            .arg(path)
+            .args([
+                "remote",
+                "add",
+                "origin",
+                "https://example.invalid/fixture.git",
+            ])
+            .output()
+            .expect("add fixture Git remote");
+        assert!(remote.status.success(), "add fixture remote");
+        let commit = Command::new("git")
+            .args(["-C"])
+            .arg(path)
+            .args([
+                "-c",
+                "user.name=AgentCanon test",
+                "-c",
+                "user.email=agent-canon-test@example.invalid",
+                "commit",
+                "--allow-empty",
+                "-m",
+                "receipt fixture",
+            ])
+            .output()
+            .expect("commit fixture repository identity");
+        assert!(commit.status.success(), "commit fixture checkout");
     }
 
     #[cfg(unix)]
@@ -3923,6 +8780,19 @@ mod tests {
     }
 
     #[cfg(unix)]
+    fn fake_program_probe(
+        root: &TempRoot,
+        responses: impl IntoIterator<Item = (String, CommandOutput)>,
+        downloads: impl IntoIterator<Item = Vec<u8>>,
+    ) -> ProbeEnvironment {
+        let mut probe = fake_probe(root, std::iter::empty::<(Vec<String>, CommandOutput)>());
+        probe.command_runner = CommandRunner::Fake(FakeCommandRunner::with_program_responses(
+            responses, downloads,
+        ));
+        probe
+    }
+
+    #[cfg(unix)]
     fn create_executable(probe: &ProbeEnvironment, logical_path: &str) {
         use std::os::unix::fs::PermissionsExt;
 
@@ -3940,6 +8810,16 @@ mod tests {
         CommandOutput {
             stdout: stdout.to_string(),
             stderr: String::new(),
+            success: true,
+        }
+    }
+
+    #[cfg(unix)]
+    fn failed_command_output_fixture(stderr: &str) -> CommandOutput {
+        CommandOutput {
+            stdout: String::new(),
+            stderr: stderr.to_string(),
+            success: false,
         }
     }
 
@@ -3961,6 +8841,12 @@ mod tests {
             .borrow()
             .values()
             .all(|responses| responses.is_empty()));
+        assert!(runner
+            .program_responses
+            .borrow()
+            .values()
+            .all(|responses| responses.is_empty()));
+        assert!(runner.downloads.borrow().is_empty());
     }
 
     #[cfg(unix)]
@@ -4042,12 +8928,13 @@ output_contains = "1.2.3"
             .join("../../../../")
             .canonicalize()
             .expect("repository root exists");
-        // Frozen independently from the pre-migration Python build_plan owner.
+        // Frozen from the pre-migration Python build_plan oracle at source SHA
+        // d6e7592dddd2ea8fe9e1160742808f9f38c1d3c293608cda0921147e1a47f4c5.
         let manifest = root.join("bootstrap/container/image/dependencies.toml");
         let manifest_bytes = fs::read(&manifest).expect("canonical manifest bytes are readable");
         assert_eq!(
             sha256_hex(&manifest_bytes),
-            "2ad12d007239bc2fff90ba3c8c81ca9270610c69ba38b588980459f4b6b9c52a"
+            "25cf0192adb3e7361154281a2b5b9f2a49d73e6d9de8b812b1805b5a7a4c5570"
         );
         let plan = load_plan(&root, None).expect("canonical dependency plan parses");
         let mut expected = [
@@ -4126,12 +9013,14 @@ output_contains = "1.2.3"
             .map(|record| record.id.clone())
             .collect::<BTreeSet<_>>();
         assert_eq!(actual, expected);
+        // Python platform.machine() was controlled for these oracle rows; the
+        // aarch64 fingerprint does not claim an actual arm64 execution.
         let expected_fingerprint = match env::consts::ARCH {
             "x86_64" | "amd64" => {
-                "69f80ebba0abca46cfd219a4174a8dc3a6a534fb336e2d71da5a7e4fa4ba0d85"
+                "a51cbacded9478282eb188e3be0e2f9d1cc91896c7015eac74452dc15bdfd135"
             }
             "aarch64" | "arm64" => {
-                "9eba38a548d37d212b7c5d03fc90a9aac6d073a62a1701a7469a0506dd4b89de"
+                "edc6bcc252ed48b73f4eaf5eb0b8912ddafbe55ceb8261b971fa231a78101045"
             }
             other => panic!("unsupported plan-golden architecture: {other}"),
         };
@@ -4977,5 +9866,1036 @@ output_contains = "1.0.0"
             ]
         );
         assert_eq!(plan.records.len(), 2);
+    }
+
+    #[test]
+    fn dependency_cli_parses_options_around_command_and_repeated_record_groups() {
+        let args = [
+            "--workspace".to_string(),
+            "project".to_string(),
+            "image-verify".to_string(),
+            "--records".to_string(),
+            "alpha,beta".to_string(),
+            "--records=gamma".to_string(),
+            "--format".to_string(),
+            "json".to_string(),
+        ];
+        let ParsedDependencyCli::Arguments(parsed) =
+            parse_dependency_cli(&args).expect("argparse-compatible options parse")
+        else {
+            panic!("CLI arguments should not select help");
+        };
+        assert_eq!(parsed.command, DependencyCommand::ImageVerify);
+        assert_eq!(parsed.workspace, PathBuf::from("project"));
+        assert_eq!(
+            parsed.records,
+            Some(vec!["alpha,beta".to_string(), "gamma".to_string()])
+        );
+        assert_eq!(parsed.format, "json");
+    }
+
+    #[test]
+    fn command_classifier_rejects_shell_dynamic_env_and_network_verification() {
+        let shell = classify_dependency_command(
+            &[
+                "sh".to_string(),
+                "-c".to_string(),
+                "apt-get install x".to_string(),
+            ],
+            "image-install",
+            "image-installer",
+            "install-apt-package",
+            Some(Method::AptPackage),
+            false,
+        )
+        .expect_err("shell process graphs are refused");
+        assert_eq!(shell.0, CommandCapability::ShellEvaluation);
+
+        let dynamic_env = classify_dependency_command(
+            &[
+                "env".to_string(),
+                "-S".to_string(),
+                "npm install x".to_string(),
+            ],
+            "image-install",
+            "image-installer",
+            "install-npm-global",
+            Some(Method::NpmGlobal),
+            false,
+        )
+        .expect_err("env string expansion is refused");
+        assert_eq!(dynamic_env.0, CommandCapability::Unknown);
+
+        let network_verify = classify_dependency_command(
+            &[
+                "curl".to_string(),
+                "--fail".to_string(),
+                "--output".to_string(),
+                "/tmp/index".to_string(),
+                "https://example.invalid/index".to_string(),
+            ],
+            "image-verify",
+            "typed-verifier",
+            "verify-apt-repository-key",
+            Some(Method::AptRepository),
+            false,
+        )
+        .expect_err("network fetch is refused during image verification");
+        assert_eq!(network_verify.0, CommandCapability::NetworkFetch);
+
+        assert!(classify_dependency_command(
+            &["apt-get".to_string(), "update".to_string(),],
+            "image-install",
+            "image-installer",
+            "install-apt-repository",
+            Some(Method::AptRepository),
+            true,
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn project_extra_validation_uses_declared_optional_dependencies() {
+        let root = TempRoot::new();
+        fs::write(
+            root.0.join("pyproject.toml"),
+            "[project.optional-dependencies]\nDev_Test = []\n",
+        )
+        .expect("write declared project extra");
+        assert_eq!(
+            validate_project_extras(&root.0, &["dev-test".to_string()])
+                .expect("PEP 503 equivalent name is declared"),
+            vec!["dev-test".to_string()]
+        );
+        assert!(validate_project_extras(&root.0, &["missing".to_string()])
+            .expect_err("undeclared extra is rejected")
+            .to_string()
+            .contains("project extras are not declared"));
+        assert!(validate_project_extras(
+            &root.0,
+            &["dev-test".to_string(), "DEV_test".to_string()]
+        )
+        .expect_err("canonical duplicate extras are rejected")
+        .to_string()
+        .contains("duplicate Python extra"));
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn parent_owned_install_receipt_round_trips_and_is_removed_through_authority() {
+        let root = TempRoot::new();
+        let workspace = root.0.join("workspace");
+        initialize_git_checkout(&workspace);
+        let manifest = root.write_manifest(
+            "dependencies.toml",
+            r#"
+schema = "agent-canon.tool-dependencies"
+schema_version = 2
+[[records]]
+id = "fixture-cli"
+package = "fixture-cli"
+method = "npm-global"
+version = "1.2.3"
+source = "https://registry.npmjs.org/fixture-cli"
+deps = []
+provides = ["fixture-cli"]
+failure_policy = "fail"
+[records.verification]
+kind = "npm-package"
+executable = "fixture-cli"
+args = ["--version"]
+output_contains = "1.2.3"
+"#,
+        );
+        let plan = load_plan(&workspace, Some(&manifest)).expect("receipt plan parses");
+        let record = plan.by_id("fixture-cli").unwrap();
+        let receipt_path = workspace.join(".agent-canon/dependency-receipts/fixture-cli.json");
+        let mut installer = Installer::new(false, None);
+        installer.parent_attestation =
+            Some(attest_dependency_parent(&workspace).expect("Git parent root attests"));
+        installer
+            .write_receipt(&receipt_path, &plan, record, None, &BTreeMap::new(), None)
+            .expect("publish receipt through parent-owned capability");
+        let payload: Value = serde_json::from_slice(
+            &installer
+                .read_receipt(&receipt_path)
+                .expect("receipt reads through authority"),
+        )
+        .expect("receipt is JSON");
+        assert_eq!(payload["record_id"], "fixture-cli");
+        assert_eq!(payload["status"], "pass");
+        installer
+            .remove_receipt(&receipt_path)
+            .expect("remove receipt through its captured parent identity");
+        assert!(!receipt_path.exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn image_installer_publishes_receipt_and_removes_stale_receipt_on_failure() {
+        let root = TempRoot::new();
+        let workspace = root.0.join("workspace");
+        fs::create_dir_all(&workspace).expect("workspace is created");
+        let manifest = root.write_manifest(
+            "dependencies.toml",
+            r#"
+schema = "agent-canon.tool-dependencies"
+schema_version = 2
+
+[[records]]
+id = "fixture-npm"
+package = "fixture-npm"
+method = "npm-global"
+version = "1.0.0"
+source = "https://registry.npmjs.org/fixture-npm"
+deps = []
+provides = ["fixture-npm"]
+failure_policy = "fail"
+[records.verification]
+kind = "npm-package"
+executable = "fixture-npm"
+args = ["--version"]
+output_contains = "1.0.0"
+"#,
+        );
+        let plan = load_plan(&workspace, Some(&manifest)).expect("fixture plan parses");
+        let receipt_root = root.0.join("receipts");
+        let receipt_path = receipt_root.join("fixture-npm.json");
+        let command = vec![
+            NPM_ENV_EXECUTABLE.to_string(),
+            format!("PATH={NPM_SYSTEM_PATH}"),
+            "/usr/bin/npm".to_string(),
+            "install".to_string(),
+            "--force".to_string(),
+            "--global".to_string(),
+            "--prefix".to_string(),
+            NPM_GLOBAL_PREFIX.to_string(),
+            "fixture-npm@1.0.0".to_string(),
+        ];
+
+        let probe = fake_probe(
+            &root,
+            [(command.clone(), command_output_fixture("installed"))],
+        );
+        let mut installer = Installer::with_probe(true, Some(root.0.clone()), probe);
+        let completed = installer
+            .install(&plan, &workspace, &receipt_root, None, None)
+            .expect("image npm record installs through the selected provider");
+        assert_eq!(completed, vec!["fixture-npm".to_string()]);
+        let receipt: Value = serde_json::from_slice(
+            &fs::read(&receipt_path).expect("successful install publishes receipt"),
+        )
+        .expect("receipt is valid JSON");
+        assert_eq!(receipt["status"], "installed");
+        assert_eq!(receipt["record_id"], "fixture-npm");
+        assert_eq!(
+            receipt["executable_bindings"]["fixture-npm"]["absolute_path"],
+            "/usr/local/bin/fixture-npm"
+        );
+        assert!(installer
+            .receipt_matches(&receipt_path, &plan, plan.by_id("fixture-npm").unwrap())
+            .expect("receipt identity can be checked"));
+        assert_fake_responses_consumed(&installer.probe);
+
+        fs::write(&receipt_path, b"stale receipt").expect("seed stale receipt");
+        let failing_probe = fake_probe(
+            &root,
+            [(
+                command,
+                failed_command_output_fixture("provider rejected install"),
+            )],
+        );
+        let mut failing_installer =
+            Installer::with_probe(true, Some(root.0.clone()), failing_probe);
+        let error = failing_installer
+            .install(&plan, &workspace, &receipt_root, None, None)
+            .expect_err("provider failure remains fatal");
+        assert!(error.to_string().contains("provider rejected install"));
+        assert!(
+            !receipt_path.exists(),
+            "failed install leaves no stale receipt"
+        );
+        assert_fake_responses_consumed(&failing_installer.probe);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn image_installer_runs_apt_and_pipx_providers_in_dependency_order() {
+        let root = TempRoot::new();
+        let workspace = root.0.join("workspace");
+        fs::create_dir_all(&workspace).expect("workspace is created");
+        let manifest = root.write_manifest(
+            "dependencies.toml",
+            r#"
+schema = "agent-canon.tool-dependencies"
+schema_version = 2
+
+[[records]]
+id = "fixture-cli"
+package = "fixture-cli"
+method = "pipx"
+version = "1.2.3"
+source = "https://pypi.org/simple"
+deps = ["pipx"]
+provides = ["fixture-cli"]
+failure_policy = "fail"
+[records.verification]
+kind = "pipx-package"
+executable = "fixture-cli"
+args = ["--version"]
+output_contains = "1.2.3"
+
+[[records]]
+id = "pipx"
+package = "pipx"
+method = "apt-package"
+version = "1.4.3-1"
+source = "ubuntu:24.04"
+deps = []
+provides = ["pipx"]
+failure_policy = "fail"
+[records.verification]
+kind = "apt-package"
+"#,
+        );
+        let plan = load_plan(&workspace, Some(&manifest)).expect("apt and pipx plan parses");
+        assert_eq!(
+            plan.order,
+            vec!["pipx".to_string(), "fixture-cli".to_string()]
+        );
+        let apt_command = vec![
+            "apt-get".to_string(),
+            "install".to_string(),
+            "-y".to_string(),
+            "--no-install-recommends".to_string(),
+            "--no-remove".to_string(),
+            "pipx=1.4.3-1".to_string(),
+        ];
+        let pipx_command = vec![
+            "pipx".to_string(),
+            "install".to_string(),
+            "--index-url".to_string(),
+            "https://pypi.org/simple".to_string(),
+            "fixture-cli==1.2.3".to_string(),
+        ];
+        let probe = fake_probe(
+            &root,
+            [
+                (apt_command.clone(), command_output_fixture("installed")),
+                (pipx_command.clone(), command_output_fixture("installed")),
+            ],
+        );
+        let mut installer = Installer::with_probe(true, Some(root.0.clone()), probe);
+        let receipt_root = root.0.join("receipts");
+        assert_eq!(
+            installer
+                .install(&plan, &workspace, &receipt_root, None, None)
+                .expect("typed apt and pipx records install"),
+            plan.order
+        );
+        let calls = fixture_invocations(&installer.probe);
+        assert_eq!(
+            calls
+                .iter()
+                .map(|call| call.argv.clone())
+                .collect::<Vec<_>>(),
+            vec![apt_command, pipx_command]
+        );
+        let pipx_receipt: Value = serde_json::from_slice(
+            &fs::read(receipt_root.join("fixture-cli.json")).expect("pipx receipt exists"),
+        )
+        .expect("pipx receipt is JSON");
+        assert_eq!(pipx_receipt["status"], "installed");
+        assert_eq!(
+            pipx_receipt["executable_bindings"]["fixture-cli"]["absolute_path"],
+            "/usr/local/bin/fixture-cli"
+        );
+        assert_fake_responses_consumed(&installer.probe);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn image_installer_receipts_the_observed_version_for_unpinned_apt_packages() {
+        let root = TempRoot::new();
+        let workspace = root.0.join("workspace");
+        fs::create_dir_all(&workspace).expect("workspace is created");
+        let manifest = root.write_manifest(
+            "dependencies.toml",
+            r#"
+schema = "agent-canon.tool-dependencies"
+schema_version = 2
+
+[[records]]
+id = "fixture-apt"
+package = "fixture-apt"
+method = "apt-package"
+source = "ubuntu:24.04"
+deps = []
+provides = ["fixture-apt"]
+failure_policy = "fail"
+[records.verification]
+kind = "apt-package"
+"#,
+        );
+        let plan = load_plan(&workspace, Some(&manifest)).expect("apt plan parses");
+        let install_command = vec![
+            "apt-get".to_string(),
+            "install".to_string(),
+            "-y".to_string(),
+            "--no-install-recommends".to_string(),
+            "--no-remove".to_string(),
+            "fixture-apt".to_string(),
+        ];
+        let query_command = vec![
+            "/usr/bin/dpkg-query".to_string(),
+            "--show".to_string(),
+            "--showformat=${Status}\\t${Version}\\t${Package}\\n".to_string(),
+            "fixture-apt".to_string(),
+        ];
+        let probe = fake_probe(
+            &root,
+            [
+                (install_command, command_output_fixture("installed")),
+                (
+                    query_command,
+                    command_output_fixture("install ok installed\t2.4.6-1\tfixture-apt\n"),
+                ),
+            ],
+        );
+        let mut installer = Installer::with_probe(true, Some(root.0.clone()), probe);
+        let receipt_root = root.0.join("receipts");
+        installer
+            .install(&plan, &workspace, &receipt_root, None, None)
+            .expect("unpinned apt package installs");
+        let receipt: Value = serde_json::from_slice(
+            &fs::read(receipt_root.join("fixture-apt.json")).expect("apt receipt exists"),
+        )
+        .expect("apt receipt is JSON");
+        assert_eq!(receipt["resolved_package_version"], "2.4.6-1");
+        assert!(installer
+            .receipt_matches(
+                &receipt_root.join("fixture-apt.json"),
+                &plan,
+                plan.by_id("fixture-apt").unwrap()
+            )
+            .expect("version-bound receipt matches its plan"));
+        assert_fake_responses_consumed(&installer.probe);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn apt_repository_installer_checks_key_fingerprint_and_deb_checksum() {
+        let root = TempRoot::new();
+        let workspace = root.0.join("workspace");
+        fs::create_dir_all(&workspace).expect("workspace is created");
+        let key_bytes = b"fixture public signing key";
+        let package_bytes = b"fixture deb package";
+        let checksum = Sha256::digest(package_bytes)
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>();
+        let fingerprint = "0123456789ABCDEF0123456789ABCDEF01234567";
+        let manifest_text = |expected_checksum: &str| {
+            format!(
+                r#"
+schema = "agent-canon.tool-dependencies"
+schema_version = 2
+
+[[records]]
+id = "fixture-repository"
+package = "fixture-repository"
+method = "apt-repository"
+version = "1.0.0"
+source = "https://example.invalid/apt"
+key_url = "https://example.invalid/apt/key.gpg"
+key_fingerprint = "{fingerprint}"
+repository_suite = "stable"
+repository_components = ["main"]
+repository_package_url = "https://example.invalid/apt/fixture-repository.deb"
+repository_package_sha256 = "{expected_checksum}"
+deps = []
+provides = ["fixture-repository"]
+failure_policy = "fail"
+[records.verification]
+kind = "apt-repository"
+"#
+            )
+        };
+        let manifest = root.write_manifest("dependencies.toml", &manifest_text(&checksum));
+        let plan = load_plan(&workspace, Some(&manifest)).expect("repository plan parses");
+        let mut gpg_fields = vec![String::new(); 10];
+        gpg_fields[0] = "fpr".to_string();
+        gpg_fields[9] = fingerprint.to_string();
+        let observed_fingerprint = gpg_fields.join(":");
+        let responses = [
+            ("curl".to_string(), command_output_fixture("downloaded key")),
+            (
+                "gpg".to_string(),
+                command_output_fixture(&observed_fingerprint),
+            ),
+            ("gpg".to_string(), command_output_fixture("dearmored")),
+            (
+                "install".to_string(),
+                command_output_fixture("installed key"),
+            ),
+            (
+                "install".to_string(),
+                command_output_fixture("installed source"),
+            ),
+            ("apt-get".to_string(), command_output_fixture("updated")),
+            (
+                "curl".to_string(),
+                command_output_fixture("downloaded package"),
+            ),
+            (
+                "apt-get".to_string(),
+                command_output_fixture("installed package"),
+            ),
+        ];
+        let probe = fake_program_probe(
+            &root,
+            responses,
+            [key_bytes.to_vec(), package_bytes.to_vec()],
+        );
+        let mut installer = Installer::with_probe(true, Some(root.0.clone()), probe);
+        installer
+            .install_record(plan.by_id("fixture-repository").unwrap(), &workspace, false)
+            .expect("valid repository key and immutable package install");
+        let calls = fixture_invocations(&installer.probe);
+        assert_eq!(
+            calls.iter().filter(|call| call.argv[0] == "curl").count(),
+            2
+        );
+        assert!(calls.iter().any(|call| {
+            call.argv
+                .first()
+                .is_some_and(|program| program == "apt-get")
+                && call
+                    .argv
+                    .iter()
+                    .any(|argument| argument.ends_with("fixture-repository.deb"))
+        }));
+        assert_fake_responses_consumed(&installer.probe);
+
+        let mismatch_manifest =
+            root.write_manifest("checksum-mismatch.toml", &manifest_text(&"0".repeat(64)));
+        let mismatch_plan = load_plan(&workspace, Some(&mismatch_manifest))
+            .expect("checksum mismatch fixture plan parses");
+        let mismatch_probe = fake_program_probe(
+            &root,
+            [
+                ("curl".to_string(), command_output_fixture("downloaded key")),
+                (
+                    "gpg".to_string(),
+                    command_output_fixture(&observed_fingerprint),
+                ),
+                ("gpg".to_string(), command_output_fixture("dearmored")),
+                (
+                    "install".to_string(),
+                    command_output_fixture("installed key"),
+                ),
+                (
+                    "install".to_string(),
+                    command_output_fixture("installed source"),
+                ),
+                ("apt-get".to_string(), command_output_fixture("updated")),
+                (
+                    "curl".to_string(),
+                    command_output_fixture("downloaded package"),
+                ),
+            ],
+            [key_bytes.to_vec(), package_bytes.to_vec()],
+        );
+        let mut mismatch_installer =
+            Installer::with_probe(true, Some(root.0.clone()), mismatch_probe);
+        let error = mismatch_installer
+            .install_record(
+                mismatch_plan.by_id("fixture-repository").unwrap(),
+                &workspace,
+                false,
+            )
+            .expect_err("package checksum mismatch prevents installation");
+        assert!(error
+            .to_string()
+            .contains("immutable apt package SHA256 mismatch"));
+        assert!(!fixture_invocations(&mismatch_installer.probe)
+            .iter()
+            .any(|call| call
+                .argv
+                .first()
+                .is_some_and(|program| program == "apt-get")
+                && call.argv.iter().any(|argument| argument == "install")));
+        assert_fake_responses_consumed(&mismatch_installer.probe);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn rust_lean_and_browser_installers_keep_their_declared_provider_argv() {
+        let root = TempRoot::new();
+        let workspace = root.0.join("workspace");
+        fs::create_dir_all(&workspace).expect("workspace is created");
+        let browser_cache = PathBuf::from("/usr/local/share/agent-canon/browser-fixture");
+        let manifest = root.write_manifest(
+            "dependencies.toml",
+            &format!(
+                r#"
+schema = "agent-canon.tool-dependencies"
+schema_version = 2
+
+[[records]]
+id = "rust-toolchain"
+package = "rust"
+method = "rust-toolchain"
+version = "1.99.1"
+source = "https://static.rust-lang.org"
+components = ["rustfmt"]
+verification = {{ kind = "rust-toolchain", executable = "rustc", args = ["--version"], output_contains = "rustc 1.99.1" }}
+deps = []
+provides = ["cargo", "rustc", "rustfmt"]
+failure_policy = "fail"
+
+[[records]]
+id = "lean-toolchain"
+package = "lean"
+method = "lean-toolchain"
+version = "leanprover/lean4:v4.30.0"
+source = "https://github.com/leanprover/lean4"
+verification = {{ kind = "lean-toolchain" }}
+deps = []
+provides = ["elan", "lean", "lake"]
+failure_policy = "fail"
+
+[[records]]
+id = "browser"
+package = "chromium"
+method = "browser-install"
+version = "1.2.3"
+source = "https://playwright.example.invalid"
+browser = "chromium"
+browser_cache_path = "{}"
+verification = {{ kind = "browser-executable", executable_globs = ["chromium-*/chrome"], args = ["--version"], output_contains = "Chromium" }}
+deps = []
+provides = ["chromium"]
+failure_policy = "fail"
+"#,
+                browser_cache.display()
+            ),
+        );
+        let plan = load_plan(&workspace, Some(&manifest)).expect("toolchain plan parses");
+        let program_responses = [
+            (
+                "rustup-init".to_string(),
+                command_output_fixture("installed"),
+            ),
+            ("rustup".to_string(), command_output_fixture("installed")),
+            ("rustup".to_string(), command_output_fixture("installed")),
+            ("rustup".to_string(), command_output_fixture("installed")),
+            ("elan-init".to_string(), command_output_fixture("installed")),
+            ("elan".to_string(), command_output_fixture("")),
+            ("elan".to_string(), command_output_fixture("installed")),
+            ("elan".to_string(), command_output_fixture("installed")),
+            (
+                "install".to_string(),
+                command_output_fixture("created cache"),
+            ),
+            (
+                "env".to_string(),
+                command_output_fixture("installed browser"),
+            ),
+        ];
+        let probe = fake_program_probe(&root, program_responses, std::iter::empty::<Vec<u8>>());
+        let mut installer = Installer::with_probe(true, Some(root.0.clone()), probe);
+        for record_id in ["rust-toolchain", "lean-toolchain", "browser"] {
+            installer
+                .install_record(plan.by_id(record_id).unwrap(), &workspace, false)
+                .expect("declared provider command succeeds");
+        }
+        let calls = fixture_invocations(&installer.probe);
+        let commands = calls
+            .iter()
+            .map(|call| call.argv.clone())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            commands[0],
+            vec![
+                "/usr/local/bin/rustup-init",
+                "-y",
+                "--default-toolchain",
+                "none",
+                "--profile",
+                "minimal",
+                "--no-modify-path",
+            ]
+        );
+        assert_eq!(
+            commands[1],
+            vec![
+                "rustup",
+                "toolchain",
+                "install",
+                "1.99.1",
+                "--profile",
+                "minimal"
+            ]
+        );
+        assert_eq!(
+            commands[2],
+            vec![
+                "rustup",
+                "component",
+                "add",
+                "rustfmt",
+                "--toolchain",
+                "1.99.1"
+            ]
+        );
+        assert_eq!(commands[3], vec!["rustup", "default", "1.99.1"]);
+        assert_eq!(
+            commands[4],
+            vec![
+                "/usr/local/bin/elan-init",
+                "-y",
+                "--default-toolchain",
+                "leanprover/lean4:v4.30.0",
+                "--no-modify-path",
+            ]
+        );
+        assert_eq!(commands[5], vec!["elan", "toolchain", "list"]);
+        assert_eq!(
+            commands[6],
+            vec!["elan", "toolchain", "install", "leanprover/lean4:v4.30.0"]
+        );
+        assert_eq!(
+            commands[7],
+            vec!["elan", "default", "leanprover/lean4:v4.30.0"]
+        );
+        assert_eq!(
+            commands[8],
+            vec![
+                "install",
+                "-d",
+                "-m",
+                "0775",
+                browser_cache.to_string_lossy().as_ref()
+            ]
+        );
+        assert_eq!(
+            commands[9],
+            vec![
+                "env".to_string(),
+                format!("PLAYWRIGHT_BROWSERS_PATH={}", browser_cache.display()),
+                "playwright".to_string(),
+                "install".to_string(),
+                "--with-deps".to_string(),
+                "chromium".to_string(),
+            ]
+        );
+        assert_fake_responses_consumed(&installer.probe);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn cargo_source_installer_uses_locked_manifest_build_without_shell_evaluation() {
+        let root = TempRoot::new();
+        let workspace = root.0.join("workspace");
+        let source = workspace.join("cargo-source");
+        fs::create_dir_all(&source).expect("Cargo source directory is created");
+        fs::write(
+            source.join("Cargo.toml"),
+            "[package]\nname='fixture'\nversion='0.1.0'\n",
+        )
+        .expect("Cargo manifest fixture is written");
+        let manifest = root.write_manifest(
+            "dependencies.toml",
+            r#"
+schema = "agent-canon.tool-dependencies"
+schema_version = 2
+
+[[records]]
+id = "fixture-cargo"
+package = "fixture-cargo"
+method = "cargo-source-build"
+version = "0.1.0"
+source = "cargo-source"
+repo = "https://example.invalid/fixture-cargo.git"
+source_identity = "active-source"
+locked = true
+verification = { kind = "cargo-binary", path = "target/release/fixture", args = ["--version"], output_contains = "fixture 0.1.0" }
+deps = []
+provides = ["fixture-cargo"]
+failure_policy = "fail"
+"#,
+        );
+        let plan = load_plan(&workspace, Some(&manifest)).expect("Cargo record parses");
+        let probe = fake_program_probe(
+            &root,
+            [("cargo".to_string(), command_output_fixture("built"))],
+            std::iter::empty::<Vec<u8>>(),
+        );
+        let mut installer = Installer::with_probe(true, Some(root.0.clone()), probe);
+        installer
+            .install_record(plan.by_id("fixture-cargo").unwrap(), &workspace, false)
+            .expect("Cargo source build starts through the provider");
+        let calls = fixture_invocations(&installer.probe);
+        assert_eq!(calls.len(), 1);
+        assert_eq!(
+            calls[0].argv,
+            vec![
+                "cargo",
+                "build",
+                "--release",
+                "--locked",
+                "--manifest-path",
+                source.join("Cargo.toml").to_string_lossy().as_ref(),
+            ]
+        );
+        assert!(calls[0].environment.contains_key("CARGO_TARGET_DIR"));
+        assert_fake_responses_consumed(&installer.probe);
+    }
+
+    // The Ubuntu image contract freezes the tree before its atomic publication.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn image_install_and_verify_use_frozen_plan_receipts_and_live_executable_output() {
+        let root = TempRoot::new();
+        let workspace = root.0.join("workspace");
+        fs::create_dir_all(&workspace).expect("workspace is created");
+        let payload = b"fixture release executable";
+        let checksum = Sha256::digest(payload)
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>();
+        let manifest = root.write_manifest(
+            "dependencies.toml",
+            &format!(
+                r#"
+schema = "agent-canon.tool-dependencies"
+schema_version = 2
+
+[[records]]
+id = "fixture-release"
+package = "fixture-release"
+method = "release-asset"
+version = "1.2.3"
+source = "https://example.invalid/fixture-release"
+checksum = "{checksum}"
+asset = "fixture-release"
+archive_format = "binary"
+extract = "none"
+destination = "/usr/local/bin/fixture-release"
+deps = []
+provides = ["fixture-release"]
+failure_policy = "fail"
+[records.verification]
+kind = "absolute-executable"
+path = "/usr/local/bin/fixture-release"
+args = ["--version"]
+output_contains = "1.2.3"
+"#
+            ),
+        );
+        let plan = load_plan(&workspace, Some(&manifest)).expect("release plan parses");
+        let target = root.0.join("frozen-image");
+        let installer_probe = fake_program_probe(
+            &root,
+            [
+                ("curl".to_string(), command_output_fixture("downloaded")),
+                ("install".to_string(), command_output_fixture("installed")),
+            ],
+            [payload.to_vec()],
+        );
+        let installer = Installer::with_probe(true, Some(root.0.clone()), installer_probe);
+        let completed = image_install_plan_at(
+            &plan,
+            &workspace,
+            None,
+            None,
+            installer,
+            ImageInstallContext {
+                target: &target,
+                production: false,
+                runtime_identity: Some(RuntimeIdentity {
+                    os_id: "ubuntu".to_string(),
+                    version_id: "24.04".to_string(),
+                    platform: "linux/amd64".to_string(),
+                }),
+            },
+        )
+        .expect("native image installer publishes the frozen plan");
+        assert_eq!(completed, vec!["fixture-release".to_string()]);
+        assert_eq!(
+            fs::read(target.join("plan.json"))
+                .expect("frozen plan exists")
+                .last(),
+            Some(&b'\n')
+        );
+        let receipt: Value = serde_json::from_slice(
+            &fs::read(target.join("receipts/fixture-release.json"))
+                .expect("immutable release receipt exists"),
+        )
+        .expect("receipt parses");
+        assert_eq!(receipt["status"], "installed");
+        assert_eq!(receipt["record_id"], "fixture-release");
+
+        let verifier_probe = fake_probe(
+            &root,
+            [(
+                vec![
+                    "/usr/local/bin/fixture-release".to_string(),
+                    "--version".to_string(),
+                ],
+                command_output_fixture("fixture-release 1.2.3"),
+            )],
+        );
+        create_executable(&verifier_probe, "/usr/local/bin/fixture-release");
+        let verified = image_verify_plan_at(
+            &plan,
+            &workspace,
+            None,
+            &target,
+            false,
+            Installer::with_probe(true, Some(root.0.clone()), verifier_probe),
+        )
+        .expect("image verify checks the stored identity and live executable output");
+        assert_eq!(verified, vec!["fixture-release".to_string()]);
+
+        let bad_checksum_manifest = root.write_manifest(
+            "bad-checksum.toml",
+            &format!(
+                r#"
+schema = "agent-canon.tool-dependencies"
+schema_version = 2
+[[records]]
+id = "fixture-release"
+package = "fixture-release"
+method = "release-asset"
+version = "1.2.3"
+source = "https://example.invalid/fixture-release"
+checksum = "{}"
+asset = "fixture-release"
+archive_format = "binary"
+extract = "none"
+destination = "/usr/local/bin/fixture-release"
+deps = []
+provides = ["fixture-release"]
+failure_policy = "fail"
+[records.verification]
+kind = "absolute-executable"
+path = "/usr/local/bin/fixture-release"
+args = ["--version"]
+output_contains = "1.2.3"
+"#,
+                "0".repeat(64)
+            ),
+        );
+        let bad_checksum_plan =
+            load_plan(&workspace, Some(&bad_checksum_manifest)).expect("failure plan parses");
+        let bad_checksum_probe = fake_program_probe(
+            &root,
+            [("curl".to_string(), command_output_fixture("downloaded"))],
+            [payload.to_vec()],
+        );
+        let mut bad_checksum_installer =
+            Installer::with_probe(true, Some(root.0.clone()), bad_checksum_probe);
+        let error = bad_checksum_installer
+            .install_record(
+                bad_checksum_plan.by_id("fixture-release").unwrap(),
+                &workspace,
+                false,
+            )
+            .expect_err("release checksum mismatch prevents installation");
+        assert!(error.to_string().contains("release checksum mismatch"));
+        assert!(!fixture_invocations(&bad_checksum_installer.probe)
+            .iter()
+            .any(|call| call
+                .argv
+                .first()
+                .is_some_and(|program| program == "install")));
+        assert_fake_responses_consumed(&bad_checksum_installer.probe);
+
+        for directory in [target.join("receipts"), target.clone()] {
+            fs::set_permissions(directory, fs::Permissions::from_mode(0o755))
+                .expect("make frozen fixture directories removable");
+        }
+    }
+
+    #[test]
+    fn archive_extractors_preserve_safe_files_and_reject_parent_traversal() {
+        let root = TempRoot::new();
+        let archive_path = root.0.join("fixture.tar");
+        let tar_bytes = |name: &str, payload: &[u8]| {
+            let mut builder = tar::Builder::new(Vec::new());
+            let mut header = tar::Header::new_gnu();
+            header.set_size(payload.len() as u64);
+            header.set_mode(0o755);
+            header.set_entry_type(tar::EntryType::Regular);
+            header.set_cksum();
+            builder
+                .append_data(&mut header, name, payload)
+                .expect("write tar fixture entry");
+            builder.into_inner().expect("finish tar fixture")
+        };
+
+        let safe_tar = tar_bytes("bin/fixture", b"tar payload");
+        fs::write(&archive_path, &safe_tar).expect("write safe tar input");
+        let tar_destination = root.0.join("tar-output");
+        safe_extract_archive(&archive_path, &tar_destination, "tar")
+            .expect("extract a regular tar entry");
+        assert_eq!(
+            fs::read(tar_destination.join("bin/fixture")).expect("read extracted tar entry"),
+            b"tar payload"
+        );
+
+        let mut gzip = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+        gzip.write_all(&safe_tar).expect("compress tar fixture");
+        fs::write(&archive_path, gzip.finish().expect("finish gzip fixture"))
+            .expect("write gzip input");
+        let gzip_destination = root.0.join("gzip-output");
+        safe_extract_archive(&archive_path, &gzip_destination, "tar.gz")
+            .expect("extract a gzip-compressed tar entry");
+        assert_eq!(
+            fs::read(gzip_destination.join("bin/fixture")).expect("read gzip payload"),
+            b"tar payload"
+        );
+
+        let zip_path = root.0.join("fixture.zip");
+        let file = fs::File::create(&zip_path).expect("create zip fixture");
+        let mut zip = zip::ZipWriter::new(file);
+        zip.start_file(
+            "bin/fixture",
+            zip::write::SimpleFileOptions::default().unix_permissions(0o755),
+        )
+        .expect("start zip fixture entry");
+        zip.write_all(b"zip payload")
+            .expect("write zip fixture entry");
+        zip.finish().expect("finish zip fixture");
+        let zip_destination = root.0.join("zip-output");
+        safe_extract_archive(&zip_path, &zip_destination, "zip")
+            .expect("extract a regular zip entry");
+        assert_eq!(
+            fs::read(zip_destination.join("bin/fixture")).expect("read extracted zip entry"),
+            b"zip payload"
+        );
+
+        // Append a hostile raw header: tar::Builder::append_data rejects this
+        // path before the extractor can receive and validate it.
+        let mut hostile_header = tar::Header::new_gnu();
+        hostile_header.set_size(b"outside".len() as u64);
+        hostile_header.set_mode(0o755);
+        hostile_header.set_entry_type(tar::EntryType::Regular);
+        hostile_header.as_mut_bytes()[.."../escaped".len()].copy_from_slice(b"../escaped");
+        hostile_header.set_cksum();
+        let mut hostile_tar = hostile_header.as_bytes().to_vec();
+        hostile_tar.extend_from_slice(b"outside");
+        hostile_tar.resize(1024, 0);
+        fs::write(&archive_path, hostile_tar).expect("write raw traversal tar input");
+        let traversal_destination = root.0.join("traversal-output");
+        assert!(
+            safe_extract_archive(&archive_path, &traversal_destination, "tar")
+                .expect_err("tar parent traversal is rejected")
+                .to_string()
+                .contains("escapes extraction root")
+        );
+        assert!(!root.0.join("escaped").exists());
     }
 }

@@ -1,0 +1,85 @@
+{
+  "source": "2e8dd23dae249e923c1fd122b6a0017b59feef31",
+  "python": "3.12.3",
+  "source_hash": "8e55797c74d5b73f2c9ecd67800dcafcbcab6c96bac2d9049f913b56c5b9d2ac",
+  "cases": [
+    {
+      "input": "git@GitHub.COM:Owner/Repo.git",
+      "accepted": true,
+      "normalized": "github.com/owner/repo",
+      "stable_id": "github.com-owner-repo-620c3a937ce854b7477cb210"
+    },
+    {
+      "input": "https://github.com/Owner/Repo.git",
+      "accepted": true,
+      "normalized": "github.com/owner/repo",
+      "stable_id": "github.com-owner-repo-620c3a937ce854b7477cb210"
+    },
+    {
+      "input": "ssh://git@github.com/Owner/Repo.git",
+      "accepted": true,
+      "normalized": "github.com/owner/repo",
+      "stable_id": "github.com-owner-repo-620c3a937ce854b7477cb210"
+    },
+    {
+      "input": "https://GitHub.com./Owner//Repo.GIT/",
+      "accepted": true,
+      "normalized": "github.com/owner/repo",
+      "stable_id": "github.com-owner-repo-620c3a937ce854b7477cb210"
+    },
+    {
+      "input": "https://user:password@example.invalid:443/a/repo.git",
+      "accepted": true,
+      "normalized": "example.invalid/a/repo",
+      "stable_id": "example.invalid-a-repo-151d7ccbde498c0e03093fc6"
+    },
+    {
+      "input": "/local/repo",
+      "accepted": false,
+      "error": "source_remote_must_be_network_identity"
+    },
+    {
+      "input": "file:///local/repo",
+      "accepted": false,
+      "error": "source_remote_must_be_network_identity"
+    },
+    {
+      "input": "../relative",
+      "accepted": false,
+      "error": "source_remote_must_be_network_identity"
+    },
+    {
+      "input": "",
+      "accepted": false,
+      "error": "source_remote_must_be_network_identity"
+    },
+    {
+      "input": "https://example.invalid/",
+      "accepted": false,
+      "error": "source_remote_missing_repository"
+    },
+    {
+      "input": "https://example.invalid/\u00c4/\u00df.git",
+      "accepted": true,
+      "normalized": "example.invalid/\u00e4/ss",
+      "stable_id": "example.invalid-ss-bf091e3c6a2dc13fe23937b0"
+    },
+    {
+      "input": "https://example.invalid/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "accepted": true,
+      "normalized": "example.invalid/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "stable_id": "example.invalid-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-60f2b0fbfa11e88c02e2a99c"
+    },
+    {
+      "input": "git@example.invalid:a/repo",
+      "accepted": true,
+      "normalized": "example.invalid/a/repo",
+      "stable_id": "example.invalid-a-repo-151d7ccbde498c0e03093fc6"
+    },
+    {
+      "input": "bad",
+      "accepted": false,
+      "error": "source_remote_invalid"
+    }
+  ]
+}

@@ -19,7 +19,7 @@ Omit the profile flags to create the existing Python scaffold.
 The direct source-checkout invocation for the existing Python scaffold is:
 
 ```text
-python3 tools/experiments/lifecycle/create_experiment_topic.py <topic>
+tools/bin/agent-canon create-experiment-topic <topic>
 ```
 
 For C++ topics, use `--template-profile cpp` and set `--cmake-profile` to the

@@ -6,7 +6,7 @@ responsibility Owns the host-controlled lifecycle of the shared AgentCanon tool 
 upstream design ../../documents/design/agent-canon-bootstrap-tool-runtime.md shared runtime, target, and archive boundary
 upstream implementation ../../bootstrap.sh sole host bootstrap entrypoint
 upstream implementation ../../tools/runtime/container/bootstrap_runtime.py typed control-plane implementation
-upstream implementation ../../tools/runtime/dispatch/tool_dispatch.py namespaced tool dispatch and parity boundary
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/tool_dispatch.rs namespaced tool dispatch and parity boundary
 downstream design ./agent-eval-accumulation.md eval evidence collection and archive handoff
 downstream implementation ../../tests/bootstrap/test_bootstrap_runtime.py lifecycle contract tests
 downstream implementation ../../tests/agent_tools/test_execution_route_order.py command order regression
@@ -146,7 +146,7 @@ when the owner permits it, and retain the one-container/image limit and
 task-created resource IDs for cleanup.
 
 Eval collection is its own selected branch: run registered producers, collect
-the run bundle, sync through the archive adapter, and verify remote repository
+the producer results, sync through the archive adapter, and verify remote repository
 and commit readback. Producer definitions and manifests come from the
 image-owned AgentCanon snapshot; the registered project remains a read-only
 observation target. Use `$agent-eval-accumulation` for producer/checker detail.

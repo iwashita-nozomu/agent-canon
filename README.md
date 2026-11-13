@@ -51,10 +51,19 @@ AgentCanon checkout, Cargo, or Docker. codex-config is an example of a
 standalone Rust operation; commands that call external tools keep their
 command-specific requirements.
 
+The archive supplies AgentCanon itself. Commands that invoke external CLIs need
+those providers on PATH; the shared-runtime installation below supplies the
+repository's configured providers through its `exec` and catalog routes.
+Docs commands include their default Markdown/link settings. Existing project
+settings take precedence, so a fresh project needs no AgentCanon config tree.
+
 The source checkout wrapper at tools/bin/agent-canon directly executes an
 existing native binary from the crate's target/release or target/debug
-directory. Set AGENT_CANON_NATIVE_BIN to select a binary stored elsewhere.
-The generic agent-canon tool run catalog route is still transitional and
+directory, then uses the installed `agent-canon` on PATH. A normal native CLI
+installation therefore also enables the source commands shown in this repository.
+Set AGENT_CANON_NATIVE_BIN to select a particular executable; that explicit
+selection takes precedence and is not replaced when it is unavailable.
+The generic agent-canon tool run catalog route uses the native CLI and
 continues to use its registered shared runtime.
 
 Knowledge and feedback commands use the native executable to write and inspect
@@ -137,23 +146,24 @@ described earlier runs directly from its downloaded executable.
 
 `bootstrap.sh` は `BASH_SOURCE` の script location から repository root を解決するため、
 どの current working directory から呼び出しても同じ install root を使います。
-`ROOT` には認可された親 repository root を指定してください。
+共有 runtime の操作では、install root と認可された control root を指定します。
 
 Shared-runtime lifecycle and generic catalog commands use top-level
 bootstrap.sh. These routes require an authorized control root and the ignored
-install-root .runtime/ state described below.
+control-root `.runtime/` state described below.
 
-`bootstrap.sh` が解決した install root、明示した control root、install root 配下の
-`.runtime/` の順に状態をたどります。`install` は image と resident を構築し、
+source は install root、runtime の状態は明示した control root 配下の
+`.runtime/` に置きます。`install` は image と resident を構築し、
 `update` は同じ resident を検証済み checkout で置き換え、`status` はその状態を
 読み取ります。`gc --dry-run` はこの経路を読み取り専用で確認し、`gc` は lock の下で
 host Docker の stale owned resource と resident の state/cache/lease GC を同じ receipt
 にまとめます。
 
 ```bash
-ROOT=<authorized-parent-root>
-BOOTSTRAP=./bootstrap.sh
-COMMON=(--control-parent-root "$ROOT")
+INSTALL_ROOT=/absolute/path/to/agent-canon
+CONTROL_ROOT=<authorized-control-root>
+BOOTSTRAP="$INSTALL_ROOT/bootstrap.sh"
+COMMON=(--repository-root "$INSTALL_ROOT" --control-parent-root "$CONTROL_ROOT")
 
 "$BOOTSTRAP" "${COMMON[@]}" install
 "$BOOTSTRAP" "${COMMON[@]}" update
@@ -252,7 +262,10 @@ Python tools are not exposed as a new collection of flat global executables.
 Only catalog entries with schema-v2 parity evidence can use the bootstrap-owned route:
 
 ```bash
-agent-canon tool run <catalog-id> -- <args...>  # AGENT_CANON_TARGET_ROOT is explicit
+/absolute/path/to/agent-canon/bootstrap.sh \
+  --repository-root /absolute/path/to/agent-canon \
+  --control-parent-root <authorized-control-root> \
+  tool run --root <project-root> <catalog-id> -- <args...>
 ```
 
 Parity covers argv, cwd, stdin/stdout/stderr, exit and signal behavior, and
@@ -278,7 +291,7 @@ The default runtime root is intentionally limited to the bootstrap-owned
 ignored directory below the install checkout:
 
 ```text
-<install-root>/.runtime/
+<control-parent-root>/.runtime/
   current-generation  rollback-generation  lifecycle.lock  mounts.toml
   codex-home/  tasks/  spool/  archive/  container-runtime/
   cache/       # bounded bootstrap cache; other artifacts remain external

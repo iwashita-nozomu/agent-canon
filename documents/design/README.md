@@ -12,9 +12,9 @@ upstream design dependency-manifest-design.md dependency evidence contract
 このディレクトリは、設計の正本を集約する入口です。
 存在しない旧パスを経由せず、ここから現在の設計文書へ直接辿れる状態を保ちます。
 
-Target-State-First の設計schemaとworkflow契約は
-[codex-spark-implementation-routing.md](codex-spark-implementation-routing.md) が所有します。
-同文書の過去のreceipt記録と、現在のhandoffで選ぶ検証済みpacketを区別します。
+role と model の参照先は
+[codex-spark-implementation-routing.md](codex-spark-implementation-routing.md) で確認します。
+設計の内容と検証は、それぞれの product・数理・実験の owner が定めます。
 
 文書の filename、配置、構成判断は [文書規約](../rule/README.md) を参照します。
 この index は配置規則を複製せず、個別設計の target state と実装境界への reader route を提供します。
@@ -39,10 +39,10 @@ Target-State-First の設計schemaとworkflow契約は
 - [devcontainer/parent-devcontainer-policy.md](devcontainer/parent-devcontainer-policy.md)
   - 親root と AgentCanon source の devcontainer 境界、wrapper 順序、compose 出力、
     親 hook 契約を定義します。
-  - `tools/runtime/container/devcontainer_dependencies.py` が `pyproject.toml` の
+  - `tools/runtime/dispatch/agent-canon/src/environment_dependencies.rs` が `pyproject.toml` の
     optional-dependencies extras の名前・順序・重複と存在を検証し、標準 editable
     install / `pip check` を所有します。pack/env の typed extras は
-    `tools/runtime/container/devcontainer_dependencies.py` から Compose 境界へ
+    `tools/runtime/dispatch/agent-canon/src/environment_dependencies.rs` から Compose 境界へ
     projection されます。
 - [experiment_runner.md](experiment_runner.md)
   - `experiment_runner` の契約と実行モデル
@@ -85,7 +85,7 @@ Target-State-First の設計schemaとworkflow契約は
 - [semantic-responsibility-contract.md](semantic-responsibility-contract.md)
   - semantic delta、obligation、一次検証 owner、hard-edge closure、run-local instance の契約
 - [agent-team-module-boundaries.md](agent-team-module-boundaries.md)
-  - AgentTeam runtime orchestration の Python module boundary、公開 facade、migration wave、検証責任
+  - 独自 task 管理の廃止後に残る role・数理入力・tool-call の責務境界
 - [rust-agent-tool-migration.md](rust-agent-tool-migration.md)
   - Agent tool の Rust 移行設計
 - [static-seed-consumer-static-projection.md](static-seed-consumer-static-projection.md)

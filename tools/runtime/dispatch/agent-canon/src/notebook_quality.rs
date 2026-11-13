@@ -6,7 +6,7 @@
 // upstream implementation python_cli_integer.rs parses Python-compatible integer thresholds
 // downstream implementation main.rs exposes the notebook-quality selector
 // downstream implementation ../../../../../tools/validation/ci/runners/run_all_checks.sh runs default notebook validation
-// downstream implementation ../../../../../tools/validation/semantic/tools/tool_rejection_preflight.py predicts the notebook quality contract check
+// downstream implementation tool_rejection_preflight.rs predicts the notebook quality contract check
 // downstream implementation ../../../../../tests/tools/test_notebook_quality.py preserves notebook checker CLI oracles
 // downstream design ../../../../../documents/tools/notebook_quality.md documents the command contract
 // @dependency-end
@@ -19,13 +19,10 @@ use serde::Serialize;
 use serde_json::Value;
 use std::collections::BTreeSet;
 use std::fs;
-use std::io::Read;
 use std::path::{Component, Path, PathBuf};
-use std::process::{Command, Stdio};
 use std::str::FromStr;
 use std::sync::OnceLock;
-use std::thread;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 const NOTEBOOK_SUFFIX: &str = ".ipynb";
 const DEFAULT_NOTEBOOK_DIRS: &[&str] = &["jupyter", "notebooks"];
@@ -438,56 +435,7 @@ fn changed_notebook_paths(root: &Path) -> Result<Vec<PathBuf>, String> {
 }
 
 fn git_lines(root: &Path, args: &[&str]) -> Result<Vec<String>, String> {
-    let mut child = Command::new("git")
-        .arg("-C")
-        .arg(root)
-        .args(args)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
-        .map_err(|error| format!("could not start git: {error}"))?;
-    let mut stdout = child
-        .stdout
-        .take()
-        .ok_or_else(|| "could not capture git output".to_owned())?;
-    let reader = thread::spawn(move || {
-        let mut bytes = Vec::new();
-        let result = stdout.read_to_end(&mut bytes);
-        (result, bytes)
-    });
-    let started = Instant::now();
-    let status = loop {
-        match child.try_wait() {
-            Ok(Some(status)) => break Some(status),
-            Ok(None) if started.elapsed() < GIT_TIMEOUT => {
-                thread::sleep(Duration::from_millis(10));
-            }
-            Ok(None) => {
-                let _ = child.kill();
-                let _ = child.wait();
-                break None;
-            }
-            Err(_) => {
-                let _ = child.kill();
-                let _ = child.wait();
-                break None;
-            }
-        }
-    };
-    let (read_result, bytes) = reader
-        .join()
-        .map_err(|_| "could not read git output".to_owned())?;
-    if status.is_none() {
-        return Err("git command timed out or failed while waiting (10 seconds)".to_owned());
-    }
-    if read_result.is_err() {
-        return Err("could not read git output".to_owned());
-    }
-    if !status.is_some_and(|status| status.success()) {
-        return Ok(Vec::new());
-    }
-    let output =
-        String::from_utf8(bytes).map_err(|error| format!("git output is not UTF-8: {error}"))?;
+    let output = agent_canon::git_read::output(root, args, GIT_TIMEOUT)?.unwrap_or_default();
     Ok(output
         .split('\n')
         .map(str::trim)

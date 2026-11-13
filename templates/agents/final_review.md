@@ -31,7 +31,6 @@ upstream design ../../documents/design/dependency-manifest-design.md dependency 
 
 ## Planned Work Completion Review（planned work 完了レビュー）
 
-<!-- planned work unit と active clause がすべて完了し、schedule.md が全 TODO surface を反映し、work_log.md が意味のある実行履歴を示すか確認します。chunk、slice、checkpoint、subpass だけが完了していれば required_change とします。 -->
 
 ## Cross-Doc Coverage Review（文書横断 coverage レビュー）
 

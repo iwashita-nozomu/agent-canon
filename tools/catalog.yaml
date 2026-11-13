@@ -4,6 +4,8 @@
 # upstream design README.md shared tool family ownership
 # upstream design ../documents/tools/repo-local-tool-imports.md legacy import disposition ledger
 # downstream implementation runtime/dispatch/agent-canon/src/catalog/tool_catalog.rs validates this catalog
+# downstream implementation runtime/dispatch/agent-canon/src/tool_dispatch.rs loads typed runtime descriptors
+# downstream implementation runtime/dispatch/agent-canon/src/catalog/skill_routes.rs routes explicit capabilities
 # downstream implementation runtime/dispatch/agent-canon/src/tool_drift.rs checks catalog drift contracts
 # downstream design ../documents/tools/tool-docs.toml maps same-named tool docs
 # downstream implementation ../tests/agent_tools/test_tool_catalog.py validates canonical visualization tool registration
@@ -51,9 +53,48 @@ runtime_schema:
   # one-file catalog entry below. Keeping this inventory here prevents the
   # dispatcher from silently dropping a first-class Rust route.
   rust_public_commands:
+    - id: rust-skill-shim-evaluation
+      selector: skill-shim-evaluation
+      path: tools/runtime/dispatch/agent-canon/src/skill_shim_evaluation.rs
+    - id: rust-skill-shim-materializer
+      selector: skill-shim-materializer
+      path: tools/runtime/dispatch/agent-canon/src/catalog/skill_materialization.rs
+    - id: rust-render-code-template
+      selector: render-code-template
+      path: tools/runtime/dispatch/agent-canon/src/code_template_rendering.rs
+    - id: rust-skill-dependency-map
+      selector: skill-dependency-map
+      path: tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs
+    - id: rust-check-agent-canon-log-policy
+      selector: check-agent-canon-log-policy
+      path: tools/runtime/dispatch/agent-canon/src/log_policy.rs
+    - id: rust-parent-repository-audit
+      selector: parent-repository-audit
+      path: tools/runtime/dispatch/agent-canon/src/parent_repository_audit.rs
+    - id: rust-environment-dependencies
+      selector: environment-dependencies
+      path: tools/runtime/dispatch/agent-canon/src/environment_dependencies.rs
+    - id: rust-workflow-selection-manifest
+      selector: workflow-selection-manifest
+      path: tools/runtime/dispatch/agent-canon/src/workflow_selection_eval.rs
+    - id: rust-sync-experiment-registry-context
+      selector: sync-experiment-registry-context
+      path: tools/runtime/dispatch/agent-canon/src/experiment_registry/context.rs
+    - id: rust-check-skill-tool-invocation-graph
+      selector: check-skill-tool-invocation-graph
+      path: tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs
+    - id: rust-server-readiness
+      selector: server-readiness
+      path: tools/runtime/dispatch/agent-canon/src/server_readiness.rs
+    - id: rust-chatgpt-codex-route
+      selector: chatgpt-codex-route
+      path: tools/runtime/dispatch/agent-canon/src/chatgpt_codex_routing.rs
     - id: rust-version
       selector: --version
       path: tools/runtime/dispatch/agent-canon/src/main.rs
+    - id: rust-capability-route
+      selector: capability-route
+      path: tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs
     - id: rust-rust-migration-audit
       selector: rust-migration-audit
       path: tools/runtime/dispatch/agent-canon/src/migration_audit.rs
@@ -90,6 +131,9 @@ runtime_schema:
     - id: rust-python-module-groups-check
       selector: python-module-groups-check
       path: tools/runtime/dispatch/agent-canon/src/python_module_groups.rs
+    - id: rust-historical-skill-usage-read
+      selector: historical-skill-usage-read
+      path: tools/runtime/dispatch/agent-canon/src/historical_skill_usage.rs
 
 status_values:
   - canonical
@@ -106,7 +150,6 @@ family_values:
   - oop_cpp
   - data
   - hlo
-  - audit
   - experiments
   - validation
   - root
@@ -176,11 +219,6 @@ families:
     root: tools/analysis/hlo
     summary: HLO result summarization helpers.
     audience: agent
-    placement: support_library
-  audit:
-    root: tools/audit/logging
-    summary: Portable audit log schema and writer helpers.
-    audience: internal
     placement: support_library
   experiments:
     root: tools/experiments
@@ -279,22 +317,38 @@ entries:
 
   - id: organize-designs
     summary: Plans design-document organization and requires an explicit mutation capability to apply it.
-    path: tools/validation/documentation/authoring/organize_designs.py
+    path: tools/runtime/dispatch/agent-canon/src/docs.rs
     family: docs
     role: docs
     status: maintainer_only
     audience: maintainer
     placement: workflow_helper
-    command: python3 tools/validation/documentation/authoring/organize_designs.py --runtime-root <external-runtime>
-    dispatch: {argv: ["python3", "tools/validation/documentation/authoring/organize_designs.py", "--runtime-root", "<external-runtime>"]}
+    command: tools/bin/agent-canon docs organize-designs --runtime-root <external-runtime>
+    dispatch:
+      runtime: rust
+      argv: ["tools/bin/agent-canon", "docs", "organize-designs", "--runtime-root", "<external-runtime>"]
+      execution_plane: tool-container
+      cwd: source-root
+      env: allowlisted
+      stdin: inherited
+      stdout: captured
+      stderr: captured
+      exit: propagate
+      signal: propagate
+      # Dispatch owns the external report; source copies require the explicit mutation capability.
+      side_effect: external-artifact
+      output_root: external-runtime
+      written_paths: []
     writes: true
     default_wiring:
       ci: false
       pr_check: false
     docs:
-      - documents/tools/README.md
+      - documents/tools/agent-canon.md
     tests:
       - tests/tools/test_design_doc_runtime_boundaries.py
+      - tools/runtime/dispatch/agent-canon/tests/design_organizer_native.rs
+      - tools/runtime/dispatch/agent-canon/tests/source_mutation_native.rs
 
   - id: numeric-performance
     summary: Classifies post-run numerical performance observations using task-owned mathematical evidence.
@@ -760,14 +814,14 @@ entries:
   - id: check-proof-trace-alignment
     public: true
     summary: Checks package-retained proof trace contracts against implementation source paths, AST anchors, and retained checked theorem names.
-    path: tools/validation/semantic/proof/check_proof_trace_alignment.py
+    path: tools/runtime/dispatch/agent-canon/src/check_proof_trace_alignment.rs
     family: agent_tools
     role: checker
     status: canonical
     audience: skill
     placement: skill_helper
-    command: python3 tools/validation/semantic/proof/check_proof_trace_alignment.py
-    dispatch: {argv: ["python3", "tools/validation/semantic/proof/check_proof_trace_alignment.py"]}
+    command: tools/bin/agent-canon check-proof-trace-alignment
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "check-proof-trace-alignment"]}
     writes: false
     default_wiring:
       ci: false
@@ -783,12 +837,12 @@ entries:
   - id: repo-structure-contract
     public: true
     summary: Compares an observed repository tree with the AgentCanon structure contract.
-    path: tools/validation/semantic/structure/repo_structure_contract.py
+    path: tools/runtime/dispatch/agent-canon/src/repo_structure_contract.rs
     family: agent_tools
     role: checker
     status: canonical
-    command: python3 tools/validation/semantic/structure/repo_structure_contract.py
-    dispatch: {argv: ["python3", "tools/validation/semantic/structure/repo_structure_contract.py"]}
+    command: tools/bin/agent-canon repo-structure-contract
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "repo-structure-contract"]}
     writes: false
     default_wiring:
       ci: false
@@ -826,12 +880,12 @@ entries:
   - id: wiki-publish
     public: true
     summary: Publishes one markdown wiki page to the dedicated repo.wiki.git sidecar using default-branch-only clone, format gates, source commit binding, and exact readback identity.
-    path: tools/repository/github/wiki_publish.py
+    path: tools/runtime/dispatch/agent-canon/src/wiki_publish.rs
     family: agent_tools
     role: sync
     status: canonical
-    command: python3 tools/repository/github/wiki_publish.py --help
-    dispatch: {argv: ["python3", "tools/repository/github/wiki_publish.py", "--help"]}
+    command: tools/bin/agent-canon wiki-publish --help
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "wiki-publish", "--help"]}
     writes: true
     default_wiring:
       ci: false
@@ -847,12 +901,12 @@ entries:
 
   - id: eval-accumulation-check
     summary: Validates append-only AgentCanon hook results and registered eval-family accumulation.
-    path: eval/checkers/eval_accumulation_check.py
+    path: tools/runtime/dispatch/agent-canon/src/eval_accumulation_check.rs
     family: agent_tools
     role: checker
     status: canonical
-    command: python3 eval/checkers/eval_accumulation_check.py
-    dispatch: {argv: ["python3", "eval/checkers/eval_accumulation_check.py"]}
+    command: tools/bin/agent-canon eval-accumulation-check
+    dispatch: {argv: ["tools/bin/agent-canon", "eval-accumulation-check"]}
     writes: false
     default_wiring:
       ci: true
@@ -933,12 +987,12 @@ entries:
       - tools/runtime/dispatch/agent-canon/src/template_tests.rs
 
   - id: template-bundle
-    summary: Exports one canonical template profile to a fresh external directory.
+    summary: Exports canonical template profiles and static seeds, and reads committed tree entries.
     path: tools/runtime/dispatch/agent-canon/src/template_bundle.rs
     family: agent_tools
     role: helper
     status: canonical
-    command: tools/bin/agent-canon template-bundle <export|verify|native-package|native-verify|native-version> [options]
+    command: tools/bin/agent-canon template-bundle <export|committed-tree|verify|native-package|native-verify|native-version> [options]
     writes: true
     dispatch:
       runtime: native
@@ -960,25 +1014,31 @@ entries:
     docs:
       - templates/README.md
       - documents/contracts/template-bundle-manifest.toml
+      - documents/contracts/static-seed-export.md
+      - documents/contracts/static-seed-allowlist.toml
+      - documents/tools/export_static_seed.md
+      - documents/tools/agent-canon.md
     tests:
       - tools/runtime/dispatch/agent-canon/src/template_tests.rs
       - tools/runtime/dispatch/agent-canon/tests/native_release_native.rs
       - tests/agent_tools/test_native_cli_distribution.py
+      - tests/agent_tools/test_export_static_seed.py
+      - tests/agent_tools/test_render_dependency_manifest_graph.py
 
   - id: create-experiment-topic
     public: true
     summary: Materializes one selected experiment topic package and its registry entry in an explicit target.
-    path: tools/experiments/lifecycle/create_experiment_topic.py
+    path: tools/runtime/dispatch/agent-canon/src/experiment_registry/create_experiment_topic.rs
     family: experiments
     role: experiment
     status: canonical
     audience: user
     placement: user_entrypoint
-    command: python3 tools/experiments/lifecycle/create_experiment_topic.py <topic>
+    command: tools/bin/agent-canon create-experiment-topic <topic>
     writes: true
     dispatch:
-      runtime: python
-      argv: [python3, tools/experiments/lifecycle/create_experiment_topic.py]
+      runtime: rust
+      argv: [tools/bin/agent-canon, create-experiment-topic]
       execution_plane: tool-container
       cwd: source-root
       env: allowlisted
@@ -1005,12 +1065,12 @@ entries:
 
   - id: run-accumulated-agent-evals
     summary: Runs registered AgentCanon eval producers with append-only accumulation before archive validation.
-    path: eval/producers/run_accumulated_agent_evals.py
+    path: tools/runtime/dispatch/agent-canon/src/eval_accumulation.rs
     family: agent_tools
     role: runner
     status: canonical
-    command: python3 eval/producers/run_accumulated_agent_evals.py --run-id <run-id>
-    dispatch: {argv: ["python3", "eval/producers/run_accumulated_agent_evals.py", "--run-id", "<run-id>"]}
+    command: tools/bin/agent-canon run-accumulated-agent-evals --run-id <run-id>
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "run-accumulated-agent-evals"]}
     writes: true
     default_wiring:
       ci: true
@@ -1030,8 +1090,8 @@ entries:
     family: agent_tools
     role: sync
     status: canonical
-    command: python3 tools/runtime/archive/runtime_log_archive_git.py <append-context-discovery|materialize-runtime-event|check-hook-hot-path|sync>
-    dispatch: {argv: ["python3", "tools/runtime/archive/runtime_log_archive_git.py", "<append-context-discovery|materialize-runtime-event|check-hook-hot-path|sync>"]}
+    command: python3 tools/runtime/archive/runtime_log_archive_git.py <append-context-discovery|materialize-runtime-event|sync>
+    dispatch: {argv: ["python3", "tools/runtime/archive/runtime_log_archive_git.py", "<append-context-discovery|materialize-runtime-event|sync>"]}
     writes: true
     default_wiring:
       ci: false
@@ -1046,14 +1106,15 @@ entries:
       - tests/agent_tools/test_hook_event_log.py
       - tests/agent_tools/test_runtime_log_archive_git.py
 
-  - id: workflow-monitor
-    summary: Appends observed workflow behavior and actual native-result evidence to an agent run bundle.
-    path: tools/runtime/lifecycle/workflow_monitor.py
+  - id: export-codex-runtime-summary
+    public: true
+    summary: Exports bounded, prompt-free Codex runtime summaries from local history, SQLite, and optional legacy session JSONL.
+    path: tools/runtime/dispatch/agent-canon/src/codex_runtime_summary.rs
     family: agent_tools
-    role: workflow
+    role: runner
     status: canonical
-    command: python3 tools/runtime/lifecycle/workflow_monitor.py --report-dir <report-dir>
-    dispatch: {argv: ["python3", "tools/runtime/lifecycle/workflow_monitor.py", "--report-dir", "<report-dir>"]}
+    command: tools/bin/agent-canon export-codex-runtime-summary
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "export-codex-runtime-summary"]}
     writes: true
     default_wiring:
       ci: false
@@ -1061,26 +1122,11 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
+      - documents/tools/codex_runtime_summary.md
+      - documents/runtime/runtime-log-archive.md
     tests:
-      - tests/agent_tools/test_workflow_monitor.py
+      - tests/agent_tools/test_export_codex_runtime_summary.py
 
-  - id: waterfall-gate-check
-    summary: Checks the next approved waterfall gate against the prepared run bundle.
-    path: tools/validation/semantic/lifecycle/waterfall_gate_check.py
-    family: agent_tools
-    role: workflow
-    status: canonical
-    command: python3 tools/validation/semantic/lifecycle/waterfall_gate_check.py --report-dir <report-dir> --gate <gate>
-    dispatch: {argv: ["python3", "tools/validation/semantic/lifecycle/waterfall_gate_check.py", "--report-dir", "<report-dir>", "--gate", "<gate>"]}
-    writes: false
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-    tests:
-      - tests/agent_tools/test_waterfall_gate_check.py
 
   - id: agent-canon-graph
     summary: Builds and serves the one-build dependency graph with an optional persisted runtime-evidence snapshot.
@@ -1103,13 +1149,13 @@ entries:
       - tests/agent_tools/test_check_dependency_headers.py
 
   - id: graph-client
-    summary: Provides the typed consume-only Python adapter for graph status, query, and context responses.
-    path: tools/analysis/dependencies/graph_client.py
-    family: agent_tools
-    role: helper
+    summary: Provides a typed native client for source-derived dependency query and context plus explicit persisted graph operations.
+    path: tools/runtime/dispatch/agent-canon/src/graph_client.rs
+    family: root
+    role: runner
     status: canonical
-    command: tools/bin/agent-canon graph <status|query|context> --root <repo-root> --format json
-    dispatch: {argv: ["tools/bin/agent-canon", "graph", "<status|query|context>", "--root", "<repo-root>", "--format", "json"]}
+    command: tools/bin/agent-canon graph-client <status|query|context> --root <repo-root> --format json
+    dispatch: {argv: ["tools/bin/agent-canon", "graph-client", "<status|query|context>", "--root", "<repo-root>", "--format", "json"]}
     writes: false
     default_wiring:
       ci: false
@@ -1118,17 +1164,23 @@ entries:
       - tools/README.md
       - documents/tools/README.md
       - agents/canonical/CLI_ENTRYPOINTS.md
+      - documents/design/dependency-manifest-design.md
+      - documents/design/source-owned-dependency-validation.md
     tests:
+      - tests/agent_tools/test_graph_client_source_projection.py
+      - tests/agent_tools/test_dependency_graph_cycles.py
       - tests/agent_tools/test_check_dependency_headers.py
+      - tests/agent_tools/test_prose_reasoning_graph.py
+      - tests/agent_tools/test_runtime_log_archive_git.py
 
   - id: workflow-selection-eval
     summary: Validates deterministic prompt-to-workflow routing cases.
-    path: eval/producers/evaluate_workflow_selection.py
+    path: tools/runtime/dispatch/agent-canon/src/workflow_selection_eval.rs
     family: agent_tools
     role: checker
     status: canonical
-    command: python3 eval/producers/evaluate_workflow_selection.py
-    dispatch: {argv: ["python3", "eval/producers/evaluate_workflow_selection.py"]}
+    command: tools/bin/agent-canon evaluate-workflow-selection
+    dispatch: {runtime: rust, argv: [tools/bin/agent-canon, evaluate-workflow-selection]}
     writes: true
     default_wiring:
       ci: true
@@ -1266,7 +1318,7 @@ entries:
 
   - id: quarto
     summary: Runs Quarto's native CLI in the shared tool container for registered project inputs and external artifacts.
-    path: tools/runtime/dispatch/tool_dispatch.py
+    path: tools/runtime/dispatch/agent-canon/src/tool_dispatch.rs
     family: agent_tools
     role: helper
     status: canonical
@@ -1301,7 +1353,7 @@ entries:
 
   - id: vl-convert
     summary: Converts a selected native Vega-Lite specification to a static artifact with the official shared CLI.
-    path: tools/runtime/dispatch/tool_dispatch.py
+    path: tools/runtime/dispatch/agent-canon/src/tool_dispatch.rs
     family: agent_tools
     role: helper
     status: canonical
@@ -1358,15 +1410,15 @@ entries:
   - id: route
     public: true
     summary: Maps long proposed tool/skill names to short task-routing areas and owns deterministic prompt skill routing.
-    path: tools/agent/orchestration/route.py
+    path: tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs
     family: agent_tools
     role: workflow
     status: canonical
-    command: python3 tools/agent/orchestration/route.py
+    command: tools/bin/agent-canon route
     writes: false
     dispatch:
-      runtime: python
-      argv: [python3, tools/agent/orchestration/route.py]
+      runtime: rust
+      argv: [tools/bin/agent-canon, route]
       execution_plane: tool-container
       cwd: target-root
       env: allowlisted
@@ -1523,7 +1575,7 @@ entries:
 
   - id: scip
     summary: Runs the official SCIP CLI against standard index.scip artifacts in the shared tool container.
-    path: tools/runtime/dispatch/tool_dispatch.py
+    path: tools/runtime/dispatch/agent-canon/src/tool_dispatch.rs
     family: agent_tools
     role: helper
     status: canonical
@@ -1556,12 +1608,12 @@ entries:
 
   - id: check-github-workflows
     summary: Validates GitHub Actions and PR template surfaces.
-    path: tools/validation/ci/checks/check_github_workflows.py
+    path: tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs
     family: ci
     role: checker
     status: canonical
-    command: python3 tools/validation/ci/checks/check_github_workflows.py
-    dispatch: {argv: ["python3", "tools/validation/ci/checks/check_github_workflows.py"]}
+    command: tools/bin/agent-canon check-github-workflows
+    dispatch: {argv: ["tools/bin/agent-canon", "check-github-workflows"]}
     writes: false
     default_wiring:
       ci: true
@@ -1597,14 +1649,14 @@ entries:
 
   - id: orphan-lifecycle
     summary: Inventories semantic branch, PR-head, and worktree lifecycle state and authorizes exact cleanup candidates without performing mutation.
-    path: tools/repository/git/orphan_lifecycle.py
+    path: tools/runtime/dispatch/agent-canon/src/orphan_lifecycle.rs
     family: agent_tools
     role: inventory
     status: canonical
     audience: agent
     placement: workflow_helper
-    command: python3 tools/repository/git/orphan_lifecycle.py
-    dispatch: {argv: ["python3", "tools/repository/git/orphan_lifecycle.py"]}
+    command: tools/bin/agent-canon orphan-lifecycle
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "orphan-lifecycle"]}
     writes: true
     default_wiring:
       ci: false
@@ -1714,7 +1766,6 @@ entries:
     tests:
       - tools/runtime/dispatch/agent-canon/tests/generated_completeness_native.rs
       - tests/agent_tools/test_github_publish.py
-      - tests/agent_tools/test_bootstrap_and_close.py
 
   - id: check-agent-canon-pr
     summary: Runs the standalone AgentCanon PR readiness checklist.
@@ -1791,33 +1842,14 @@ entries:
     tests:
       - tests/tools/test_run_all_checks_script.py
 
-  - id: agent-canon-update-todos
-    summary: Routes parent readback tasks after a standalone AgentCanon source merge.
-    path: tools/agent/orchestration/agent_canon_update_todos.py
-    family: agent_tools
-    role: workflow
-    status: canonical
-    command: python3 tools/agent/orchestration/agent_canon_update_todos.py
-    dispatch: {argv: ["python3", "tools/agent/orchestration/agent_canon_update_todos.py"]}
-    writes: true
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-      - documents/agent-canon/agent-canon-parent-repo-latest-checklist.md
-    tests:
-      - tests/agent_tools/test_agent_canon_update_todos.py
-
   - id: check-agent-runtime-alignment
     summary: Verifies runtime entrypoints and agent config mirrors stay aligned.
-    path: tools/validation/semantic/runtime/check_agent_runtime_alignment.py
+    path: tools/runtime/dispatch/agent-canon/src/runtime_alignment.rs
     family: agent_tools
     role: checker
     status: canonical
-    command: python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py
-    dispatch: {argv: ["python3", "tools/validation/semantic/runtime/check_agent_runtime_alignment.py"]}
+    command: tools/bin/agent-canon check-agent-runtime-alignment
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "check-agent-runtime-alignment"]}
     writes: false
     default_wiring:
       ci: false
@@ -1831,12 +1863,12 @@ entries:
 
   - id: check-skill-frontmatter
     summary: Validates runtime skill SKILL.md YAML frontmatter for Codex loading.
-    path: tools/validation/semantic/skills/check_skill_frontmatter.py
+    path: tools/runtime/dispatch/agent-canon/src/skill_frontmatter.rs
     family: agent_tools
     role: checker
     status: canonical
-    command: python3 tools/validation/semantic/skills/check_skill_frontmatter.py
-    dispatch: {argv: ["python3", "tools/validation/semantic/skills/check_skill_frontmatter.py"]}
+    command: tools/bin/agent-canon check-skill-frontmatter
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "check-skill-frontmatter"]}
     writes: false
     default_wiring:
       ci: true
@@ -1846,7 +1878,7 @@ entries:
       - documents/tools/README.md
       - agents/canonical/skills.md
     tests:
-      - tests/agent_tools/test_check_skill_frontmatter.py
+      - tools/runtime/dispatch/agent-canon/tests/skill_frontmatter_native.rs
 
   - id: skill-document-reader
     summary: Reads compact Skills and task-relevant canonical sections in bounded UTF-8 chunks.
@@ -1917,12 +1949,12 @@ entries:
 
   - id: reference-materializer
     summary: Converts consulted PDF or HTML references into Markdown files under references/.
-    path: tools/analysis/documents/reference_materializer.py
+    path: tools/runtime/dispatch/agent-canon/src/reference_materializer.rs
     family: agent_tools
     role: sync
     status: canonical
-    command: python3 tools/analysis/documents/reference_materializer.py
-    dispatch: {argv: ["python3", "tools/analysis/documents/reference_materializer.py"]}
+    command: tools/bin/agent-canon reference-materializer
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "reference-materializer"]}
     writes: true
     default_wiring:
       ci: false
@@ -1934,33 +1966,16 @@ entries:
     tests:
       - tests/agent_tools/test_reference_materializer.py
 
-  - id: smoke-test-research-perspective-pack
-    summary: Smoke-tests the research perspective role packet.
-    path: eval/checkers/smoke_test_research_perspective_pack.py
-    family: agent_tools
-    role: checker
-    status: canonical
-    command: python3 eval/checkers/smoke_test_research_perspective_pack.py
-    dispatch: {argv: ["python3", "eval/checkers/smoke_test_research_perspective_pack.py"]}
-    writes: false
-    default_wiring:
-      ci: true
-      pr_check: true
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-    tests:
-      - tests/agent_tools/test_smoke_test_research_perspective_pack.py
 
   - id: evaluate-codex-agent-roles
     summary: Evaluates and optionally accumulates Codex subagent role behavior, routing, model settings, and runtime metrics.
-    path: eval/producers/evaluate_codex_agent_roles.py
+    path: tools/runtime/dispatch/agent-canon/src/codex_agent_role_eval/mod.rs
     family: agent_tools
     role: checker
     status: canonical
-    command: python3 eval/producers/evaluate_codex_agent_roles.py
-    dispatch: {argv: ["python3", "eval/producers/evaluate_codex_agent_roles.py"]}
-    writes: false
+    command: tools/bin/agent-canon evaluate-codex-agent-roles
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "evaluate-codex-agent-roles"], execution_plane: tool-container, cwd: source-root, env: allowlisted, stdin: inherited, stdout: captured, stderr: captured}
+    writes: true
     default_wiring:
       ci: true
       pr_check: true
@@ -1974,12 +1989,12 @@ entries:
 
   - id: check-experiment-registry
     summary: Validates the shared experiment registry contract.
-    path: tools/validation/ci/checks/check_experiment_registry.py
+    path: tools/runtime/dispatch/agent-canon/src/experiment_registry.rs
     family: ci
     role: checker
     status: canonical
-    command: python3 -m tools.validation.ci.checks.check_experiment_registry
-    dispatch: {argv: ["python3", "-m", "tools.validation.ci.checks.check_experiment_registry"]}
+    command: tools/bin/agent-canon experiment-registry
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "experiment-registry"], execution_plane: tool-container, cwd: source-root, env: allowlisted, stdin: inherited, stdout: captured, stderr: captured}
     writes: false
     default_wiring:
       ci: true
@@ -1988,8 +2003,8 @@ entries:
       - tools/README.md
       - documents/tools/README.md
       - documents/experiments/experiment-registry.md
-    tests: []
-    test_exempt_reason: Registry contract is exercised through repo-wide CI smoke checks.
+    tests:
+      - tools/runtime/dispatch/agent-canon/tests/experiment_registry_native.rs
 
   - id: check-solid-evidence
     summary: Checks SOLID-sensitive Python changes have path-covered OOP readability evidence.
@@ -2246,12 +2261,12 @@ entries:
 
   - id: tool-rejection-preflight
     summary: Predicts edit-time responsibility, hook, tool, skill, protocol, and catalog rejection gates for handoff packets.
-    path: tools/validation/semantic/tools/tool_rejection_preflight.py
+    path: tools/runtime/dispatch/agent-canon/src/tool_rejection_preflight.rs
     family: agent_tools
     role: workflow
     status: canonical
-    command: python3 tools/validation/semantic/tools/tool_rejection_preflight.py
-    dispatch: {argv: ["python3", "tools/validation/semantic/tools/tool_rejection_preflight.py"]}
+    command: tools/bin/agent-canon tool-rejection-preflight
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "tool-rejection-preflight"]}
     writes: false
     default_wiring:
       ci: false
@@ -2265,44 +2280,6 @@ entries:
     tests:
       - tests/agent_tools/test_tool_rejection_preflight.py
 
-  - id: bootstrap-agent-run
-    summary: Bootstraps a staged agent run bundle from a task request.
-    path: tools/runtime/lifecycle/bootstrap_agent_run.py
-    family: agent_tools
-    role: workflow
-    status: canonical
-    command: python3 tools/runtime/lifecycle/bootstrap_agent_run.py
-    dispatch: {argv: ["python3", "tools/runtime/lifecycle/bootstrap_agent_run.py"]}
-    writes: true
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-      - agents/canonical/CODEX_BOOTSTRAP.md
-    tests:
-      - tests/agent_tools/test_bootstrap_and_close.py
-
-  - id: task-close
-    summary: Checks closeout evidence before task completion.
-    path: tools/runtime/dispatch/agent-canon/src/task_close.rs
-    family: agent_tools
-    role: workflow
-    status: canonical
-    command: tools/bin/agent-canon task-close
-    dispatch: {argv: ["tools/bin/agent-canon", "task-close"]}
-    writes: true
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-      - agents/canonical/CODEX_COMPLETION.md
-    tests:
-      - tests/agent_tools/test_bootstrap_and_close.py
-      - tools/runtime/dispatch/agent-canon/tests/task_close_native.rs
 
   - id: evaluate-agent-run
     public: true
@@ -2425,12 +2402,12 @@ entries:
 
   - id: compare-codex-token-footprints
     summary: Compares Codex session token footprints for efficiency review.
-    path: eval/checkers/compare_codex_token_footprints.py
+    path: tools/runtime/dispatch/agent-canon/src/token_footprints.rs
     family: agent_tools
     role: checker
     status: canonical
-    command: python3 eval/checkers/compare_codex_token_footprints.py
-    dispatch: {argv: ["python3", "eval/checkers/compare_codex_token_footprints.py"]}
+    command: tools/bin/agent-canon compare-codex-token-footprints
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "compare-codex-token-footprints"]}
     writes: true
     default_wiring:
       ci: false
@@ -2440,24 +2417,6 @@ entries:
       - documents/tools/README.md
     tests:
       - tests/agent_tools/test_compare_codex_token_footprints.py
-
-  - id: worktree-scope-lint
-    summary: Checks worktree scope and action-log discipline.
-    path: tools/repository/workspace/worktree_scope_lint.py
-    family: agent_tools
-    role: checker
-    status: canonical
-    command: python3 tools/repository/workspace/worktree_scope_lint.py
-    dispatch: {argv: ["python3", "tools/repository/workspace/worktree_scope_lint.py"]}
-    writes: false
-    default_wiring:
-      ci: true
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-    tests:
-      - tests/agent_tools/test_worktree_scope_lint.py
 
   - id: jsonl-to-md
     summary: Converts JSONL result logs into Markdown tables.
@@ -2497,42 +2456,6 @@ entries:
     tests:
       - tests/tools/test_result_log_tools.py
 
-  - id: audit-log-schema
-    summary: Defines the portable audit log schema.
-    path: tools/audit/logging/audit_log_schema.py
-    family: audit
-    role: audit
-    status: canonical
-    command: python3 tools/audit/logging/audit_log_schema.py
-    dispatch: {argv: ["python3", "tools/audit/logging/audit_log_schema.py"]}
-    writes: false
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-    tests: []
-    test_exempt_reason: Library-style schema support used by audit_logger.py.
-
-  - id: audit-logger
-    summary: Writes portable automation events to JSONL audit logs.
-    path: tools/audit/logging/audit_logger.py
-    family: audit
-    role: audit
-    status: canonical
-    command: python3 tools/audit/logging/audit_logger.py
-    dispatch: {argv: ["python3", "tools/audit/logging/audit_logger.py"]}
-    writes: true
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-    tests: []
-    test_exempt_reason: Portable helper; covered by repo-local audit use.
-
   - id: run-managed-experiment
     summary: Creates and tracks shared managed experiment runs.
     path: tools/experiments/execution/run_managed_experiment.py
@@ -2555,12 +2478,12 @@ entries:
   - id: html-artifact-access
     public: true
     summary: Prints SSH tunnel and static-server commands for remote HTML artifacts.
-    path: tools/experiments/artifacts/html_artifact_access.py
+    path: tools/runtime/dispatch/agent-canon/src/html_artifact_access.rs
     family: experiments
     role: helper
     status: canonical
-    command: python3 tools/experiments/artifacts/html_artifact_access.py
-    dispatch: {argv: ["python3", "tools/experiments/artifacts/html_artifact_access.py"]}
+    command: tools/bin/agent-canon html-artifact-access
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "html-artifact-access"]}
     writes: false
     default_wiring:
       ci: false
@@ -2575,12 +2498,12 @@ entries:
 
   - id: update-latest-result
     summary: Updates LATEST pointers for experiment result roots.
-    path: tools/experiments/artifacts/update_latest_result.py
+    path: tools/runtime/dispatch/agent-canon/src/latest_result.rs
     family: experiments
     role: experiment
     status: canonical
-    command: python3 -m tools.experiments.artifacts.update_latest_result
-    dispatch: {argv: ["python3", "-m", "tools.experiments.artifacts.update_latest_result"]}
+    command: tools/bin/agent-canon update-latest-result
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "update-latest-result"]}
     writes: true
     default_wiring:
       ci: false
@@ -2612,23 +2535,6 @@ entries:
     tests:
       - tests/tools/test_save_experiment_result_annex.py
 
-  - id: triplet-validator
-    summary: Validates source, document, and test triplets.
-    path: tools/validation/documentation/checks/triplet_validator.py
-    family: validation
-    role: checker
-    status: canonical
-    command: python3 tools/validation/documentation/checks/triplet_validator.py
-    dispatch: {argv: ["python3", "tools/validation/documentation/checks/triplet_validator.py"]}
-    writes: false
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-    tests: []
-    test_exempt_reason: No dedicated unit test exists; invoke the checker directly through its catalog command.
-
 
   - id: notebook-quality
     summary: Validates notebooks as readable runnable demos instead of fine-grained tests.
@@ -2652,14 +2558,14 @@ entries:
   - id: extract-docx
     public: true
     summary: Decomposes an authorized DOCX into a searchable and auditable reference bundle.
-    path: tools/analysis/documents/extraction/extract_docx.py
+    path: tools/runtime/dispatch/agent-canon/src/extract_docx.rs
     family: docs
     role: helper
     status: canonical
     audience: user
     placement: user_entrypoint
-    command: python3 tools/analysis/documents/extraction/extract_docx.py INPUT.docx --output-dir OUTPUT_DIR
-    dispatch: {argv: ["python3", "tools/analysis/documents/extraction/extract_docx.py", "INPUT.docx", "--output-dir", "OUTPUT_DIR"]}
+    command: tools/bin/agent-canon extract-docx INPUT.docx --output-dir OUTPUT_DIR
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "extract-docx", "INPUT.docx", "--output-dir", "OUTPUT_DIR"]}
     writes: true
     default_wiring:
       ci: false

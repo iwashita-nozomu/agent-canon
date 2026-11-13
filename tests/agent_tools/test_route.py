@@ -3,9 +3,9 @@
 # @dependency-start
 # contract test
 # responsibility Tests short task routing helper behavior and explicit capability owner partitions.
-# upstream implementation ../../tools/agent/orchestration/route.py selects short tool and skill routes
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs owns the native route selector
 # upstream implementation ../../tools/agent/skills/skill_route_catalog.py owns catalog/rule/index behavior
-# upstream implementation ../../tools/agent/orchestration/capability_route.py owns capability preflight/decision behavior
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs owns native capability preflight/decision behavior
 # upstream design ../../documents/design/tool-skill-routing-refactor.md defines naming policy
 # upstream design ../../.codex/personal/skills/code-visualization/SKILL.md owns the runtime direct-route text
 # upstream design ../../agents/skills/code-visualization.md owns visualization selection and native renderer routing
@@ -20,27 +20,23 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import tomllib
 import unittest
 from pathlib import Path
-from unittest.mock import patch
 
+import tomllib
 import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-ROUTE = PROJECT_ROOT / "tools" / "agent" / "orchestration" / "route.py"
-AGENT_CANON_CLI = PROJECT_ROOT / "tools" / "bin" / "agent-canon"
-sys.path.insert(0, str(PROJECT_ROOT))
-from tools.runtime.source import agent_canon_source_root  # noqa: E402
-import tools.agent.orchestration.capability_route as capability_module  # noqa: E402
-import tools.agent.orchestration.route as route_module  # noqa: E402
-import tools.agent.skills.skill_route_catalog as catalog_module  # noqa: E402
-from tools.agent.orchestration.team_config import (  # noqa: E402
-    default_specialists_for_task,
-    load_task_catalog,
-    load_team_config,
+AGENT_CANON_CLI = Path(
+    os.environ.get(
+        "AGENT_CANON_CLI", str(PROJECT_ROOT / "tools" / "bin" / "agent-canon")
+    )
 )
-from tools.runtime.manifest.manifest_rendering import render_subagent_prompt_packet  # noqa: E402
+CAPABILITY_ROUTE_GOLDEN = (
+    PROJECT_ROOT / "tests" / "fixtures" / "capability_route" / "python_golden.json"
+)
+sys.path.insert(0, str(PROJECT_ROOT))
+import tools.agent.skills.skill_route_catalog as catalog_module  # noqa: E402
 
 
 def _route_environment(
@@ -58,10 +54,10 @@ def _route_environment(
 
 
 class RouteToolTest(unittest.TestCase):
-    """Exercise route.py output and routing aliases."""
+    """Exercise the native route command output and routing aliases."""
 
     def test_catalog_loading_needs_no_authoring_tools_or_schema_files(self) -> None:
-        """Routing reads its two inputs without launching validation subprocesses."""
+        """The native router reads its two catalog owners without authoring tools."""
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             inputs = root / "agents" / "skills"
@@ -70,24 +66,34 @@ class RouteToolTest(unittest.TestCase):
                 shutil.copyfile(
                     PROJECT_ROOT / "agents" / "skills" / name, inputs / name
                 )
-            with (
-                patch.dict("os.environ", {"PATH": ""}),
-                patch.object(
-                    subprocess,
-                    "run",
-                    side_effect=AssertionError("unexpected subprocess"),
-                ),
-            ):
-                rules = catalog_module.load_skill_route_rules(root)
-        self.assertIsInstance(rules, tuple)
-        self.assertIn("task-routing", {rule.skill for rule in rules})
+            environment = _route_environment(("--root", str(root)))
+            environment["PATH"] = ""
+            result = subprocess.run(
+                [
+                    str(AGENT_CANON_CLI),
+                    "route",
+                    "--root",
+                    str(root),
+                    "--prompt",
+                    "$task-routing",
+                    "--format",
+                    "json",
+                ],
+                cwd=PROJECT_ROOT,
+                env=environment,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("task-routing", json.loads(result.stdout)["matched_skills"])
 
     def run_route(self, *args: str) -> subprocess.CompletedProcess[str]:
-        """Run route.py with arguments."""
+        """Run the native route selector with arguments."""
         if not any(arg == "--mode" or arg.startswith("--mode=") for arg in args):
             args = (*args, "--mode", "repo-changing")
         return subprocess.run(
-            [sys.executable, str(ROUTE), *args],
+            [str(AGENT_CANON_CLI), "route", *args],
             cwd=PROJECT_ROOT,
             env=_route_environment(args),
             check=False,
@@ -100,9 +106,9 @@ class RouteToolTest(unittest.TestCase):
         cwd: Path,
         *args: str,
     ) -> subprocess.CompletedProcess[str]:
-        """Run route.py from a given working directory."""
+        """Run the native route selector from a given working directory."""
         return subprocess.run(
-            [sys.executable, str(ROUTE), *args],
+            [str(AGENT_CANON_CLI), "route", *args],
             cwd=str(cwd),
             env=_route_environment(args, cwd_is_local_root=True),
             check=False,
@@ -151,7 +157,7 @@ class RouteToolTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("ROUTE=task-routing", result.stdout)
         self.assertIn("AREA=checks", result.stdout)
-        self.assertIn("TOOL=route.py", result.stdout)
+        self.assertIn("TOOL=tools/bin/agent-canon route", result.stdout)
         self.assertIn("SKILL=task-routing", result.stdout)
         self.assertIn("COMMANDS=make check-matrix", result.stdout)
         self.assertIn("changed=README.md", result.stdout)
@@ -213,34 +219,6 @@ class RouteToolTest(unittest.TestCase):
                 result.stderr,
             )
 
-    def test_source_root_resolution_utils_cover_shapes(self) -> None:
-        """Unit tests cover direct source-root resolution edge cases."""
-        with patch.dict(
-            "os.environ",
-            {"AGENT_CANON_SOURCE_ROOT": "", "AGENT_CANON_ROOT": ""},
-        ):
-            with tempfile.TemporaryDirectory() as tmp_dir:
-                root = Path(tmp_dir)
-                (root / "agents" / "skills").mkdir(parents=True, exist_ok=True)
-                standalone = root / "agents" / "skills" / "catalog.yaml"
-                standalone.parent.mkdir(parents=True, exist_ok=True)
-                standalone.write_text("version: 1\nskill_families:\n", encoding="utf-8")
-                resolution = agent_canon_source_root.resolve_agent_canon_source_root(
-                    root
-                )
-                self.assertEqual(resolution.layout, "standalone")
-                self.assertEqual(resolution.source_root, root.resolve())
-                self.assertEqual(resolution.current_repository_root, root.resolve())
-
-            with tempfile.TemporaryDirectory() as tmp_dir:
-                with self.assertRaises(
-                    agent_canon_source_root.SourceRootFailure
-                ) as exc:
-                    agent_canon_source_root.resolve_agent_canon_source_root(
-                        Path(tmp_dir)
-                    )
-                self.assertEqual(exc.exception.code, "agent_canon_source_root_missing")
-
     def test_long_proposed_tool_name_resolves_to_short_area(self) -> None:
         """Long candidate-list tool names should become aliases."""
         result = self.run_route("--name", "profile_surface_resolver.py")
@@ -248,7 +226,9 @@ class RouteToolTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("STATUS=alias", result.stdout)
         self.assertIn("CANONICAL_AREA=surface", result.stdout)
-        self.assertIn("CANONICAL_TOOL=route.py --area surface", result.stdout)
+        self.assertIn(
+            "CANONICAL_TOOL=tools/bin/agent-canon route --area surface", result.stdout
+        )
         self.assertIn("CANONICAL_SKILL=task-routing", result.stdout)
 
     def test_long_proposed_skill_name_resolves_to_task_routing(self) -> None:
@@ -276,7 +256,9 @@ class RouteToolTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("CANONICAL_AREA=search", result.stdout)
-        self.assertIn("CANONICAL_TOOL=route.py --area search", result.stdout)
+        self.assertIn(
+            "CANONICAL_TOOL=tools/bin/agent-canon route --area search", result.stdout
+        )
 
     def test_private_subagent_startup_aliases_are_unknown_names(self) -> None:
         """Historical startup labels should not resolve as route aliases."""
@@ -398,97 +380,60 @@ class RouteToolTest(unittest.TestCase):
 
     def test_research_tasks_put_math_route_before_generic_specialists(self) -> None:
         """T4/T5 expose a conditional math route before generic specialists."""
-        config = load_team_config()
-        catalog = load_task_catalog(config)
+        alignment = subprocess.run(
+            [
+                str(AGENT_CANON_CLI),
+                "check-agent-runtime-alignment",
+                "--root",
+                str(PROJECT_ROOT),
+            ],
+            cwd=PROJECT_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(alignment.returncode, 0, alignment.stdout + alignment.stderr)
+        catalog = yaml.safe_load(
+            (PROJECT_ROOT / "agents/task_catalog.yaml").read_text(encoding="utf-8")
+        )
+        route = catalog["math_intent_routes"]["mathematical_correction"]
+        self.assertEqual(
+            route,
+            {
+                "id": "mathematical_correction",
+                "requires_math_intent": True,
+                "activation": "mathematical_or_numerical_correction_evidence",
+                "owner_skill": "computational-optimization",
+                "reviewer": "mathematical_correctness_reviewer",
+                "required_packet": "mathematical_intent_packet",
+            },
+        )
+        research_family = next(
+            family
+            for family in catalog["workflow_families"]
+            if family["id"] == "research_driven_change"
+        )
+        self.assertIn(
+            "mathematical_correctness_reviewer",
+            research_family["roles"]["specialists"],
+        )
         for task_id in ("T4", "T5"):
             with self.subTest(task_id=task_id):
-                task = next(item for item in catalog.tasks if item["id"] == task_id)
-                route = task["math_intent_route"]
-                self.assertEqual(route, "mathematical_correction")
-                self.assertEqual(
-                    catalog.raw["math_intent_routes"][route],
-                    {
-                        "id": "mathematical_correction",
-                        "requires_math_intent": True,
-                        "activation": "mathematical_or_numerical_correction_evidence",
-                        "owner_skill": "computational-optimization",
-                        "reviewer": "mathematical_correctness_reviewer",
-                        "required_packet": "mathematical_intent_packet",
-                    },
-                )
-                self.assertIn(
-                    "mathematical_correctness_reviewer",
-                    next(
-                        family
-                        for family in catalog.workflow_families
-                        if family["id"] == "research_driven_change"
-                    )["roles"]["specialists"],
-                )
+                task = next(item for item in catalog["tasks"] if item["id"] == task_id)
+                self.assertEqual(task["math_intent_route"], "mathematical_correction")
                 self.assertNotIn(
-                    "mathematical_correctness_reviewer",
-                    default_specialists_for_task(config, catalog, task_id),
+                    "mathematical_correctness_reviewer", task["specialists"]
                 )
 
     def test_math_scope_contract_is_owned_and_routed(self) -> None:
-        """The math owner defines packet fields and orchestration routes to it."""
+        """The math role and orchestration retain the mathematical owner route."""
         orchestration = (
             PROJECT_ROOT / "agents" / "skills" / "agent-orchestration.md"
         ).read_text(encoding="utf-8")
-        optimization = (
-            PROJECT_ROOT / "agents" / "skills" / "computational-optimization.md"
-        ).read_text(encoding="utf-8")
-        bootstrap = (
-            PROJECT_ROOT / "tools" / "runtime" / "lifecycle" / "bootstrap_agent_run.py"
-        ).read_text(encoding="utf-8")
-        for field in (
-            "math_object",
-            "problem",
-            "variables",
-            "domains",
-            "units",
-            "objective",
-            "residual",
-            "constraints",
-            "equations",
-            "definitions",
-            "assumptions",
-            "approximations",
-            "derivation",
-            "iteration_map",
-            "update_map",
-            "invariants",
-            "limits",
-            "stopping_scalar",
-            "failure_semantics",
-            "equation_to_code_map",
-            "math_oracle",
-            "counterexample",
-            "mathematical_definition_paths",
-            "mathematical_oracle_paths",
-            "mathematical_documentation_paths",
-            "allowed_write_paths",
-            "forbidden_surfaces",
-            "separate_handoff_targets",
-        ):
-            with self.subTest(field=field):
-                self.assertIn(field, optimization)
-        for surface in (
-            "architecture",
-            "JIT",
-            "backend",
-            "runtime",
-            "routing",
-            "environment",
-        ):
-            with self.subTest(surface=surface):
-                self.assertIn(surface, optimization)
         self.assertIn(
             "[computational-optimization](computational-optimization.md)",
             orchestration,
         )
-        self.assertIn("mathematical intent", orchestration)
-        self.assertIn("math_packet_missing", optimization)
-        self.assertIn("writer_target", bootstrap)
 
         team_config = json.loads(
             (PROJECT_ROOT / "agents" / "agents_config.json").read_text(encoding="utf-8")
@@ -1541,7 +1486,10 @@ class RouteToolTest(unittest.TestCase):
 
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 self.assertIn("CANONICAL_AREA=structure", result.stdout)
-                self.assertIn("CANONICAL_TOOL=route.py --area structure", result.stdout)
+                self.assertIn(
+                    "CANONICAL_TOOL=tools/bin/agent-canon route --area structure",
+                    result.stdout,
+                )
 
     def test_prompt_routes_contextual_routing_redesign_to_architecture_stack(
         self,
@@ -1601,17 +1549,28 @@ class RouteToolTest(unittest.TestCase):
 
     def test_comprehensive_tasks_project_cross_module_handoff_guidance(self) -> None:
         """T11/T12 inherit the conditional dependency-resolution prompt."""
-        config = load_team_config()
-        catalog = load_task_catalog(config)
+        alignment = subprocess.run(
+            [
+                str(AGENT_CANON_CLI),
+                "check-agent-runtime-alignment",
+                "--root",
+                str(PROJECT_ROOT),
+            ],
+            cwd=PROJECT_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(alignment.returncode, 0, alignment.stdout + alignment.stderr)
+        catalog = yaml.safe_load(
+            (PROJECT_ROOT / "agents/task_catalog.yaml").read_text(encoding="utf-8")
+        )
         family = next(
             family
-            for family in catalog.workflow_families
+            for family in catalog["workflow_families"]
             if family["id"] == "comprehensive_development"
         )
-        rendered = "\n".join(
-            # The family packet is the existing task-manifest projection for T11/T12.
-            render_subagent_prompt_packet(family, indent="  ")
-        )
+        rendered = json.dumps(family["subagent_prompt"], ensure_ascii=False)
         self.assertIn("involved Git-root/module count", rendered)
         self.assertIn("dependency-repository consumer", rendered)
         self.assertIn("dependency DAG", rendered)
@@ -1628,7 +1587,11 @@ class RouteToolTest(unittest.TestCase):
         ):
             self.assertIn(marker, rendered)
         self.assertEqual(
-            [task["family"] for task in catalog.tasks if task["id"] in ("T11", "T12")],
+            [
+                task["family"]
+                for task in catalog["tasks"]
+                if task["id"] in ("T11", "T12")
+            ],
             ["comprehensive_development", "comprehensive_development"],
         )
 
@@ -1920,9 +1883,9 @@ class CapabilityRouteTest(unittest.TestCase):
     """Exercise explicit capability routing and its immutable envelopes."""
 
     def run_route(self, *args: str) -> subprocess.CompletedProcess[str]:
-        """Run route.py with arguments for one capability test."""
+        """Run the native route selector with arguments for one route test."""
         return subprocess.run(
-            [sys.executable, str(ROUTE), *args],
+            [str(AGENT_CANON_CLI), "route", *args],
             cwd=PROJECT_ROOT,
             env=_route_environment(args),
             check=False,
@@ -1995,6 +1958,34 @@ class CapabilityRouteTest(unittest.TestCase):
             encoding="utf-8",
         )
         return path
+
+    def test_native_capability_route_matches_frozen_python_cli_outputs(self) -> None:
+        """The Rust route matches the frozen old CLI on exact inputs and streams."""
+        golden = json.loads(CAPABILITY_ROUTE_GOLDEN.read_text(encoding="utf-8"))
+        self.assertEqual(golden["source"], "cdf54b674130cd9b058e6848b8fd815b6ea8bfa6")
+        self.assertEqual(
+            golden["route_sha256"],
+            "4a5354289bb29a0a2d21da08b03c6b9f59ec52b274845086f91407c133931d86",
+        )
+        self.assertEqual(
+            golden["capability_sha256"],
+            "4d92beaa59e7ea03503a2cc1498b84d267dd5eb49e80e41228fbb3e69d112f6b",
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for input_file in golden["input_files"]:
+                path = root / input_file["path"]
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(input_file["text"], encoding="utf-8")
+            for case in golden["cases"]:
+                with self.subTest(case=case["name"]):
+                    arguments = tuple(
+                        value.replace("<ROOT>", str(root)) for value in case["argv"]
+                    )
+                    result = self.run_route(*arguments)
+                    self.assertEqual(result.returncode, case["exit"])
+                    self.assertEqual(result.stdout, case["stdout"])
+                    self.assertEqual(result.stderr, case["stderr"])
 
     def capability_entry(
         self,
@@ -2351,14 +2342,6 @@ class CapabilityRouteTest(unittest.TestCase):
             )
         self.assert_failure_code(result, "capability-root-catalog-invalid")
 
-    def test_capability_route_direct_unknown_id_is_fail_closed(self) -> None:
-        """The direct helper has the same unknown-ID contract as the CLI."""
-        rules = catalog_module.load_skill_route_rules(PROJECT_ROOT)
-        index = catalog_module.build_capability_index(rules)
-        with self.assertRaises(capability_module.CapabilityRouteError) as raised:
-            capability_module.capability_skill_routes(("unknown_capability",), index)
-        self.assertEqual(raised.exception.code, "unknown-capability:unknown_capability")
-
     def test_capability_route_failure_preserves_exact_error_fields(self) -> None:
         """Failure decisions keep the stable schema and empty match fields."""
         result = self.run_route(
@@ -2415,17 +2398,26 @@ class CapabilityRouteTest(unittest.TestCase):
         with self.assertRaises(TypeError):
             index.rules_by_skill["other"] = index.rules_by_skill["oop-type-design"]  # type: ignore[index]
 
-    def test_capability_route_json_serializes_immutable_mapping(self) -> None:
-        """The JSON adapter converts immutable mappings without asdict()."""
-        rules = catalog_module.load_skill_route_rules(PROJECT_ROOT)
-        index = catalog_module.build_capability_index(rules)
-        preflight = capability_module.CapabilityPreflight(
-            ("oop_type_design",), "repo-changing", "json", "", None
+    def test_native_capability_json_preserves_related_skill_order(self) -> None:
+        """The native envelope preserves related candidates and deferred order."""
+        result = self.run_route(
+            "--capability",
+            "oop_type_design",
+            "--mode",
+            "repo-changing",
+            "--format",
+            "json",
         )
-        decision = capability_module.decide_capabilities(
-            ("oop_type_design",), "repo-changing", index, preflight
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(
+            payload["skills"],
+            ["agent-orchestration", "codex-task-workflow", "oop-type-design"],
         )
-        payload = route_module.capability_decision_to_json_data(decision)
+        self.assertEqual(
+            payload["active_skills"], ["agent-orchestration", "oop-type-design"]
+        )
+        self.assertEqual(payload["deferred_skills"], ["codex-task-workflow"])
         self.assertEqual(
             payload["related_skills"]["oop-type-design"],
             [

@@ -1,0 +1,12 @@
+{
+  "schema": "agent_canon.skill_tool_invocation_graph.v2",
+  "version": 2,
+  "skill_count": 70,
+  "command_count": 0,
+  "tool_count": 0,
+  "edge_count": 307,
+  "graph_digest": "4e6d2a92e09ecb1d227248ccf034cb2f18817d080195b3f855b727e6e87d0dfa",
+  "json_digest": "db044e6375672c4a582f8942efcfa1890590e34a6cf57b14bd1381a15d423fef",
+  "mermaid_digest": "2229e79a597c1cc5e1e2ccfa15eb8dae9d4c0cb9997de8e0b7f8ea9d6717327c",
+  "json_sha256": "db1433b0133941531f008230954b035c35239df5523a244ce2398c975aae266a"
+}

@@ -181,13 +181,9 @@ The five Codex phase owners keep their established section anchors, including
 Operational markers stay in their actual canonical owner rather than being copied
 to root entrypoints to satisfy a test.
 
-Bounded execution consumes existing structured task evidence. Full staging, DIC,
-child handoff, and coordinated completion have separate explicit conditions before
-their detail sections. Native [TaskClose](../../tools/runtime/dispatch/agent-canon/src/task_close.rs)
-remains the single coordinated terminal owner;
-bounded delivery uses the existing `execution_route_policy` instead of materializing
-a new ledger to satisfy unrelated fields. Family selection comes from task_catalog,
-not an independently maintained six-family prose list.
+Task execution uses the agreed scope, selected design and validation owners,
+and actual results. Native Codex tools provide collaboration; Git and the
+conversation carry scope and handoff. Family selection comes from task_catalog.
 
 Source execution failures route directly to Notes Lifecycle. Artifact creation routes
 to document placement/naming and consumer-reference updates at the moment a document

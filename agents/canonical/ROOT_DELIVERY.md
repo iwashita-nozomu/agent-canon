@@ -27,11 +27,8 @@ applicable owner or qualified handoff and are not attributed to AgentCanon by
 proximity. This common boundary exposes reporting scope without selecting an
 external checkout, credential, or publication implementation.
 
-A failed verification also follows
-[Failed Verification Record](../../documents/operations/notes-lifecycle.md#failed-verification-record)
-at observation time. Link the reusable topic from the Issue; later cause or repair
-evidence updates the same topic. Public memo recording does not activate private
-feedback capture or behavior evaluation.
+Verification failures use actual outputs and the current conversation for diagnosis.
+A separate failure topic, work log, or per-attempt record is not required.
 
 ## Feasible Issue evidence
 

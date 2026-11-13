@@ -54,9 +54,7 @@ If a focused command is unavailable in a fresh checkout, report the missing
 owner/route; do not create a fallback that writes into source. Use one task
 temporary directory outside the source checkout and one shared tool image at
 most. Track any image/container created for validation and remove that exact
-resource after evidence is captured. Creator-owned temporary resources also
-require a cleanup receipt naming each exact path or resource ID and an absence
-readback before `agent-canon task-close` can report a terminal result.
+resource after evidence is captured. Preserve unknown and user-owned resources.
 
 ## Validation Failure Response
 

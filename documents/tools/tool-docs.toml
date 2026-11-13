@@ -17,17 +17,17 @@ classification_values = ["public", "internal", "compat", "retired", "example"]
 [[tool]]
 id = "route"
 classification = "public"
-tool = "tools/agent/orchestration/route.py"
+tool = "tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs"
 doc = "documents/tools/route.md"
-language = "python"
+language = "rust"
 summary = "Short task-routing tool documentation."
 
 [[tool]]
 id = "html-artifact-access"
 classification = "public"
-tool = "tools/experiments/artifacts/html_artifact_access.py"
+tool = "tools/runtime/dispatch/agent-canon/src/html_artifact_access.rs"
 doc = "documents/tools/html_artifact_access.md"
-language = "python"
+language = "rust"
 summary = "Remote HTML artifact browser-access command documentation."
 
 [[tool]]
@@ -89,7 +89,7 @@ summary = "SQLite-backed prose structure graph and external-runtime artifact bou
 [[tool]]
 id = "repo-structure-contract"
 classification = "public"
-tool = "tools/validation/semantic/structure/repo_structure_contract.py"
+tool = "tools/runtime/dispatch/agent-canon/src/repo_structure_contract.rs"
 doc = "documents/tools/repo_structure_contract.md"
 language = "python"
 summary = "Repository tree versus AgentCanon structure contract checker documentation."
@@ -137,7 +137,7 @@ summary = "gh-backed GitHub branch and PR publish tool documentation."
 [[tool]]
 id = "wiki-publish"
 classification = "public"
-tool = "tools/repository/github/wiki_publish.py"
+tool = "tools/runtime/dispatch/agent-canon/src/wiki_publish.rs"
 doc = "documents/tools/wiki_publish.md"
 language = "python"
 summary = "Deterministic AgentCanon wiki publication to repo.wiki.git with default-branch-only and source-commit binding."
@@ -157,6 +157,14 @@ tool = "tools/runtime/dispatch/agent-canon/src/git_dependency_diff_summary.rs"
 doc = "documents/tools/git_dependency_diff_summary.md"
 language = "rust"
 summary = "Git diff, optional SCIP impact, and dependency-header expansion summary documentation."
+
+[[tool]]
+id = "export-codex-runtime-summary"
+classification = "public"
+tool = "tools/runtime/dispatch/agent-canon/src/codex_runtime_summary.rs"
+doc = "documents/tools/codex_runtime_summary.md"
+language = "rust"
+summary = "Bounded and prompt-free Codex runtime summary export documentation."
 
 [[tool]]
 id = "scip-index"
@@ -193,9 +201,9 @@ summary = "Deterministic source-to-consumer root AGENTS.md composition documenta
 [[tool]]
 id = "create-experiment-topic"
 classification = "public"
-tool = "tools/experiments/lifecycle/create_experiment_topic.py"
+tool = "tools/runtime/dispatch/agent-canon/src/experiment_registry/create_experiment_topic.rs"
 doc = "documents/tools/create_experiment_topic.md"
-language = "python"
+language = "rust"
 summary = "Creates a selected Python or C++ experiment topic and registers it in an explicit parent target."
 
 [[tool]]
@@ -281,9 +289,9 @@ summary = "JIT-canonical IR to Lean evidence-catalog documentation."
 [[tool]]
 id = "check-proof-trace-alignment"
 classification = "public"
-tool = "tools/validation/semantic/proof/check_proof_trace_alignment.py"
+tool = "tools/runtime/dispatch/agent-canon/src/check_proof_trace_alignment.rs"
 doc = "documents/tools/check_proof_trace_alignment.md"
-language = "python"
+language = "rust"
 summary = "Proof trace code-path and proposition alignment checker documentation."
 
 [[tool]]
@@ -297,10 +305,10 @@ summary = "Canonical native LSP 3.17 code-analysis API, protocol, and report sch
 [[tool]]
 id = "extract-docx"
 classification = "public"
-tool = "tools/analysis/documents/extraction/extract_docx.py"
+tool = "tools/runtime/dispatch/agent-canon/src/extract_docx.rs"
 doc = "documents/tools/extract_docx.md"
-language = "python"
-summary = "Standard-library DOCX decomposition into searchable and auditable reference bundles."
+language = "rust"
+summary = "Native DOCX decomposition into searchable and auditable reference bundles."
 
 [[tool]]
 id = "evaluate-agent-run"

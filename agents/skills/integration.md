@@ -43,6 +43,10 @@ manual recreation of deleted content. Keep the source tree shape, including
 renames, deletions, file types, and links, unless a conflict decision is backed
 by the owning contract.
 
+Resolve modify/delete conflicts in favor of an intentional deletion. Carry any
+still-required edits into the replacement owner, and remove the old path from
+the index with `git rm`. An older branch's edits do not restore a retired file.
+
 Run the merge in the current authorized integration checkout. If the selected
 repository-topic lifecycle prepared a `linked-worktree` or `independent-clone`,
 reuse that checkout; this skill does not manually create, move, or remove a
@@ -70,12 +74,14 @@ it does not prove behavior or replace the changed owner validation.
    the command pass.
 4. For each conflict, read the competing blocks and their callers/consumers or
    path owners. Resolve according to the source contract, target contract, and
-   intended tree shape. If the contracts disagree, return a typed conflict to
+   intended tree shape, preserving intentional deletions over older edits. If
+   the contracts disagree, return a typed conflict to
    the owning design/review route instead of inventing a compatibility path.
 5. After the merge, read back only the changed structural paths and their direct
    owner/consumer edges. Confirm that required additions, renames, deletions,
    file types, and links match the source integration intent and that no
-   conflict markers remain. When the source diff contains structural paths,
+   conflict markers remain. Verify that retired paths have not reappeared.
+   When the source diff contains structural paths,
    the existing targeted owner check may provide this comparison:
 
    ```bash
@@ -88,9 +94,9 @@ it does not prove behavior or replace the changed owner validation.
 
    Do not run this command for a content-only merge, turn it into a full-tree
    scan, or add a second checker.
-6. Run the selected post-merge validation once at the owning unit boundary.
-   The selected owner decides whether a behavioral check is needed; this skill
-   does not add a generic full suite, tree checker, or convention gate.
+6. After the planned integration and retirement review are complete, validate
+   the affected final state. Reuse valid owner results; individual merge commits
+   do not create separate test runs.
 7. Return the source ref, base ref, merge result, resolved conflict paths,
    changed-tree readback, validation command/result, and unresolved blockers to
    the caller. GitHub publication remains a separate `pr-processing` operation.

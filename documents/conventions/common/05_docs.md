@@ -7,7 +7,6 @@ downstream design ../../../agents/skills/structure-planning.md applies responsib
 downstream design ../../../agents/skills/structure-refactor.md repairs overloaded document boundaries
 downstream implementation ../../../tools/runtime/dispatch/agent-canon/src/docs.rs enforces Markdown math notation and fence rules
 downstream implementation ../../../tools/validation/semantic/convention/check_convention_compliance.py validates document claim grounding
-downstream implementation ../../../tools/runtime/dispatch/agent-canon/src/task_close.rs validates document split decision closeout evidence
 @dependency-end
 -->
 
@@ -40,11 +39,6 @@ downstream implementation ../../../tools/runtime/dispatch/agent-canon/src/task_c
   先頭付近に reader map を置きます。reader map は、その文書が扱う内容、
   主な章のまとまり、読むべき場面、誤用を避ける境界を短く示します。
 - `documents/` 内の編成は、参照先の一覧ではなく、責務ごとの分割を優先します。
-- 文書を分割、統合、移動、または現状維持する Markdown 変更では、
-  `document_split_decision` を記録します。判断候補は
-  `keep:<reason>`、`split:<new-owner-boundary>`、`merge:<target>`、
-  `inline:<target-section>`、`rename:<new-path>`、
-  `not_applicable:format-only:<reason>` のいずれかにします。
 - 実装への参照は、実装ファイル名や実装上の制約を明示する必要がある場合に限ります。
 - 読者が移動する意味を持つ文書または skill の参照は、標準 Markdown リンクで記述します。
   リンク先は、リンクを含む Markdown ファイルを基準にした相対 path とし、存在する
@@ -83,59 +77,29 @@ downstream implementation ../../../tools/runtime/dispatch/agent-canon/src/task_c
   output 用、`math` / `latex` / `tex` は standalone display math への移行対象として
   扱う。
 
-## Document Split Decision
+## 文書構造の判断
 
-`document_split_decision` は、文書構造変更の自動判定に使う machine-readable
-field です。本文量そのものではなく、文書責務、読者、読む契機、source map、
-validation route、更新頻度、正本 owner の組み合わせで判断します。
-読む契機は、その内容が必要になる判断・操作です。同じ owner や読者でも、
-通常実行と環境再構築のように独立して必要になる手順は別の読取責務です。
-一方を使うために他方の詳細まで読ませる構成は、見出しの追加だけで維持せず、
-既存の正本への移管を先に検討します。対応する owner がない場合だけ、独立した
-責務の optional 文書を設けます。これは文字数による機械分割ではありません。
+文書を分割、統合、移動、または現状維持する場合は、本文量ではなく、責務、読者、読む
+契機、source map、validation route、更新頻度、正本 owner の組み合わせで判断します。
+読む契機は、その内容が必要になる判断・操作です。同じ owner や読者でも、通常実行と
+環境再構築のように独立して必要になる手順は別の読取責務です。
 
-- `keep:<reason>`: 同じ owner、reader、読む契機、source map、validation route、
-  update cadence を持つ一つの責務は同じ文書に残します。その責務内の読者順序を
-  章、reader map、Mermaid 図、section contract で直せる場合は `keep` を選びます。
-- `split:<new-owner-boundary>`: 新しい責務 owner、別読者、独立した読む契機、
-  別 validation route、別 source map、または独立した update cadence を持つ内容は
-  別文書に分けます。
-- `merge:<target>`: 2 つ以上の文書が同じ owner、reader、読む契機、source map、
-  validation route、update cadence を持ち、差し替え可能な境界を作らない場合は
-  正本側へ統合します。
-- `inline:<target-section>`: 独立文書にするほどの owner boundary がなく、親文書の
-  受け入れ条件、例外、検証経路の一部として読むべき内容は section に戻します。
-- `rename:<new-path>`: 責務は変えず、path 名だけが reader map または documents
-  index とずれている場合に使います。
-- `not_applicable:format-only:<reason>`: typo、link、format-only の変更で文書構造に
-  触らない場合に使います。
-
-受け入れ条件:
-
-- `structure-planning` の `document_unit` は、owner、reader、source map、
-  validation route、update cadence、canonical parent、downstream consumers を
-  列として持ち、reader に読む契機と必要な判断を含めます。
-- `split_when` は上の `split` 条件のどれが成立したかを示します。
-- `merge_when` は同じ owner、reader、読む契機、source map、validation route、
-  update cadence が揃い、別文書にしたときの差し替え可能な責務境界がないことを示します。
-- `invalid_split_boundaries` は、本文量、token 量、読み込み chunk、章番号、近い path、
-  一時的な作業都合、同じ validation oracle を共有する連続説明だけを分割根拠にすることです。
-  余計な読取が独立した責務の混在を示す場合は、その責務境界を修正します。
-- 移管元の重複詳細は削除し、必要な箇所に「条件 → 正本の該当節」の Markdown リンクを
-  残します。入口に全分割先の読了を要求せず、共通の安全・権限制約は単独でも保持します。
-- 代表的な作業について入口から必要な正本へ到達でき、対象外の兄弟文書を読む要求が
-  ないことを確認します。途中で読む契機が変わった場合は、その地点で該当先へ進みます。
-  文書サイズの減少と実セッションの token 削減実測は別の結果として扱います。
-- closeout の Document Structure Evidence は `document_split_decision` を記録し、
-  `python3 tools/validation/semantic/convention/check_convention_compliance.py` と
-  `tools/bin/agent-canon task-close` がこの field の有無を確認します。
+- 同じ責務の読者順序を見出し、reader map、Mermaid 図、section contract で直せる場合は、
+  正本に残して構成を整えます。
+- 新しい owner、別読者、独立した読む契機、別 validation route、別 source map、または
+  独立した update cadence を持つ内容は別の正本を検討します。
+- 同じ owner と読む契機を持ち、差し替え可能な境界がない文書は正本側へまとめます。
+- 親文書の受け入れ条件、例外、検証経路の一部は、独立 owner がない限り親の section に
+  戻します。
+- 責務を変えず path 名だけが reader map や documents index とずれた文書は、正本の path
+  を整理します。
+- typo、link、format-only の変更は、文書構造変更として扱いません。
 
 ## Claim Grounding
 
 - `claim grounding` では、正本文書の claim を evidence class と一緒に書きます。
   evidence class は、実装 path、設定 surface、checker / tool output、
-  proof obligation、外部 source packet、または run-local planning evidence の
-  いずれかです。
+  proof obligation、または外部 source evidence のいずれかです。
 - 数学的 claim は、claim、assumptions、definitions、theorem target または
   proof obligation、`proof_status`、checker evidence を分けて書きます。
   実装由来の数学 claim は public entrypoint、入力 schema、戻り値 projection、
@@ -153,9 +117,9 @@ validation route、更新頻度、正本 owner の組み合わせで判断しま
   assumptions / preconditions、validation command を並べます。
 - 実装 claim は、対象 file / symbol / command と validation route を添えます。
   未実装 behavior の文書形は、設計候補または open obligation です。
-- Provisional wording such as `まずは`, `for now`, or `first pass` belongs to run-local planning evidence.
-  正本文書では、同じ内容を受け入れ条件、scope、
-  validation route、または明示的な limitation として書きます。
+- Provisional wording such as `まずは`, `for now`, or `first pass` remains draft language.
+  正本文書では、同じ内容を受け入れ条件、scope、validation route、または明示的な limitation
+  として書きます。
 - 誇張に見える claim は、測定対象、条件、evidence path、`proof_status` を持つ
   限定 claim へ分解します。`verified` は checker が通った artifact と対応している場合に
   使います。

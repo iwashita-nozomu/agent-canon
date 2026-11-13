@@ -7,7 +7,7 @@ upstream design ../canonical/CODEX_WORKFLOW.md task execution and closeout contr
 upstream design ../canonical/CODEX_SUBAGENTS.md subagent routing and role contract
 upstream design ../COMMUNICATION_PROTOCOL.md bounded context and handoff contract
 upstream implementation ../../.codex/config.toml shared runtime limits and defaults
-upstream implementation ../../eval/checkers/compare_codex_token_footprints.py equivalent session comparison
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/token_footprints.rs equivalent session comparison
 upstream implementation ../../eval/producers/evaluate_codex_agent_roles.py observed role evidence
 downstream design ./structure-refactor.md repairs independently activated responsibilities coupled into one read
 downstream design ./agent-log-analysis.md structured token evidence routing
@@ -24,27 +24,40 @@ downstream design ./agent-eval-accumulation.md accumulated eval evidence route
 - Boundary: the caller supplies the task context; existing owners define metric,
   collection, and runtime routes.
 
-## Method
+## Task workflow
 
-Start from the caller's goal and the context already available. Use known facts,
-the current revision, metrics, or target role only as relevant. On a resumed or
-compressed context, retain why completed fixes were accepted and what unit
-remains. Continue that unit without reopening finished work or restoring a
-rejected approach. Re-read only a truncated relevant part or check a specific
-missing fact when it could change the action; do not reopen the full history.
-Do not re-compress context just to make it shorter when no task-relevant
-information or handoff needs it.
+1. Reuse the goal, source and accepted decisions. Fix the requested token metric
+   and required task outcomes before a comparison. Carry already located target,
+   consumer/test references and completed lookup results, with source revision and
+   scope, in the existing handoff. Supply the raw source slices needed for the next
+   decision, including affected fields' definitions and consumers; avoid a reading
+   list of whole files or completed history. Additional
+   reads remain available for a missing decision. Preserve these facts on resumption.
+2. Inspect the selected sessions' actual counters and calls. Separate document
+   reads, cached/fresh input, output, retries and tool calls; identify a concrete
+   redundant read, oversized result or failed call. Obtain counters from existing
+   runtime logs outside the task agent's work; do not add manual measurement to
+   its deliverable. Keep missing data unmeasured and include new preparation work
+   when claiming savings for an entire delegated workflow.
+3. Repair that cause at its existing owner. Use
+   [bounded reads](agent-orchestration.md#owner-first-read-trace) and
+   [tool cooperation](agent-orchestration.md#skill-and-tool-cooperation) for
+   search scope and batching. Keep required code, consumer and validation coverage.
+   Do not change a model/window merely to compensate for unnecessary calls.
+4. When empirical comparison is selected, freeze the same task, source, authority,
+   model/effort and required outcomes under
+   [empirical-prompt-tuning](empirical-prompt-tuning.md#workflow). Compare actual
+   session counters and completed outputs, including nearby regression cases.
+   Smaller documents alone do not establish lower total tokens. An unrelated
+   built-in comparison threshold does not replace the agreed success criterion.
+5. Adopt only a candidate meeting the requested metric and required outcomes;
+   otherwise retain the supported result and fix the next observed cause. Record
+   accepted/rejected revisions, sessions and limits in the existing Issue/result,
+   then complete the selected formatting, delivery and application route.
 
-Identify a concrete repeated read, decision, unused output, retry, or other
-source-supported waste; follow it to its owner and repair it with the owner's
-normal validation. A supported waste repair does not need comparison sessions.
-Shorter text, fewer roles, or a successful task alone does not prove token
-savings. Keep the task's required behavior and checks intact.
-
-Missing counters or incomplete coverage remain unknown or `unmeasured`, not
-zero. Do not automatically collect logs, sync archives, repair dashboards,
-rerun producers, or launch comparison sessions. Change a model, window, runtime,
-or profile only when observed evidence identifies that setting as the cause.
+A supported local waste repair needs no new comparison sessions unless the
+requested claim depends on them. Log collection, archive repair and profile
+changes remain separate selected operations; this workflow creates no ledger.
 
 ## Quantitative claims
 
@@ -61,8 +74,8 @@ do not create an unrelated baseline or a new metric/threshold.
   relevant task family only as needed. Team, role, and context choices belong to
   `$agent-orchestration` and `$subagent-bootstrap`.
 - For an actual session comparison, reuse or select
-  `eval/checkers/compare_codex_token_footprints.py`. Use
-  `eval/producers/evaluate_codex_agent_roles.py` only when role attribution is
+  `tools/bin/agent-canon compare-codex-token-footprints`. Use
+  `tools/bin/agent-canon evaluate-codex-agent-roles` only when role attribution is
   unresolved. For an accumulated trend question, use existing dashboard
   summaries and `eval/producers/generate_agent_runtime_dashboard.py` as its
   owner; run collection or repair through `$agent-eval-accumulation` only when

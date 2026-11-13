@@ -10,10 +10,9 @@ downstream implementation ./documents/README.md reader-facing document template 
 downstream implementation ./code/README.md materializable code and Docstring template source
 downstream implementation ./experiments/_template/run.py runnable experiment scaffold source
 downstream implementation ./experiments/_cpp_template C++-first experiment package source
-downstream implementation ../tools/runtime/source/export_static_seed.py produces the exact default-consumer seed
-downstream implementation ../tools/agent/templates/code_template_rendering.py renders AgentCanon-internal code templates
-downstream implementation ../tools/agent/orchestration/agent_team.py renders AgentCanon-internal agent templates
-downstream implementation ../tools/experiments/lifecycle/create_experiment_topic.py copies AgentCanon-internal experiment templates
+downstream implementation ../tools/runtime/dispatch/agent-canon/src/template_bundle.rs produces the exact default-consumer seed
+downstream implementation ../tools/runtime/dispatch/agent-canon/src/code_template_rendering.rs renders AgentCanon-internal code templates through the native CLI
+downstream implementation ../tools/runtime/dispatch/agent-canon/src/experiment_registry/create_experiment_topic.rs copies AgentCanon-internal experiment templates
 @dependency-end
 -->
 
@@ -69,7 +68,7 @@ background task は再生成や上流探索を行いません。
 
 ## Experiment Copy Boundary
 
-`create_experiment_topic.py` は AgentCanon source内のcanonical packageを読み、生成先
+`create-experiment-topic` は AgentCanon source内のcanonical packageを読み、生成先
 `experiments/<topic>/`と`experiments/registry.toml`だけを同じoperationで更新します。default Python profileは
 registryの`defaults.topic_template_dir`または`_template/`を使います。C++ profileは明示的な
 `--template-profile cpp`とconsumer-selected `--cmake-profile`を要求し、`_cpp_template/`から

@@ -62,51 +62,35 @@ contracts and their consumers as necessary.
 Markdown links identify the expected owner and Skill route; they do not create a
 dispatch frontier. When delegation is selected, use the configured native
 collaboration route and preserve actual launch, completion, and failure results.
-A blocked child does not create a parent write fallback. User-guided debugging
-uses the common ROOT exception.
+Repair a selected tool's refusal at its owner, then resume the authorized
+operation. Runtime identity, spawn, and writer-packet records are not editing
+permission gates.
 
 A bounded route's selected execution owner performs its edit and verification
 without a child handoff. When the selected route requires full staging, read
 [Coordination design packet](#coordination-design-packet) before that handoff.
-Only an activated design-correspondence route reads
-[DIC](../internal-routines/design-implementation-correspondence.md) and carries
-its clause/fingerprint/closure evidence. Neither a document link nor the presence
-of a design file activates DIC, full staging, or a separate reviewer.
+When a selected design needs comparison with the diff, use
+[design-to-diff review](../internal-routines/design-implementation-correspondence.md).
 
 ## Coordination design packet
 
-This section applies only to the selected full-staging route. Its
-`team_manifest.yaml#run.active_design_packet` is the persisted artifact authority,
-with schema `waterfall.design_packet.v1`. Preserve the selected design artifact,
-technical review, document-flow review paths, and `document_flow_required` flag.
-Selection precedence is explicit `--active-design-packet`, workflow-specific
-record, then the standard `agents_config` artifact registry. Consumers read the
-persisted selection rather than deriving new paths.
+Read the selected design for the requested behavior, assumptions, interfaces,
+side effects, and verification. Carry the necessary references in the native
+handoff. Mathematical obligations, proof and experiment artifacts keep their
+domain owners. Use existing project paths; no task manifest, fingerprint file,
+or custom runtime gate is required.
 
-Before the implementation handoff, read the selected Abstract Design Frame,
-Implementation Source Packet, Design Side-Effect Map, and Design-To-Implementation
-Trace. The packet references the populated run-local
-`artifact:semantic_responsibility_contract.toml`, which allocates semantic deltas,
-implementation actions, obligations, primary verification owners, supporting
-properties/roles, and hard-edge closure. Keep one instance shared with review.
-Missing/unknown/invalid fields, schemas, or outside-bundle paths return a typed
-blocker to the packet owner.
-
-Activate a separate detailed-design or document-flow review only for a
-distinct unresolved claim/risk the current owning gate cannot decide. Activated reviews must reference the same
-manifest-declared design and provide their normalized decisions; required
-`document_flow_required` approval remains necessary. Gate transitions use the
-existing waterfall gate owner and current review evidence. Changed design
-invalidates the affected review, not every unrelated gate.
+Activate a separate detailed-design or document-flow review only for a distinct
+unresolved judgment. Preserve accepted findings and recheck the affected evidence
+when the design changes.
 
 ## Edit Execution Surface
 
 Use patch-based edits for changes whose responsibility can be traced manually.
 Use the repository's existing generator, transformer, or formatter for mechanical
 changes. Preserve unrelated/user-owned content and review the resulting diff.
-The requested scope remains authoritative; retain the selected change unit and
-source-backed scope decisions in the existing task/handoff rather than creating
-a second scope ledger.
+The requested scope remains authoritative. Keep the selected change and its
+source-backed scope decisions in the current conversation.
 
 For document creation, splitting, movement, or deletion, first read
 [placement and references](ARTIFACT_PLACEMENT.md#置き場ルール). Formatting follows
@@ -163,6 +147,33 @@ task or handoff; the latest explicit user instruction governs conflicts while
 compatible earlier requirements remain active. Before editing or restoring
 behavior, define the intended outcome across changed and retained requirements;
 use history for rationale, not correctness.
+
+For the planned repair or migration, follow this order:
+
+1. Decide what changes and how before editing: the required behavior, retained
+   implementation, affected callers, and obsolete paths/symbols to delete.
+   Group the work into complete units by responsibility and dependency.
+2. Implement each unit in dependency order: connect callers to the retained
+   API, then delete superseded code and its exclusive helpers, configuration,
+   build targets, dependencies, and fixtures under
+   [RC-09](../../documents/design/responsibility-cleanup.md#duplicate-implementation-retirement).
+   Move tests for retained guarantees to that API and preserve shared support.
+3. Inspect the actual diff and search old paths, symbols, imports, dispatch,
+   and build references within the affected responsibility. Use existing
+   reference tools when text search cannot establish reachability. Remove
+   missed code and migrate remaining callers before validation; explain retained
+   old code by a current requirement in the existing task/PR context.
+4. Format the final state and run its selected tests and checks together.
+
+The final-state review catches code left behind when a new path works; tests of
+the new path alone do not establish deletion. If the change makes no code
+obsolete, retain the required implementation without forcing unrelated deletion.
+
+Use existing failure evidence to settle the repair decision before the next
+implementation pass. Intermediate helpers, edits, and commits do not require
+separate test runs. Planning and handoff use the current context, without work
+ledgers, scope tables, or replacement-tracking files.
+
 For a failed test or unavailable execution, use the
 [test responsibility contract](../../documents/conventions/coding-conventions-testing.md#3-unit-test-contract)
 to distinguish missing input preparation from missing required API behavior,
@@ -200,13 +211,10 @@ manifests and reconstruction recipes; materialized programs retain explicit
 lifetime ownership. These requirements apply to that changed contract, not to
 unrelated implementations.
 
-After an implementation slice, continue remaining required work and selected
-review/validation. Keep a run-local work log only for selected coordination or
-resumption; otherwise use the existing task/Issue or structured handoff. Record
-stale legacy scope/log observations with their owner rather than making them new
-authority. Validation autofix follows an in-scope contract finding; unrelated
-style debt stays separate. A failed check immediately routes to its
-[topic record](../../documents/operations/notes-lifecycle.md#failed-verification-record).
+Continue the planned implementation and retirement review before final
+validation. Carry unfinished work and established findings in the conversation.
+Validation autofix follows an in-scope contract finding; unrelated style debt
+stays separate.
 
 ### Return from a repair detour
 
@@ -214,8 +222,8 @@ Use this section when diagnosis or cause repair interrupts requested code work.
 The cause owner is a repair destination, not a replacement for the task.
 
 1. Before moving to that owner, retain the original target's repository/path and
-   symbol or block, interrupted operation, and acceptance in the existing task or
-   handoff. Reuse the known source revision and execution route. Keep this return
+   symbol or block, interrupted operation, and acceptance in the current context.
+   Reuse the known source revision and execution route. Keep this return
    point distinct from the cause location; a changed cause hypothesis does not
    change the requested outcome.
 2. Locate and repair the demonstrated in-scope cause. Once that repair and its
@@ -225,7 +233,7 @@ The cause owner is a repair destination, not a replacement for the task.
    evidence rather than restarting intake or unrelated diagnosis.
 3. Complete the target's remaining implementation and selected acceptance check
    before taking an unrelated finding or reporting completion. When no further
-   target edit is needed, record why and continue its selected verification;
+   target edit is needed, explain why and continue its selected verification;
    reopening a file, promising to resume, or a cause-side pass is not that result.
 
 A prerequisite repair's success does not prove its caller's requested behavior;

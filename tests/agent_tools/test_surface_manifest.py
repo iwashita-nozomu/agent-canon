@@ -11,18 +11,14 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import asdict
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from typing import cast
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 AGENT_CANON_CLI = os.environ.get("AGENT_CANON_CLI")
-from tools.agent.skills.skill_projection_registry import (  # noqa: E402
-    GeneratedProjectionRegistryError,
-    generated_skill_projections,
-)
 
 
 class SurfaceManifestTest(unittest.TestCase):
@@ -37,12 +33,16 @@ class SurfaceManifestTest(unittest.TestCase):
         self.assertEqual(payload["schema"], "agent-canon.surface-manifest.v2")
         self.assertEqual(payload["prefix"], ".")
         self.assertTrue(payload["entries"])
-        self.assertEqual(
-            payload["generated_projections"],
-            [
-                asdict(projection)
-                for projection in generated_skill_projections(PROJECT_ROOT)
-            ],
+        projections = cast(list[dict[str, str]], payload["generated_projections"])
+        projection_paths = [projection["path"] for projection in projections]
+        self.assertTrue(projections)
+        self.assertEqual(projection_paths, sorted(projection_paths))
+        self.assertEqual(len(projection_paths), len(set(projection_paths)))
+        self.assertTrue(
+            all(
+                projection["projection_producer"] == "agent-canon-bootstrap"
+                for projection in projections
+            )
         )
         self.assertTrue(
             all(
@@ -82,17 +82,6 @@ class SurfaceManifestTest(unittest.TestCase):
                     f"downstream implementation ../../.codex/personal/skills/_duplicate/SKILL.md {name}\n",
                     encoding="utf-8",
                 )
-            with self.assertRaises(GeneratedProjectionRegistryError) as raised:
-                generated_skill_projections(root)
-            self.assertEqual(raised.exception.code, "generated_projection_ambiguous")
-            self.assertEqual(
-                raised.exception.path,
-                ".codex/personal/skills/_duplicate/SKILL.md",
-            )
-            self.assertEqual(
-                raised.exception.owners,
-                ("agents/internal-routines/one.md", "agents/internal-routines/two.md"),
-            )
             (root / "manifest.toml").write_text(
                 'version = 1\nintegration_mode = "agent-canon-runtime"\nselection = "explicit-opt-in"\n',
                 encoding="utf-8",
@@ -105,7 +94,10 @@ class SurfaceManifestTest(unittest.TestCase):
                 "normalized-snapshot",
             )
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn(str(raised.exception), result.stderr)
+            self.assertIn(
+                "generated_projection_ambiguous:.codex/personal/skills/_duplicate/SKILL.md:agents/internal-routines/one.md,agents/internal-routines/two.md",
+                result.stderr,
+            )
 
     def test_invalid_runtime_producer_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

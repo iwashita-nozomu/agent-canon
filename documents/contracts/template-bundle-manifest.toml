@@ -1,7 +1,7 @@
 # Canonical template bundle profiles owned by AgentCanon.
 # @dependency-start
 # contract configuration
-# responsibility Declares canonical template, Codex plugin, and native CLI package inputs.
+# responsibility Declares canonical template, Codex plugin, static-seed, and native CLI package inputs.
 # upstream design ../design/agent-canon-bootstrap-tool-runtime.md distribution boundary
 # downstream implementation ../../tools/runtime/dispatch/agent-canon/src/template_bundle.rs snapshot exporter
 # @dependency-end
@@ -49,42 +49,29 @@ roots = [
   "tools/agent/orchestration/__init__.py",
   "tools/agent/skills/__init__.py",
   "tools/agent/templates/__init__.py",
-  "tools/agent/orchestration/capability_route.py",
   "tools/agent/orchestration/mid_task_user_input_policy.py",
-  "tools/agent/orchestration/prompt_capture.py",
-  "tools/agent/orchestration/prompt_classifier.py",
-  "tools/agent/orchestration/route.py",
-  "tools/agent/orchestration/subagent_selection.py",
-  "tools/agent/orchestration/team_config.py",
-  "tools/agent/orchestration/tool_selection.py",
-  "tools/agent/orchestration/workflow_context.py",
-  "tools/agent/skills/skill_lane_detector.py",
-  "tools/agent/skills/skill_dependency_map.py",
+  "tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs",
+  "tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs",
   "tools/agent/skills/skill_route_catalog.py",
   "tools/catalog.yaml",
   "tools/repository/__init__.py",
   "tools/repository/workspace/parent_root_side_effects.py",
-  "tools/repository/workspace/workspace_scope.py",
   "tools/runtime/__init__.py",
   "tools/runtime/archive/__init__.py",
   "tools/runtime/archive/behavior_event_assembly.py",
   "tools/runtime/archive/log_repository_identity.py",
   "tools/runtime/archive/runtime_log_paths.py",
-  "tools/runtime/archive/work_log.py",
   "tools/runtime/artifacts/__init__.py",
   "tools/runtime/artifacts/artifact_identity.py",
   "tools/runtime/artifacts/runtime_artifacts.py",
   "tools/runtime/authority/__init__.py",
-  "tools/runtime/authority/hook_retirement.py",
   "tools/runtime/authority/hook_safety.py",
-  "tools/runtime/authority/mutation_authority.py",
   "tools/runtime/authority/writer_target.py",
   "tools/runtime/container/__init__.py",
   "tools/runtime/container/bootstrap_runtime.py",
   "tools/runtime/container/execution_resource_projection.py",
   "tools/runtime/lifecycle/__init__.py",
   "tools/runtime/lifecycle/update_lifecycle_contract.py",
-  "tools/runtime/lifecycle/workflow_monitor.py",
   "tools/runtime/source/__init__.py",
   "tools/runtime/source/agent_canon_source_root.py",
   "tools/runtime/values.py",
@@ -99,4 +86,4 @@ roots = ["LICENSE"]
 
 [profiles.static-seed]
 roots = []
-producer = "tools/runtime/source/export_static_seed.py"
+producer = "tools/runtime/dispatch/agent-canon/src/template_bundle.rs"

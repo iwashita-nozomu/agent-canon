@@ -4,7 +4,7 @@
 # contract test
 # responsibility Checks bounded route admission, sparse output, escalation, and unavailable validation.
 # upstream design ../../agents/task_catalog.yaml execution route policy
-# upstream implementation ../../tools/agent/orchestration/route.py route selection and CLI
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs native route selection and CLI
 # @dependency-end
 
 from __future__ import annotations
@@ -12,16 +12,42 @@ from __future__ import annotations
 import json
 import os
 import subprocess
-import sys
 from pathlib import Path
 
 import pytest
 import yaml
 
-from tools.agent.orchestration.route import RISK_VALUES, decide_execution
-
 ROOT = Path(__file__).resolve().parents[2]
-ROUTER = ROOT / "tools/agent/orchestration/route.py"
+AGENT_CANON_CLI = Path(
+    os.environ.get("AGENT_CANON_CLI", str(ROOT / "tools/bin/agent-canon"))
+)
+ROUTER = AGENT_CANON_CLI
+RISK_VALUES = ("routine", "focused", "profile", "shared", "large")
+
+
+def decide_execution(root: Path, context: dict[str, object]) -> dict[str, object]:
+    """Query the native route owner for a bounded closeout decision."""
+    result = subprocess.run(
+        [
+            str(AGENT_CANON_CLI),
+            "route",
+            "--root",
+            str(root),
+            "--area",
+            "closeout",
+            "--execution-context",
+            "-",
+            "--format",
+            "json",
+        ],
+        input=json.dumps(context),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise ValueError(result.stderr.strip())
+    return json.loads(result.stdout)
 
 
 @pytest.fixture
@@ -58,8 +84,8 @@ def test_real_edge_or_resumption_selects_existing_coordination(context, reason):
     result = decide_execution(ROOT, {**context, "coordination": [reason]})
     assert result == {
         "execution_route": "coordination",
-        "next_action": "run_existing_coordinated_closeout",
-        "commands": ["tools/bin/agent-canon task-close --run-id <run-id>"],
+        "next_action": "coordinate_with_native_codex_and_report_results",
+        "commands": [],
         "selected_validation": context["validation"],
         "verification_status": "pending",
     }
@@ -126,8 +152,8 @@ def test_cli_is_artifact_free_and_does_not_route_by_risk(
     context["coordination"] = coordination
     result = subprocess.run(
         [
-            sys.executable,
             str(ROUTER),
+            "route",
             "--root",
             str(ROOT),
             "--area",
@@ -154,8 +180,8 @@ def test_cli_is_artifact_free_and_does_not_route_by_risk(
 def test_closeout_without_context_does_not_advertise_a_run_bundle(tmp_path):
     result = subprocess.run(
         [
-            sys.executable,
             str(ROUTER),
+            "route",
             "--root",
             str(ROOT),
             "--area",
@@ -176,8 +202,8 @@ def test_closeout_without_context_does_not_advertise_a_run_bundle(tmp_path):
 def test_non_closeout_selector_rejects_execution_context(context, tmp_path):
     result = subprocess.run(
         [
-            sys.executable,
             str(ROUTER),
+            "route",
             "--root",
             str(ROOT),
             "--area",

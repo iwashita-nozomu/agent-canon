@@ -1,0 +1,426 @@
+{
+  "source": "89b84d6af88566106c9aad74cb7c5f8541aefa3d",
+  "python": "3.12.3",
+  "source_hash": "f1e4c382883e0459b81fd5962fdb1c0763fd7381f443474eac3925a422ff39ce",
+  "scope": "canonical_hook_event_bytes andpurenamespace/timestamp helpers; filesystemtransport remainsseparate",
+  "cases": [
+    {
+      "name": "valid",
+      "input": {
+        "hook_run_id": "hook-fixed",
+        "timestamp": "2026-01-01T00:00:00Z",
+        "payload_fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "pass",
+        "source_repo_key": "fixture-source",
+        "hook_log_namespace": "fixture"
+      },
+      "accepted": true,
+      "output_base64": "eyJob29rX2xvZ19uYW1lc3BhY2UiOiJmaXh0dXJlIiwiaG9va19ydW5faWQiOiJob29rLWZpeGVkIiwicGF5bG9hZF9maW5nZXJwcmludCI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWEiLCJzb3VyY2VfcmVwb19rZXkiOiJmaXh0dXJlLXNvdXJjZSIsInN0YXR1cyI6InBhc3MiLCJ0aW1lc3RhbXAiOiIyMDI2LTAxLTAxVDAwOjAwOjAwWiJ9Cg=="
+    },
+    {
+      "name": "hook_run_id/0",
+      "input": {
+        "hook_run_id": null,
+        "timestamp": "2026-01-01T00:00:00Z",
+        "payload_fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "pass",
+        "source_repo_key": "fixture-source",
+        "hook_log_namespace": "fixture"
+      },
+      "accepted": false,
+      "observed_error": "hook_run_id"
+    },
+    {
+      "name": "hook_run_id/1",
+      "input": {
+        "hook_run_id": "",
+        "timestamp": "2026-01-01T00:00:00Z",
+        "payload_fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "pass",
+        "source_repo_key": "fixture-source",
+        "hook_log_namespace": "fixture"
+      },
+      "accepted": false,
+      "observed_error": "hook_run_id"
+    },
+    {
+      "name": "hook_run_id/2",
+      "input": {
+        "hook_run_id": " ",
+        "timestamp": "2026-01-01T00:00:00Z",
+        "payload_fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "pass",
+        "source_repo_key": "fixture-source",
+        "hook_log_namespace": "fixture"
+      },
+      "accepted": false,
+      "observed_error": "hook_run_id"
+    },
+    {
+      "name": "hook_run_id/3",
+      "input": {
+        "hook_run_id": 3,
+        "timestamp": "2026-01-01T00:00:00Z",
+        "payload_fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "pass",
+        "source_repo_key": "fixture-source",
+        "hook_log_namespace": "fixture"
+      },
+      "accepted": false,
+      "observed_error": "hook_run_id"
+    },
+    {
+      "name": "timestamp/0",
+      "input": {
+        "hook_run_id": "hook-fixed",
+        "timestamp": null,
+        "payload_fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "pass",
+        "source_repo_key": "fixture-source",
+        "hook_log_namespace": "fixture"
+      },
+      "accepted": false,
+      "observed_error": "timestamp"
+    },
+    {
+      "name": "timestamp/1",
+      "input": {
+        "hook_run_id": "hook-fixed",
+        "timestamp": "",
+        "payload_fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "pass",
+        "source_repo_key": "fixture-source",
+        "hook_log_namespace": "fixture"
+      },
+      "accepted": false,
+      "observed_error": "timestamp"
+    },
+    {
+      "name": "timestamp/2",
+      "input": {
+        "hook_run_id": "hook-fixed",
+        "timestamp": " ",
+        "payload_fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "pass",
+        "source_repo_key": "fixture-source",
+        "hook_log_namespace": "fixture"
+      },
+      "accepted": false,
+      "observed_error": "timestamp"
+    },
+    {
+      "name": "timestamp/3",
+      "input": {
+        "hook_run_id": "hook-fixed",
+        "timestamp": 3,
+        "payload_fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "pass",
+        "source_repo_key": "fixture-source",
+        "hook_log_namespace": "fixture"
+      },
+      "accepted": false,
+      "observed_error": "timestamp"
+    },
+    {
+      "name": "payload_fingerprint/0",
+      "input": {
+        "hook_run_id": "hook-fixed",
+        "timestamp": "2026-01-01T00:00:00Z",
+        "payload_fingerprint": null,
+        "status": "pass",
+        "source_repo_key": "fixture-source",
+        "hook_log_namespace": "fixture"
+      },
+      "accepted": false,
+      "observed_error": "payload_fingerprint"
+    },
+    {
+      "name": "payload_fingerprint/1",
+      "input": {
+        "hook_run_id": "hook-fixed",
+        "timestamp": "2026-01-01T00:00:00Z",
+        "payload_fingerprint": "",
+        "status": "pass",
+        "source_repo_key": "fixture-source",
+        "hook_log_namespace": "fixture"
+      },
+      "accepted": false,
+      "observed_error": "payload_fingerprint"
+    },
+    {
+      "name": "payload_fingerprint/2",
+      "input": {
+        "hook_run_id": "hook-fixed",
+        "timestamp": "2026-01-01T00:00:00Z",
+        "payload_fingerprint": " ",
+        "status": "pass",
+        "source_repo_key": "fixture-source",
+        "hook_log_namespace": "fixture"
+      },
+      "accepted": false,
+      "observed_error": "payload_fingerprint"
+    },
+    {
+      "name": "payload_fingerprint/3",
+      "input": {
+        "hook_run_id": "hook-fixed",
+        "timestamp": "2026-01-01T00:00:00Z",
+        "payload_fingerprint": 3,
+        "status": "pass",
+        "source_repo_key": "fixture-source",
+        "hook_log_namespace": "fixture"
+      },
+      "accepted": false,
+      "observed_error": "payload_fingerprint"
+    },
+    {
+      "name": "status/0",
+      "input": {
+        "hook_run_id": "hook-fixed",
+        "timestamp": "2026-01-01T00:00:00Z",
+        "payload_fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": null,
+        "source_repo_key": "fixture-source",
+        "hook_log_namespace": "fixture"
+      },
+      "accepted": false,
+      "observed_error": "status"
+    },
+    {
+      "name": "status/1",
+      "input": {
+        "hook_run_id": "hook-fixed",
+        "timestamp": "2026-01-01T00:00:00Z",
+        "payload_fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "",
+        "source_repo_key": "fixture-source",
+        "hook_log_namespace": "fixture"
+      },
+      "accepted": false,
+      "observed_error": "status"
+    },
+    {
+      "name": "status/2",
+      "input": {
+        "hook_run_id": "hook-fixed",
+        "timestamp": "2026-01-01T00:00:00Z",
+        "payload_fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": " ",
+        "source_repo_key": "fixture-source",
+        "hook_log_namespace": "fixture"
+      },
+      "accepted": false,
+      "observed_error": "status"
+    },
+    {
+      "name": "status/3",
+      "input": {
+        "hook_run_id": "hook-fixed",
+        "timestamp": "2026-01-01T00:00:00Z",
+        "payload_fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": 3,
+        "source_repo_key": "fixture-source",
+        "hook_log_namespace": "fixture"
+      },
+      "accepted": false,
+      "observed_error": "status"
+    },
+    {
+      "name": "source_repo_key/0",
+      "input": {
+        "hook_run_id": "hook-fixed",
+        "timestamp": "2026-01-01T00:00:00Z",
+        "payload_fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "pass",
+        "source_repo_key": null,
+        "hook_log_namespace": "fixture"
+      },
+      "accepted": false,
+      "observed_error": "source_repo_key"
+    },
+    {
+      "name": "source_repo_key/1",
+      "input": {
+        "hook_run_id": "hook-fixed",
+        "timestamp": "2026-01-01T00:00:00Z",
+        "payload_fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "pass",
+        "source_repo_key": "",
+        "hook_log_namespace": "fixture"
+      },
+      "accepted": false,
+      "observed_error": "source_repo_key"
+    },
+    {
+      "name": "source_repo_key/2",
+      "input": {
+        "hook_run_id": "hook-fixed",
+        "timestamp": "2026-01-01T00:00:00Z",
+        "payload_fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "pass",
+        "source_repo_key": " ",
+        "hook_log_namespace": "fixture"
+      },
+      "accepted": false,
+      "observed_error": "source_repo_key"
+    },
+    {
+      "name": "source_repo_key/3",
+      "input": {
+        "hook_run_id": "hook-fixed",
+        "timestamp": "2026-01-01T00:00:00Z",
+        "payload_fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "pass",
+        "source_repo_key": 3,
+        "hook_log_namespace": "fixture"
+      },
+      "accepted": false,
+      "observed_error": "source_repo_key"
+    },
+    {
+      "name": "hook_log_namespace/0",
+      "input": {
+        "hook_run_id": "hook-fixed",
+        "timestamp": "2026-01-01T00:00:00Z",
+        "payload_fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "pass",
+        "source_repo_key": "fixture-source",
+        "hook_log_namespace": null
+      },
+      "accepted": false,
+      "observed_error": "hook_log_namespace"
+    },
+    {
+      "name": "hook_log_namespace/1",
+      "input": {
+        "hook_run_id": "hook-fixed",
+        "timestamp": "2026-01-01T00:00:00Z",
+        "payload_fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "pass",
+        "source_repo_key": "fixture-source",
+        "hook_log_namespace": ""
+      },
+      "accepted": false,
+      "observed_error": "hook_log_namespace"
+    },
+    {
+      "name": "hook_log_namespace/2",
+      "input": {
+        "hook_run_id": "hook-fixed",
+        "timestamp": "2026-01-01T00:00:00Z",
+        "payload_fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "pass",
+        "source_repo_key": "fixture-source",
+        "hook_log_namespace": " "
+      },
+      "accepted": false,
+      "observed_error": "hook_log_namespace"
+    },
+    {
+      "name": "hook_log_namespace/3",
+      "input": {
+        "hook_run_id": "hook-fixed",
+        "timestamp": "2026-01-01T00:00:00Z",
+        "payload_fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "pass",
+        "source_repo_key": "fixture-source",
+        "hook_log_namespace": 3
+      },
+      "accepted": false,
+      "observed_error": "hook_log_namespace"
+    },
+    {
+      "name": "extra-unicode",
+      "input": {
+        "hook_run_id": "hook-fixed",
+        "timestamp": "2026-01-01T00:00:00Z",
+        "payload_fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "pass",
+        "source_repo_key": "fixture-source",
+        "hook_log_namespace": "fixture",
+        "extra": {
+          "\u65e5\u672c\u8a9e": "\ud800",
+          "array": [
+            true,
+            1.5,
+            null
+          ]
+        }
+      },
+      "accepted": true,
+      "output_base64": "eyJleHRyYSI6eyJhcnJheSI6W3RydWUsMS41LG51bGxdLCJcdTY1ZTVcdTY3MmNcdThhOWUiOiJcdWQ4MDAifSwiaG9va19sb2dfbmFtZXNwYWNlIjoiZml4dHVyZSIsImhvb2tfcnVuX2lkIjoiaG9vay1maXhlZCIsInBheWxvYWRfZmluZ2VycHJpbnQiOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIiwic291cmNlX3JlcG9fa2V5IjoiZml4dHVyZS1zb3VyY2UiLCJzdGF0dXMiOiJwYXNzIiwidGltZXN0YW1wIjoiMjAyNi0wMS0wMVQwMDowMDowMFoifQo="
+    },
+    {
+      "name": "nan",
+      "input": {
+        "hook_run_id": "hook-fixed",
+        "timestamp": "2026-01-01T00:00:00Z",
+        "payload_fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "pass",
+        "source_repo_key": "fixture-source",
+        "hook_log_namespace": "fixture",
+        "other": NaN
+      },
+      "accepted": false,
+      "observed_error": "event_schema_invalid"
+    },
+    {
+      "name": "list",
+      "input": [],
+      "accepted": false,
+      "observed_error": "event_schema_invalid"
+    }
+  ],
+  "slugs": [
+    {
+      "input": "",
+      "output": "unknown-runtime"
+    },
+    {
+      "input": ".",
+      "output": "unknown-runtime"
+    },
+    {
+      "input": "A B_C.D-E",
+      "output": "a-b_c.d-e"
+    },
+    {
+      "input": "\u65e5\u672c\u8a9e",
+      "output": "unknown-runtime"
+    },
+    {
+      "input": "\u00e9 test \u00df",
+      "output": "test"
+    },
+    {
+      "input": "--..__Foo__..--",
+      "output": "foo"
+    },
+    {
+      "input": "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+      "output": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    },
+    {
+      "input": "a/b:c",
+      "output": "a-b-c"
+    },
+    {
+      "input": "\tABC\n",
+      "output": "abc"
+    }
+  ],
+  "timestamps": [
+    {
+      "input": "2026-01-01T00:00:00.123456Z",
+      "output": "20260101T000000123456Z"
+    },
+    {
+      "input": "2026-01-01T00:00:00+00:00",
+      "output": "20260101T000000+0000"
+    },
+    {
+      "input": "opaque",
+      "output": "opaque"
+    }
+  ]
+}

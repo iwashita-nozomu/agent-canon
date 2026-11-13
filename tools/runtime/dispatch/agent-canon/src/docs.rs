@@ -14,12 +14,14 @@
 // upstream implementation python_cli_integer.rs shares Python Unicode decimal-digit classification
 // upstream implementation python_sequence_matcher.rs provides CPython-compatible similarity scoring
 // downstream implementation ../../../../bin/agent-canon invokes this command through the CLI wrapper
+// downstream implementation template_bundle.rs shares static-seed TOML traversal and prefix policy
 // downstream implementation ../../../../../tests/tools/test_check_bootstrap_docs.py validates bootstrap and static-seed checks
-// downstream implementation ../../../../../tests/agent_tools/test_export_static_seed.py invokes source-free validation on exported seeds
+// downstream implementation ../../../../../tests/agent_tools/test_export_static_seed.py invokes source-free validation on native-exported seeds
 // downstream implementation ../../../../../tests/tools/test_fix_mermaid.py tests native Mermaid syntax validation
 // downstream test ../tests/source_mutation_native.rs validates source mutation capability behavior
 // downstream test ../tests/design_duplicates_native.rs compares duplicate-design CLI behavior with its frozen oracle
 // downstream test ../tests/design_similarity_native.rs compares similarity CLI behavior with frozen Python oracles
+// downstream test ../tests/design_organizer_native.rs compares organizer CLI behavior with its frozen Python oracle
 // @dependency-end
 
 use crate::python_cli_options::{resolve_long_option_prefix, LongOptionError};
@@ -48,6 +50,13 @@ const SIMILAR_DESIGN_PROGRAM: &str = "find_similar_designs.py";
 const SIMILAR_DESIGN_USAGE: &str = "usage: find_similar_designs.py [-h] [--design-root DESIGN_ROOT] [--min MIN]\n                               [--runtime-root RUNTIME_ROOT] [--output OUTPUT]";
 const SIMILAR_DESIGN_TASK_DIRECTORY: &str = "tasks/similar-designs";
 const SIMILAR_DESIGN_REPORT_FILENAME: &str = "similar_designs_report.txt";
+const ORGANIZE_DESIGN_PROGRAM: &str = "organize_designs.py";
+const ORGANIZE_DESIGN_USAGE: &str = "usage: organize_designs.py [-h] [--design-root DESIGN_ROOT] [--apply]\n                           [--mutation-capability-json MUTATION_CAPABILITY_JSON]\n                           [--runtime-root RUNTIME_ROOT] [--output OUTPUT]";
+const ORGANIZE_DESIGN_TASK_DIRECTORY: &str = "tasks/design-organization";
+const ORGANIZE_DESIGN_REPORT_FILENAME: &str = "design_organize_report.txt";
+const EMBEDDED_MARKDOWNLINT_CONFIG: &str = include_str!("../../../../../.markdownlint-cli2.jsonc");
+const EMBEDDED_LYCHEE_CONFIG: &str =
+    include_str!("../../../../../tools/validation/documentation/config/lychee.toml");
 
 const DEFAULT_DOC_TARGETS: &[&str] = &[
     "README.md",
@@ -80,6 +89,11 @@ static MARKDOWN_LINK_PATTERN: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\[([^\]]+)\]\(([^)]+)\)").expect("static Markdown link regex"));
 static CODE_FENCE_PATTERN: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?s)```.*?```").expect("static Markdown code-fence regex"));
+static ORGANIZER_CODE_PATH_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"`([^`/]+/[^`]+(?:/[^`]*)?)`").expect("static organizer code-path regex")
+});
+static ORGANIZER_MODULE_NAME_PATTERN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^[A-Za-z0-9_.-]+$").expect("static organizer module-name regex"));
 static EXTERNAL_LINK_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^[a-zA-Z][a-zA-Z0-9+.-]*://").expect("static external link scheme regex")
 });
@@ -139,12 +153,12 @@ const STATIC_SEED_FORBIDDEN_CONTENT: &[&[u8]] = &[
     b"vendor/agent-canon",
 ];
 
-const STATIC_SEED_FORBIDDEN_PREFIXES: &[&[u8]] = &[
-    b"agents/skills/",
-    b"agents/model_profiles.toml",
-    b"tools/agent_tools/",
-    b"../../agents/",
-    b"../../tools/",
+pub(crate) const STATIC_SEED_FORBIDDEN_PREFIXES: &[&str] = &[
+    "agents/skills/",
+    "agents/model_profiles.toml",
+    "tools/agent_tools/",
+    "../../agents/",
+    "../../tools/",
 ];
 
 const STATIC_SEED_PROVENANCE_PATH: &str = "agent-canon-static-seed.json";
@@ -205,6 +219,12 @@ struct WriteSummary {
 }
 
 pub fn run(args: &[String]) -> i32 {
+    if args
+        .first()
+        .is_some_and(|argument| argument.as_str() == "organize-designs")
+    {
+        return run_organize_designs(&args[1..]);
+    }
     if args
         .first()
         .is_some_and(|argument| argument.as_str() == "find-similar-designs")
@@ -406,6 +426,413 @@ fn run_redundant_designs(raw: &[String]) -> i32 {
     }
     println!("Report written to {}", target.display());
     0
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct OrganizeDesignArgs {
+    design_root: PathBuf,
+    apply: bool,
+    mutation_capability_json: Option<String>,
+    runtime_root: Option<PathBuf>,
+    output: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum OrganizeDesignOption {
+    Help,
+    DesignRoot,
+    Apply,
+    MutationCapabilityJson,
+    RuntimeRoot,
+    Output,
+}
+
+const ORGANIZE_DESIGN_OPTIONS: &[(&str, OrganizeDesignOption)] = &[
+    ("--help", OrganizeDesignOption::Help),
+    ("--design-root", OrganizeDesignOption::DesignRoot),
+    ("--apply", OrganizeDesignOption::Apply),
+    (
+        "--mutation-capability-json",
+        OrganizeDesignOption::MutationCapabilityJson,
+    ),
+    ("--runtime-root", OrganizeDesignOption::RuntimeRoot),
+    ("--output", OrganizeDesignOption::Output),
+];
+
+enum OrganizeDesignParse {
+    Run(OrganizeDesignArgs),
+    Help,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct OrganizeDesignProposal {
+    source: PathBuf,
+    target: PathBuf,
+    module: Option<String>,
+}
+
+fn run_organize_designs(raw: &[String]) -> i32 {
+    let parsed = match parse_organize_design_args(raw) {
+        Ok(OrganizeDesignParse::Run(parsed)) => parsed,
+        Ok(OrganizeDesignParse::Help) => {
+            print_organize_design_help();
+            return 0;
+        }
+        Err(message) => return organize_design_error(&message),
+    };
+
+    let current_dir = match std::env::current_dir() {
+        Ok(path) => path,
+        Err(error) => {
+            return organize_design_runtime_error(format!("cannot resolve source root: {error}"));
+        }
+    };
+    let source_root = match fs::canonicalize(&current_dir) {
+        Ok(path) => path,
+        Err(error) => {
+            return organize_design_runtime_error(format!(
+                "cannot resolve source root {}: {error}",
+                current_dir.display()
+            ));
+        }
+    };
+    let design_dir = match resolve_design_root(&parsed.design_root, &current_dir) {
+        Ok(path) => path,
+        Err(message) => return organize_design_error(&message),
+    };
+    if !design_dir.is_dir() {
+        return organize_design_error(format!(
+            "design root is not a directory: {}",
+            design_dir.display()
+        ));
+    }
+    let proposals = match build_organize_design_proposals(&design_dir) {
+        Ok(proposals) => proposals,
+        Err(error) => return organize_design_runtime_error(error),
+    };
+    let capability = if parsed.apply {
+        match SourceMutationCapability::from_json(
+            &source_root,
+            parsed.mutation_capability_json.as_deref(),
+        ) {
+            Ok(capability) => Some(capability),
+            Err(error) => return organize_design_runtime_error(error.to_string()),
+        }
+    } else {
+        None
+    };
+
+    let requested_runtime_root = parsed.runtime_root.clone().or_else(|| {
+        std::env::var_os(RUNTIME_ROOT_ENV)
+            .filter(|value| !value.is_empty())
+            .and_then(|value| value.into_string().ok())
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty())
+            .map(PathBuf::from)
+    });
+    let runtime_root = match requested_runtime_root
+        .as_deref()
+        .map(expand_cli_path)
+        .transpose()
+    {
+        Ok(path) => path,
+        Err(error) => return organize_design_runtime_error(error),
+    };
+    let boundary =
+        match RuntimeArtifactBoundary::for_source(&source_root, runtime_root.as_deref(), true) {
+            Ok(boundary) => boundary,
+            Err(error) => return organize_design_runtime_error(error),
+        };
+    let output = match parsed.output.as_deref().map(expand_cli_path).transpose() {
+        Ok(path) => path,
+        Err(error) => return organize_design_runtime_error(error),
+    };
+    let report_target = match admit_external_report_target(
+        &boundary,
+        output.as_deref(),
+        Path::new(ORGANIZE_DESIGN_TASK_DIRECTORY),
+        ORGANIZE_DESIGN_REPORT_FILENAME,
+    ) {
+        Ok(target) => target,
+        Err(error) => return organize_design_runtime_error(error),
+    };
+
+    if let Some(capability) = capability.as_ref() {
+        for proposal in proposals
+            .iter()
+            .filter(|proposal| proposal.module.is_some())
+        {
+            if let Err(error) = capability.assert_allowed(&proposal.target) {
+                return organize_design_runtime_error(error);
+            }
+        }
+        for proposal in proposals
+            .iter()
+            .filter(|proposal| proposal.module.is_some())
+        {
+            if let Err(error) =
+                capability.copy_file_with_metadata(&proposal.source, &proposal.target)
+            {
+                return organize_design_runtime_error(error);
+            }
+        }
+    }
+
+    let report = render_organize_design_report(&proposals, parsed.apply);
+    let relative_target = match report_target.strip_prefix(boundary.root()) {
+        Ok(path) => path,
+        Err(_) => {
+            return organize_design_runtime_error(format!(
+                "path escapes runtime root: {}",
+                report_target.display()
+            ));
+        }
+    };
+    if let Err(error) = boundary.atomic_write_text(relative_target, &report, 0o600) {
+        return organize_design_runtime_error(error);
+    }
+    println!("Report written to {}", report_target.display());
+    0
+}
+
+fn parse_organize_design_args(raw: &[String]) -> Result<OrganizeDesignParse, String> {
+    let mut parsed = OrganizeDesignArgs {
+        design_root: PathBuf::from("documents/design"),
+        apply: false,
+        mutation_capability_json: None,
+        runtime_root: None,
+        output: None,
+    };
+    let mut index = 0;
+    let mut unrecognized = Vec::new();
+    while index < raw.len() {
+        let argument = raw[index].as_str();
+        if argument == "-h" {
+            return Ok(OrganizeDesignParse::Help);
+        }
+
+        let (option, inline_value) = argument
+            .split_once('=')
+            .map_or((argument, None), |(option, value)| (option, Some(value)));
+        if !option.starts_with("--") || option == "--" {
+            unrecognized.push(argument.to_string());
+            index += 1;
+            continue;
+        }
+
+        let name = match resolve_long_option_prefix(option, ORGANIZE_DESIGN_OPTIONS) {
+            Ok(name) => name,
+            Err(LongOptionError::Unrecognized) => {
+                unrecognized.push(argument.to_string());
+                index += 1;
+                continue;
+            }
+            Err(LongOptionError::Ambiguous(matches)) => {
+                return Err(format!(
+                    "ambiguous option: {option} could match {}",
+                    matches.join(", ")
+                ));
+            }
+        };
+        match name {
+            OrganizeDesignOption::Help => {
+                return match inline_value {
+                    Some(value) => Err(format!(
+                        "argument -h/--help: ignored explicit argument '{value}'"
+                    )),
+                    None => Ok(OrganizeDesignParse::Help),
+                };
+            }
+            OrganizeDesignOption::Apply => {
+                if let Some(value) = inline_value {
+                    return Err(format!(
+                        "argument --apply: ignored explicit argument '{value}'"
+                    ));
+                }
+                parsed.apply = true;
+            }
+            option_name => {
+                let value = match inline_value {
+                    Some(value) => value.to_string(),
+                    None => {
+                        index += 1;
+                        let Some(value) = raw.get(index) else {
+                            return Err(format!(
+                                "argument {}: expected one argument",
+                                organize_design_option_label(option_name)
+                            ));
+                        };
+                        if value.starts_with("--") {
+                            return Err(format!(
+                                "argument {}: expected one argument",
+                                organize_design_option_label(option_name)
+                            ));
+                        }
+                        value.clone()
+                    }
+                };
+                match option_name {
+                    OrganizeDesignOption::DesignRoot => parsed.design_root = PathBuf::from(value),
+                    OrganizeDesignOption::MutationCapabilityJson => {
+                        parsed.mutation_capability_json = Some(value)
+                    }
+                    OrganizeDesignOption::RuntimeRoot => {
+                        parsed.runtime_root = Some(PathBuf::from(value))
+                    }
+                    OrganizeDesignOption::Output => parsed.output = Some(PathBuf::from(value)),
+                    OrganizeDesignOption::Help | OrganizeDesignOption::Apply => {
+                        unreachable!("flag options are handled before their values")
+                    }
+                }
+            }
+        }
+        index += 1;
+    }
+    if unrecognized.is_empty() {
+        Ok(OrganizeDesignParse::Run(parsed))
+    } else {
+        Err(format!(
+            "unrecognized arguments: {}",
+            unrecognized.join(" ")
+        ))
+    }
+}
+
+fn organize_design_option_label(option: OrganizeDesignOption) -> &'static str {
+    match option {
+        OrganizeDesignOption::DesignRoot => "--design-root",
+        OrganizeDesignOption::MutationCapabilityJson => "--mutation-capability-json",
+        OrganizeDesignOption::RuntimeRoot => "--runtime-root",
+        OrganizeDesignOption::Output => "--output",
+        OrganizeDesignOption::Help | OrganizeDesignOption::Apply => {
+            unreachable!("flag options do not take values")
+        }
+    }
+}
+
+fn print_organize_design_help() {
+    println!("{ORGANIZE_DESIGN_USAGE}\n");
+    println!("Plan design-document organization without implicit source mutation.");
+    println!();
+    println!("The default operation only reads documents/design and writes an external");
+    println!("runtime report. --apply is a distinct source mutation route and requires");
+    println!("an exact typed --mutation-capability-json covering every target.\n");
+    println!("options:");
+    println!("  -h, --help            show this help message and exit");
+    println!("  --design-root DESIGN_ROOT");
+    println!("                        Read-only design root (defaults to documents/design).");
+    println!("  --apply               Copy proposals into source; requires an explicit");
+    println!("                        mutation capability.");
+    println!("  --mutation-capability-json MUTATION_CAPABILITY_JSON");
+    println!("                        Exact typed source mutation capability JSON.");
+    println!("  --runtime-root RUNTIME_ROOT");
+    println!("                        External runtime root (or AGENT_CANON_RUNTIME_ROOT);");
+    println!("                        never source-local.");
+    println!("  --output OUTPUT       External report path; when omitted, a run-scoped file");
+    println!("                        is created under the runtime root.");
+}
+
+fn organize_design_error(message: impl std::fmt::Display) -> i32 {
+    eprintln!("{ORGANIZE_DESIGN_USAGE}");
+    eprintln!("{ORGANIZE_DESIGN_PROGRAM}: error: {message}");
+    2
+}
+
+fn organize_design_runtime_error(message: impl std::fmt::Display) -> i32 {
+    organize_design_error(format!("runtime_or_mutation_error: {message}"))
+}
+
+fn build_organize_design_proposals(
+    design_dir: &Path,
+) -> Result<Vec<OrganizeDesignProposal>, String> {
+    let mut files = collect_organizer_markdown_files(design_dir)?;
+    #[cfg(windows)]
+    let case_mapper = icu_casemap::CaseMapper::new();
+    #[cfg(windows)]
+    let path_order = |left: &Path, right: &Path| similarity_path_order(left, right, &case_mapper);
+    #[cfg(not(windows))]
+    let path_order = |left: &Path, right: &Path| similarity_path_order(left, right);
+    files.sort_by(|left, right| path_order(left, right));
+
+    let mut proposals = Vec::with_capacity(files.len());
+    for source in files {
+        let relative = source
+            .strip_prefix(design_dir)
+            .expect("organizer source is beneath its root");
+        if relative.components().count() >= 2 {
+            continue;
+        }
+        if source
+            .components()
+            .any(|component| component.as_os_str() == std::ffi::OsStr::new("templates"))
+        {
+            continue;
+        }
+        let text = fs::read_to_string(&source).map_err(|error| {
+            format!("cannot read design document {}: {error}", source.display())
+        })?;
+        match detect_organizer_submodule(&text) {
+            Some(module) => proposals.push(OrganizeDesignProposal {
+                target: design_dir
+                    .join(&module)
+                    .join(source.file_name().expect("markdown path has a filename")),
+                source,
+                module: Some(module),
+            }),
+            None => proposals.push(OrganizeDesignProposal {
+                target: source.clone(),
+                source,
+                module: None,
+            }),
+        }
+    }
+    Ok(proposals)
+}
+
+fn detect_organizer_submodule(text: &str) -> Option<String> {
+    let path = ORGANIZER_CODE_PATH_PATTERN.captures(text)?.get(1)?.as_str();
+    let parts = path.split('/').collect::<Vec<_>>();
+    let candidate = if parts.first().copied() == Some("python") {
+        parts.get(1).copied()?
+    } else {
+        parts.first().copied()?
+    };
+    if matches!(candidate, "." | "..") || !ORGANIZER_MODULE_NAME_PATTERN.is_match(candidate) {
+        return None;
+    }
+    Some(candidate.to_string())
+}
+
+fn render_organize_design_report(proposals: &[OrganizeDesignProposal], apply: bool) -> String {
+    let mut lines = Vec::new();
+    let mut submodules = BTreeSet::new();
+    for proposal in proposals {
+        match &proposal.module {
+            None => lines.push(format!(
+                "UNRESOLVED (no explicit code path): {}",
+                proposal.source.display()
+            )),
+            Some(module) => {
+                submodules.insert(module.clone());
+                if apply {
+                    lines.push(format!(
+                        "COPIED {} -> {}",
+                        proposal.source.display(),
+                        proposal.target.display()
+                    ));
+                } else {
+                    lines.push(format!(
+                        "PROPOSE {} -> {}",
+                        proposal.source.display(),
+                        proposal.target.display()
+                    ));
+                }
+            }
+        }
+    }
+    lines.extend([String::new(), "Detected submodules:".to_string()]);
+    lines.extend(submodules.into_iter().map(|name| format!(" - {name}")));
+    format!("{}\n", lines.join("\n"))
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1023,6 +1450,18 @@ fn build_redundant_design_report(
 }
 
 fn collect_redundant_markdown_files(root: &Path, files: &mut Vec<PathBuf>) -> Result<(), String> {
+    let include = |path: &Path| !redundant_markdown_name_is_excluded(path);
+    collect_markdown_tree(root, files, &include)
+}
+
+fn collect_markdown_tree<F>(
+    root: &Path,
+    files: &mut Vec<PathBuf>,
+    include: &F,
+) -> Result<(), String>
+where
+    F: Fn(&Path) -> bool,
+{
     let entries = fs::read_dir(root)
         .map_err(|error| format!("cannot read design root {}: {error}", root.display()))?;
     for entry in entries {
@@ -1033,7 +1472,7 @@ fn collect_redundant_markdown_files(root: &Path, files: &mut Vec<PathBuf>) -> Re
             .file_type()
             .map_err(|error| format!("cannot inspect design path {}: {error}", path.display()))?;
         if file_type.is_dir() {
-            collect_redundant_markdown_files(&path, files)?;
+            collect_markdown_tree(&path, files, include)?;
             continue;
         }
         let is_markdown = path.extension().is_some_and(|extension| {
@@ -1044,15 +1483,34 @@ fn collect_redundant_markdown_files(root: &Path, files: &mut Vec<PathBuf>) -> Re
                 extension == "md"
             }
         });
-        let excluded_name = path.file_name().is_some_and(|name| {
-            let name = name.to_string_lossy();
-            name.to_lowercase().contains("template") || name.ends_with(".bak")
-        });
-        if is_markdown && !excluded_name && path.is_file() {
+        if is_markdown && include(&path) && path.is_file() {
             files.push(path);
         }
     }
     Ok(())
+}
+
+fn redundant_markdown_name_is_excluded(path: &Path) -> bool {
+    path.file_name().is_some_and(|name| {
+        let name = name.to_string_lossy();
+        name.to_lowercase().contains("template") || name.ends_with(".bak")
+    })
+}
+
+fn collect_organizer_markdown_files(root: &Path) -> Result<Vec<PathBuf>, String> {
+    let include_all = |_path: &Path| true;
+    let mut files = Vec::new();
+    collect_markdown_tree(root, &mut files, &include_all)?;
+    files.retain(|path| {
+        let has_templates_component = path
+            .components()
+            .any(|component| component.as_os_str() == std::ffi::OsStr::new("templates"));
+        !has_templates_component
+            && path
+                .strip_prefix(root)
+                .is_ok_and(|relative| relative.components().count() < 2)
+    });
+    Ok(files)
 }
 
 fn normalized_design_sha(text: &str) -> String {
@@ -1519,6 +1977,7 @@ commands:\n\
   format                  format Markdown, then run the adjacent docs check\n\
   find-redundant-designs  report exact duplicate design documents; --delete requires an exact source mutation capability\n\
   find-similar-designs    compare Markdown design documents and write an external runtime report\n\
+  organize-designs        plan design-document placement; --apply requires an exact source mutation capability\n\
   links                   check Markdown links; --apply requires an exact source mutation capability\n\
   check-entrypoints       check the finite root entrypoint owner-map contract\n\
   check-bootstrap         check bootstrap docs or a source-free static-seed consumer\n\
@@ -1837,53 +2296,37 @@ fn canonical_role_path(role: &str, raw_path: &str) -> Option<String> {
     (resolved == expected).then_some(resolved)
 }
 
+/// Visit semantic keys and strings using toml_edit's traversal of every TOML form.
+pub(crate) fn visit_toml_strings<'doc>(
+    table: &'doc dyn TableLike,
+    callback: impl FnMut(&'doc str, Option<&'doc str>),
+) {
+    use toml_edit::visit::Visit;
+    struct Strings<F>(F);
+    impl<'doc, F: FnMut(&'doc str, Option<&'doc str>)> Visit<'doc> for Strings<F> {
+        fn visit_table_like_kv(&mut self, key: &'doc str, node: &'doc Item) {
+            (self.0)(key, Some(key));
+            toml_edit::visit::visit_table_like_kv(self, key, node);
+        }
+        fn visit_string(&mut self, node: &'doc toml_edit::Formatted<String>) {
+            (self.0)(node.value(), None);
+        }
+    }
+    Strings(callback).visit_table_like(table);
+}
+
 fn scan_toml_table(table: &dyn TableLike, found: &mut BTreeSet<Vec<u8>>) {
-    for (key, item) in table.iter() {
-        scan_toml_string(key, found);
-        scan_toml_item(item, found);
-    }
+    visit_toml_strings(table, |value, _| {
+        let lowered = value.to_lowercase();
+        for marker in STATIC_SEED_FORBIDDEN_PREFIXES {
+            if contains_bytes(lowered.as_bytes(), marker.as_bytes()) {
+                found.insert(marker.as_bytes().to_vec());
+            }
+        }
+    });
 }
 
-fn scan_toml_item(item: &Item, found: &mut BTreeSet<Vec<u8>>) {
-    if let Some(value) = item.as_str() {
-        scan_toml_string(value, found);
-    } else if let Some(table) = item.as_table() {
-        scan_toml_table(table, found);
-    } else if let Some(tables) = item.as_array_of_tables() {
-        for table in tables.iter() {
-            scan_toml_table(table, found);
-        }
-    } else if let Some(values) = item.as_array() {
-        for value in values.iter() {
-            scan_toml_value(value, found);
-        }
-    } else if let Some(table) = item.as_inline_table() {
-        scan_toml_table(table, found);
-    }
-}
-
-fn scan_toml_value(value: &toml_edit::Value, found: &mut BTreeSet<Vec<u8>>) {
-    if let Some(value) = value.as_str() {
-        scan_toml_string(value, found);
-    } else if let Some(values) = value.as_array() {
-        for value in values.iter() {
-            scan_toml_value(value, found);
-        }
-    } else if let Some(table) = value.as_inline_table() {
-        scan_toml_table(table, found);
-    }
-}
-
-fn scan_toml_string(value: &str, found: &mut BTreeSet<Vec<u8>>) {
-    let lowered = value.to_lowercase().into_bytes();
-    for marker in STATIC_SEED_FORBIDDEN_PREFIXES {
-        if contains_bytes(&lowered, marker) {
-            found.insert(marker.to_vec());
-        }
-    }
-}
-
-fn contains_bytes(source: &[u8], needle: &[u8]) -> bool {
+pub(crate) fn contains_bytes(source: &[u8], needle: &[u8]) -> bool {
     !needle.is_empty() && source.windows(needle.len()).any(|window| window == needle)
 }
 
@@ -2307,15 +2750,72 @@ fn render_findings(findings: &[Finding], root: &Path) -> bool {
     findings.is_empty()
 }
 
+enum DocsProviderConfig {
+    Project(PathBuf),
+    Embedded(tempfile::NamedTempFile),
+}
+
+impl DocsProviderConfig {
+    fn path(&self) -> &Path {
+        match self {
+            Self::Project(path) => path,
+            Self::Embedded(file) => file.path(),
+        }
+    }
+}
+
+fn docs_provider_config(
+    root: &Path,
+    relative_path: &Path,
+    suffix: &str,
+    embedded_config: &str,
+    provider: &str,
+) -> Result<DocsProviderConfig, String> {
+    let project_path = root.join(relative_path);
+    match fs::symlink_metadata(&project_path) {
+        Ok(_) => Ok(DocsProviderConfig::Project(project_path)),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {
+            let mut temporary = tempfile::Builder::new()
+                .suffix(suffix)
+                .tempfile()
+                .map_err(|error| format!("cannot stage embedded {provider} config: {error}"))?;
+            temporary
+                .write_all(embedded_config.as_bytes())
+                .map_err(|error| format!("cannot write embedded {provider} config: {error}"))?;
+            temporary
+                .flush()
+                .map_err(|error| format!("cannot flush embedded {provider} config: {error}"))?;
+            Ok(DocsProviderConfig::Embedded(temporary))
+        }
+        Err(error) => Err(format!(
+            "cannot inspect {provider} config {}: {error}",
+            project_path.display()
+        )),
+    }
+}
+
 fn run_markdownlint_cli(root: &Path, files: &[PathBuf]) -> bool {
     if files.is_empty() {
         return true;
     }
+    let config = match docs_provider_config(
+        root,
+        Path::new(".markdownlint-cli2.jsonc"),
+        ".markdownlint-cli2.jsonc",
+        EMBEDDED_MARKDOWNLINT_CONFIG,
+        "markdownlint-cli2",
+    ) {
+        Ok(config) => config,
+        Err(error) => {
+            eprintln!("markdownlint-cli2: {error}");
+            return false;
+        }
+    };
     let mut command = Command::new("markdownlint-cli2");
     command
         .current_dir(root)
         .arg("--config")
-        .arg(root.join(".markdownlint-cli2.jsonc"))
+        .arg(config.path())
         .arg("--no-globs");
     for path in files {
         command.arg(format!(":{}", path.display()));
@@ -2327,6 +2827,52 @@ fn run_lychee(root: &Path, files: &[PathBuf]) -> bool {
     if files.is_empty() {
         return true;
     }
+
+    let python_template_root = root.join("templates/experiments/_template");
+    let cpp_template_root = root.join("templates/experiments/_cpp_template");
+    let mut ordinary_files = Vec::new();
+    let mut python_template_files = Vec::new();
+    let mut cpp_template_files = Vec::new();
+    for path in files {
+        if path.starts_with(&python_template_root) {
+            python_template_files.push(path.clone());
+        } else if path.starts_with(&cpp_template_root) {
+            cpp_template_files.push(path.clone());
+        } else {
+            ordinary_files.push(path.clone());
+        }
+    }
+
+    let mut succeeded = true;
+    if !ordinary_files.is_empty() {
+        succeeded &= run_lychee_group(root, &ordinary_files, None);
+    }
+    if !python_template_files.is_empty() {
+        succeeded &= run_lychee_group(root, &python_template_files, Some("_template"));
+    }
+    if !cpp_template_files.is_empty() {
+        succeeded &= run_lychee_group(root, &cpp_template_files, Some("_cpp_template"));
+    }
+    succeeded
+}
+
+fn run_lychee_group(root: &Path, files: &[PathBuf], template_profile: Option<&str>) -> bool {
+    if files.is_empty() {
+        return true;
+    }
+    let config = match docs_provider_config(
+        root,
+        Path::new("tools/validation/documentation/config/lychee.toml"),
+        ".toml",
+        EMBEDDED_LYCHEE_CONFIG,
+        "lychee",
+    ) {
+        Ok(config) => config,
+        Err(error) => {
+            eprintln!("lychee: {error}");
+            return false;
+        }
+    };
     let mut inputs = Vec::with_capacity(files.len());
     for path in files {
         let Some(relative) = pathdiff::diff_paths(path, root) else {
@@ -2340,11 +2886,23 @@ fn run_lychee(root: &Path, files: &[PathBuf]) -> bool {
     }
 
     let mut command = Command::new("lychee");
-    command
-        .current_dir(root)
-        .arg("--config")
-        .arg(root.join("tools/validation/documentation/config/lychee.toml"))
-        .args(inputs);
+    command.current_dir(root).arg("--config").arg(config.path());
+    if let Some(template_profile) = template_profile {
+        let base_path = root.join("experiments").join(template_profile);
+        let mut base_url = base_path.into_os_string();
+        let separator = std::path::MAIN_SEPARATOR.to_string();
+        base_url.push(separator.as_str());
+        let remap = format!(
+            "^(file:.*)/experiments/{template_profile}(/.*)$ $1/templates/experiments/{template_profile}$2"
+        );
+        command
+            .arg("--no-progress")
+            .arg("--base-url")
+            .arg(base_url)
+            .arg("--remap")
+            .arg(remap);
+    }
+    command.args(inputs);
     run_native_command("lychee", &mut command)
 }
 
@@ -2369,8 +2927,11 @@ struct DocumentAst {
 }
 
 fn read_document_ast(root: &Path, path: &Path) -> Result<DocumentAst, String> {
+    let cache = DocsTemporaryDirectory::create("pandoc-cache")
+        .map_err(|error| format!("quarto pandoc: cannot create temporary cache: {error}"))?;
     let output = Command::new("quarto")
         .current_dir(root)
+        .env("XDG_CACHE_HOME", &cache.0)
         .arg("pandoc")
         .arg(path)
         .arg("--to=json")

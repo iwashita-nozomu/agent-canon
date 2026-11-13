@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests the standalone AgentCanon GitHub workflow convention checker.
-# upstream implementation ../../tools/validation/ci/checks/check_github_workflows.py convention checker
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs native checker
 # upstream implementation ../../.github/workflows/agent-runtime-dashboard.yml dashboard event contract
 # upstream implementation ../../.github/workflows/agent-canon-native-release.yml native publication planning
 # downstream implementation ../../.github/workflows/agent-canon-static-gates.yml standalone gate workflow
@@ -13,16 +13,14 @@ from __future__ import annotations
 
 import os
 import subprocess
-import sys
 import tempfile
+import tomllib
 from pathlib import Path
 
 import yaml
 
-from tools.validation.ci.checks.check_github_workflows import check_root_copy_headers
 
 ROOT = Path(__file__).resolve().parents[2]
-CHECKER = ROOT / "tools" / "validation" / "ci" / "checks" / "check_github_workflows.py"
 AGENT_CANON_CLI = os.environ.get("AGENT_CANON_CLI")
 RUNTIME_DASHBOARD_WORKFLOW = (
     ROOT / ".github" / "workflows" / "agent-runtime-dashboard.yml"
@@ -40,6 +38,27 @@ def _native_cli() -> str:
     ):
         raise RuntimeError("AGENT_CANON_CLI must select an absolute executable file")
     return str(executable)
+
+
+def test_native_build_toolchain_matches_canonical_image_pin() -> None:
+    workflow = yaml.safe_load(
+        (ROOT / ".github/workflows/agent-canon-native-release.yml").read_text()
+    )
+    manifest = tomllib.loads(
+        (ROOT / "bootstrap/container/image/dependencies.toml").read_text(
+            encoding="utf-8"
+        )
+    )
+    rust_toolchain = next(
+        record["version"]
+        for record in manifest["records"]
+        if record.get("id") == "rust-toolchain"
+    )
+    compiling_jobs = {"prepare", "build", "publish-release"}
+
+    assert {
+        workflow["jobs"][job]["env"]["RUSTUP_TOOLCHAIN"] for job in compiling_jobs
+    } == {rust_toolchain}
 
 
 def test_native_publication_plan_honors_the_event_and_manual_choice() -> None:
@@ -235,11 +254,37 @@ def test_windows_rebuild_comparison_rejects_changed_or_missing_output() -> None:
 
 def run_checker(root: Path) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        [sys.executable, str(CHECKER), "--root", str(root)],
+        [_native_cli(), "check-github-workflows", "--root", str(root)],
         check=False,
         capture_output=True,
         text=True,
     )
+
+
+def test_native_checker_cli_help_and_argparse_root_spellings() -> None:
+    for option in ("-h", "--help"):
+        help_result = subprocess.run(
+            [_native_cli(), "check-github-workflows", option],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        assert help_result.returncode == 0, help_result.stderr
+        assert "usage:" in help_result.stdout
+        assert "--root ROOT" in help_result.stdout
+
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        copy_required_surfaces(root)
+        for root_args in ((f"--root={root}",), ("--r", str(root))):
+            result = subprocess.run(
+                [_native_cli(), "check-github-workflows", *root_args],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            assert result.returncode == 0, result.stdout + result.stderr
+            assert "GITHUB_WORKFLOWS_CHECKED=0" in result.stdout
 
 
 def copy_required_surfaces(root: Path) -> None:
@@ -369,7 +414,8 @@ def test_no_submodule_checkout_helper_remains() -> None:
         ROOT / "tools" / "ci" / "checkout_agent_canon_submodule.sh",
     )
     assert all(not path.exists() for path in forbidden)
-    assert "checkout_agent_canon_submodule" not in CHECKER.read_text(encoding="utf-8")
+    checker = ROOT / "tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs"
+    assert "checkout_agent_canon_submodule" not in checker.read_text(encoding="utf-8")
 
 
 def test_workflows_do_not_restore_workspace_runtime_defaults() -> None:
@@ -398,8 +444,10 @@ def test_dashboard_header_checker_rejects_missing_pr_trigger_or_job_guard() -> N
     source = RUNTIME_DASHBOARD_WORKFLOW.read_text(encoding="utf-8")
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
+        copy_required_surfaces(root)
+        write_workflow(root, VALID_WORKFLOW)
         write_dashboard_workflow(root, source)
-        assert check_root_copy_headers(root) == []
+        assert run_checker(root).returncode == 0
 
         ordered_job = (
             "  dashboard:\n"
@@ -414,7 +462,7 @@ def test_dashboard_header_checker_rejects_missing_pr_trigger_or_job_guard() -> N
         reordered = source.replace(ordered_job, reordered_job, 1)
         assert reordered != source
         write_dashboard_workflow(root, reordered)
-        assert check_root_copy_headers(root) == []
+        assert run_checker(root).returncode == 0
 
         mutations = (
             (
@@ -432,5 +480,5 @@ def test_dashboard_header_checker_rejects_missing_pr_trigger_or_job_guard() -> N
             mutated = source.replace(removed_text, replacement, 1)
             assert mutated != source
             write_dashboard_workflow(root, mutated)
-            findings = check_root_copy_headers(root)
-            assert any(finding.message == expected_message for finding in findings)
+            result = run_checker(root)
+            assert expected_message in result.stdout + result.stderr

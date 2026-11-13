@@ -51,26 +51,12 @@ a parent environment, product runtime, numerical stack, test, permission,
 mount, GPU, dependency, or CI semantics refactor merely because those surfaces
 refer to AgentCanon.
 
-Before any parent edit, add this bounded readback to the existing task scope
-update. It is not a new schema or durable packet:
+Before editing, identify the authorized paths, exact AgentCanon management
+edges, and mixed-file spans in the current conversation. Edit only those known
+surfaces; unresolved ownership is investigated before the affected edit. No
+write-set table, migration-status record, or per-path ledger is required.
 
-```text
-source_free_parent_issue=<repository-qualified Issue>
-management_write_set=<exact path + operation + AgentCanon edge + owner evidence, one row per path>
-immutable_parent_surfaces=<matched parent-owned paths or semantics>
-mixed_file_limit=<exact AgentCanon dispatch/reference span only>
-migration_status=unresolved|ready|parent_owner_handoff_required
-```
-
-Every write-set row names one existing exact path and, for a mixed file, the
-exact dispatch/reference span. Placeholders, directory-wide globs, and
-unresolved paths are not write authority. Keep `migration_status=unresolved`
-and perform no parent mutation until every proposed row is exact.
-Do not place an unresolved candidate in `management_write_set` even with a
-"no authority" annotation; report it only as an unresolved item in the task
-update.
-
-The management write set may contain only evidenced operations from this list:
+The authorized changes are limited to these evidenced operations:
 
 - remove an AgentCanon gitlink/submodule and its matching `.gitmodules` entry;
 - remove AgentCanon-owned root projections, source symlinks, or updater state;
@@ -89,11 +75,10 @@ surface.
 
 If the migration cannot complete without another change, stop before that edit
 and hand the exact path, required operation, owner, and validation route to the
-parent owner under a separate Issue/approval. Do not widen
-`management_write_set` to absorb the blocker.
+parent owner under a separate Issue/approval. Keep the original migration scope while that separate change is resolved.
 
 Report two separate validation results: `source_free_boundary` proves every
-changed path/hunk belongs to the management write set and immutable surfaces
+changed path/hunk belongs to the authorized migration and immutable surfaces
 are unchanged; `parent_product_validation` is selected and interpreted only by
 the parent owner. A parent product test result cannot authorize an out-of-scope
 migration edit, and a source-free boundary pass cannot claim product behavior.
@@ -101,13 +86,14 @@ migration edit, and a source-free boundary pass cannot claim product behavior.
 ## Runtime bootstrap
 
 The only lifecycle entrypoint is top-level `bootstrap.sh`. It requires an
-authorized parent control root; the default runtime is the ignored,
-reconstructible `<install-root>/.runtime/`:
+authorized parent control root; the runtime is the ignored,
+reconstructible `<control-parent-root>/.runtime/`:
 
 ```bash
+INSTALL_ROOT=<absolute-installed-agent-canon-root>
+BOOTSTRAP="$INSTALL_ROOT/bootstrap.sh"
 ROOT=<authorized-parent-root>
-BOOTSTRAP=./bootstrap.sh
-COMMON=(--control-parent-root "$ROOT")
+COMMON=(--repository-root "$INSTALL_ROOT" --control-parent-root "$ROOT")
 
 "$BOOTSTRAP" "${COMMON[@]}" install
 "$BOOTSTRAP" "${COMMON[@]}" start
@@ -117,8 +103,8 @@ COMMON=(--control-parent-root "$ROOT")
 
 There is no implicit `$HOME`, `$HOME/.cache`, `$HOME/.local`, global
 `CODEX_HOME`, source-tree general artifact directory, or project-local fallback.
-Only bootstrap-owned `.runtime/` is permitted under the install source; other
-runtime roots must not escape through a symlink. One control root uses one
+Runtime state belongs to the explicit control root; runtime roots must not
+escape through a symlink. One control root uses one
 shared image and at most one resident tool container; task directories and
 exact target mounts provide isolation. Never create a project/task-specific
 AgentCanon image, container, virtualenv, Cargo toolchain, or volume.
@@ -225,12 +211,11 @@ Start at the requested target and governing contract. Follow the
 [ROOT_AGENTS target-first boundary](../../ROOT_AGENTS.md#always-on-boundary);
 inspect callers only when the selected mechanism or an explicit cross-surface
 change depends on them. Do not make a broad use-site survey a prerequisite. For
-a source-free parent migration, freeze the exact management write set and
-immutable parent surfaces before any parent edit. The design record follows the
-open decision: when a cross-surface contract such as command shape, state roots,
-resource cap, rollback, archive route, cleanup, or validation remains
-unresolved, settle it in the existing design trace; for a bounded change with
-settled ownership, carry the decision in the existing task record.
+a source-free parent migration, identify the exact AgentCanon changes and
+immutable parent surfaces before editing. Resolve open cross-surface questions
+such as command shape, state roots, resource cap, rollback, archive route,
+cleanup, or validation before implementation. Keep settled decisions and necessary source context in
+the conversation, without a design-status or task ledger.
 
 Implement in the owning AgentCanon clone, keeping affected docs, manifests,
 code, tests, and dependency headers aligned. Runtime, cache, eval, and test

@@ -1,0 +1,84 @@
+{
+  "source_commit": "edd5cdce7e6f7511c80fb5d6fc67125f0f4eb1fe",
+  "script_sha256": "e0c4dff61b3363910f8a3b474eee8b154e4e1c334fec9ca7274adba57f129ffb",
+  "cases": [
+    {
+      "name": "comparison-pass",
+      "args": [
+        "--baseline-session",
+        "{case}/baseline.jsonl",
+        "--candidate-session",
+        "{case}/candidate.jsonl",
+        "--report-out",
+        "{case}/report.md",
+        "--report-dir",
+        "{case}/reports/agents/run-1"
+      ],
+      "exit": 0,
+      "stdout": "TOKEN_FOOTPRINT_COMPARISON=pass\nTOKEN_FOOTPRINT_BASELINE_TOTAL=200\nTOKEN_FOOTPRINT_CANDIDATE_TOTAL=80\nTOKEN_FOOTPRINT_RATIO=0.400\nTOKEN_FOOTPRINT_TARGET=0.500\nTOKEN_FOOTPRINT_BELOW_TARGET=yes\nNEXT_ACTION=record_token_efficiency_evidence\n",
+      "stderr": "",
+      "sessions": {
+        "candidate.jsonl": "{\"type\":\"event_msg\",\"payload\":{\"type\":\"token_count\",\"info\":{\"total_token_usage\":{\"input_tokens\":10,\"cached_input_tokens\":2,\"output_tokens\":3,\"reasoning_output_tokens\":1,\"total_tokens\":80}}}}\n",
+        "baseline.jsonl": "{\"type\":\"event_msg\",\"payload\":{\"type\":\"token_count\",\"info\":{\"total_token_usage\":{\"input_tokens\":10,\"cached_input_tokens\":2,\"output_tokens\":3,\"reasoning_output_tokens\":1,\"total_tokens\":200}}}}\n"
+      },
+      "report": "# Codex Token Footprint Comparison\n<!--\n@dependency-start\nresponsibility Records Codex token footprint comparison evidence.\nupstream implementation ../../eval/checkers/compare_codex_token_footprints.py generates this report\n@dependency-end\n-->\n\n## Summary\n\n- comparison_status: pass\n- baseline_total_tokens: 200\n- candidate_total_tokens: 80\n- token_ratio: 0.400\n- target_ratio: 0.500\n\n## Sessions\n\n| Label | Session File | input | cached input | output | reasoning output | total |\n| ----- | ------------ | ----- | ------------ | ------ | ---------------- | ----- |\n| baseline | {case}/baseline.jsonl | 10 | 2 | 3 | 1 | 200 |\n| candidate | {case}/candidate.jsonl | 10 | 2 | 3 | 1 | 80 |\n\n## Machine Status\n\n- TOKEN_FOOTPRINT_COMPARISON=pass\n- TOKEN_FOOTPRINT_RATIO=0.400\n- TOKEN_FOOTPRINT_TARGET=0.500\n",
+      "monitor_raw": "# Workflow Monitoring\n<!--\n@dependency-start\nresponsibility Records workflow monitoring for this run bundle.\nupstream design ../../../templates/agents/workflow_monitoring.md template\n@dependency-end\n-->\n\n- Run ID: run-1\n\n## Signals\n\n## Behavior Events\n\n- `2026-11-01 18:32 JST` token_efficiency_protocol=active token_footprint_comparison=pass baseline_total=200 candidate_total=80 token_ratio=0.400 target_ratio=0.500\n## Tool Warnings\n\n- tool_warnings_status: pending\n\n## Interventions\n\n- `2026-11-01 18:32 JST` token footprint measured from Codex session logs baseline=baseline.jsonl candidate=candidate.jsonl\n## Improvement Decisions\n\n- skill_improvement_decision: pending\n- config_improvement_decision: pending\n- workflow_improvement_decision: pending\n- knowledge_learning_decision: pending\n",
+      "monitor_normalized": "# Workflow Monitoring\n<!--\n@dependency-start\nresponsibility Records workflow monitoring for this run bundle.\nupstream design ../../../templates/agents/workflow_monitoring.md template\n@dependency-end\n-->\n\n- Run ID: run-1\n\n## Signals\n\n## Behavior Events\n\n- `2026-11-01 18:32 JST` token_efficiency_protocol=active token_footprint_comparison=pass baseline_total=200 candidate_total=80 token_ratio=0.400 target_ratio=0.500\n## Tool Warnings\n\n- tool_warnings_status: pending\n\n## Interventions\n\n- `2026-11-01 18:32 JST` token footprint measured from Codex session logs baseline=baseline.jsonl candidate=candidate.jsonl\n## Improvement Decisions\n\n- skill_improvement_decision: pending\n- config_improvement_decision: pending\n- workflow_improvement_decision: pending\n- knowledge_learning_decision: pending\n"
+    },
+    {
+      "name": "comparison-fail",
+      "args": [
+        "--baseline-session",
+        "{case}/baseline.jsonl",
+        "--candidate-session",
+        "{case}/candidate.jsonl"
+      ],
+      "exit": 1,
+      "stdout": "TOKEN_FOOTPRINT_COMPARISON=fail\nTOKEN_FOOTPRINT_BASELINE_TOTAL=200\nTOKEN_FOOTPRINT_CANDIDATE_TOTAL=120\nTOKEN_FOOTPRINT_RATIO=0.600\nTOKEN_FOOTPRINT_TARGET=0.500\nTOKEN_FOOTPRINT_BELOW_TARGET=no\nNEXT_ACTION=reduce_token_footprint\n",
+      "stderr": "",
+      "sessions": {
+        "candidate.jsonl": "{\"type\":\"event_msg\",\"payload\":{\"type\":\"token_count\",\"info\":{\"total_token_usage\":{\"input_tokens\":10,\"cached_input_tokens\":2,\"output_tokens\":3,\"reasoning_output_tokens\":1,\"total_tokens\":120}}}}\n",
+        "baseline.jsonl": "{\"type\":\"event_msg\",\"payload\":{\"type\":\"token_count\",\"info\":{\"total_token_usage\":{\"input_tokens\":10,\"cached_input_tokens\":2,\"output_tokens\":3,\"reasoning_output_tokens\":1,\"total_tokens\":200}}}}\n"
+      }
+    },
+    {
+      "name": "summary",
+      "args": [
+        "--session-glob",
+        "{case}/sessions/*.jsonl",
+        "--moving-average-window",
+        "2",
+        "--report-out",
+        "{case}/report.md",
+        "--report-dir",
+        "{case}/reports/agents/run-1"
+      ],
+      "exit": 0,
+      "stdout": "TOKEN_USAGE_SUMMARY=pass\nTOKEN_USAGE_SESSION_COUNT=2\nTOKEN_USAGE_TOKEN_EVENT_COUNT=3\nTOKEN_USAGE_TOTAL_TOKENS=300\nTOKEN_USAGE_RECENT_DAYS=all\nTOKEN_USAGE_AVERAGE_TOKENS_PER_EVENT=100.000\nTOKEN_USAGE_MOVING_AVERAGE_WINDOW=2\nTOKEN_USAGE_LATEST_MOVING_AVERAGE_TOTAL=150.000\nNEXT_ACTION=record_token_usage_summary\n",
+      "stderr": "",
+      "sessions": {
+        "sessions/a.jsonl": "{\"type\":\"event_msg\",\"payload\":{\"type\":\"token_count\",\"info\":{\"total_token_usage\":{\"input_tokens\":10,\"cached_input_tokens\":2,\"output_tokens\":3,\"reasoning_output_tokens\":1,\"total_tokens\":50}}}}\n{\"type\":\"event_msg\",\"payload\":{\"type\":\"token_count\",\"info\":{\"total_token_usage\":{\"input_tokens\":10,\"cached_input_tokens\":2,\"output_tokens\":3,\"reasoning_output_tokens\":1,\"total_tokens\":100}}}}\n",
+        "sessions/b.jsonl": "{\"type\":\"event_msg\",\"payload\":{\"type\":\"token_count\",\"info\":{\"total_token_usage\":{\"input_tokens\":10,\"cached_input_tokens\":2,\"output_tokens\":3,\"reasoning_output_tokens\":1,\"total_tokens\":200}}}}\n"
+      },
+      "report": "# Codex Token Usage Summary\n<!--\n@dependency-start\nresponsibility Records Codex token usage moving-average evidence.\nupstream implementation ../../eval/checkers/compare_codex_token_footprints.py generates this report\n@dependency-end\n-->\n\n## Summary\n\n- token_usage_summary_status: present\n- token_session_count: 2\n- token_event_count: 3\n- total_tokens: 300\n- recent_days: all\n- average_tokens_per_event: 100.000\n- moving_average_window: 2\n- latest_moving_average_total_tokens: 150.000\n\n## Sessions\n\n| Session File | token events | input | cached input | output | reasoning output | total | moving average total |\n| ------------ | ------------ | ----- | ------------ | ------ | ---------------- | ----- | -------------------- |\n| {case}/sessions/a.jsonl | 2 | 10 | 2 | 3 | 1 | 100 | 100.000 |\n| {case}/sessions/b.jsonl | 1 | 10 | 2 | 3 | 1 | 200 | 150.000 |\n\n## Machine Status\n\n- TOKEN_USAGE_SUMMARY=pass\n- TOKEN_USAGE_SESSION_COUNT=2\n- TOKEN_USAGE_TOKEN_EVENT_COUNT=3\n- TOKEN_USAGE_TOTAL_TOKENS=300\n- TOKEN_USAGE_RECENT_DAYS=all\n- TOKEN_USAGE_AVERAGE_TOKENS_PER_EVENT=100.000\n- TOKEN_USAGE_MOVING_AVERAGE_WINDOW=2\n- TOKEN_USAGE_LATEST_MOVING_AVERAGE_TOTAL=150.000\n",
+      "monitor_raw": "# Workflow Monitoring\n<!--\n@dependency-start\nresponsibility Records workflow monitoring for this run bundle.\nupstream design ../../../templates/agents/workflow_monitoring.md template\n@dependency-end\n-->\n\n- Run ID: run-1\n\n## Signals\n\n## Behavior Events\n\n- `2026-11-01 18:32 JST` token_usage_summary=present session_count=2 token_event_count=3 total_tokens=300 recent_days=all moving_average_window=2 latest_moving_average_total=150.000 average_tokens_per_event=100.000\n## Tool Warnings\n\n- tool_warnings_status: pending\n\n## Interventions\n\n- `2026-11-01 18:32 JST` token usage moving average measured from Codex session logs\n## Improvement Decisions\n\n- skill_improvement_decision: pending\n- config_improvement_decision: pending\n- workflow_improvement_decision: pending\n- knowledge_learning_decision: pending\n",
+      "monitor_normalized": "# Workflow Monitoring\n<!--\n@dependency-start\nresponsibility Records workflow monitoring for this run bundle.\nupstream design ../../../templates/agents/workflow_monitoring.md template\n@dependency-end\n-->\n\n- Run ID: run-1\n\n## Signals\n\n## Behavior Events\n\n- `2026-11-01 18:32 JST` token_usage_summary=present session_count=2 token_event_count=3 total_tokens=300 recent_days=all moving_average_window=2 latest_moving_average_total=150.000 average_tokens_per_event=100.000\n## Tool Warnings\n\n- tool_warnings_status: pending\n\n## Interventions\n\n- `2026-11-01 18:32 JST` token usage moving average measured from Codex session logs\n## Improvement Decisions\n\n- skill_improvement_decision: pending\n- config_improvement_decision: pending\n- workflow_improvement_decision: pending\n- knowledge_learning_decision: pending\n"
+    },
+    {
+      "name": "recent",
+      "args": [
+        "--session-glob",
+        "{case}/sessions/*.jsonl",
+        "--recent-days",
+        "5"
+      ],
+      "exit": 0,
+      "stdout": "TOKEN_USAGE_SUMMARY=pass\nTOKEN_USAGE_SESSION_COUNT=1\nTOKEN_USAGE_TOKEN_EVENT_COUNT=1\nTOKEN_USAGE_TOTAL_TOKENS=300\nTOKEN_USAGE_RECENT_DAYS=5\nTOKEN_USAGE_AVERAGE_TOKENS_PER_EVENT=300.000\nTOKEN_USAGE_MOVING_AVERAGE_WINDOW=5\nTOKEN_USAGE_LATEST_MOVING_AVERAGE_TOTAL=300.000\nNEXT_ACTION=record_token_usage_summary\n",
+      "stderr": "",
+      "sessions": {
+        "sessions/a.jsonl": "{\"type\":\"event_msg\",\"payload\":{\"type\":\"token_count\",\"info\":{\"total_token_usage\":{\"input_tokens\":10,\"cached_input_tokens\":2,\"output_tokens\":3,\"reasoning_output_tokens\":1,\"total_tokens\":100}}}}\n",
+        "sessions/b.jsonl": "{\"type\":\"event_msg\",\"payload\":{\"type\":\"token_count\",\"info\":{\"total_token_usage\":{\"input_tokens\":10,\"cached_input_tokens\":2,\"output_tokens\":3,\"reasoning_output_tokens\":1,\"total_tokens\":300}}}}\n"
+      }
+    }
+  ]
+}

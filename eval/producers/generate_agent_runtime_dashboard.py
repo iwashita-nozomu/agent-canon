@@ -1451,7 +1451,6 @@ class RuntimeDashboardVisuals:
 
     def markdown_docs_row(self) -> str:
         """Return the Markdown/docs signal action-map row."""
-        breakdown = self.summary.markdown_docs_breakdown
         evidence_count = markdown_hook_signal_count(self.summary)
         return action_map_row(
             "Markdown/docs hook signals",
@@ -3282,7 +3281,7 @@ def hook_failure_next_action(
             reason=f"{failed} hook entries report status=fail",
             evidence=evidence,
             owner_surface=".codex/hooks/ and hook accumulation tooling",
-            command="python3 eval/checkers/eval_accumulation_check.py",
+            command="tools/bin/agent-canon eval-accumulation-check",
             done_condition="hook status fail count is 0",
             issue=issue_label_by_slug(summary, "eval-accumulation-gaps"),
             automation="agent-fix",
@@ -3320,7 +3319,7 @@ def reference_capture_next_action(
                 action="confirm reference capture hook is producing evidence",
                 reason="no reference_capture_guard entries are present",
                 evidence=REFERENCE_CAPTURE_EVIDENCE_TARGET,
-                owner_surface="tools/analysis/documents/reference_materializer.py",
+                owner_surface="tools/runtime/dispatch/agent-canon/src/reference_materializer.rs",
                 command=DASHBOARD_TOOL_ROUTE,
                 done_condition="AGENT_RUNTIME_DASHBOARD_REFERENCE_CAPTURE_ENTRIES>0",
                 issue=issue_label_by_slug(summary, "eval-accumulation-gaps"),
@@ -3335,8 +3334,8 @@ def reference_capture_next_action(
             action="materialize missing consulted source URLs",
             reason=f"{breakdown.missing_url_observations} observed URLs are not registered",
             evidence=REFERENCE_CAPTURE_EVIDENCE_TARGET,
-            owner_surface="references/external/ and tools/analysis/documents/reference_materializer.py",
-            command="python3 tools/analysis/documents/reference_materializer.py --url <url> --input <pdf-or-html>",
+            owner_surface="references/external/ and tools/runtime/dispatch/agent-canon/src/reference_materializer.rs",
+            command="tools/bin/agent-canon reference-materializer --url <url> --input <pdf-or-html>",
             done_condition="AGENT_RUNTIME_DASHBOARD_REFERENCE_MISSING_URLS=0",
             issue=issue_label_by_slug(summary, "eval-accumulation-gaps"),
             automation="agent-fix-with-source-file",
@@ -3357,7 +3356,7 @@ def workflow_attribution_next_action(
             action="repair workflow attribution logging",
             reason=f"{breakdown.entries_without_workflow} hook entries lack workflow attribution",
             evidence=WORKFLOW_ATTRIBUTION_EVIDENCE_TARGET,
-            owner_surface="tools/runtime/archive/behavior_event_assembly.py and workflow_monitoring.md",
+            owner_surface="tools/runtime/dispatch/agent-canon/src/behavior_event_assembly.rs and workflow_monitoring.md",
             command=DASHBOARD_TOOL_ROUTE,
             done_condition="AGENT_RUNTIME_DASHBOARD_HOOK_WORKFLOW_MISSING=0 or entries are explicitly exempt",
             issue=issue_label_by_slug(summary, "eval-accumulation-gaps"),
@@ -3395,7 +3394,6 @@ def markdown_docs_next_action(
     summary: RuntimeDashboardSummary,
 ) -> tuple[DashboardNextAction, ...]:
     """Return the next action for Markdown/docs checker signals."""
-    breakdown = summary.markdown_docs_breakdown
     if markdown_hook_signal_count(summary) > 0:
         return ()
     return (
@@ -3430,7 +3428,7 @@ def prompt_tool_next_action(
             action="repair prompt and tool selection evidence",
             reason="prompt excerpts or tool selection entries are missing",
             evidence=PROMPT_TOOL_EVIDENCE_TARGET,
-            owner_surface="tools/runtime/archive/behavior_event_assembly.py",
+            owner_surface="tools/runtime/dispatch/agent-canon/src/behavior_event_assembly.rs",
             command=DASHBOARD_TOOL_ROUTE,
             done_condition="prompt_entries>0, tool_selection_entries>0, prompt_missing_excerpt_entries=0",
             issue=issue_label_by_slug(summary, "eval-accumulation-gaps"),
@@ -3457,7 +3455,7 @@ def token_usage_next_action(
             reason="no token footprint comparison or moving-average evidence found",
             evidence=TOKEN_USAGE_EVIDENCE_TARGET,
             owner_surface="workflow_monitoring.md and token logging hooks",
-            command="python3 eval/checkers/compare_codex_token_footprints.py --session-glob '<sessions>' --report-dir <run>",
+            command="tools/bin/agent-canon compare-codex-token-footprints --session-glob '<sessions>' --report-dir <run>",
             done_condition="AGENT_RUNTIME_DASHBOARD_TOKEN_COMPARISONS>0 or AGENT_RUNTIME_DASHBOARD_TOKEN_SUMMARIES>0",
             issue=issue_label_by_slug(summary, "eval-accumulation-gaps"),
             automation="human-review-then-agent-fix",

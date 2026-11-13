@@ -1,0 +1,244 @@
+{
+  "source": "89b84d6af88566106c9aad74cb7c5f8541aefa3d",
+  "python": "3.12.3",
+  "source_hash": "4fe86df1e3c5df782c533dceccc13165d026e013cb91d5483f1b010c4c6c7597",
+  "scope": "read-only load and typed WorkflowContext; storage/clockproducer remain atPythonowneruntilconsumerclosure",
+  "cases": [
+    {
+      "name": "missing",
+      "kind": "missing",
+      "bytes_base64": null,
+      "output": {
+        "workflows": [],
+        "timestamp": "",
+        "source_event": "",
+        "has_workflow": false
+      }
+    },
+    {
+      "name": "directory",
+      "kind": "directory",
+      "bytes_base64": null,
+      "output": {
+        "workflows": [],
+        "timestamp": "",
+        "source_event": "",
+        "has_workflow": false
+      }
+    },
+    {
+      "name": "value-0",
+      "kind": "file",
+      "bytes_base64": "bnVsbA==",
+      "output": {
+        "workflows": [],
+        "timestamp": "",
+        "source_event": "",
+        "has_workflow": false
+      }
+    },
+    {
+      "name": "value-1",
+      "kind": "file",
+      "bytes_base64": "W10=",
+      "output": {
+        "workflows": [],
+        "timestamp": "",
+        "source_event": "",
+        "has_workflow": false
+      }
+    },
+    {
+      "name": "value-2",
+      "kind": "file",
+      "bytes_base64": "e30=",
+      "output": {
+        "workflows": [],
+        "timestamp": "",
+        "source_event": "",
+        "has_workflow": false
+      }
+    },
+    {
+      "name": "value-3",
+      "kind": "file",
+      "bytes_base64": "eyJ3b3JrZmxvd3MiOiBbXX0=",
+      "output": {
+        "workflows": [],
+        "timestamp": "",
+        "source_event": "",
+        "has_workflow": false
+      }
+    },
+    {
+      "name": "value-4",
+      "kind": "file",
+      "bytes_base64": "eyJ3b3JrZmxvd3MiOiBbImEiLCAiYSIsICIiLCAiXHU2NWU1XHU2NzJjXHU4YTllIiwgIlx1ZDgzZFx1ZGUwMCJdLCAidGltZXN0YW1wIjogImFueSIsICJzb3VyY2VfZXZlbnQiOiAiUG9zdFRvb2xVc2UifQ==",
+      "output": {
+        "workflows": [
+          "a",
+          "a",
+          "",
+          "\u65e5\u672c\u8a9e",
+          "\ud83d\ude00"
+        ],
+        "timestamp": "any",
+        "source_event": "PostToolUse",
+        "has_workflow": true
+      }
+    },
+    {
+      "name": "value-5",
+      "kind": "file",
+      "bytes_base64": "eyJ3b3JrZmxvd3MiOiAiYSJ9",
+      "output": {
+        "workflows": [],
+        "timestamp": "",
+        "source_event": "",
+        "has_workflow": false
+      }
+    },
+    {
+      "name": "value-6",
+      "kind": "file",
+      "bytes_base64": "eyJ3b3JrZmxvd3MiOiBbM119",
+      "output": {
+        "workflows": [],
+        "timestamp": "",
+        "source_event": "",
+        "has_workflow": false
+      }
+    },
+    {
+      "name": "value-7",
+      "kind": "file",
+      "bytes_base64": "eyJ3b3JrZmxvd3MiOiBbImEiXSwgInRpbWVzdGFtcCI6IG51bGx9",
+      "output": {
+        "workflows": [],
+        "timestamp": "",
+        "source_event": "",
+        "has_workflow": false
+      }
+    },
+    {
+      "name": "value-8",
+      "kind": "file",
+      "bytes_base64": "eyJ3b3JrZmxvd3MiOiBbImEiXSwgInNvdXJjZV9ldmVudCI6IDN9",
+      "output": {
+        "workflows": [],
+        "timestamp": "",
+        "source_event": "",
+        "has_workflow": false
+      }
+    },
+    {
+      "name": "value-9",
+      "kind": "file",
+      "bytes_base64": "eyJzY2hlbWEiOiAiaWdub3JlZCIsICJ3b3JrZmxvd3MiOiBbImEiXSwgInVua25vd24iOiB0cnVlfQ==",
+      "output": {
+        "workflows": [
+          "a"
+        ],
+        "timestamp": "",
+        "source_event": "",
+        "has_workflow": true
+      }
+    },
+    {
+      "name": "value-10",
+      "kind": "file",
+      "bytes_base64": "eyJ3b3JrZmxvd3MiOiBbIlx1ZDgwMCJdLCAidGltZXN0YW1wIjogIlx1ZGMwMCIsICJzb3VyY2VfZXZlbnQiOiAieCJ9",
+      "output": {
+        "workflows": [
+          "\ud800"
+        ],
+        "timestamp": "\udc00",
+        "source_event": "x",
+        "has_workflow": true
+      }
+    },
+    {
+      "name": "invalid-json",
+      "kind": "file",
+      "bytes_base64": "ew==",
+      "output": {
+        "workflows": [],
+        "timestamp": "",
+        "source_event": "",
+        "has_workflow": false
+      }
+    },
+    {
+      "name": "invalid-utf8",
+      "kind": "file",
+      "bytes_base64": "/w==",
+      "output": {
+        "workflows": [],
+        "timestamp": "",
+        "source_event": "",
+        "has_workflow": false
+      }
+    },
+    {
+      "name": "bom",
+      "kind": "file",
+      "bytes_base64": "77u/eyJ3b3JrZmxvd3MiOlsiYSJdfQ==",
+      "output": {
+        "workflows": [],
+        "timestamp": "",
+        "source_event": "",
+        "has_workflow": false
+      }
+    },
+    {
+      "name": "duplicate-last",
+      "kind": "file",
+      "bytes_base64": "eyJ3b3JrZmxvd3MiOlsiZmlyc3QiXSwid29ya2Zsb3dzIjpbImxhc3QiXX0=",
+      "output": {
+        "workflows": [
+          "last"
+        ],
+        "timestamp": "",
+        "source_event": "",
+        "has_workflow": true
+      }
+    },
+    {
+      "name": "nonfinite-unused",
+      "kind": "file",
+      "bytes_base64": "eyJ3b3JrZmxvd3MiOlsiYSJdLCJvdGhlciI6TmFOfQ==",
+      "output": {
+        "workflows": [
+          "a"
+        ],
+        "timestamp": "",
+        "source_event": "",
+        "has_workflow": true
+      }
+    },
+    {
+      "name": "nonfinite-workflow",
+      "kind": "file",
+      "bytes_base64": "eyJ3b3JrZmxvd3MiOltOYU5dfQ==",
+      "output": {
+        "workflows": [],
+        "timestamp": "",
+        "source_event": "",
+        "has_workflow": false
+      }
+    },
+    {
+      "name": "symlink-valid",
+      "kind": "symlink",
+      "bytes_base64": "eyJ3b3JrZmxvd3MiOlsiYSJdfQ==",
+      "output": {
+        "workflows": [
+          "a"
+        ],
+        "timestamp": "",
+        "source_event": "",
+        "has_workflow": true
+      }
+    }
+  ]
+}

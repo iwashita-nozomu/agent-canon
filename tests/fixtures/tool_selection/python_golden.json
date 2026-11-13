@@ -1,0 +1,931 @@
+{
+  "source": "88a70bddaaacd2f2d5913e7f83dc2756f0ec8fa0",
+  "python": "3.12.3",
+  "source_hash": "99c844a0e1529761777d232a3adca37b267e6ba5a08b1dc77b24bf6fd197628c",
+  "cases": [
+    {
+      "name": "null",
+      "input": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "tool_name": "",
+          "command_verb": "",
+          "selected_tools": [],
+          "tool_input_fingerprint": "",
+          "tool_input_keys": [],
+          "tool_input_key_count": 0,
+          "selection_kind": "",
+          "should_log": false
+        }
+      }
+    },
+    {
+      "name": "empty",
+      "input": {},
+      "output": {
+        "ok": true,
+        "result": {
+          "tool_name": "",
+          "command_verb": "",
+          "selected_tools": [],
+          "tool_input_fingerprint": "",
+          "tool_input_keys": [],
+          "tool_input_key_count": 0,
+          "selection_kind": "",
+          "should_log": false
+        }
+      }
+    },
+    {
+      "name": "bash",
+      "input": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "cmd": "git status"
+        }
+      },
+      "output": {
+        "ok": true,
+        "result": {
+          "tool_name": "Bash",
+          "command_verb": "git",
+          "selected_tools": [
+            "Bash"
+          ],
+          "tool_input_fingerprint": "89d31bcb424d",
+          "tool_input_keys": [
+            "cmd"
+          ],
+          "tool_input_key_count": 1,
+          "selection_kind": "executed_tool",
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "no-name",
+      "input": {
+        "tool_input": {
+          "command": "git status"
+        }
+      },
+      "output": {
+        "ok": true,
+        "result": {
+          "tool_name": "",
+          "command_verb": "git",
+          "selected_tools": [],
+          "tool_input_fingerprint": "e0d3e391760d",
+          "tool_input_keys": [
+            "command"
+          ],
+          "tool_input_key_count": 1,
+          "selection_kind": "",
+          "should_log": false
+        }
+      }
+    },
+    {
+      "name": "input-wrong-type",
+      "input": {
+        "tool_name": "Bash",
+        "tool_input": [
+          "x"
+        ]
+      },
+      "output": {
+        "ok": true,
+        "result": {
+          "tool_name": "Bash",
+          "command_verb": "",
+          "selected_tools": [
+            "Bash"
+          ],
+          "tool_input_fingerprint": "",
+          "tool_input_keys": [],
+          "tool_input_key_count": 0,
+          "selection_kind": "executed_tool",
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "selected-list",
+      "input": {
+        "selected_tools": [
+          "x",
+          "",
+          null,
+          7,
+          "x",
+          "y"
+        ]
+      },
+      "output": {
+        "ok": true,
+        "result": {
+          "tool_name": "",
+          "command_verb": "",
+          "selected_tools": [
+            "x",
+            "x",
+            "y"
+          ],
+          "tool_input_fingerprint": "",
+          "tool_input_keys": [],
+          "tool_input_key_count": 0,
+          "selection_kind": "",
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "selected-wrong-type",
+      "input": {
+        "selected_tools": "x"
+      },
+      "output": {
+        "ok": true,
+        "result": {
+          "tool_name": "",
+          "command_verb": "",
+          "selected_tools": [],
+          "tool_input_fingerprint": "",
+          "tool_input_keys": [],
+          "tool_input_key_count": 0,
+          "selection_kind": "",
+          "should_log": false
+        }
+      }
+    },
+    {
+      "name": "empty-command-stops-alias",
+      "input": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "",
+          "cmd": "git status"
+        },
+        "cmd": "top --flag"
+      },
+      "output": {
+        "ok": true,
+        "result": {
+          "tool_name": "Bash",
+          "command_verb": "top",
+          "selected_tools": [
+            "Bash"
+          ],
+          "tool_input_fingerprint": "a71c6361b2de",
+          "tool_input_keys": [
+            "cmd",
+            "command"
+          ],
+          "tool_input_key_count": 2,
+          "selection_kind": "executed_tool",
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "typed-fallback",
+      "input": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": 0,
+          "cmd": "git status"
+        }
+      },
+      "output": {
+        "ok": true,
+        "result": {
+          "tool_name": "Bash",
+          "command_verb": "git",
+          "selected_tools": [
+            "Bash"
+          ],
+          "tool_input_fingerprint": "6c90858eb0b0",
+          "tool_input_keys": [
+            "cmd",
+            "command"
+          ],
+          "tool_input_key_count": 2,
+          "selection_kind": "executed_tool",
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "unicode-key",
+      "input": {
+        "tool_input": {
+          "\u00e9": 1,
+          "\ud800": "value"
+        }
+      },
+      "output": {
+        "ok": true,
+        "result": {
+          "tool_name": "",
+          "command_verb": "",
+          "selected_tools": [],
+          "tool_input_fingerprint": "c5641bdf2dff",
+          "tool_input_keys": [
+            "\u00e9",
+            "\ud800"
+          ],
+          "tool_input_key_count": 2,
+          "selection_kind": "",
+          "should_log": false
+        }
+      }
+    },
+    {
+      "name": "surrogate-name",
+      "input": {
+        "tool_name": "\ud800"
+      },
+      "output": {
+        "ok": true,
+        "result": {
+          "tool_name": "\ud800",
+          "command_verb": "",
+          "selected_tools": [
+            "\ud800"
+          ],
+          "tool_input_fingerprint": "",
+          "tool_input_keys": [],
+          "tool_input_key_count": 0,
+          "selection_kind": "executed_tool",
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "nonfinite",
+      "input": {
+        "tool_input": {
+          "x": NaN
+        }
+      },
+      "output": {
+        "ok": false,
+        "error_type": "ValueError",
+        "error": "Out of range float values are not JSON compliant: nan"
+      }
+    },
+    {
+      "name": "overflow",
+      "input": {
+        "tool_input": {
+          "x": Infinity
+        }
+      },
+      "output": {
+        "ok": false,
+        "error_type": "ValueError",
+        "error": "Out of range float values are not JSON compliant: inf"
+      }
+    },
+    {
+      "name": "huge-int",
+      "input": {
+        "tool_input": {
+          "x": 1000000000000000000000000000000000000000000000000000000000000
+        }
+      },
+      "output": {
+        "ok": true,
+        "result": {
+          "tool_name": "",
+          "command_verb": "",
+          "selected_tools": [],
+          "tool_input_fingerprint": "ccf65284b3c1",
+          "tool_input_keys": [
+            "x"
+          ],
+          "tool_input_key_count": 1,
+          "selection_kind": "",
+          "should_log": false
+        }
+      }
+    },
+    {
+      "name": "leading-0",
+      "input": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "  printf '%s' private-command-value"
+        }
+      },
+      "output": {
+        "ok": true,
+        "result": {
+          "tool_name": "Bash",
+          "command_verb": "printf",
+          "selected_tools": [
+            "Bash"
+          ],
+          "tool_input_fingerprint": "f234585e750f",
+          "tool_input_keys": [
+            "command"
+          ],
+          "tool_input_key_count": 1,
+          "selection_kind": "executed_tool",
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "leading-1",
+      "input": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "sudo printf '%s' private-command-value"
+        }
+      },
+      "output": {
+        "ok": true,
+        "result": {
+          "tool_name": "Bash",
+          "command_verb": "sudo",
+          "selected_tools": [
+            "Bash"
+          ],
+          "tool_input_fingerprint": "e2ba57d97a0d",
+          "tool_input_keys": [
+            "command"
+          ],
+          "tool_input_key_count": 1,
+          "selection_kind": "executed_tool",
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "leading-2",
+      "input": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "sudo -p private-command-value /usr/bin/printf"
+        }
+      },
+      "output": {
+        "ok": true,
+        "result": {
+          "tool_name": "Bash",
+          "command_verb": "sudo",
+          "selected_tools": [
+            "Bash"
+          ],
+          "tool_input_fingerprint": "e299d12998e3",
+          "tool_input_keys": [
+            "command"
+          ],
+          "tool_input_key_count": 1,
+          "selection_kind": "executed_tool",
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "leading-3",
+      "input": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "env VALUE=private-command-value /usr/bin/printf"
+        }
+      },
+      "output": {
+        "ok": true,
+        "result": {
+          "tool_name": "Bash",
+          "command_verb": "env",
+          "selected_tools": [
+            "Bash"
+          ],
+          "tool_input_fingerprint": "b2609ca93e79",
+          "tool_input_keys": [
+            "command"
+          ],
+          "tool_input_key_count": 1,
+          "selection_kind": "executed_tool",
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "private-prefix-0-command",
+      "input": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "/usr/bin/printf '%s' private-command-value"
+        }
+      },
+      "output": {
+        "ok": true,
+        "result": {
+          "tool_name": "Bash",
+          "command_verb": "",
+          "selected_tools": [
+            "Bash"
+          ],
+          "tool_input_fingerprint": "e19a5f75337d",
+          "tool_input_keys": [
+            "command"
+          ],
+          "tool_input_key_count": 1,
+          "selection_kind": "executed_tool",
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "private-prefix-0-cmd",
+      "input": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "cmd": "/usr/bin/printf '%s' private-command-value"
+        }
+      },
+      "output": {
+        "ok": true,
+        "result": {
+          "tool_name": "Bash",
+          "command_verb": "",
+          "selected_tools": [
+            "Bash"
+          ],
+          "tool_input_fingerprint": "e0e976f478b4",
+          "tool_input_keys": [
+            "cmd"
+          ],
+          "tool_input_key_count": 1,
+          "selection_kind": "executed_tool",
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "private-prefix-1-command",
+      "input": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "./printf '%s' private-command-value"
+        }
+      },
+      "output": {
+        "ok": true,
+        "result": {
+          "tool_name": "Bash",
+          "command_verb": "",
+          "selected_tools": [
+            "Bash"
+          ],
+          "tool_input_fingerprint": "d47fe53ed5ac",
+          "tool_input_keys": [
+            "command"
+          ],
+          "tool_input_key_count": 1,
+          "selection_kind": "executed_tool",
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "private-prefix-1-cmd",
+      "input": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "cmd": "./printf '%s' private-command-value"
+        }
+      },
+      "output": {
+        "ok": true,
+        "result": {
+          "tool_name": "Bash",
+          "command_verb": "",
+          "selected_tools": [
+            "Bash"
+          ],
+          "tool_input_fingerprint": "dfb15c6c6a14",
+          "tool_input_keys": [
+            "cmd"
+          ],
+          "tool_input_key_count": 1,
+          "selection_kind": "executed_tool",
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "private-prefix-2-command",
+      "input": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "'/usr/bin/printf' '%s' private-command-value"
+        }
+      },
+      "output": {
+        "ok": true,
+        "result": {
+          "tool_name": "Bash",
+          "command_verb": "",
+          "selected_tools": [
+            "Bash"
+          ],
+          "tool_input_fingerprint": "41a708132e7f",
+          "tool_input_keys": [
+            "command"
+          ],
+          "tool_input_key_count": 1,
+          "selection_kind": "executed_tool",
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "private-prefix-2-cmd",
+      "input": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "cmd": "'/usr/bin/printf' '%s' private-command-value"
+        }
+      },
+      "output": {
+        "ok": true,
+        "result": {
+          "tool_name": "Bash",
+          "command_verb": "",
+          "selected_tools": [
+            "Bash"
+          ],
+          "tool_input_fingerprint": "3f4c9a9fea7b",
+          "tool_input_keys": [
+            "cmd"
+          ],
+          "tool_input_key_count": 1,
+          "selection_kind": "executed_tool",
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "private-prefix-3-command",
+      "input": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "\"/usr/bin/printf\" '%s' private-command-value"
+        }
+      },
+      "output": {
+        "ok": true,
+        "result": {
+          "tool_name": "Bash",
+          "command_verb": "",
+          "selected_tools": [
+            "Bash"
+          ],
+          "tool_input_fingerprint": "b08bb1402a89",
+          "tool_input_keys": [
+            "command"
+          ],
+          "tool_input_key_count": 1,
+          "selection_kind": "executed_tool",
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "private-prefix-3-cmd",
+      "input": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "cmd": "\"/usr/bin/printf\" '%s' private-command-value"
+        }
+      },
+      "output": {
+        "ok": true,
+        "result": {
+          "tool_name": "Bash",
+          "command_verb": "",
+          "selected_tools": [
+            "Bash"
+          ],
+          "tool_input_fingerprint": "c324c72905d2",
+          "tool_input_keys": [
+            "cmd"
+          ],
+          "tool_input_key_count": 1,
+          "selection_kind": "executed_tool",
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "private-prefix-4-command",
+      "input": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "VALUE=private-command-value /usr/bin/printf '%s' private-command-value"
+        }
+      },
+      "output": {
+        "ok": true,
+        "result": {
+          "tool_name": "Bash",
+          "command_verb": "",
+          "selected_tools": [
+            "Bash"
+          ],
+          "tool_input_fingerprint": "e05821b5672d",
+          "tool_input_keys": [
+            "command"
+          ],
+          "tool_input_key_count": 1,
+          "selection_kind": "executed_tool",
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "private-prefix-4-cmd",
+      "input": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "cmd": "VALUE=private-command-value /usr/bin/printf '%s' private-command-value"
+        }
+      },
+      "output": {
+        "ok": true,
+        "result": {
+          "tool_name": "Bash",
+          "command_verb": "",
+          "selected_tools": [
+            "Bash"
+          ],
+          "tool_input_fingerprint": "7548440a1728",
+          "tool_input_keys": [
+            "cmd"
+          ],
+          "tool_input_key_count": 1,
+          "selection_kind": "executed_tool",
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "private-prefix-5-command",
+      "input": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "${COMMAND} '%s' private-command-value"
+        }
+      },
+      "output": {
+        "ok": true,
+        "result": {
+          "tool_name": "Bash",
+          "command_verb": "",
+          "selected_tools": [
+            "Bash"
+          ],
+          "tool_input_fingerprint": "150b1e70c8fa",
+          "tool_input_keys": [
+            "command"
+          ],
+          "tool_input_key_count": 1,
+          "selection_kind": "executed_tool",
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "private-prefix-5-cmd",
+      "input": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "cmd": "${COMMAND} '%s' private-command-value"
+        }
+      },
+      "output": {
+        "ok": true,
+        "result": {
+          "tool_name": "Bash",
+          "command_verb": "",
+          "selected_tools": [
+            "Bash"
+          ],
+          "tool_input_fingerprint": "563c81a0b575",
+          "tool_input_keys": [
+            "cmd"
+          ],
+          "tool_input_key_count": 1,
+          "selection_kind": "executed_tool",
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "private-prefix-6-command",
+      "input": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "printf; /usr/bin/printf '%s' private-command-value"
+        }
+      },
+      "output": {
+        "ok": true,
+        "result": {
+          "tool_name": "Bash",
+          "command_verb": "",
+          "selected_tools": [
+            "Bash"
+          ],
+          "tool_input_fingerprint": "0da3a9885781",
+          "tool_input_keys": [
+            "command"
+          ],
+          "tool_input_key_count": 1,
+          "selection_kind": "executed_tool",
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "private-prefix-6-cmd",
+      "input": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "cmd": "printf; /usr/bin/printf '%s' private-command-value"
+        }
+      },
+      "output": {
+        "ok": true,
+        "result": {
+          "tool_name": "Bash",
+          "command_verb": "",
+          "selected_tools": [
+            "Bash"
+          ],
+          "tool_input_fingerprint": "7e0b288adb8b",
+          "tool_input_keys": [
+            "cmd"
+          ],
+          "tool_input_key_count": 1,
+          "selection_kind": "executed_tool",
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "unicode-whitespace-0",
+      "input": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "\u001cgit\u001cstatus\u001c"
+        }
+      },
+      "output": {
+        "ok": true,
+        "result": {
+          "tool_name": "Bash",
+          "command_verb": "git",
+          "selected_tools": [
+            "Bash"
+          ],
+          "tool_input_fingerprint": "1ac272819b45",
+          "tool_input_keys": [
+            "command"
+          ],
+          "tool_input_key_count": 1,
+          "selection_kind": "executed_tool",
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "unicode-whitespace-1",
+      "input": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "\u0085git\u0085status\u0085"
+        }
+      },
+      "output": {
+        "ok": true,
+        "result": {
+          "tool_name": "Bash",
+          "command_verb": "git",
+          "selected_tools": [
+            "Bash"
+          ],
+          "tool_input_fingerprint": "db3bbccc38ea",
+          "tool_input_keys": [
+            "command"
+          ],
+          "tool_input_key_count": 1,
+          "selection_kind": "executed_tool",
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "unicode-whitespace-2",
+      "input": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "\u2003git\u2003status\u2003"
+        }
+      },
+      "output": {
+        "ok": true,
+        "result": {
+          "tool_name": "Bash",
+          "command_verb": "git",
+          "selected_tools": [
+            "Bash"
+          ],
+          "tool_input_fingerprint": "4adfc048d8e7",
+          "tool_input_keys": [
+            "command"
+          ],
+          "tool_input_key_count": 1,
+          "selection_kind": "executed_tool",
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "unicode-whitespace-3",
+      "input": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "\u00a0git\u00a0status\u00a0"
+        }
+      },
+      "output": {
+        "ok": true,
+        "result": {
+          "tool_name": "Bash",
+          "command_verb": "git",
+          "selected_tools": [
+            "Bash"
+          ],
+          "tool_input_fingerprint": "fbae1815c25a",
+          "tool_input_keys": [
+            "command"
+          ],
+          "tool_input_key_count": 1,
+          "selection_kind": "executed_tool",
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "top-level-command",
+      "input": {
+        "tool_name": "Bash",
+        "command": "/usr/bin/printf '%s' private-command-value"
+      },
+      "output": {
+        "ok": true,
+        "result": {
+          "tool_name": "Bash",
+          "command_verb": "",
+          "selected_tools": [
+            "Bash"
+          ],
+          "tool_input_fingerprint": "",
+          "tool_input_keys": [],
+          "tool_input_key_count": 0,
+          "selection_kind": "executed_tool",
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "top-level-cmd",
+      "input": {
+        "tool_name": "Bash",
+        "cmd": "/usr/bin/printf '%s' private-command-value"
+      },
+      "output": {
+        "ok": true,
+        "result": {
+          "tool_name": "Bash",
+          "command_verb": "",
+          "selected_tools": [
+            "Bash"
+          ],
+          "tool_input_fingerprint": "",
+          "tool_input_keys": [],
+          "tool_input_key_count": 0,
+          "selection_kind": "executed_tool",
+          "should_log": true
+        }
+      }
+    }
+  ]
+}

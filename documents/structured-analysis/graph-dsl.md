@@ -11,7 +11,7 @@ downstream implementation ../../tools/runtime/dispatch/agent-canon/src/structure
 downstream design ../../tools/analysis/documents/prose_reasoning_graph.py documents the prose graph adapter command surface
 downstream design ../../tools/analysis/dependencies/render_dependency_manifest_graph.py documents dependency graph projection rendering
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/graph.rs materializes canonical repository graph facts into this schema
-downstream implementation ../../tools/analysis/dependencies/graph_client.py supplies typed read-only graph projections
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/graph_client.rs supplies typed read-only graph projections
 @dependency-end
 -->
 

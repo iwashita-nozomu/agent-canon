@@ -2,7 +2,6 @@
 # contract test
 # responsibility Verifies the bounded checkout identity readback and transition projections.
 # upstream implementation ../../tools/runtime/authority/checkout_identity.py owns read-only checkout identity
-# downstream implementation ../../tools/runtime/manifest/manifest_rendering.py projects the identity contract into handoffs
 # @dependency-end
 """Focused tests for checkout identity boundaries."""
 
@@ -33,7 +32,13 @@ def _repository(tmp_path: Path) -> Path:
     (root / "README.md").write_text("identity\n", encoding="utf-8")
     _git(root, "add", "README.md")
     _git(root, "commit", "-m", "initial")
-    _git(root, "remote", "add", "origin", "git@github.com:Iwashita-Nozomu/Agent-Canon.git")
+    _git(
+        root,
+        "remote",
+        "add",
+        "origin",
+        "git@github.com:Iwashita-Nozomu/Agent-Canon.git",
+    )
     return root
 
 
@@ -61,7 +66,9 @@ def test_identity_reports_detached_head(tmp_path: Path) -> None:
     assert identity.head == head
 
 
-def test_identity_tracks_cwd_transition_without_mutating_checkout(tmp_path: Path) -> None:
+def test_identity_tracks_cwd_transition_without_mutating_checkout(
+    tmp_path: Path,
+) -> None:
     root = _repository(tmp_path)
     nested = root / "nested"
     nested.mkdir()

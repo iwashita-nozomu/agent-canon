@@ -1,12 +1,13 @@
 # @dependency-start
 # contract test
 # responsibility Verifies design-document analyzers keep reports external and source mutation explicit.
-# upstream implementation ../../tools/analysis/documents/formatting/_runtime_output.py shared runtime/mutation boundary
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/source_mutation.rs explicit source mutation boundary
 # upstream implementation ../../tools/runtime/dispatch/agent-canon/src/docs.rs native exact duplicate analyzer
 # upstream evidence ../../tests/fixtures/design_duplicates/python_golden.json frozen Python duplicate CLI oracle
 # upstream implementation ../../tools/runtime/dispatch/agent-canon/src/docs.rs native similarity analyzer
 # upstream evidence ../../tests/fixtures/design_similarity/python_golden.json frozen similarity CLI oracle
-# upstream implementation ../../tools/validation/documentation/authoring/organize_designs.py organization planner
+# upstream evidence ../../tools/runtime/dispatch/agent-canon/tests/design_organizer_native.rs frozen organizer CLI oracle
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/docs.rs native organizer CLI
 # downstream implementation ../../tests/agent_tools/test_source_runtime_side_effects.py source side-effect regression suite
 # @dependency-end
 """Regression tests for external design-document reports."""
@@ -21,13 +22,13 @@ from pathlib import Path
 
 from tests.agent_tools.rust_cli_fixture import standalone_agent_canon
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
 AGENT_CANON = standalone_agent_canon()
-SCRIPTS = {
-    "organize": PROJECT_ROOT
-    / "tools/validation/documentation/authoring/organize_designs.py",
+TOOLS = ("redundant", "similar", "organize")
+NATIVE_COMMANDS = {
+    "redundant": "find-redundant-designs",
+    "similar": "find-similar-designs",
+    "organize": "organize-designs",
 }
-TOOLS = ("redundant", "similar", *SCRIPTS)
 
 
 class DesignDocumentRuntimeBoundaryTest(unittest.TestCase):
@@ -46,14 +47,7 @@ class DesignDocumentRuntimeBoundaryTest(unittest.TestCase):
         *extra: str,
     ) -> subprocess.CompletedProcess[str]:
         """Run one analyzer with a clean environment."""
-        if tool in ("redundant", "similar"):
-            command_name = {
-                "redundant": "find-redundant-designs",
-                "similar": "find-similar-designs",
-            }[tool]
-            command = [str(AGENT_CANON), "docs", command_name, *extra]
-        else:
-            command = ["python3", str(SCRIPTS[tool]), *extra]
+        command = [str(AGENT_CANON), "docs", NATIVE_COMMANDS[tool], *extra]
         if runtime is not None:
             command.extend(["--runtime-root", str(runtime)])
         environment = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}

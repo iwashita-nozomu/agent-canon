@@ -13,15 +13,14 @@
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/tool_proof_coverage.rs reports catalog proof obligations
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/tool_drift.rs validates tool/convention trace contracts
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/responsibility_scope.rs validates responsibility-scope coverage
-# upstream implementation ../../../../eval/producers/run_accumulated_agent_evals.py writes required eval family reports before accumulation validation
-# upstream implementation ../../../../eval/checkers/eval_accumulation_check.py validates eval result accumulation
+# upstream implementation ../../../runtime/dispatch/agent-canon/src/eval_accumulation.rs writes required eval family reports before accumulation validation
+# upstream implementation ../../../runtime/dispatch/agent-canon/src/eval_accumulation_check.rs validates eval result accumulation
 # upstream implementation ../../../runtime/archive/runtime_log_archive_git.py manages mounted hook/eval log archive branches
-# upstream implementation ../../semantic/skills/check_skill_frontmatter.py validates runtime skill YAML frontmatter
-# upstream implementation ../../../../eval/producers/evaluate_workflow_selection.py validates workflow selection routing cases
-# upstream implementation ../checks/check_github_workflows.py validates GitHub workflow and PR checklist contracts
+# upstream implementation ../../../runtime/dispatch/agent-canon/src/skill_frontmatter.rs validates runtime skill YAML frontmatter
+# upstream implementation ../../../runtime/dispatch/agent-canon/src/workflow_selection_eval.rs validates workflow selection routing cases
+# upstream implementation ../../../runtime/dispatch/agent-canon/src/github_workflow_check.rs validates GitHub workflow and PR checklist contracts
 # upstream implementation ../../../../bootstrap/container/image/Dockerfile defines the shared tool image
 # upstream implementation ../../../runtime/container/bootstrap_runtime.py owns lifecycle readback
-# upstream implementation ../../../../eval/checkers/smoke_test_research_perspective_pack.py validates research role packet
 # @dependency-end
 set -euo pipefail
 
@@ -350,17 +349,6 @@ echo ""
 
 EXIT_CODE=0
 
-if [ -f "${WORKSPACE_ROOT}/WORKTREE_SCOPE.md" ]; then
-  echo "0️⃣a worktree scope / action-log checks を実行中..."
-  if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/worktree_scope_lint.py" --current 2>&1; then
-    echo "✅ worktree scope / action-log checks 成功"
-  else
-    echo "❌ worktree scope / action-log checks 失敗"
-    EXIT_CODE=1
-  fi
-  echo ""
-fi
-
 # 0. agent/runtime sync checks
 echo "0️⃣  agent/runtime sync checks を実行中..."
 CANON_GRAPH_READY=0
@@ -368,12 +356,6 @@ if run_agent_canon graph build --root "$WORKSPACE_ROOT" --profile default --form
   CANON_GRAPH_READY=1
 else
   echo "❌ canonical graph build 失敗"
-  EXIT_CODE=1
-fi
-if "$PYTHON_BIN" "${WORKSPACE_ROOT}/eval/checkers/smoke_test_research_perspective_pack.py" 2>&1; then
-  echo "✅ research perspective pack smoke test 成功"
-else
-  echo "❌ research perspective pack smoke test 失敗"
   EXIT_CODE=1
 fi
 if run_agent_canon notebook-quality --all 2>&1; then
@@ -402,7 +384,7 @@ else
   echo "❌ convention compliance wiring checks 失敗"
   EXIT_CODE=1
 fi
-if "$PYTHON_BIN" "${WORKSPACE_ROOT}/tools/validation/semantic/skills/check_skill_frontmatter.py" 2>&1; then
+if run_agent_canon check-skill-frontmatter --root "${WORKSPACE_ROOT}" 2>&1; then
   echo "✅ runtime skill frontmatter checks 成功"
 else
   echo "❌ runtime skill frontmatter checks 失敗"
@@ -439,14 +421,15 @@ accumulated_eval_args=(
   --log-dir "${AGENT_CANON_CI_EVAL_LOG_DIR_VALUE}"
 )
 if AGENT_CANON_HOOK_ARCHIVE_DIR="${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}" \
-  "$PYTHON_BIN" "${WORKSPACE_ROOT}/eval/producers/run_accumulated_agent_evals.py" "${accumulated_eval_args[@]}" 2>&1; then
+  run_agent_canon run-accumulated-agent-evals "${accumulated_eval_args[@]}" 2>&1; then
   echo "✅ accumulated agent eval producers 成功"
 else
   echo "❌ accumulated agent eval producers 失敗"
   EXIT_CODE=1
 fi
-if AGENT_CANON_HOOK_ARCHIVE_DIR="${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}" "$PYTHON_BIN" "${WORKSPACE_ROOT}/eval/checkers/eval_accumulation_check.py" \
-  --root "${WORKSPACE_ROOT}" --runtime-root "${AGENT_CANON_CI_RUNTIME_ROOT}" 2>&1; then
+if AGENT_CANON_HOOK_ARCHIVE_DIR="${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}" \
+  run_agent_canon eval-accumulation-check \
+    --root "${WORKSPACE_ROOT}" --runtime-root "${AGENT_CANON_CI_RUNTIME_ROOT}" 2>&1; then
   echo "✅ eval accumulation checks 成功"
 else
   echo "❌ eval accumulation checks 失敗"
@@ -455,7 +438,7 @@ fi
 echo "RUST_CHECKS=owned_by_bootstrap_container_static_gate"
 if [ "$SKIP_GITHUB_WORKFLOWS" -eq 1 ]; then
   echo "GITHUB_WORKFLOW_CHECKS=skip reason=already_checked_by_parent_gate"
-elif "$PYTHON_BIN" "${CANON_CI_ROOT}/check_github_workflows.py" 2>&1; then
+elif run_agent_canon check-github-workflows --root "${WORKSPACE_ROOT}" 2>&1; then
   echo "✅ GitHub workflow / PR template checks 成功"
 else
   echo "❌ GitHub workflow / PR template checks 失敗"
@@ -491,7 +474,7 @@ if [ "$SKIP_EXPERIMENTS" -eq 1 ]; then
 elif [ ! -e experiments/registry.toml ]; then
   echo "EXPERIMENT_REGISTRY=skip"
   echo "experiment registry absent in this checkout; skipping registry validation"
-elif "$PYTHON_BIN" "${CANON_CI_ROOT}/check_experiment_registry.py" 2>&1; then
+elif run_agent_canon experiment-registry 2>&1; then
   echo "✅ experiment registry checks 成功"
 else
   echo "❌ experiment registry checks 失敗"

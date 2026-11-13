@@ -17,11 +17,20 @@ downstream implementation ../../tools/bin/agent-canon stable native entrypoint
 
 ## Scope and Intent
 
+The [agent tool-authoring rule](../../ROOT_AGENTS.md#always-on-boundary) requires
+shell scripts or Rust for new tools and task automation, including temporary
+and inline code. Existing Python tools and external Python providers may still
+be invoked through their selected execution contract during migration.
+
 Migrate every AgentCanon-owned Python tool implementation to Rust, including
 workflow orchestration, runtime lifecycle, Eval producers and checkers, and
 active hooks. This replaces the earlier policy that kept frequently changing
 workflow tools in Python. Stability and usage may inform implementation work;
 they do not exempt an owned tool from migration.
+
+Delete tools without a required use, together with their exclusive support and
+callers. Implement retained tool behavior in Rust. Shell entrypoints invoke the
+existing Rust executable and preserve its arguments, streams, and exit status.
 
 Preserve the tool's external CLI/API, schema, exit behavior, filesystem effects,
 mount and credential boundaries, and consumer functionality. Prioritize memory
@@ -72,13 +81,20 @@ expression unparse, and visitor traversal. Old/new fixture comparison remains
 the acceptance oracle for CPython AST behavior.
 
 Private feedback/knowledge storage now belongs to `private_feedback.rs`; its
-packaged Python adapter is retired. `workflow_monitor.py` remains an owned Python
-implementation pending its own port and invokes native capture through stdin.
-That remaining caller is not a feedback implementation fallback. The planner
+packaged Python adapter and custom task monitoring writer are retired. The planner
 retains its adapter-marker observation so a future reintroduced delegation is
 still visible. Host archive Git/annex publication remains at its existing owner.
 
 ## Runtime and External Providers
+
+The active host Hook route calls native `codex-hook` after the existing resident
+trust admission and target-mount transaction. Its dispatcher composes the native
+safety, event-assembly, spool, and report owners. Frozen old
+CLI cases check both the library and real command; integration tests retain
+report selection and containment, privacy, append/report failures, and ordinary
+editing without runtime role or receipt gates. The Python dispatcher is retired after its direct tests and consumers move to
+the native command. Shared Python helpers retain their remaining consumers and
+remain in the migration inventory.
 
 The stable entrypoint is `tools/bin/agent-canon`; native source belongs under
 `tools/runtime/dispatch/agent-canon/src`. Use the selected shared build and
@@ -124,6 +140,24 @@ no-follow handling, locks, and authenticated handoffs to avoid that work.
 `runtime_boundary.rs` provides useful external-artifact checks but does not yet
 replace all guarantees of `parent_root_side_effects.py` and
 `runtime_artifacts.py`.
+
+The optional native CPython connection lives at
+`tools/runtime/python-provider`. It uses PyO3's safe, interpreter-bound object
+APIs to call the selected external modules and existing consumer code. Build
+this provider for the Python runtime selected with `PYO3_PYTHON`; its shared
+library remains owned by that environment. Keep the standalone AgentCanon CLI
+independent of this link so ordinary commands retain their Python-free startup.
+Provider selection and module/function calls belong in Rust. Existing consumer
+Python remains an input; no AgentCanon Python source or inline program is added.
+The initial consumers are PDF extraction and retained proof-trace loading;
+JAX extraction remains unfinished until its existing dynamic API is connected.
+
+This split follows PyO3's documented
+[dynamic embedding and interpreter selection](https://github.com/PyO3/pyo3/blob/main/guide/src/building-and-distribution.md#embedding-python-in-rust)
+and its [Python object lifetime contract](https://github.com/PyO3/pyo3/blob/main/guide/src/python-from-rust.md#the-py-lifetime).
+Verify the provider against controlled external modules and the consuming
+public CLI, including unavailable runtime/module failures, before retiring each
+owning Python implementation.
 
 The native parent-root authority accepts an explicit `AttestationRequest`.
 `ParentRootAttestor::attest` validates only that request; it does not construct
@@ -234,12 +268,48 @@ and stale-evidence checks. The existing
 [runtime-surface owner](../runtime/SHARED_RUNTIME_SURFACES.md) defines this
 version transition and the retained external interface.
 
-The Python skill-projection library remains for `source_dependency_graph.py`
-and supplies an independent comparison oracle. Its implementation stays in the
-pending inventory until that Python consumer is ported. External Python
-execution selected by an explicit v2 identity is a retained provider capability;
-it does not mean the native default delegates to an owned Python tool. This
-port does not complete other migration families.
+The native skill-projection registry serves both
+`source_dependency_graph.rs` and `surface_manifest.rs`; the source graph CLI and
+its active consumers now use the native owner. The frozen Python source-query,
+context, and export corpus remains an independent compatibility oracle.
+External Python execution selected by an explicit v2 identity is a retained
+provider capability; it does not mean the native default delegates to an owned
+Python tool. This port does not complete other migration families.
+
+## Native DOCX Extraction and Caller Closure
+
+`tools/bin/agent-canon extract-docx` owns the public `extract-docx` catalog
+route and selects `tools/runtime/dispatch/agent-canon/src/extract_docx.rs`.
+The Python implementation is retired; the Python CLI test remains as an
+independent input/oracle harness and invokes the native product command.
+The `tool-docs.toml` entry and public DOCX guide name the same native owner.
+
+The migration preserves the schema-v1 bundle, member order and hashes,
+paragraph/table/Office Math Markdown, CLI status split, source snapshot checks,
+absent-or-empty output reservation, and stage/readback/publish/rollback flow.
+Archive names come from raw ZIP name bytes and flags: bit 11 selects UTF-8,
+otherwise CP437 is decoded, and names are truncated at NUL as CPython
+`ZipInfo` does. Unicode 15 NFC and full case folding retain portable member
+identity; Stored, Deflate, BZIP2, and LZMA methods remain available. The safe
+Expat 2.9 port matches the frozen 20-case ElementTree acceptance and event
+corpus, including encoding, namespaces, default attributes, entities, and depth;
+this is not a universal XML-equivalence claim. External entity references fail
+without external I/O. The DOCX owner opens the
+caller-selected input and canonical output parent as capabilities and does not
+apply the separate external-runtime artifact boundary to the user's bundle.
+Heading suffixes reuse the shared Unicode 15 decimal parser while preserving
+Python's `isdigit` selection and `int(character)` failure for nondecimal Digit
+characters. Multiple paragraph-property blocks retain the original search order.
+XML elements live in a flat indexed arena; parsing, lookup, text extraction,
+table traversal, and destruction do not recurse or add a nesting limit.
+
+The previous Python helper-mock readback test is replaced by a native
+transaction-boundary check over real staged bytes; it asserts no publication,
+stage cleanup, and preservation of an admitted empty output. The preserved CLI
+tests keep the late-failure and output transaction oracles. The XML corpus
+continues to freeze the old ElementTree events and Markdown projection. This
+closes the known DOCX caller set; it does not imply that other Python document
+tools are native or migrated.
 
 ## Plan and Audit Interfaces
 

@@ -14,6 +14,17 @@ downstream implementation ../../tests/agent_tools/test_prose_reasoning_graph.py 
 
 # prose_reasoning_graph.py
 
+## 語の抽出
+
+語の抽出は、既存のRustコマンド `agent-canon structured-analysis lexicon` が担当します。
+Unicodeを扱うライブラリICU4Xの辞書で日本語を区切り、句読点やemojiを除外します。抽出した語は、意味解析用の
+中間データ、概念、文同士の比較で共通利用します。原文と原文中の位置は変更しません。
+分野の候補は語句に基づく目安であり、実コーパスによる精度検証を表す値ではありません。
+
+内部の接続は標準入力のJSON `{"texts": ["こんにちは世界。"], "prompt": "研究論文"}` を
+一括で渡し、各入力の `terms`、文書全体の `top_terms`、`corpus_hints` を受け取ります。
+解析では必要な本文を一括処理し、文の比較ごとに別プロセスを起動しません。
+
 `prose_reasoning_graph.py` は、Markdown または plain text を一時的な
 SQLite-backed prose reasoning graph に変換する文章解析ツールです。
 根拠として graph DB は中間解析 artifact であり、したがって source document や DSL spec の代替ではありません。

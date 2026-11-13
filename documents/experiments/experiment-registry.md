@@ -5,8 +5,10 @@ contract reference
 responsibility Documents Experiment Registry for this repository.
 upstream design README.md durable document index
 upstream design ./gpu-admission-r5-source-packet.md exact registry closure and frozen topic adapter contract
-downstream implementation ../../tools/validation/ci/checks/check_experiment_registry.py validates registry schema
-downstream implementation ../../tools/validation/semantic/tools/tool_rejection_preflight.py predicts managed execution surface guardrails
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/experiment_registry.rs validates registry schema
+downstream test ../../tools/runtime/dispatch/agent-canon/tests/experiment_registry_native.rs exercises the native command and controlled registry fixtures
+downstream implementation ../../tools/bin/agent-canon exposes the native command
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/tool_rejection_preflight.rs predicts managed execution surface guardrails
 @dependency-end
 -->
 
@@ -132,7 +134,7 @@ registry entry を一つの route で配置します。`templates/experiments/_t
 利用者向けの作成手順にしません。
 
 ```bash
-python3 tools/experiments/lifecycle/create_experiment_topic.py <topic>
+tools/bin/agent-canon create-experiment-topic <topic>
 ```
 
 実行、publication、LATEST 更新には variant を必ず明示します。
@@ -140,7 +142,7 @@ python3 tools/experiments/lifecycle/create_experiment_topic.py <topic>
 ```bash
 python3 -m tools.experiments.execution.run_managed_experiment --topic <topic> --variant <variant> -- python3 experiments/<topic>/run.py
 python3 -m tools.experiments.artifacts.save_experiment_result_annex --result-dir experiments/<topic>/result/<run-id> --annex-repo "$EXPERIMENT_RESULT_ANNEX_REPO"
-python3 -m tools.experiments.artifacts.update_latest_result experiments/<topic>/result --variant <variant>
+agent-canon update-latest-result experiments/<topic>/result --variant <variant>
 ```
 
 ## server 実行ルール
@@ -163,18 +165,19 @@ python3 -m tools.experiments.artifacts.update_latest_result experiments/<topic>/
 ## validation
 
 ```bash
-python3 -m tools.validation.ci.checks.check_experiment_registry
+agent-canon experiment-registry
 make experiment-check
 ```
 
-この checker は、path の存在、必須 field、command の placeholder、branch / worktree metadata の妥当性を確認します。
+この native command は、path の存在、必須 field、command の placeholder、branch / worktree metadata の妥当性を確認します。
 registered command から `{config_path}` が欠ける場合も fail します。
 
 実験実行面の検証は [experiment-lifecycle](../../agents/skills/experiment-lifecycle.md#topic-boundary)
-の変更契約に従います。`tool_rejection_preflight.py` の
+の変更契約に従います。`tool-rejection-preflight` の
 `experiment_execution_surface_guard` は
 [Optional Rejection Prediction](../../agents/COMMUNICATION_PROTOCOL.md#optional-rejection-prediction)
 の補助診断であり、patch 前の必須 evidence ではありません。
-registry checker (`check_experiment_registry.py`) と runner の
-`tests/tools/test_run_managed_experiment.py` は、それぞれの契約変更を検証します。
+native registry command の契約は
+`tools/runtime/dispatch/agent-canon/tests/experiment_registry_native.rs` が検証します。
+`tests/tools/test_run_managed_experiment.py` は managed runner の契約を検証します。
 この文書の説明だけの変更に runner test や formal run を要求しません。

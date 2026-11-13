@@ -271,7 +271,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                 / "check_agent_canon_pr.sh"
             )
             text = script.read_text(encoding="utf-8").replace(
-                'python3 "${WORKSPACE_ROOT}/tools/validation/semantic/runtime/check_agent_runtime_alignment.py"\n',
+                'run_agent_canon check-agent-runtime-alignment --root "${WORKSPACE_ROOT}"\n',
                 "",
             )
             script.write_text(text, encoding="utf-8")
@@ -486,7 +486,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                     "# upstream design ../../../../.codex/README.md runtime hook behavior",
                     "# upstream design ../../../catalog.yaml tool catalog",
                     "# upstream implementation ./convention_compliance_contracts.toml marker contracts",
-                    "# upstream implementation ../skills/check_skill_frontmatter.py skill frontmatter",
+                    "# upstream implementation ../skills/check-skill-frontmatter skill frontmatter",
                     "# downstream implementation ../../ci/runners/run_all_checks.sh ci",
                     "# downstream implementation ../../../runtime/dispatch/agent-canon/src/tool_drift.rs drift gate",
                     "# downstream implementation ../../../../tests/agent_tools/test_check_convention_compliance.py tests",
@@ -503,7 +503,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             ".codex/README.md",
             "tools/catalog.yaml",
             "tools/validation/semantic/convention/convention_compliance_contracts.toml",
-            "tools/validation/semantic/skills/check_skill_frontmatter.py",
+            "tools/runtime/dispatch/agent-canon/src/skill_frontmatter.rs",
             "tools/validation/ci/runners/run_all_checks.sh",
             "tools/runtime/dispatch/agent-canon/src/tool_drift.rs",
             "tests/agent_tools/test_check_convention_compliance.py",
@@ -514,17 +514,17 @@ class CheckToolConventionDriftTest(unittest.TestCase):
         """Write fixtures for the tool rejection preflight contract."""
         self.write_file(
             root,
-            "tools/validation/semantic/tools/tool_rejection_preflight.py",
+            "tools/runtime/dispatch/agent-canon/src/tool_rejection_preflight.rs",
             "\n".join(
                 [
                     "# @dependency-start",
                     "# responsibility Prechecks edit-time risk class.",
-                    "# upstream design ../../../../agents/COMMUNICATION_PROTOCOL.md protocol",
-                    "# upstream design ../../../../agents/skills/codex-task-workflow.md workflow",
-                    "# upstream design ../../../../tools/runtime/dispatch/agent-canon/src/responsibility_scope.rs scope",
-                    "# upstream design ../../../README.md tool entrypoints",
-                    "# upstream design ../../../../documents/tools/README.md user-facing routes",
-                    "# upstream implementation ../../../../tests/agent_tools/test_tool_rejection_preflight.py scope preflight",
+                    "# upstream design ../../../../../agents/COMMUNICATION_PROTOCOL.md protocol",
+                    "# upstream design ../../../../../agents/skills/codex-task-workflow.md workflow",
+                    "# upstream implementation responsibility_scope.rs scope",
+                    "# upstream design ../../../../../tools/README.md tool entrypoints",
+                    "# upstream design ../../../../../documents/tools/README.md user-facing routes",
+                    "# downstream implementation ../../../../../tests/agent_tools/test_tool_rejection_preflight.py scope preflight",
                     "# @dependency-end",
                     "",
                 ]
@@ -588,15 +588,15 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                     "# upstream implementation ../../../repository/workspace/parent_root_side_effects.py parent-root boundary",
                     "# upstream implementation ../../../runtime/artifacts/runtime_artifacts.py runtime output boundary",
                     "# upstream implementation ../../../runtime/dispatch/agent-canon/src/report_artifact_checks.rs generated artifact guard",
-                    "# upstream implementation ../../semantic/runtime/check_agent_runtime_alignment.py runtime alignment",
+                    "# upstream implementation ../../../runtime/dispatch/agent-canon/src/runtime_alignment.rs runtime alignment",
                     "# upstream implementation ../../semantic/convention/check_convention_compliance.py convention gate",
                     "# upstream implementation ../../../runtime/lifecycle/update_lifecycle_contract.py lifecycle receipt",
                     "# upstream implementation ../../../runtime/dispatch/agent-canon/src/main.rs CLI build gate",
-                    "# upstream implementation ./check_github_workflows.py github checks",
+                    "# upstream implementation ../../../runtime/dispatch/agent-canon/src/github_workflow_check.rs github checks",
                     "# upstream implementation ./run_python_quality_checks.sh python quality",
                     "# @dependency-end",
                     'run_agent_canon generated-artifact-guard --root "${WORKSPACE_ROOT}"',
-                    'python3 "${WORKSPACE_ROOT}/tools/validation/semantic/runtime/check_agent_runtime_alignment.py"',
+                    'run_agent_canon check-agent-runtime-alignment --root "${WORKSPACE_ROOT}"',
                     "",
                 ]
             ),
@@ -607,11 +607,11 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             "tools/repository/workspace/parent_root_side_effects.py",
             "tools/runtime/artifacts/runtime_artifacts.py",
             "tools/runtime/dispatch/agent-canon/src/report_artifact_checks.rs",
-            "tools/validation/semantic/runtime/check_agent_runtime_alignment.py",
+            "tools/runtime/dispatch/agent-canon/src/runtime_alignment.rs",
             "tools/validation/semantic/convention/check_convention_compliance.py",
             "tools/runtime/lifecycle/update_lifecycle_contract.py",
             "tools/runtime/dispatch/agent-canon/src/main.rs",
-            "tools/validation/ci/checks/check_github_workflows.py",
+            "tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs",
             "tools/validation/ci/checks/run_python_quality_checks.sh",
         ]:
             self.write_plain_manifest(root, relative)

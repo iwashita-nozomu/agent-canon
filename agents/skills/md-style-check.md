@@ -29,16 +29,17 @@ downstream implementation ../../tests/tools/test_fix_mermaid.py tests native Mer
 
 1. Identify the changed Markdown paths and content owner. This binds the
    operation and returned findings to the requested scope.
-2. Run AgentCanon's native
-   `agent-canon docs format --root . <changed Markdown paths...>` through the
-   [shared runtime route](agent-canon-bootstrap.md#command-shape), with the
-   registered target as the working directory. This entrypoint applies the
-   configured formatter and checks together on the selected files. Read help
-   only when an option remains unresolved. If a provider requires writable
-   cache or temporary output, place a task-specific directory under
-   `AGENT_CANON_RUNTIME_ROOT` and pass it through that invocation's supported
-   environment variable. The registered target or private home may be
-   read-only, so generated state belongs outside them under the
+2. Follow the
+   [formatter execution procedure](../../documents/design/formatting.md#markdown-through-the-shared-runtime)
+   through the [shared runtime route](agent-canon-bootstrap.md#command-shape).
+   Registered targets are read-only: run AgentCanon's native
+   `agent-canon docs format --root <snapshot> <changed Markdown paths...>` on
+   a writable source snapshot in the runtime task directory, then inspect and
+   copy back only the selected files.
+   This entrypoint applies the configured formatter and checks together on the
+   selected files. Read help only when an option remains unresolved. The docs
+   command owns temporary provider output; bootstrap supplies its task-local
+   `TMPDIR`. Generated state follows the
    [shared runtime boundary](agent-canon-bootstrap.md#command-shape).
 3. Inspect the formatter's changes and diagnostics, then repair relevant
    formatting, link, heading, math, or Mermaid findings. The formatter

@@ -9,7 +9,7 @@
 // upstream design ../../../../README.md tool entrypoint index
 // upstream design ../../../../../documents/tools/README.md user-facing tool index
 // downstream implementation main.rs exposes the responsibility-scope CLI selector
-// downstream implementation ../../../../validation/semantic/tools/tool_rejection_preflight.py queries planned path owners
+// downstream implementation tool_rejection_preflight.rs queries planned path owners
 // downstream test ../../../../../tests/agent_tools/test_responsibility_scope.py tests scope validation and ownership queries
 // @dependency-end
 
@@ -70,9 +70,9 @@ pub struct Scope {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-struct PathOwnership {
-    path: String,
-    scope_ids: Vec<String>,
+pub(crate) struct PathOwnership {
+    pub(crate) path: String,
+    pub(crate) scope_ids: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -671,7 +671,7 @@ fn scope_covers(scope: &Scope, path: &str) -> bool {
         .any(|pattern| pattern_covers(pattern, path))
 }
 
-fn owners_for_paths(scopes: &[Scope], paths: &[String]) -> Vec<PathOwnership> {
+pub(crate) fn owners_for_paths(scopes: &[Scope], paths: &[String]) -> Vec<PathOwnership> {
     paths
         .iter()
         .map(|path| PathOwnership {

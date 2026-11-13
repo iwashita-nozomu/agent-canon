@@ -8,21 +8,38 @@
 
 # Match rustfmt's LF policy on every host without changing global Git settings.
 tools/runtime/dispatch/agent-canon/**/*.rs text eol=lf
+tools/runtime/python-provider/**/*.rs text eol=lf
+
+# The native docs CLI embeds these provider defaults for source-free targets.
+.markdownlint-cli2.jsonc text eol=lf
+tools/validation/documentation/config/lychee.toml text eol=lf
 
 # The dependency-plan golden binds to these tracked manifest bytes on every host.
 bootstrap/container/image/dependencies.toml text eol=lf
 
 # Frozen Python JSON goldens are byte-hashed by native tests; preserve LF bytes on every host.
-tests/fixtures/update_lifecycle/*_python_golden.json text eol=lf
-tests/fixtures/owner_guarantee/python_golden.json text eol=lf
+tests/fixtures/**/*python_golden.json text eol=lf
 
-# These frozen oracles bind their exact UTF-8 bytes on every host.
-tests/fixtures/design_similarity/python_golden.json text eol=lf
-tests/fixtures/design_similarity/float_python_golden.json text eol=lf
+# Skill v3 records bind source bytes and compare rendered projection bytes.
+agents/skills/*.md text eol=lf
+agents/skills/catalog.yaml text eol=lf
+agents/skills/skill-dependencies.yaml text eol=lf
+.codex/personal/skills/**/SKILL.md text eol=lf
+tests/fixtures/skill_frontmatter/** text eol=lf
+
+# Registry mutation fixtures contain exact line replacements on every host.
+tests/fixtures/experiment_registry/** text eol=lf
+
+# Graph identities bind these source and artifact bytes on every host.
+agents/canonical/skills.md text eol=lf
+documents/design/skill-tool-invocation-graph.md text eol=lf
+documents/runtime/skill-dependency-graph.* text eol=lf
+tests/fixtures/skill_dependency_graph/** text eol=lf
+
+# The embedded actionlint config is byte-hashed by the native checker; preserve LF bytes on every host.
+tools/validation/ci/config/actionlint.yaml text eol=lf
 
 # NVIDIA parser fixtures intentionally retain invalid whitespace/CRLF bytes as
 # raw evidence; do not run Git's text whitespace diff oracle over these files.
 tests/fixtures/nvidia/*.txt -diff
 tests/fixtures/nvidia/*.xml -diff
-# The TaskClose baseline corpus is byte-hashed by native tests on every host.
-tests/fixtures/task_close/python_golden.json text eol=lf

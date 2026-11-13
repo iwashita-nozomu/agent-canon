@@ -62,6 +62,19 @@ project's own Docker test runner.
 
 ## One command family
 
+For a first shared-runtime installation, the host needs Bash, Git, and a running
+Docker daemon. Clone the published source into an unused absolute install path:
+
+```bash
+INSTALL_ROOT=<absolute-installed-agent-canon-root>
+git clone https://github.com/iwashita-nozomu/agent-canon.git "$INSTALL_ROOT"
+```
+
+An existing installation uses its current source checkout. The native release
+archive supplies the Rust CLI; the source checkout supplies `bootstrap.sh` and
+the shared-runtime catalog. Choose the authorized control root once and reuse
+it across projects; each project is registered separately below.
+
 The installer entrypoint comes from the installed runtime source root; the
 observed project/worktree is a separate read-only `--root <topic>` target. Use
 the latest installed/bootstrap absolute entrypoint for that runtime; a topic

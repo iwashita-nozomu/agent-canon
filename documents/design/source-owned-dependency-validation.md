@@ -6,8 +6,8 @@ contract design
 responsibility Defines the authority boundary between tracked dependency source and optional persisted graph analysis.
 upstream design dependency-manifest-design.md dependency manifest DSL, relation, and review semantics
 downstream design ../../agents/canonical/CLI_ENTRYPOINTS.md public source and persisted graph command routes
-downstream implementation ../../tools/analysis/dependencies/source_dependency_graph.py derives source dependency facts
-downstream implementation ../../tools/analysis/dependencies/graph_client.py exposes source dependency compatibility and explicit graph runtime commands
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/source_dependency_graph.rs derives source dependency facts
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/graph_client.rs exposes typed source dependency queries and explicit graph runtime commands
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/dependency_manifest.rs owns the explicit graph-analysis source snapshot parser
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/dependency_headers.rs validates selected canonical source manifests
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/tool_drift.rs consumes source-derived dependency facts
@@ -19,8 +19,9 @@ downstream implementation ../../tests/agent_tools/test_check_dependency_headers.
 -->
 
 This design specializes the dependency-manifest design for authority and runtime
-ownership in `tools/analysis/dependencies/source_dependency_graph.py`. It replaces the
-former assumption that dependency correctness must be read from a persisted graph in `tools/analysis/dependencies/graph_client.py`. The manifest DSL, relation meanings,
+ownership in `tools/runtime/dispatch/agent-canon/src/source_dependency_graph.rs`. It replaces the
+former assumption that dependency correctness must be read from persisted graph state. The native
+`GraphClient` API retains persisted operations for explicit graph analysis. The manifest DSL, relation meanings,
 bidirectional review, cycle review, and changed-path selection remain owned by
 [dependency-manifest-design.md](dependency-manifest-design.md).
 
@@ -72,8 +73,8 @@ of $V(S)$.
 
 ### Source is the sole correctness authority
 
-Tracked source plus canonical parent-view bindings owns dependency facts through `tools/analysis/dependencies/source_dependency_graph.py`. Dependency query/context
-consumers used by validation, drift checks, and bounded search read those bytes directly through `tools/analysis/dependencies/graph_client.py`. A persisted snapshot is never consulted as a
+Tracked source plus canonical parent-view bindings owns dependency facts through `tools/runtime/dispatch/agent-canon/src/source_dependency_graph.rs`. Dependency query/context
+consumers used by validation, drift checks, bounded search, and prose ingestion read those bytes directly through `tools/runtime/dispatch/agent-canon/src/graph_client.rs`. A persisted snapshot is never consulted as a
 fallback or tie-breaker.
 
 ### Parsing fails closed
@@ -93,7 +94,7 @@ record tuples, not process-local counters or database row IDs.
 ### Canonical path containment
 
 Every relative target is resolved from the canonical source file in
-`tools/analysis/dependencies/source_dependency_graph.py`. The resolved path must remain
+`tools/runtime/dispatch/agent-canon/src/source_dependency_graph.rs`. The resolved path must remain
 below the selected repository root. Parent views are mapped by
 
 ### Cache and runtime state are non-authoritative
@@ -114,7 +115,7 @@ falls back from a parse error to cached facts.
 | explicit `graph build` / `graph status` | persisted graph runtime | yes |
 | non-dependency graph relations and token graph context | persisted graph runtime | yes |
 
-`GraphClient` remains a compatibility boundary while callers migrate. Its
+The native `GraphClient` API retains the typed response boundary. Its
 full-repository dependency query and tokenless path context are source-derived.
 `build`, `status`, non-dependency relation queries, and token context remain
 explicit persisted-graph operations. This split prevents broad caller churn
@@ -171,7 +172,7 @@ source consumers do not need a simultaneous rewrite. Compatibility applies only
 to response shape. It does not preserve the previous authority of persisted
 snapshots.
 
-`GraphClient` remains the source-owned adapter for explicit dependency analysis
+The native `GraphClient` API is the source-owned adapter for explicit dependency analysis
 and persisted graph operations. PR graph selection was removed with the
 dependency-specific PR gate; it is not an alias for the selected analysis route.
 
@@ -189,11 +190,11 @@ dependency-specific PR gate; it is not an alias for the selected analysis route.
 
 - `DSL` assumption: relation syntax and registered kinds are owned by
   [documents/design/dependency-manifest-design.md](dependency-manifest-design.md) and parsed by
-  `tools/analysis/dependencies/source_dependency_graph.py`.
+  `tools/runtime/dispatch/agent-canon/src/source_dependency_graph.rs`.
 - `normalization` assumption: canonical path and surface binding normalization
-  is owned by `tools/analysis/dependencies/source_dependency_graph.py` and
+  is owned by `tools/runtime/dispatch/agent-canon/src/source_dependency_graph.rs`.
 - Evidence sources: source projection and regression tests are
-  `tools/analysis/dependencies/source_dependency_graph.py` and the focused
+  `tools/runtime/dispatch/agent-canon/src/source_dependency_graph.rs` and the focused
   dependency-analysis tests.
 - Parent-doc alignment: relation and runtime authority remain governed by
   [documents/design/dependency-manifest-design.md](dependency-manifest-design.md).

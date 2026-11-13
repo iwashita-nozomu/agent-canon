@@ -3,7 +3,7 @@
 # contract tool
 # responsibility Renders dependency manifest graph TSV artifacts into deterministic bundle and projection reports.
 # upstream implementation ./check_dependency_graph.sh writes dependency graph TSV artifacts.
-# upstream implementation ../../runtime/source/export_static_seed.py reads complete committed Git trees for the optional tracked-path layer.
+# upstream implementation ../../runtime/dispatch/agent-canon/src/template_bundle.rs exposes committed Git trees for the optional tracked-path layer.
 # upstream design ../../../documents/design/dependency-manifest-design.md defines manifest graph semantics.
 # downstream design ../../../documents/tools/render_dependency_manifest_graph.md documents report generation.
 # downstream implementation ../../../tests/agent_tools/test_render_dependency_manifest_graph.py tests graph rendering.
@@ -26,15 +26,6 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TypedDict, cast
-
-if __package__ in (None, ""):
-    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
-
-from tools.runtime.source.export_static_seed import (
-    GitTreeEntry,
-    StaticSeedError,
-    load_committed_tree,
-)
 
 GRAPH_TSV_FIELD_COUNT = 4
 GRAPH_IR_SCHEMA = "agent_canon.graph_ir.v2"
@@ -91,6 +82,16 @@ class Edge:
     kind: str
     source: str
     target: str
+
+
+@dataclass(frozen=True)
+class GitTreeEntry:
+    """One committed tree entry returned by the native template-bundle owner."""
+
+    mode: str
+    object_type: str
+    object_id: str
+    path: str
 
 
 @dataclass(frozen=True)
@@ -461,12 +462,6 @@ def generate_graph_tsv(root: Path, target_path: Path, *, scope: str) -> GraphInp
         capture_output=True,
         text=True,
     )
-    if result.returncode != 0 and (
-        not target_path.exists() or target_path.stat().st_size == 0
-    ):
-        sys.stderr.write(result.stdout)
-        sys.stderr.write(result.stderr)
-        raise SystemExit(result.returncode)
     if result.returncode != 0:
         sys.stderr.write(result.stdout)
         sys.stderr.write(result.stderr)
@@ -649,6 +644,37 @@ def detect_direction_cycles(
     return detect_cycles(tuple(edge for edge in edges if edge.direction == direction))
 
 
+def _read_committed_tree(
+    root: Path, source_revision: str
+) -> tuple[str, dict[str, GitTreeEntry]]:
+    """Consume the native owner's committed-tree contract."""
+    cli = os.environ.get("AGENT_CANON_CLI") or "agent-canon"
+    try:
+        result = subprocess.run(
+            (
+                cli,
+                "template-bundle",
+                "committed-tree",
+                "--source-root",
+                str(root),
+                "--source-ref",
+                source_revision,
+            ),
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        payload = json.loads(result.stdout)
+        return payload["source_commit"], {
+            entry["path"]: GitTreeEntry(**entry) for entry in payload["entries"]
+        }
+    except subprocess.CalledProcessError as error:
+        detail = error.stderr.strip() or error.stdout.strip()
+        raise ValueError(f"unable to read selected Git tree: {detail}") from error
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        raise ValueError(f"unable to read selected Git tree: {error}") from error
+
+
 def build_report(
     root: Path,
     edges: tuple[Edge, ...],
@@ -656,10 +682,7 @@ def build_report(
     source_revision: str = "HEAD",
 ) -> GraphReport:
     """Build typed dependency diagnostics alongside one committed source tree."""
-    try:
-        tracked_tree_revision, tree_entries = load_committed_tree(root, source_revision)
-    except StaticSeedError as error:
-        raise ValueError(f"unable to read selected Git tree: {error}") from error
+    tracked_tree_revision, tree_entries = _read_committed_tree(root, source_revision)
     tracked_tree_entries = tuple(tree_entries[path] for path in sorted(tree_entries))
     node_set = {edge.source for edge in edges} | {edge.target for edge in edges}
     degree = Counter[str]()

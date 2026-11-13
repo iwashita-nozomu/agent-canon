@@ -191,6 +191,69 @@ fn source_capability_writes_only_the_approved_file() {
 }
 
 #[test]
+fn atomic_source_write_can_create_only_the_approved_target_parents() {
+    let root = TempRoot::new();
+    let relative = Path::new(".codex/personal/skills/example/SKILL.md");
+    let target = root.0.join(relative);
+    let capability = capability(&root.0, &[".codex/personal/skills/example/SKILL.md"]);
+
+    capability
+        .atomic_write_text_with_parents(relative, "generated\n", 0o644, true)
+        .expect("atomic writer creates missing parents beneath the exact grant");
+
+    assert_eq!(fs::read(&target).unwrap(), b"generated\n");
+    assert!(target.parent().unwrap().is_dir());
+    assert!(capability
+        .atomic_write_text_with_parents(
+            Path::new(".codex/personal/skills/other/SKILL.md"),
+            "deny\n",
+            0o644,
+            true
+        )
+        .is_err());
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        assert_eq!(
+            fs::metadata(&target).unwrap().permissions().mode() & 0o777,
+            0o644
+        );
+    }
+}
+
+#[test]
+fn source_capability_atomically_replaces_only_the_approved_file() {
+    let root = TempRoot::new();
+    let approved = root.write("documents/runtime/graph.md", "before\n");
+    let untouched = root.write("documents/runtime/untouched.md", "untouched\n");
+    let capability = capability(&root.0, &["documents/runtime/graph.md"]);
+
+    capability
+        .atomic_write_text(&approved, "after\n", 0o644)
+        .expect("approved source file is atomically replaced");
+
+    assert_eq!(fs::read_to_string(&approved).unwrap(), "after\n");
+    assert_eq!(fs::read_to_string(&untouched).unwrap(), "untouched\n");
+    assert_eq!(
+        fs::read_dir(approved.parent().unwrap()).unwrap().count(),
+        2,
+        "the same-directory temporary file is removed after publication"
+    );
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        assert_eq!(
+            approved.metadata().unwrap().permissions().mode() & 0o777,
+            0o644
+        );
+    }
+    assert!(capability
+        .atomic_write_text(&untouched, "must remain denied\n", 0o644)
+        .is_err());
+    assert_eq!(fs::read_to_string(&untouched).unwrap(), "untouched\n");
+}
+
+#[test]
 fn source_capability_removes_only_the_approved_file() {
     let root = TempRoot::new();
     let approved = root.write("docs/approved.md", "remove me\n");
@@ -204,6 +267,229 @@ fn source_capability_removes_only_the_approved_file() {
     assert!(!approved.exists());
     assert!(capability.remove_file(&untouched).is_err());
     assert_eq!(fs::read_to_string(&untouched).unwrap(), "untouched\n");
+}
+
+#[test]
+fn source_capability_copies_regular_file_content_mode_and_times() {
+    let root = TempRoot::new();
+    let source = root.write("documents/design/a.md", "copy source\n");
+    let target = root.0.join("documents/design/foo/a.md");
+    let source_atime = std::time::UNIX_EPOCH + std::time::Duration::from_secs(1_700_000_100);
+    let source_mtime = std::time::UNIX_EPOCH + std::time::Duration::new(1_700_000_123, 456_789_012);
+    let source_file = fs::OpenOptions::new()
+        .write(true)
+        .open(&source)
+        .expect("source is opened for metadata setup");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&source, fs::Permissions::from_mode(0o640))
+            .expect("source mode is seeded");
+    }
+    source_file
+        .set_times(
+            fs::FileTimes::new()
+                .set_accessed(source_atime)
+                .set_modified(source_mtime),
+        )
+        .expect("source times are seeded");
+    let capability = capability(&root.0, &["documents/design/foo/a.md"]);
+
+    capability
+        .copy_file_with_metadata(&source, &target)
+        .expect("source file copies under the exact grant");
+
+    let source_metadata = fs::metadata(&source).expect("source metadata remains available");
+    let target_metadata = fs::metadata(&target).expect("target metadata is available");
+    assert_eq!(
+        source_metadata.modified().unwrap(),
+        target_metadata.modified().unwrap()
+    );
+    assert_eq!(
+        source_metadata.accessed().unwrap(),
+        target_metadata.accessed().unwrap()
+    );
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        assert_eq!(
+            source_metadata.permissions().mode() & 0o7777,
+            target_metadata.permissions().mode() & 0o7777
+        );
+    }
+    assert_eq!(
+        fs::read(&target).expect("copied bytes are readable"),
+        b"copy source\n"
+    );
+    assert_eq!(
+        fs::read(&source).expect("source bytes remain readable"),
+        b"copy source\n"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn source_capability_copies_source_symlink_text_and_timestamps() {
+    use std::os::unix::fs::symlink;
+
+    let root = TempRoot::new();
+    let target_payload = root.write("documents/payload.md", "link target\n");
+    let source_link = root.0.join("documents/design/a.md");
+    fs::create_dir_all(source_link.parent().unwrap()).expect("source parent exists");
+    symlink(&target_payload, &source_link).expect("source symlink is created");
+    let source_link_times =
+        std::time::SystemTime::UNIX_EPOCH + std::time::Duration::new(1_700_000_123, 456_789_012);
+    let source_parent = cap_std::fs::Dir::open_ambient_dir(
+        source_link.parent().unwrap(),
+        cap_std::ambient_authority(),
+    )
+    .expect("source parent is opened for fixture metadata");
+    use cap_fs_ext::DirExt;
+    source_parent
+        .set_symlink_times(
+            "a.md",
+            Some(cap_fs_ext::SystemTimeSpec::from(
+                cap_std::time::SystemTime::from_std(source_link_times),
+            )),
+            Some(cap_fs_ext::SystemTimeSpec::from(
+                cap_std::time::SystemTime::from_std(source_link_times),
+            )),
+        )
+        .expect("source symlink times are seeded");
+    let target = root.0.join("documents/design/foo/a.md");
+    let capability = capability(&root.0, &["documents/design/foo/a.md"]);
+
+    capability
+        .copy_file_with_metadata(&source_link, &target)
+        .expect("source symlink is copied as a link");
+
+    assert_eq!(
+        fs::read_link(&target).expect("target remains a link"),
+        target_payload
+    );
+    assert!(fs::symlink_metadata(&target)
+        .expect("target link metadata exists")
+        .file_type()
+        .is_symlink());
+    let source_mtime = fs::symlink_metadata(&source_link)
+        .expect("source link metadata exists")
+        .modified()
+        .unwrap();
+    let target_mtime = fs::symlink_metadata(&target)
+        .expect("target link metadata exists")
+        .modified()
+        .unwrap();
+    assert_eq!(source_mtime, target_mtime);
+    assert_eq!(fs::read_to_string(&target).unwrap(), "link target\n");
+    assert_eq!(
+        fs::read_to_string(&target_payload).unwrap(),
+        "link target\n"
+    );
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn source_capability_copies_symlink_xattrs_when_the_filesystem_allows_them() {
+    use rustix::fs::{lgetxattr, lgetxattr_query, lsetxattr, XattrFlags};
+    use rustix::io::Errno;
+    use std::os::unix::fs::symlink;
+
+    let root = TempRoot::new();
+    root.write("documents/payload.md", "symlink target\n");
+    let source_link = root.0.join("documents/design/a.md");
+    fs::create_dir_all(source_link.parent().unwrap()).expect("source parent exists");
+    symlink("../payload.md", &source_link).expect("source symlink is created");
+    let xattr_name = "user.agentcanon.organizer.link";
+    let xattr_value = b"copied-link-value";
+    match lsetxattr(&source_link, xattr_name, xattr_value, XattrFlags::empty()) {
+        Ok(()) => {}
+        Err(error)
+            if error == Errno::PERM
+                || error == Errno::ACCESS
+                || error == Errno::NOTSUP
+                || error == Errno::OPNOTSUPP =>
+        {
+            eprintln!("filesystem does not permit symlink xattr setup: {error}");
+            return;
+        }
+        Err(error) => panic!("source symlink xattr setup failed: {error}"),
+    }
+    let target_link = root.0.join("documents/design/foo/a.md");
+    let capability = capability(&root.0, &["documents/design/foo/a.md"]);
+
+    capability
+        .copy_file_with_metadata(&source_link, &target_link)
+        .expect("source symlink and its metadata are copied");
+
+    let length = lgetxattr_query(&target_link, xattr_name).expect("copied link xattr exists");
+    let mut actual = vec![0; length];
+    let written =
+        lgetxattr(&target_link, xattr_name, &mut actual).expect("copied link xattr is readable");
+    actual.truncate(written);
+    assert_eq!(actual, xattr_value);
+}
+
+#[cfg(windows)]
+#[test]
+fn source_capability_copies_external_absolute_symlink_text_and_rejects_collision() {
+    use std::os::windows::fs::symlink_file;
+
+    let root = TempRoot::new();
+    let source_root = root.0.join("source");
+    let support_root = root.0.join("support");
+    fs::create_dir_all(source_root.join("documents/design"))
+        .expect("source design root is created");
+    fs::create_dir_all(&support_root).expect("external support root is created");
+    let support_file = support_root.join("real.md");
+    fs::write(&support_file, "external support content\n")
+        .expect("external support file is written");
+    let source_link = source_root.join("documents/design/a.md");
+    symlink_file(&support_file, &source_link).expect("absolute external source link is created");
+    let target_directory = source_root.join("documents/design/foo");
+    fs::create_dir_all(&target_directory).expect("target parent is created");
+    let copied_link = target_directory.join("copied.md");
+    let collision = target_directory.join("collision.md");
+    fs::write(&collision, "existing target remains\n").expect("collision target is seeded");
+    let source_link_text = fs::read_link(&source_link).expect("source link text is read");
+    let capability = capability(
+        &source_root,
+        &[
+            "documents/design/foo/copied.md",
+            "documents/design/foo/collision.md",
+        ],
+    );
+
+    capability
+        .copy_file_with_metadata(&source_link, &copied_link)
+        .expect("absolute external link is copied beneath the source grant");
+
+    assert_eq!(
+        fs::read_link(&copied_link).expect("copied external link text is read"),
+        source_link_text,
+        "the copy preserves the source link's raw absolute target text"
+    );
+    assert_eq!(
+        fs::read(&support_file).expect("external support content remains readable"),
+        b"external support content\n",
+        "copying the link does not mutate its external target"
+    );
+
+    assert!(
+        capability
+            .copy_file_with_metadata(&source_link, &collision)
+            .is_err(),
+        "an existing destination fails atomically"
+    );
+    assert_eq!(
+        fs::read(&collision).expect("existing collision target remains readable"),
+        b"existing target remains\n",
+        "failed link creation leaves the existing destination unchanged"
+    );
+    assert_eq!(
+        fs::read(&support_file).expect("external support content remains readable"),
+        b"external support content\n",
+        "the collision path does not mutate the external target"
+    );
 }
 
 #[test]
@@ -236,6 +522,9 @@ fn source_capability_rechecks_symlink_components_before_write_or_remove() {
     symlink(&outside, &guide).expect("replacement symlink is created");
     assert!(capability
         .write_text(&guide, "must not follow link\n")
+        .is_err());
+    assert!(capability
+        .atomic_write_text(&guide, "must not replace link\n", 0o644)
         .is_err());
     assert!(capability.remove_file(&guide).is_err());
     assert!(fs::symlink_metadata(&guide)

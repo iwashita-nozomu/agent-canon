@@ -100,7 +100,9 @@ mode の選択・作成は lifecycle command が行い、manual clone や手動 
 
 競合で停止した merge は native Git の `MERGE_HEAD` と index に状態が残ります。
 integration executor は実際の unmerged paths を確認し、各競合をその source owner と
-レビューして解消します。`finalize-merge` は未解決 index を `git write-tree` が拒否する
+レビューして解消します。意図的な削除・置換と旧 branch の編集が競合した場合は
+削除を採用し、必要な変更を移行先へ反映します。旧ファイルを復活させません。
+`finalize-merge` は未解決 index を `git write-tree` が拒否する
 場合は commit せず、解決済み index の tree と `MERGE_HEAD` を親とする commit を read back
 します。競合後に `origin/main` が進んでも、停止中 merge の相手は保存された
 `MERGE_HEAD` です。別 inventory / plan は lifecycle の前提ではありません。
@@ -124,8 +126,8 @@ integration executor は実際の unmerged paths を確認し、各競合をそ�
   commit/tree の保持だけを示します。どちらも ignored file、submodule の per-worktree Git metadata/object、
   annex-only content の保存・復元可能性を証明しません。これらの保持判断は既存 task owner の前提条件です。
 - 削除後は exact path の不存在を確認し、linked-worktree では worktree list からの消失も
-  確認します。既存 task/Issue の結果に削除 path と復元先、または保持 path・理由・解除条件を
-  記録し、closeout では未解決の保持対象だけを引き継ぎます。新しい台帳は作りません。
+  確認します。未解決の保持対象と再開に必要な事実は会話で引き継ぎます。
+  cleanup の台帳は作りません。
   clone の削除は remote branch、clone 外の local refs、無関係な checkout、workspace 全体の
   削除を認可しません。
 - linked-worktree cleanup は proof preflight 後、exact path に対して `git worktree remove --force` を一度実行します。

@@ -8,7 +8,6 @@ upstream design ../conventions/coding-conventions-testing.md test source and exe
 upstream design ../experiments/experiment-registry.md managed experiment identity and execution
 upstream design ../experiments/result-log-retention-and-visualization.md result and retention ownership
 upstream design ../structure/repo-structure-contract.toml repository path-existence profiles, not CMake graph selection
-downstream implementation ../../tools/runtime/manifest/manifest_rendering.py routes C++ reviewer candidates from changed paths
 downstream design ../../agents/skills/cpp-review.md owns selected project-native C++ review
 downstream design ../../agents/skills/refactor-loop.md consumes the selected path and graph boundary
 @dependency-end
@@ -90,9 +89,7 @@ registration は project-owned であり、`cpp-core`、`cpp-tests`、`build/cpp
 
 ## Profile selection and review
 
-`tools/runtime/manifest/manifest_rendering.py` は changed C/C++ source、header、または CMake
-manifest から native reviewer candidate を選びます。その language-review routing は path
-候補を示すもので、CMake profile を選択・検証するものではありません。C++ review は
+変更された C/C++ source、header、CMake manifest に応じて、既存の C++ review を選択します。C++ review は
 consumer の canonical CMake entrypoint、production target、選択された consumer manifest、
 実際の configure/build/test command を読み戻します。
 
@@ -108,7 +105,7 @@ executable の launch、run identity、config snapshot、raw/summary result、re
 package と既存 materializer の境界を別途所有し、この文書は新しい template client を
 追加しません。
 
-`create_experiment_topic.py --template-profile cpp` は consumer owner が明示した profileだけを
+`create-experiment-topic --template-profile cpp` は consumer owner が明示した profileだけを
 materializeします。`consumer-local` はtopic-local `CMakeLists.txt`を、`root-aggregate` は既存
 root manifestからincludeするtarget registration requestを生成します。profileの選択、root manifestの
 編集、configure/build commandはproject ownerの責務です。

@@ -278,34 +278,9 @@ normalize_path() {
 resolve_generated_skill_targets() {
   local source_file="$1"
   local rel_path="$2"
-  local script_path
-  script_path="$(readlink -f "${BASH_SOURCE[0]}")"
-  python3 - "$script_path" "$ROOT_DIR" "$source_file" "$rel_path" <<'PY'
-from pathlib import Path
-import sys
-
-script_path = Path(sys.argv[1])
-root = Path(sys.argv[2])
-source_file = Path(sys.argv[3])
-raw_target = sys.argv[4]
-sys.path.insert(0, str(script_path.parents[4]))
-from tools.analysis.dependencies.source_dependency_graph import (  # noqa: E402
-    SourceDependencyError,
-    resolve_dependency_targets,
-)
-
-try:
-    source = source_file if source_file.is_absolute() else root / source_file
-    for target in resolve_dependency_targets(root, source, raw_target):
-        print(target)
-except SourceDependencyError as error:
-    # Keep an unmatched generated pattern visible to the shell existence check.
-    if str(error).startswith("unknown generated skill view: "):
-        print(error.args[0].split(": ", 1)[1])
-    else:
-        print(error, file=sys.stderr)
-        raise SystemExit(1)
-PY
+  local native_cli="${AGENT_CANON_CLI:-$ROOT_DIR/tools/bin/agent-canon}"
+  "$native_cli" source-dependency-graph resolve-targets \
+    --root "$ROOT_DIR" --source "$source_file" --target "$rel_path"
 }
 
 source_context_file() {

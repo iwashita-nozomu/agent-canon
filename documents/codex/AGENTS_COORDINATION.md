@@ -55,11 +55,9 @@ legacy adapter に重複 policy を置きません。
 
 ## Runtime Instruction Surfaces
 
-The executable policy projection is owned by the canonical workflow,
-subagent, communication, model/profile, implementation-route, capacity, and
-closeout owners. This adapter only links to those surfaces; it does not
-restate Target-State-First, Decision Sufficiency, ToolCall, capacity, or
-lifecycle policy.
+The executable policy projection is owned by the canonical runtime instructions,
+role configuration, collaboration protocol, and selected operation owners. This
+adapter only links to those surfaces; it does not duplicate their policy.
 
 - [ROOT_AGENTS.md](../../ROOT_AGENTS.md)
 - [AGENTS.md](../../AGENTS.md)
@@ -86,71 +84,12 @@ lifecycle policy.
 
 ## 実行入口
 
-標準の run bundle を作るときは次を使います。
-
-    python3 tools/runtime/lifecycle/bootstrap_agent_run.py \
-      --task "short task summary" \
-      --task-id T1 \
-      --owner "codex-or-human" \
-      --workspace-root "$PWD"
-
-研究・実験つき変更:
-
-    python3 tools/runtime/lifecycle/bootstrap_agent_run.py \
-      --task "research-backed change" \
-      --task-id T4 \
-      --owner "codex" \
-      --workspace-root "$PWD"
-
-環境変更:
-
-    python3 tools/runtime/lifecycle/bootstrap_agent_run.py \
-      --task "platform or environment change" \
-      --task-id T8 \
-      --owner "codex" \
-      --workspace-root "$PWD"
-
-学術文章:
-
-    python3 tools/runtime/lifecycle/bootstrap_agent_run.py \
-      --task "academic writing task" \
-      --task-id T10 \
-      --owner "codex" \
-      --workspace-root "$PWD"
-
-包括的開発:
-
-    python3 tools/runtime/lifecycle/bootstrap_agent_run.py \
-      --task "comprehensive development pass" \
-      --task-id T12 \
-      --owner "codex" \
-      --workspace-root "$PWD"
-
-`experimenter` が有効な run では `experiment_change_loop.md`、`infra_steward` が有効な run では `environment_change_proposal.md` も bundle に含めます。
-環境変更 run では `infra_steward` が requirements/plan/design の前に `triggering code requirement`、`blocked command`、`source-of-truth surface` を proposal に固定してから handoff します。
-`notation_definition_reviewer` と `logic_gap_reviewer` が有効な run では、学術文章の記号定義と論理飛躍を別 reviewer で閉じます。
-`citation_evidence_reviewer` が有効な run では、論文 draft の major claim が citation、figure、table、derivation、appendix、result に辿れるかを別 reviewer で閉じます。
-code change を含む run では `test_designer` が `test_plan.md` を作り、worker はそれを test 実装へ落とします。
-T12 の default-active specialists は `scheduler`、`schedule_reviewer`、`project_reviewer`、`docs_workflow_steward`、`prompt_config_reviewer` の 5 role だけです。post-implementation change review は `diff_triage_reviewer` が既定で、`python_reviewer` / `cpp_reviewer` は changed-path evidence、parent packet evidence、または明示 review-pack activation がある場合だけ追加します。
-`--task-id` は task catalog の default specialist と default review pack をそのまま bundle に反映します。
-
-Codex parent session では、planning を含む場合に plan-mode command を使って構いません。official Codex CLI では `/plan` です。
-runtime が `/agent` を提供する場合は subagent inventory の確認に使い、使えない runtime では `.codex/agents/*.toml` を正本にします。
-
-artifact-only role や review role の write scope を確認するときは、`validate_role_write_scope.py` を使います。
-
-    python3 tools/validation/semantic/authority/validate_role_write_scope.py \
-      --report-dir reports/agents/<run-id> \
-      --workspace-root "$PWD" \
-      --report-snapshot-out /tmp/agent-report-before.json \
-      --workspace-snapshot-out /tmp/agent-workspace-before.json
-
-    python3 tools/validation/semantic/authority/validate_role_write_scope.py \
-      --role change_reviewer \
-      --report-dir reports/agents/<run-id> \
-      --report-snapshot-in /tmp/agent-report-before.json \
-      --workspace-snapshot-in /tmp/agent-workspace-before.json \
-      --workspace-root "$PWD"
+Planning and collaboration use the current Codex session. The official Codex
+CLI provides `/plan` for planning and `/agent` when subagent collaboration is
+available. Role definitions remain in `agents/agents_config.json`; selected
+skills and operation owners determine which roles apply. Native AgentCanon tools
+are invoked through their existing `tools/bin/agent-canon` entrypoint when that
+runtime is selected.
 
 ## repo 側の運用ルール
 
@@ -158,11 +97,8 @@ artifact-only role や review role の write scope を確認するときは、`v
 - handoff、review、response、escalation の書式は [agents/COMMUNICATION_PROTOCOL.md](../../agents/COMMUNICATION_PROTOCOL.md) を正本にします。
 - 共通 workflow と skill routing は `agents/` 側で保守し、runtime entrypoint へ role 一覧を重複記載しません。
 - 会話だけを根拠に実装へ進めず、`documents/`、`documents/notes/`、`references/` と local library の sweep を先に行います。
-- 最初の作業 update では `workflow=<family>`, `skills=<...>`, `review=<...>` を宣言します。
 - review feedback は、直前の execution role が反映してから次段へ handoff します。
 - 学術文章では `document_flow_reviewer`、`notation_definition_reviewer`、`logic_gap_reviewer`、completeness reviewer を兼務させません。
 - 論文 draft では `citation_evidence_reviewer` も兼務させません。
 - repo ファイルを直接編集する role は parent-assigned write policy を持つ write-capable role に限ります。
-- 包括的開発では、parent が `team_manifest.yaml` の write policy で writer ごとの path / directory を管理します。
-- scope が重なる場合は current checkout 内の後続 wave に serialize し、別 `git worktree` へ分けません。
-- run 固有の artifact は `reports/agents/<run-id>/` に寄せ、repo-wide の正本と混ぜません。
+- role-specific write capability は `agents/agents_config.json` と current Codex assignment が所有します。

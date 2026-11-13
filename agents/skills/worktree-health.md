@@ -27,8 +27,6 @@ CleanupProof、closeout packet readback は既存 cleanup owner に従います�
 
 checkout の clean / dirty、差分、conflict risk、authority drift、carry-over、削除前の健全性を確認するとき。
 
-- `reports/agents/.active_run` と run bundle の task authority 確認
-- `team_manifest.yaml` / `task_authority.yaml` の write scope 逸脱確認
 - current checkout の clean / dirty 状態確認
 - conflict risk や carry-over 漏れの確認
 - 削除前の健全性チェック
@@ -36,15 +34,11 @@ checkout の clean / dirty、差分、conflict risk、authority drift、carry-ov
 ## Core References
 
 - [documents/operations/worktree-lifecycle.md](../../documents/operations/worktree-lifecycle.md)
-- [documents/operations/WORKTREE_SCOPE_TEMPLATE.md](../../documents/operations/WORKTREE_SCOPE_TEMPLATE.md)
 - [documents/operations/BRANCH_SCOPE.md](../../documents/operations/BRANCH_SCOPE.md)
 - [documents/notes/guardrails/README.md](../../documents/notes/guardrails/README.md)
 - [documents/notes/failures/README.md](../../documents/notes/failures/README.md)
 - [documents/notes/worktrees/README.md](../../documents/notes/worktrees/README.md)
 - `tools/runtime/authority/hook_safety.py`
-- `tools/repository/workspace/worktree_scope_lint.py`
-- `tools/validation/documentation/checks/check_worktree_scopes.sh`
-- `tools/validation/semantic/authority/validate_role_write_scope.py`
 
 ## Expected Outcome
 
@@ -93,8 +87,7 @@ untracked の内容が必要ならそのファイルを読みます。remote の
 
 | 適用条件 | 必要な確認・既存経路 |
 | --- | --- |
-| 選択された run bundle の authority / scope / output 診断 | `reports/agents/.active_run`、`task_authority.yaml`、`team_manifest.yaml`、run-local `work_log.md` の関係する部分を照合。write scope の検証が必要なら `python3 tools/validation/semantic/authority/validate_role_write_scope.py --report-dir reports/agents/<run-id> --workspace-root . --role <role-id>` |
-| legacy scope / action log の cleanup | `python3 tools/repository/workspace/worktree_scope_lint.py --current`、配置の確認が必要なら `bash tools/validation/documentation/checks/check_worktree_scopes.sh`。対象の scope は [WORKTREE_SCOPE_TEMPLATE](../../documents/operations/WORKTREE_SCOPE_TEMPLATE.md) を参照 |
+| legacy scope / action log の cleanup | 対象ファイルの必要な部分を読み、`git status --short --branch` と対象の `git diff -- <paths>` で実際の状態を確認。[legacy scope の確認](../../documents/operations/worktree-lifecycle.md#legacy-scope-の確認) に従う |
 | linked / stale / duplicate worktree の診断 | `git worktree list --porcelain` と対象の [worktree 記録](../../documents/notes/worktrees/README.md) |
 | 実際の drift / cleanup risk と既知事項の照合 | 関係する [guardrails](../../documents/notes/guardrails/README.md) / [failures](../../documents/notes/failures/README.md) の項目だけを参照 |
 | checkout の削除・carry-over | [worktree lifecycle](../../documents/operations/worktree-lifecycle.md) と [Branch Scope](../../documents/operations/BRANCH_SCOPE.md) の対象操作。必要な note / report / result の引継ぎ先を保持 |

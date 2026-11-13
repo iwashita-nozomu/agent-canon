@@ -60,10 +60,9 @@ For a program execution request, use this order:
    checkout does not prove parent/worker execution equivalence. Keep a worker's
    access failure scoped to that worker, not a host outage or test assertion.
    Preserve observed parent success as counterevidence, not proof of worker repair.
-   For failed verification, immediately use
-   [Failed Verification Record](../../documents/operations/notes-lifecycle.md#failed-verification-record)
-   and link the topic from the existing task/Issue. Later diagnosis updates that
-   record; saving it does not wait for a confirmed cause or task closeout.
+   Use the observed failure and current context to decide the next owning repair.
+   No failure-topic file or per-attempt ledger is required.
+
 3. Identify which required outcome the failure prevents before expanding diagnosis.
    A program assertion or test failure is not by itself an environment defect.
    Warnings, optional settings, and unavailable diagnostic tools are not new gates.

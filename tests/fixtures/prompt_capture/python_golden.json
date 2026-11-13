@@ -1,0 +1,2814 @@
+{
+  "source": "cfac45c7fb6563432ef05b0936c0f0e119daad8c",
+  "python": "3.12.3",
+  "source_hash": "f6637eba22f8515de8cd432d8fcf69c7a6f10f86c8e3697949b74fc0619ae904",
+  "contract": "Current Hook/default-redaction and eval helper consumers; custom redaction_rules have no active callers and are not selected. Failed capture compares rejection, not incidental Python exception wording.",
+  "cases": [
+    {
+      "name": "null",
+      "input": {
+        "payload": null,
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "missing",
+        "excerpt_redacted": "",
+        "char_count": 0,
+        "fingerprint": "",
+        "truncated": false,
+        "should_log": false
+      }
+    },
+    {
+      "name": "array",
+      "input": {
+        "payload": [],
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "missing",
+        "excerpt_redacted": "",
+        "char_count": 0,
+        "fingerprint": "",
+        "truncated": false,
+        "should_log": false
+      }
+    },
+    {
+      "name": "empty",
+      "input": {
+        "payload": {},
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "missing",
+        "excerpt_redacted": "",
+        "char_count": 0,
+        "fingerprint": "",
+        "truncated": false,
+        "should_log": false
+      }
+    },
+    {
+      "name": "wrong-prompt",
+      "input": {
+        "payload": {
+          "prompt": 3
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "missing",
+        "excerpt_redacted": "",
+        "char_count": 0,
+        "fingerprint": "",
+        "truncated": false,
+        "should_log": false
+      }
+    },
+    {
+      "name": "empty-prompt",
+      "input": {
+        "payload": {
+          "prompt": ""
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "missing",
+        "excerpt_redacted": "",
+        "char_count": 0,
+        "fingerprint": "",
+        "truncated": false,
+        "should_log": false
+      }
+    },
+    {
+      "name": "plain",
+      "input": {
+        "payload": {
+          "prompt": "\u4f5c\u696d\u3092\u9032\u3081\u308b \ud83d\ude00"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u4f5c\u696d\u3092\u9032\u3081\u308b \ud83d\ude00",
+        "char_count": 8,
+        "fingerprint": "e374314d0199dfd4",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "space",
+      "input": {
+        "payload": {
+          "prompt": "  "
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "  ",
+        "char_count": 2,
+        "fingerprint": "6c179f21e6f62b62",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "length/0/0",
+      "input": {
+        "payload": {
+          "prompt": ""
+        },
+        "excerpt_limit": 0
+      },
+      "accepted": true,
+      "output": {
+        "status": "missing",
+        "excerpt_redacted": "",
+        "char_count": 0,
+        "fingerprint": "",
+        "truncated": false,
+        "should_log": false
+      }
+    },
+    {
+      "name": "length/0/1",
+      "input": {
+        "payload": {
+          "prompt": ""
+        },
+        "excerpt_limit": 1
+      },
+      "accepted": true,
+      "output": {
+        "status": "missing",
+        "excerpt_redacted": "",
+        "char_count": 0,
+        "fingerprint": "",
+        "truncated": false,
+        "should_log": false
+      }
+    },
+    {
+      "name": "length/0/2",
+      "input": {
+        "payload": {
+          "prompt": ""
+        },
+        "excerpt_limit": 2
+      },
+      "accepted": true,
+      "output": {
+        "status": "missing",
+        "excerpt_redacted": "",
+        "char_count": 0,
+        "fingerprint": "",
+        "truncated": false,
+        "should_log": false
+      }
+    },
+    {
+      "name": "length/0/600",
+      "input": {
+        "payload": {
+          "prompt": ""
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "missing",
+        "excerpt_redacted": "",
+        "char_count": 0,
+        "fingerprint": "",
+        "truncated": false,
+        "should_log": false
+      }
+    },
+    {
+      "name": "length/1/0",
+      "input": {
+        "payload": {
+          "prompt": "\u3042"
+        },
+        "excerpt_limit": 0
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "",
+        "char_count": 1,
+        "fingerprint": "dc5a4d3d82f7e157",
+        "truncated": true,
+        "should_log": true
+      }
+    },
+    {
+      "name": "length/1/1",
+      "input": {
+        "payload": {
+          "prompt": "\u3042"
+        },
+        "excerpt_limit": 1
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u3042",
+        "char_count": 1,
+        "fingerprint": "dc5a4d3d82f7e157",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "length/1/2",
+      "input": {
+        "payload": {
+          "prompt": "\u3042"
+        },
+        "excerpt_limit": 2
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u3042",
+        "char_count": 1,
+        "fingerprint": "dc5a4d3d82f7e157",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "length/1/600",
+      "input": {
+        "payload": {
+          "prompt": "\u3042"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u3042",
+        "char_count": 1,
+        "fingerprint": "dc5a4d3d82f7e157",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "length/2/0",
+      "input": {
+        "payload": {
+          "prompt": "\u3042\ud83d\ude00"
+        },
+        "excerpt_limit": 0
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "",
+        "char_count": 2,
+        "fingerprint": "9e0af856c0563945",
+        "truncated": true,
+        "should_log": true
+      }
+    },
+    {
+      "name": "length/2/1",
+      "input": {
+        "payload": {
+          "prompt": "\u3042\ud83d\ude00"
+        },
+        "excerpt_limit": 1
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u3042",
+        "char_count": 2,
+        "fingerprint": "9e0af856c0563945",
+        "truncated": true,
+        "should_log": true
+      }
+    },
+    {
+      "name": "length/2/2",
+      "input": {
+        "payload": {
+          "prompt": "\u3042\ud83d\ude00"
+        },
+        "excerpt_limit": 2
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u3042\ud83d\ude00",
+        "char_count": 2,
+        "fingerprint": "9e0af856c0563945",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "length/2/600",
+      "input": {
+        "payload": {
+          "prompt": "\u3042\ud83d\ude00"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u3042\ud83d\ude00",
+        "char_count": 2,
+        "fingerprint": "9e0af856c0563945",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "length/3/0",
+      "input": {
+        "payload": {
+          "prompt": "\u3042\ud83d\ude00x"
+        },
+        "excerpt_limit": 0
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "",
+        "char_count": 3,
+        "fingerprint": "6fae3b59f791e976",
+        "truncated": true,
+        "should_log": true
+      }
+    },
+    {
+      "name": "length/3/1",
+      "input": {
+        "payload": {
+          "prompt": "\u3042\ud83d\ude00x"
+        },
+        "excerpt_limit": 1
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u3042",
+        "char_count": 3,
+        "fingerprint": "6fae3b59f791e976",
+        "truncated": true,
+        "should_log": true
+      }
+    },
+    {
+      "name": "length/3/2",
+      "input": {
+        "payload": {
+          "prompt": "\u3042\ud83d\ude00x"
+        },
+        "excerpt_limit": 2
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u3042\ud83d\ude00",
+        "char_count": 3,
+        "fingerprint": "6fae3b59f791e976",
+        "truncated": true,
+        "should_log": true
+      }
+    },
+    {
+      "name": "length/3/600",
+      "input": {
+        "payload": {
+          "prompt": "\u3042\ud83d\ude00x"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u3042\ud83d\ude00x",
+        "char_count": 3,
+        "fingerprint": "6fae3b59f791e976",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "length/599/0",
+      "input": {
+        "payload": {
+          "prompt": "\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00"
+        },
+        "excerpt_limit": 0
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "",
+        "char_count": 599,
+        "fingerprint": "8b4335a02e4fe0a1",
+        "truncated": true,
+        "should_log": true
+      }
+    },
+    {
+      "name": "length/599/1",
+      "input": {
+        "payload": {
+          "prompt": "\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00"
+        },
+        "excerpt_limit": 1
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u3042",
+        "char_count": 599,
+        "fingerprint": "8b4335a02e4fe0a1",
+        "truncated": true,
+        "should_log": true
+      }
+    },
+    {
+      "name": "length/599/2",
+      "input": {
+        "payload": {
+          "prompt": "\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00"
+        },
+        "excerpt_limit": 2
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u3042\ud83d\ude00",
+        "char_count": 599,
+        "fingerprint": "8b4335a02e4fe0a1",
+        "truncated": true,
+        "should_log": true
+      }
+    },
+    {
+      "name": "length/599/600",
+      "input": {
+        "payload": {
+          "prompt": "\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00",
+        "char_count": 599,
+        "fingerprint": "8b4335a02e4fe0a1",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "length/600/0",
+      "input": {
+        "payload": {
+          "prompt": "\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x"
+        },
+        "excerpt_limit": 0
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "",
+        "char_count": 600,
+        "fingerprint": "5fe474c4f142f3b5",
+        "truncated": true,
+        "should_log": true
+      }
+    },
+    {
+      "name": "length/600/1",
+      "input": {
+        "payload": {
+          "prompt": "\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x"
+        },
+        "excerpt_limit": 1
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u3042",
+        "char_count": 600,
+        "fingerprint": "5fe474c4f142f3b5",
+        "truncated": true,
+        "should_log": true
+      }
+    },
+    {
+      "name": "length/600/2",
+      "input": {
+        "payload": {
+          "prompt": "\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x"
+        },
+        "excerpt_limit": 2
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u3042\ud83d\ude00",
+        "char_count": 600,
+        "fingerprint": "5fe474c4f142f3b5",
+        "truncated": true,
+        "should_log": true
+      }
+    },
+    {
+      "name": "length/600/600",
+      "input": {
+        "payload": {
+          "prompt": "\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x",
+        "char_count": 600,
+        "fingerprint": "5fe474c4f142f3b5",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "length/601/0",
+      "input": {
+        "payload": {
+          "prompt": "\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042"
+        },
+        "excerpt_limit": 0
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "",
+        "char_count": 601,
+        "fingerprint": "87986f4c53bbc24d",
+        "truncated": true,
+        "should_log": true
+      }
+    },
+    {
+      "name": "length/601/1",
+      "input": {
+        "payload": {
+          "prompt": "\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042"
+        },
+        "excerpt_limit": 1
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u3042",
+        "char_count": 601,
+        "fingerprint": "87986f4c53bbc24d",
+        "truncated": true,
+        "should_log": true
+      }
+    },
+    {
+      "name": "length/601/2",
+      "input": {
+        "payload": {
+          "prompt": "\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042"
+        },
+        "excerpt_limit": 2
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u3042\ud83d\ude00",
+        "char_count": 601,
+        "fingerprint": "87986f4c53bbc24d",
+        "truncated": true,
+        "should_log": true
+      }
+    },
+    {
+      "name": "length/601/600",
+      "input": {
+        "payload": {
+          "prompt": "\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x",
+        "char_count": 601,
+        "fingerprint": "87986f4c53bbc24d",
+        "truncated": true,
+        "should_log": true
+      }
+    },
+    {
+      "name": "length/1000/0",
+      "input": {
+        "payload": {
+          "prompt": "\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042"
+        },
+        "excerpt_limit": 0
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "",
+        "char_count": 1000,
+        "fingerprint": "b9529977793dc10b",
+        "truncated": true,
+        "should_log": true
+      }
+    },
+    {
+      "name": "length/1000/1",
+      "input": {
+        "payload": {
+          "prompt": "\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042"
+        },
+        "excerpt_limit": 1
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u3042",
+        "char_count": 1000,
+        "fingerprint": "b9529977793dc10b",
+        "truncated": true,
+        "should_log": true
+      }
+    },
+    {
+      "name": "length/1000/2",
+      "input": {
+        "payload": {
+          "prompt": "\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042"
+        },
+        "excerpt_limit": 2
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u3042\ud83d\ude00",
+        "char_count": 1000,
+        "fingerprint": "b9529977793dc10b",
+        "truncated": true,
+        "should_log": true
+      }
+    },
+    {
+      "name": "length/1000/600",
+      "input": {
+        "payload": {
+          "prompt": "\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x\u3042\ud83d\ude00x",
+        "char_count": 1000,
+        "fingerprint": "b9529977793dc10b",
+        "truncated": true,
+        "should_log": true
+      }
+    },
+    {
+      "name": "negative-empty",
+      "input": {
+        "payload": {},
+        "excerpt_limit": -1
+      },
+      "accepted": false,
+      "observed_error_type": "ValueError"
+    },
+    {
+      "name": "negative-prompt",
+      "input": {
+        "payload": {
+          "prompt": "abc"
+        },
+        "excerpt_limit": -1
+      },
+      "accepted": false,
+      "observed_error_type": "ValueError"
+    },
+    {
+      "name": "token/0/0",
+      "input": {
+        "payload": {
+          "prompt": "AKIAAAAAAAAAAAAAAAAA"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "[REDACTED_SECRET]",
+        "char_count": 20,
+        "fingerprint": "4b82f7466cc183e2",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/0/1",
+      "input": {
+        "payload": {
+          "prompt": " AKIAAAAAAAAAAAAAAAAA "
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": " [REDACTED_SECRET] ",
+        "char_count": 22,
+        "fingerprint": "dbb121c5337cd39b",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/0/2",
+      "input": {
+        "payload": {
+          "prompt": "xAKIAAAAAAAAAAAAAAAAA"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "xAKIAAAAAAAAAAAAAAAAA",
+        "char_count": 21,
+        "fingerprint": "37a7738c63623b7c",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/0/3",
+      "input": {
+        "payload": {
+          "prompt": "AKIAAAAAAAAAAAAAAAAAx"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "AKIAAAAAAAAAAAAAAAAAx",
+        "char_count": 21,
+        "fingerprint": "1fe1ed41a2020b73",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/0/4",
+      "input": {
+        "payload": {
+          "prompt": "_AKIAAAAAAAAAAAAAAAAA_"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "_AKIAAAAAAAAAAAAAAAAA_",
+        "char_count": 22,
+        "fingerprint": "04814b7966b5fd4c",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/0/5",
+      "input": {
+        "payload": {
+          "prompt": "\u00e9AKIAAAAAAAAAAAAAAAAA\u00e9"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u00e9AKIAAAAAAAAAAAAAAAAA\u00e9",
+        "char_count": 22,
+        "fingerprint": "8f131f45e1a1287b",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/0/6",
+      "input": {
+        "payload": {
+          "prompt": "\ud801\udc00AKIAAAAAAAAAAAAAAAAA\ud801\udc00"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\ud801\udc00AKIAAAAAAAAAAAAAAAAA\ud801\udc00",
+        "char_count": 22,
+        "fingerprint": "a75e0d0812caa17a",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/0/7",
+      "input": {
+        "payload": {
+          "prompt": "\u00b2AKIAAAAAAAAAAAAAAAAA\u00b2"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u00b2AKIAAAAAAAAAAAAAAAAA\u00b2",
+        "char_count": 22,
+        "fingerprint": "005ff3b6c40a3ad1",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/0/8",
+      "input": {
+        "payload": {
+          "prompt": "\u0301AKIAAAAAAAAAAAAAAAAA\u0301"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u0301[REDACTED_SECRET]\u0301",
+        "char_count": 22,
+        "fingerprint": "d105ed058cf9933c",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/0/9",
+      "input": {
+        "payload": {
+          "prompt": "-AKIAAAAAAAAAAAAAAAAA-"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "-[REDACTED_SECRET]-",
+        "char_count": 22,
+        "fingerprint": "364bb6632ccdf474",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/0/10",
+      "input": {
+        "payload": {
+          "prompt": "\u200cAKIAAAAAAAAAAAAAAAAA\u200c"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u200c[REDACTED_SECRET]\u200c",
+        "char_count": 22,
+        "fingerprint": "212d18add20f84dc",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/0/11",
+      "input": {
+        "payload": {
+          "prompt": "\u0870AKIAAAAAAAAAAAAAAAAA\u0870"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u0870AKIAAAAAAAAAAAAAAAAA\u0870",
+        "char_count": 22,
+        "fingerprint": "8d3b5657213b629a",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/1/0",
+      "input": {
+        "payload": {
+          "prompt": "ghp_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "[REDACTED_SECRET]",
+        "char_count": 34,
+        "fingerprint": "aadcebbf9c9ca71d",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/1/1",
+      "input": {
+        "payload": {
+          "prompt": " ghp_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa "
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": " [REDACTED_SECRET] ",
+        "char_count": 36,
+        "fingerprint": "e2ba83684a7e24fd",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/1/2",
+      "input": {
+        "payload": {
+          "prompt": "xghp_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "xghp_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "char_count": 35,
+        "fingerprint": "d29d4ee2e97e1db6",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/1/3",
+      "input": {
+        "payload": {
+          "prompt": "ghp_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaax"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "[REDACTED_SECRET]",
+        "char_count": 35,
+        "fingerprint": "c40edf3fe9c5b7ac",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/1/4",
+      "input": {
+        "payload": {
+          "prompt": "_ghp_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa_"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "_ghp_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa_",
+        "char_count": 36,
+        "fingerprint": "658ae807467c2031",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/1/5",
+      "input": {
+        "payload": {
+          "prompt": "\u00e9ghp_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\u00e9"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u00e9ghp_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\u00e9",
+        "char_count": 36,
+        "fingerprint": "1e4bef6a6013805e",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/1/6",
+      "input": {
+        "payload": {
+          "prompt": "\ud801\udc00ghp_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\ud801\udc00"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\ud801\udc00ghp_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\ud801\udc00",
+        "char_count": 36,
+        "fingerprint": "8ee6cb924091adba",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/1/7",
+      "input": {
+        "payload": {
+          "prompt": "\u00b2ghp_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\u00b2"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u00b2ghp_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\u00b2",
+        "char_count": 36,
+        "fingerprint": "5a11d165156538b9",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/1/8",
+      "input": {
+        "payload": {
+          "prompt": "\u0301ghp_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\u0301"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u0301[REDACTED_SECRET]\u0301",
+        "char_count": 36,
+        "fingerprint": "5439dd3e7af35c93",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/1/9",
+      "input": {
+        "payload": {
+          "prompt": "-ghp_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "-[REDACTED_SECRET]-",
+        "char_count": 36,
+        "fingerprint": "23d83b6701d5a684",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/1/10",
+      "input": {
+        "payload": {
+          "prompt": "\u200cghp_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\u200c"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u200c[REDACTED_SECRET]\u200c",
+        "char_count": 36,
+        "fingerprint": "a75e820d75b5d633",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/1/11",
+      "input": {
+        "payload": {
+          "prompt": "\u0870ghp_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\u0870"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u0870ghp_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\u0870",
+        "char_count": 36,
+        "fingerprint": "1a49ec238f9461eb",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/2/0",
+      "input": {
+        "payload": {
+          "prompt": "sk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "[REDACTED_SECRET]",
+        "char_count": 35,
+        "fingerprint": "d2f94fd4e51e270b",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/2/1",
+      "input": {
+        "payload": {
+          "prompt": " sk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz "
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": " [REDACTED_SECRET] ",
+        "char_count": 37,
+        "fingerprint": "99cc9dd1ffb26656",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/2/2",
+      "input": {
+        "payload": {
+          "prompt": "xsk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "xsk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
+        "char_count": 36,
+        "fingerprint": "91cfdf51d83e28c3",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/2/3",
+      "input": {
+        "payload": {
+          "prompt": "sk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzx"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "[REDACTED_SECRET]",
+        "char_count": 36,
+        "fingerprint": "916066f75c0aaabb",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/2/4",
+      "input": {
+        "payload": {
+          "prompt": "_sk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz_"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "_sk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz_",
+        "char_count": 37,
+        "fingerprint": "39394c1a1b25ad69",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/2/5",
+      "input": {
+        "payload": {
+          "prompt": "\u00e9sk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz\u00e9"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u00e9sk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz\u00e9",
+        "char_count": 37,
+        "fingerprint": "90c2cb8c8acfdf51",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/2/6",
+      "input": {
+        "payload": {
+          "prompt": "\ud801\udc00sk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz\ud801\udc00"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\ud801\udc00sk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz\ud801\udc00",
+        "char_count": 37,
+        "fingerprint": "7e083c4b1c1a124b",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/2/7",
+      "input": {
+        "payload": {
+          "prompt": "\u00b2sk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz\u00b2"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u00b2sk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz\u00b2",
+        "char_count": 37,
+        "fingerprint": "2cc61888049343d7",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/2/8",
+      "input": {
+        "payload": {
+          "prompt": "\u0301sk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz\u0301"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u0301[REDACTED_SECRET]\u0301",
+        "char_count": 37,
+        "fingerprint": "1750a18af645afd4",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/2/9",
+      "input": {
+        "payload": {
+          "prompt": "-sk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "-[REDACTED_SECRET]-",
+        "char_count": 37,
+        "fingerprint": "3eaf7c305ed89a80",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/2/10",
+      "input": {
+        "payload": {
+          "prompt": "\u200csk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz\u200c"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u200c[REDACTED_SECRET]\u200c",
+        "char_count": 37,
+        "fingerprint": "75537840470ffe19",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/2/11",
+      "input": {
+        "payload": {
+          "prompt": "\u0870sk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz\u0870"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u0870sk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz\u0870",
+        "char_count": 37,
+        "fingerprint": "1023b1814d32ed9f",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/3/0",
+      "input": {
+        "payload": {
+          "prompt": "sk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "sk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
+        "char_count": 34,
+        "fingerprint": "ecf8b0e75fb62403",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/3/1",
+      "input": {
+        "payload": {
+          "prompt": " sk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz "
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": " sk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz ",
+        "char_count": 36,
+        "fingerprint": "7d6cb1d819f98b5a",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/3/2",
+      "input": {
+        "payload": {
+          "prompt": "xsk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "xsk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
+        "char_count": 35,
+        "fingerprint": "e378b9f65e6933b7",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/3/3",
+      "input": {
+        "payload": {
+          "prompt": "sk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzx"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "[REDACTED_SECRET]",
+        "char_count": 35,
+        "fingerprint": "488d2f50d6497b04",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/3/4",
+      "input": {
+        "payload": {
+          "prompt": "_sk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz_"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "_sk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz_",
+        "char_count": 36,
+        "fingerprint": "1f5fd46d33f74466",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/3/5",
+      "input": {
+        "payload": {
+          "prompt": "\u00e9sk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz\u00e9"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u00e9sk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz\u00e9",
+        "char_count": 36,
+        "fingerprint": "e37e0c4cfe9b2cf2",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/3/6",
+      "input": {
+        "payload": {
+          "prompt": "\ud801\udc00sk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz\ud801\udc00"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\ud801\udc00sk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz\ud801\udc00",
+        "char_count": 36,
+        "fingerprint": "c87e4599223aed87",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/3/7",
+      "input": {
+        "payload": {
+          "prompt": "\u00b2sk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz\u00b2"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u00b2sk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz\u00b2",
+        "char_count": 36,
+        "fingerprint": "829b2249b4623325",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/3/8",
+      "input": {
+        "payload": {
+          "prompt": "\u0301sk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz\u0301"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u0301sk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz\u0301",
+        "char_count": 36,
+        "fingerprint": "3910960d8e1cde00",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/3/9",
+      "input": {
+        "payload": {
+          "prompt": "-sk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "-sk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-",
+        "char_count": 36,
+        "fingerprint": "106d147446ea5dd1",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/3/10",
+      "input": {
+        "payload": {
+          "prompt": "\u200csk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz\u200c"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u200csk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz\u200c",
+        "char_count": 36,
+        "fingerprint": "a53fdeb2d36880d5",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/3/11",
+      "input": {
+        "payload": {
+          "prompt": "\u0870sk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz\u0870"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u0870sk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz\u0870",
+        "char_count": 36,
+        "fingerprint": "00a27a73ec0482c7",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/4/0",
+      "input": {
+        "payload": {
+          "prompt": "-----BEGIN PRIVATE KEY-----"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "[REDACTED_SECRET]",
+        "char_count": 27,
+        "fingerprint": "3021d90eb9437b2d",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/4/1",
+      "input": {
+        "payload": {
+          "prompt": " -----BEGIN PRIVATE KEY----- "
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": " [REDACTED_SECRET] ",
+        "char_count": 29,
+        "fingerprint": "4f0e064d660ee8f8",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/4/2",
+      "input": {
+        "payload": {
+          "prompt": "x-----BEGIN PRIVATE KEY-----"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "x[REDACTED_SECRET]",
+        "char_count": 28,
+        "fingerprint": "9c6deeec4276bb24",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/4/3",
+      "input": {
+        "payload": {
+          "prompt": "-----BEGIN PRIVATE KEY-----x"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "[REDACTED_SECRET]x",
+        "char_count": 28,
+        "fingerprint": "0f5b5877756a13c1",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/4/4",
+      "input": {
+        "payload": {
+          "prompt": "_-----BEGIN PRIVATE KEY-----_"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "_[REDACTED_SECRET]_",
+        "char_count": 29,
+        "fingerprint": "17bf9adbccc42642",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/4/5",
+      "input": {
+        "payload": {
+          "prompt": "\u00e9-----BEGIN PRIVATE KEY-----\u00e9"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u00e9[REDACTED_SECRET]\u00e9",
+        "char_count": 29,
+        "fingerprint": "9ba16624d3340b82",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/4/6",
+      "input": {
+        "payload": {
+          "prompt": "\ud801\udc00-----BEGIN PRIVATE KEY-----\ud801\udc00"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\ud801\udc00[REDACTED_SECRET]\ud801\udc00",
+        "char_count": 29,
+        "fingerprint": "868eef7a5b843c3c",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/4/7",
+      "input": {
+        "payload": {
+          "prompt": "\u00b2-----BEGIN PRIVATE KEY-----\u00b2"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u00b2[REDACTED_SECRET]\u00b2",
+        "char_count": 29,
+        "fingerprint": "5c93bdbc3a8a2589",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/4/8",
+      "input": {
+        "payload": {
+          "prompt": "\u0301-----BEGIN PRIVATE KEY-----\u0301"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u0301[REDACTED_SECRET]\u0301",
+        "char_count": 29,
+        "fingerprint": "594cc21d33dc1372",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/4/9",
+      "input": {
+        "payload": {
+          "prompt": "------BEGIN PRIVATE KEY------"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "-[REDACTED_SECRET]-",
+        "char_count": 29,
+        "fingerprint": "0120419f761142dc",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/4/10",
+      "input": {
+        "payload": {
+          "prompt": "\u200c-----BEGIN PRIVATE KEY-----\u200c"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u200c[REDACTED_SECRET]\u200c",
+        "char_count": 29,
+        "fingerprint": "d436d43800a78cb4",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/4/11",
+      "input": {
+        "payload": {
+          "prompt": "\u0870-----BEGIN PRIVATE KEY-----\u0870"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u0870[REDACTED_SECRET]\u0870",
+        "char_count": 29,
+        "fingerprint": "5cfca9d3578f38f4",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/5/0",
+      "input": {
+        "payload": {
+          "prompt": "-----BEGIN RSA PRIVATE KEY-----"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "[REDACTED_SECRET]",
+        "char_count": 31,
+        "fingerprint": "8bcac7908eb95041",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/5/1",
+      "input": {
+        "payload": {
+          "prompt": " -----BEGIN RSA PRIVATE KEY----- "
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": " [REDACTED_SECRET] ",
+        "char_count": 33,
+        "fingerprint": "f180ec0085ba70e5",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/5/2",
+      "input": {
+        "payload": {
+          "prompt": "x-----BEGIN RSA PRIVATE KEY-----"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "x[REDACTED_SECRET]",
+        "char_count": 32,
+        "fingerprint": "503cffad21fbc996",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/5/3",
+      "input": {
+        "payload": {
+          "prompt": "-----BEGIN RSA PRIVATE KEY-----x"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "[REDACTED_SECRET]x",
+        "char_count": 32,
+        "fingerprint": "d28083926eaa3432",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/5/4",
+      "input": {
+        "payload": {
+          "prompt": "_-----BEGIN RSA PRIVATE KEY-----_"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "_[REDACTED_SECRET]_",
+        "char_count": 33,
+        "fingerprint": "eb3d7bf9799304d1",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/5/5",
+      "input": {
+        "payload": {
+          "prompt": "\u00e9-----BEGIN RSA PRIVATE KEY-----\u00e9"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u00e9[REDACTED_SECRET]\u00e9",
+        "char_count": 33,
+        "fingerprint": "5578dd8c3056a2b1",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/5/6",
+      "input": {
+        "payload": {
+          "prompt": "\ud801\udc00-----BEGIN RSA PRIVATE KEY-----\ud801\udc00"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\ud801\udc00[REDACTED_SECRET]\ud801\udc00",
+        "char_count": 33,
+        "fingerprint": "e02de66672b6303f",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/5/7",
+      "input": {
+        "payload": {
+          "prompt": "\u00b2-----BEGIN RSA PRIVATE KEY-----\u00b2"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u00b2[REDACTED_SECRET]\u00b2",
+        "char_count": 33,
+        "fingerprint": "6fdddfe07ca9ad27",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/5/8",
+      "input": {
+        "payload": {
+          "prompt": "\u0301-----BEGIN RSA PRIVATE KEY-----\u0301"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u0301[REDACTED_SECRET]\u0301",
+        "char_count": 33,
+        "fingerprint": "e64e4402be729dc2",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/5/9",
+      "input": {
+        "payload": {
+          "prompt": "------BEGIN RSA PRIVATE KEY------"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "-[REDACTED_SECRET]-",
+        "char_count": 33,
+        "fingerprint": "84e47a1679096aa7",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/5/10",
+      "input": {
+        "payload": {
+          "prompt": "\u200c-----BEGIN RSA PRIVATE KEY-----\u200c"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u200c[REDACTED_SECRET]\u200c",
+        "char_count": 33,
+        "fingerprint": "9e86343bbee1aef4",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/5/11",
+      "input": {
+        "payload": {
+          "prompt": "\u0870-----BEGIN RSA PRIVATE KEY-----\u0870"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u0870[REDACTED_SECRET]\u0870",
+        "char_count": 33,
+        "fingerprint": "fb4f5e5d42d478ce",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/6/0",
+      "input": {
+        "payload": {
+          "prompt": "-----BEGIN DSA PRIVATE KEY-----"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "[REDACTED_SECRET]",
+        "char_count": 31,
+        "fingerprint": "07b213c05939fb7f",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/6/1",
+      "input": {
+        "payload": {
+          "prompt": " -----BEGIN DSA PRIVATE KEY----- "
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": " [REDACTED_SECRET] ",
+        "char_count": 33,
+        "fingerprint": "f9bfd7e203c82836",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/6/2",
+      "input": {
+        "payload": {
+          "prompt": "x-----BEGIN DSA PRIVATE KEY-----"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "x[REDACTED_SECRET]",
+        "char_count": 32,
+        "fingerprint": "e30004ee07b54e58",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/6/3",
+      "input": {
+        "payload": {
+          "prompt": "-----BEGIN DSA PRIVATE KEY-----x"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "[REDACTED_SECRET]x",
+        "char_count": 32,
+        "fingerprint": "2827f8ba1c598173",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/6/4",
+      "input": {
+        "payload": {
+          "prompt": "_-----BEGIN DSA PRIVATE KEY-----_"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "_[REDACTED_SECRET]_",
+        "char_count": 33,
+        "fingerprint": "027add3362bc5251",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/6/5",
+      "input": {
+        "payload": {
+          "prompt": "\u00e9-----BEGIN DSA PRIVATE KEY-----\u00e9"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u00e9[REDACTED_SECRET]\u00e9",
+        "char_count": 33,
+        "fingerprint": "f5917b7c23a4966d",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/6/6",
+      "input": {
+        "payload": {
+          "prompt": "\ud801\udc00-----BEGIN DSA PRIVATE KEY-----\ud801\udc00"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\ud801\udc00[REDACTED_SECRET]\ud801\udc00",
+        "char_count": 33,
+        "fingerprint": "253416dfc9f5d534",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/6/7",
+      "input": {
+        "payload": {
+          "prompt": "\u00b2-----BEGIN DSA PRIVATE KEY-----\u00b2"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u00b2[REDACTED_SECRET]\u00b2",
+        "char_count": 33,
+        "fingerprint": "03b9f338e965b9f4",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/6/8",
+      "input": {
+        "payload": {
+          "prompt": "\u0301-----BEGIN DSA PRIVATE KEY-----\u0301"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u0301[REDACTED_SECRET]\u0301",
+        "char_count": 33,
+        "fingerprint": "5004c8077eddd5f6",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/6/9",
+      "input": {
+        "payload": {
+          "prompt": "------BEGIN DSA PRIVATE KEY------"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "-[REDACTED_SECRET]-",
+        "char_count": 33,
+        "fingerprint": "5e0d2f11078a0abc",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/6/10",
+      "input": {
+        "payload": {
+          "prompt": "\u200c-----BEGIN DSA PRIVATE KEY-----\u200c"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u200c[REDACTED_SECRET]\u200c",
+        "char_count": 33,
+        "fingerprint": "983fd8e0cbead2d8",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/6/11",
+      "input": {
+        "payload": {
+          "prompt": "\u0870-----BEGIN DSA PRIVATE KEY-----\u0870"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u0870[REDACTED_SECRET]\u0870",
+        "char_count": 33,
+        "fingerprint": "0bbd643e396a3fbc",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/7/0",
+      "input": {
+        "payload": {
+          "prompt": "-----BEGIN EC PRIVATE KEY-----"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "[REDACTED_SECRET]",
+        "char_count": 30,
+        "fingerprint": "33ea101ddbe7c33b",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/7/1",
+      "input": {
+        "payload": {
+          "prompt": " -----BEGIN EC PRIVATE KEY----- "
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": " [REDACTED_SECRET] ",
+        "char_count": 32,
+        "fingerprint": "b7ceaf01ea2dd72b",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/7/2",
+      "input": {
+        "payload": {
+          "prompt": "x-----BEGIN EC PRIVATE KEY-----"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "x[REDACTED_SECRET]",
+        "char_count": 31,
+        "fingerprint": "fa0de5be1c1e0e27",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/7/3",
+      "input": {
+        "payload": {
+          "prompt": "-----BEGIN EC PRIVATE KEY-----x"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "[REDACTED_SECRET]x",
+        "char_count": 31,
+        "fingerprint": "92cf6d2d48ef7a15",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/7/4",
+      "input": {
+        "payload": {
+          "prompt": "_-----BEGIN EC PRIVATE KEY-----_"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "_[REDACTED_SECRET]_",
+        "char_count": 32,
+        "fingerprint": "0fc898be8f71a70e",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/7/5",
+      "input": {
+        "payload": {
+          "prompt": "\u00e9-----BEGIN EC PRIVATE KEY-----\u00e9"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u00e9[REDACTED_SECRET]\u00e9",
+        "char_count": 32,
+        "fingerprint": "19fbb7cd324e4bb6",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/7/6",
+      "input": {
+        "payload": {
+          "prompt": "\ud801\udc00-----BEGIN EC PRIVATE KEY-----\ud801\udc00"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\ud801\udc00[REDACTED_SECRET]\ud801\udc00",
+        "char_count": 32,
+        "fingerprint": "fe3651e43509c867",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/7/7",
+      "input": {
+        "payload": {
+          "prompt": "\u00b2-----BEGIN EC PRIVATE KEY-----\u00b2"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u00b2[REDACTED_SECRET]\u00b2",
+        "char_count": 32,
+        "fingerprint": "fd010160bc9ae5f0",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/7/8",
+      "input": {
+        "payload": {
+          "prompt": "\u0301-----BEGIN EC PRIVATE KEY-----\u0301"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u0301[REDACTED_SECRET]\u0301",
+        "char_count": 32,
+        "fingerprint": "7164d6cc28f5c595",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/7/9",
+      "input": {
+        "payload": {
+          "prompt": "------BEGIN EC PRIVATE KEY------"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "-[REDACTED_SECRET]-",
+        "char_count": 32,
+        "fingerprint": "b162ff418eb540ac",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/7/10",
+      "input": {
+        "payload": {
+          "prompt": "\u200c-----BEGIN EC PRIVATE KEY-----\u200c"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u200c[REDACTED_SECRET]\u200c",
+        "char_count": 32,
+        "fingerprint": "1711491c18d419c1",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/7/11",
+      "input": {
+        "payload": {
+          "prompt": "\u0870-----BEGIN EC PRIVATE KEY-----\u0870"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u0870[REDACTED_SECRET]\u0870",
+        "char_count": 32,
+        "fingerprint": "d76bb40521d9009f",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/8/0",
+      "input": {
+        "payload": {
+          "prompt": "-----BEGIN OPENSSH PRIVATE KEY-----"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "[REDACTED_SECRET]",
+        "char_count": 35,
+        "fingerprint": "03d104c669e3c7b6",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/8/1",
+      "input": {
+        "payload": {
+          "prompt": " -----BEGIN OPENSSH PRIVATE KEY----- "
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": " [REDACTED_SECRET] ",
+        "char_count": 37,
+        "fingerprint": "24db0adc15172d61",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/8/2",
+      "input": {
+        "payload": {
+          "prompt": "x-----BEGIN OPENSSH PRIVATE KEY-----"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "x[REDACTED_SECRET]",
+        "char_count": 36,
+        "fingerprint": "a524b0a2c4f4ccb7",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/8/3",
+      "input": {
+        "payload": {
+          "prompt": "-----BEGIN OPENSSH PRIVATE KEY-----x"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "[REDACTED_SECRET]x",
+        "char_count": 36,
+        "fingerprint": "03e5f770e907a2d7",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/8/4",
+      "input": {
+        "payload": {
+          "prompt": "_-----BEGIN OPENSSH PRIVATE KEY-----_"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "_[REDACTED_SECRET]_",
+        "char_count": 37,
+        "fingerprint": "b6bf19f63e27b3a6",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/8/5",
+      "input": {
+        "payload": {
+          "prompt": "\u00e9-----BEGIN OPENSSH PRIVATE KEY-----\u00e9"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u00e9[REDACTED_SECRET]\u00e9",
+        "char_count": 37,
+        "fingerprint": "73583d19855a3c06",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/8/6",
+      "input": {
+        "payload": {
+          "prompt": "\ud801\udc00-----BEGIN OPENSSH PRIVATE KEY-----\ud801\udc00"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\ud801\udc00[REDACTED_SECRET]\ud801\udc00",
+        "char_count": 37,
+        "fingerprint": "fe72c5de85a71284",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/8/7",
+      "input": {
+        "payload": {
+          "prompt": "\u00b2-----BEGIN OPENSSH PRIVATE KEY-----\u00b2"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u00b2[REDACTED_SECRET]\u00b2",
+        "char_count": 37,
+        "fingerprint": "8033114701b29cb6",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/8/8",
+      "input": {
+        "payload": {
+          "prompt": "\u0301-----BEGIN OPENSSH PRIVATE KEY-----\u0301"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u0301[REDACTED_SECRET]\u0301",
+        "char_count": 37,
+        "fingerprint": "9de80bb57aa7f687",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/8/9",
+      "input": {
+        "payload": {
+          "prompt": "------BEGIN OPENSSH PRIVATE KEY------"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "-[REDACTED_SECRET]-",
+        "char_count": 37,
+        "fingerprint": "aac7d7df124fc01b",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/8/10",
+      "input": {
+        "payload": {
+          "prompt": "\u200c-----BEGIN OPENSSH PRIVATE KEY-----\u200c"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u200c[REDACTED_SECRET]\u200c",
+        "char_count": 37,
+        "fingerprint": "7aa5d97c340b902d",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "token/8/11",
+      "input": {
+        "payload": {
+          "prompt": "\u0870-----BEGIN OPENSSH PRIVATE KEY-----\u0870"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "\u0870[REDACTED_SECRET]\u0870",
+        "char_count": 37,
+        "fingerprint": "de5f6459319499c0",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "multiple",
+      "input": {
+        "payload": {
+          "prompt": "AKIAAAAAAAAAAAAAAAAA ghp_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa sk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz sk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz -----BEGIN PRIVATE KEY----- -----BEGIN RSA PRIVATE KEY----- -----BEGIN DSA PRIVATE KEY----- -----BEGIN EC PRIVATE KEY----- -----BEGIN OPENSSH PRIVATE KEY-----"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "[REDACTED_SECRET] [REDACTED_SECRET] [REDACTED_SECRET] sk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz [REDACTED_SECRET] [REDACTED_SECRET] [REDACTED_SECRET] [REDACTED_SECRET] [REDACTED_SECRET]",
+        "char_count": 285,
+        "fingerprint": "41e202442ff67a4a",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "adjacent",
+      "input": {
+        "payload": {
+          "prompt": "AKIAAAAAAAAAAAAAAAAA ghp_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa sk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzAKIAAAAAAAAAAAAAAAAA ghp_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa sk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzAKIAAAAAAAAAAAAAAAAA ghp_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa sk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": true,
+      "output": {
+        "status": "present",
+        "excerpt_redacted": "[REDACTED_SECRET] [REDACTED_SECRET] [REDACTED_SECRET] [REDACTED_SECRET] [REDACTED_SECRET] [REDACTED_SECRET] [REDACTED_SECRET]",
+        "char_count": 273,
+        "fingerprint": "2969ff8898467486",
+        "truncated": false,
+        "should_log": true
+      }
+    },
+    {
+      "name": "surrogate/0",
+      "input": {
+        "payload": {
+          "prompt": "\ud800"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": false,
+      "observed_error_type": "UnicodeEncodeError"
+    },
+    {
+      "name": "surrogate/1",
+      "input": {
+        "payload": {
+          "prompt": "\udc00"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": false,
+      "observed_error_type": "UnicodeEncodeError"
+    },
+    {
+      "name": "surrogate/2",
+      "input": {
+        "payload": {
+          "prompt": "a\ud800b"
+        },
+        "excerpt_limit": 600
+      },
+      "accepted": false,
+      "observed_error_type": "UnicodeEncodeError"
+    }
+  ],
+  "redactions": [
+    {
+      "name": "redact/0",
+      "input": "",
+      "output": ""
+    },
+    {
+      "name": "redact/1",
+      "input": "AKIAAAAAAAAAAAAAAAAA",
+      "output": "[REDACTED_SECRET]"
+    },
+    {
+      "name": "redact/2",
+      "input": "ghp_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "output": "[REDACTED_SECRET]"
+    },
+    {
+      "name": "redact/3",
+      "input": "sk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
+      "output": "[REDACTED_SECRET]"
+    },
+    {
+      "name": "redact/4",
+      "input": "sk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
+      "output": "sk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
+    },
+    {
+      "name": "redact/5",
+      "input": "-----BEGIN PRIVATE KEY-----",
+      "output": "[REDACTED_SECRET]"
+    },
+    {
+      "name": "redact/6",
+      "input": "-----BEGIN RSA PRIVATE KEY-----",
+      "output": "[REDACTED_SECRET]"
+    },
+    {
+      "name": "redact/7",
+      "input": "-----BEGIN DSA PRIVATE KEY-----",
+      "output": "[REDACTED_SECRET]"
+    },
+    {
+      "name": "redact/8",
+      "input": "-----BEGIN EC PRIVATE KEY-----",
+      "output": "[REDACTED_SECRET]"
+    },
+    {
+      "name": "redact/9",
+      "input": "-----BEGIN OPENSSH PRIVATE KEY-----",
+      "output": "[REDACTED_SECRET]"
+    },
+    {
+      "name": "redact/10",
+      "input": "AKIAAAAAAAAAAAAAAAAA ghp_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa sk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz sk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz -----BEGIN PRIVATE KEY----- -----BEGIN RSA PRIVATE KEY----- -----BEGIN DSA PRIVATE KEY----- -----BEGIN EC PRIVATE KEY----- -----BEGIN OPENSSH PRIVATE KEY-----",
+      "output": "[REDACTED_SECRET] [REDACTED_SECRET] [REDACTED_SECRET] sk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz [REDACTED_SECRET] [REDACTED_SECRET] [REDACTED_SECRET] [REDACTED_SECRET] [REDACTED_SECRET]"
+    },
+    {
+      "name": "redact/11",
+      "input": "\ud800AKIAAAAAAAAAAAAAAAAA",
+      "output": "\ud800[REDACTED_SECRET]"
+    },
+    {
+      "name": "redact/12",
+      "input": "\u00e9AKIAAAAAAAAAAAAAAAAA\u00e9",
+      "output": "\u00e9AKIAAAAAAAAAAAAAAAAA\u00e9"
+    },
+    {
+      "name": "redact/13",
+      "input": "sk-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-",
+      "output": "[REDACTED_SECRET]-"
+    },
+    {
+      "name": "redact/14",
+      "input": "\u0870AKIAAAAAAAAAAAAAAAAA",
+      "output": "\u0870AKIAAAAAAAAAAAAAAAAA"
+    }
+  ]
+}

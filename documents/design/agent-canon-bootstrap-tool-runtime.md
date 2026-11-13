@@ -6,13 +6,13 @@ responsibility Defines the host bootstrap, shared AgentCanon tool runtime, exter
 upstream design ../../README.md standalone AgentCanon source entrypoint and user journey
 upstream design ../runtime/runtime-log-archive.md agent-canon-log publication and append-only archive policy
 upstream design ../../agents/skills/agent-canon-update.md AgentCanon source and parent integration workflow
-upstream implementation ../../tools/runtime/container/devcontainer_dependencies.py reusable dependency planning and image installation logic
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/environment_dependencies.rs native dependency planning and image installation logic
 upstream implementation ../../tools/runtime/archive/runtime_log_archive_git.py existing archive publication owner
 downstream implementation ../../bootstrap.sh host bootstrap entrypoint
 downstream implementation ../../bootstrap/container/image/Dockerfile shared Python, Rust, and native CLI tool image
 downstream implementation ../../tools/runtime/container/bootstrap_runtime.py resident container lifecycle and mount registry
 downstream implementation ../../tools/runtime/artifacts/runtime_artifacts.py external runtime artifact boundary
-downstream implementation ../../tools/runtime/dispatch/tool_dispatch.py catalog-namespaced typed dispatcher
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/tool_dispatch.rs native catalog-namespaced typed dispatcher
 downstream implementation ../../tests/bootstrap/test_bootstrap_runtime.py bootstrap lifecycle and compatibility tests
 downstream implementation ../../.github/workflows/agent-canon-native-release.yml builds and publishes native CLI archives
 @dependency-end
@@ -29,7 +29,7 @@ downstream implementation ../../.github/workflows/agent-canon-native-release.yml
 - Host は Skill、[AGENTS.md](../../AGENTS.md)、workflow shell、Git、GitHub、Docker、Codex 起動を所有する。
 - native binary は first-class Rust command を host 上で実行し、共有 tool container は既存 Python / LSP tool と catalog-declared native CLI を実行する。
 - project build / test / experiment / GPU は project-owned execution environment が所有する。
-- runtime lifecycle state は bootstrap-owned で ignored な `<install-root>/.runtime/` に置く。
+- runtime lifecycle state は bootstrap-owned で ignored な `<control-root>/.runtime/` に置く。
   一般の eval、report、SQLite、log、analysis、archive artifact は source tree 外に置く。
 - public command の互換性、resource lifecycle、eval publication、skill discovery を
   完了条件に含める。
@@ -49,8 +49,8 @@ native executable. It uses AGENT_CANON_NATIVE_BIN when set; otherwise it looks
 in the crate's target/release and target/debug directories. Rust commands do
 not start bootstrap, Docker, or Cargo builds implicitly.
 
-The generic agent-canon tool run catalog dispatcher remains a transitional
-route and still requires its registered shared runtime. Archives also include
+The generic agent-canon tool run catalog dispatcher uses the native CLI and
+still requires its registered shared runtime. Archives also include
 the optional knowledge/feedback Python adapter, which is found beside the
 installed executable under share/agent-canon and requires host Python 3.10 or
 newer. The adapter supports private spool reads and writes. Host/container sync
@@ -100,7 +100,7 @@ Docker label readback で既存 owner を検出し、`shared_runtime_owned_elsew
 既存 control root の明示指定を返します。
 
 ```text
-<install-root>/.runtime/
+<control-root>/.runtime/
   current-generation
   rollback-generation
   lifecycle.lock
@@ -111,7 +111,7 @@ Docker label readback で既存 owner を検出し、`shared_runtime_owned_elsew
   source-sync/source-sync.json  # host-written, resident read-only view
   spool/
 
-<install-root>/.runtime/cache/{cargo,pycache,semantic-index,tool-metadata}/
+<control-root>/.runtime/cache/{cargo,pycache,semantic-index,tool-metadata}/
 ```
 
 Bootstrap lifecycle codeだけが固定された `.runtime/` surfaces を直接管理します。
@@ -125,28 +125,13 @@ repository top-level `bootstrap.sh` は shared-runtime lifecycle と transitiona
 catalog tool route の入口です。Rust first-class command は native executable
 から直接実行し、この bootstrap path を通りません。
 
-```bash
-./bootstrap.sh --control-parent-root <path> install
-./bootstrap.sh --control-parent-root <path> update
-./bootstrap.sh --control-parent-root <path> start
-./bootstrap.sh --control-parent-root <path> status
-./bootstrap.sh --control-parent-root <path> target add --root <project-a> --mode read-only
-./bootstrap.sh --control-parent-root <path> target add --root <project-b> --mode read-only
-./bootstrap.sh --control-parent-root <path> tool run <catalog-id> -- <args...>
-./bootstrap.sh --control-parent-root <path> template export --root <registered-source> --profile <profile> --output <runtime-relative-directory>
-./bootstrap.sh --control-parent-root <path> codex prepare
-./bootstrap.sh --control-parent-root <path> codex --project-root <path>
-./bootstrap.sh --control-parent-root <path> eval collect --root <path> --run-id <id>
-./bootstrap.sh --control-parent-root <path> eval sync --run-id <id>
-./bootstrap.sh --control-parent-root <path> stop
-./bootstrap.sh --control-parent-root <path> rollback
-./bootstrap.sh --control-parent-root <path> gc
-./bootstrap.sh --control-parent-root <path> uninstall
-```
+絶対パスの installed bootstrap、明示した install/control root、登録済み project target
+を使うコマンドは [One command family](../runtime/bootstrap-runtime.md#one-command-family)
+を参照します。操作例はこの正本で管理します。
 
 Bootstrap command を実行する cwd は runtime の選択に使わず、cwd に関する warning は出しません。
 経路は `cwd -> bootstrap.sh -> install root -> control root ->
-<install-root>/.runtime/ -> resident container` です。`install` は検証済み image と
+<control-root>/.runtime/ -> resident container` です。`install` は検証済み image と
 resident を作り、`update` は同じ resident を current checkout へ更新し、`status` は
 `.runtime/` の active image と resident health を読み返します。`sync` は
 `replacement.lock` を一度だけ取得し、`git -C <install-root> fetch origin main` に
@@ -357,7 +342,7 @@ id, typed argv, runtime, execution_plane, cwd policy, env policy,
 stdin/stdout/stderr policy, exit/signal policy, side_effect_policy, output_root
 ```
 
-`tools/runtime/dispatch/tool_dispatch.py` は `tool-container` と
+`tools/runtime/dispatch/agent-canon/src/tool_dispatch.rs` は `tool-container` と
 `read-only`、`external-artifact`、`explicit-target-write` を列挙値にします。
 `native` runtime は catalog が宣言した executable argv を認証済み tool
 container 内で直接起動し、child argument を shell 評価しません。source mount
@@ -542,7 +527,7 @@ unhealthy、archive publish failure、rollback、session restart、cleanup readb
 | `update` | current checkout reconciled in existing v2 lifecycle | ordinary Docker result and existing state/container readback |
 | `start` | exactly one healthy container | inspect, limits, mounts, generation |
 | `target add` | new mount generation active | lock, zero tasks, health, mount readback |
-| `tool run` | typed catalog dispatch | `tools/runtime/dispatch/tool_dispatch.py` receipt |
+| `tool run` | typed catalog dispatch | native dispatcher request and bootstrap receipt |
 | `template export` | external template bundle exported | container-plane receipt and bundle provenance |
 | `codex prepare` | isolated managed surfaces active | collision result, link/digest/readback |
 | `eval collect` | external eval bundle complete | producer matrix, source unchanged |

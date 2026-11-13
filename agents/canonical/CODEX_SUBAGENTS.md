@@ -20,7 +20,7 @@ downstream implementation ../../.codex/agents/oop_readability_reviewer.toml OOP 
 shared workflow は [agents/canonical/CODEX_WORKFLOW.md](CODEX_WORKFLOW.md) に置き、この文書は inventory、mapping、activation に寄せます。
 permanent team role ownership、required output、write policy は `agents/agents_config.json` を正本にします。
 role profile/instruction authority は `agents/model_profiles.toml` と
-`tools/agent/orchestration/model_profile_registry.py` が所有し、`.codex/agents/*.toml`
+`tools/bin/agent-canon evaluate-codex-agent-roles` が所有し、`.codex/agents/*.toml`
 は closed generated readback view です。
 project-level subagent registration と runtime limits は `.codex/config.toml` の `[agents]` と `[agents.<name>]` を正本にします。
 prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` を先に通し、
@@ -30,10 +30,10 @@ prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` �
 
 [../../documents/design/request-intent-and-update-relation.md](../../documents/design/request-intent-and-update-relation.md) の handoff flow は既存
 agent context の再利用を優先します。並行作業を選ぶ場合は実際の依存、write scope、
-衝突を考慮し、起動結果と完了結果を区別して既存の handoff record に残します。
+衝突を考慮し、起動結果と完了結果を区別して会話または native handoff で伝えます。
 
 Runtime collaboration capability and coordination receipts are owned by
-[agents/COMMUNICATION_PROTOCOL.md#Runtime Collaboration Capability Handshake](../COMMUNICATION_PROTOCOL.md#runtime-collaboration-capability-handshake).
+[Native Collaboration](../COMMUNICATION_PROTOCOL.md#native-collaboration).
 This document only projects the route: read capability from the direct runtime
 collaboration namespace, use `direct_peer` only after an `available` readback,
 and use an honest `parent_relay` or `durable_artifact` path for
@@ -81,8 +81,8 @@ does not require separation.
   user-guided debugging の executor は各 workflow owner が定めます
 - selected route と必要な owner-critical review を解決します。関連する owner
   guidance は Markdown 相対リンクで示しますが、リンク先すべてを読む義務には
-  しません。実際の native tool / child results を選択済み workflow の既存記録へ
-  残し、起動結果と完了結果を区別します。
+  しません。実際の native tool / child results を現在の context で確認し、
+  起動結果と完了結果を区別します。
 - selected delegation / coordination route だけが write-capable implementer
   handoff を作ります。起動できない場合は実際の原因を利用者または選択済み owner に
   伝え、child に割り当てた unit を親が代替実装しません。bounded single-owner
@@ -175,7 +175,6 @@ structured handoff または、coordination/resumption が必要な場合の dur
   machine token のまま実行し、typed failure semantics を保持します。
 - `tool_evidence`: `dynamic_skill_routing` の候補、`tool_catalog_matches`、実行済み
   tool packet の結果。
-- `tool_reuse_ledger`: selected write-capable implementer には、既存 tool を使うか拒否した理由を渡します。予測検査の扱いは [Optional Rejection Prediction](../COMMUNICATION_PROTOCOL.md#optional-rejection-prediction) に従います。
 
 The worker prompt begins with the parent-selected `reuse_survey` assets and
 test paths when known; for split or extraction work, the splitter inspects
@@ -212,7 +211,7 @@ conflict/rework artifact contract to the handoff.
 
 ## Coordination
 
-Selected coordination routes use their existing handoff and record owners.
+Selected coordination routes use native handoff and current source/results.
 Markdown links point to conditional owner guidance, not a mandatory graph or
 read-set. Use actual native launch, completion, and failure results to assess the
 work; existing Eval or owner review judges missing or unnecessary work, while a
@@ -259,7 +258,7 @@ active writer's scope until its actual completion or an explicit cancellation.
 `explicit_empirical_skill_evaluation`. Use the catalog's `skill_evaluation`
 family and selected role guidance when that route is chosen. Keep the evaluator
 read-only and artifact-only; the evaluation reviewer owns scoring and
-convergence. Any run bundle is separate from the evaluator prompt, which uses
+convergence. The evaluator prompt uses
 the current Scenario Packet, packet-listed files, `do_not_read`, and fixed
 output schema.
 The evaluator's `mini_skill_evaluator_medium` profile (`gpt-6-luna/medium`) is
@@ -305,7 +304,7 @@ skill/reviewer が判断し、parent は結果を既存 handoff route で relay 
 | --- | --- | --- |
 | log archive API、structured dashboard、routing miss、selection gap、actual execution records | `agent-log-analysis` | log-analysis owner が context artifact を生成し、`prompt_config_reviewer` は prompt / config drift、`docs_workflow_steward` は workflow / skill wording、`project_reviewer` は repo-wide operational risk を別 packet で見る。parent は launch/relay/status だけを担当する |
 | repository layout、root shared view、responsibility scope、directory README、import boundary、project `.codex` / `.agents` view と personal `~/.codex` の境界 | `structure-refactor` | `explorer` は responsibility graph と stale surface、`execution_planner` は move / validation order、write-capable agent は disjoint path mapping、document-flow reviewer は reader route を見る |
-| run bundle、spawn authorization、handoff capsule、same-role instance identity | `subagent-bootstrap` | parent は launch と handoff を所有し、selected role の input packet、scope、validation route を保ちます |
+| native agent launch and handoff | `subagent-bootstrap` | parent は launch と handoff を所有し、selected role の input packet、scope、validation route を保ちます |
 
 Skill を連鎖させる場合は、前 skill が作った context artifact、handoff
 packet、または structure contract を次 skill の input にします。境界は
@@ -320,64 +319,15 @@ Tool-result route markers:
 
 ## Hook And Tool Feedback To Subagent Protocol
 
-hook、code checker、static analysis、CI、review tool の結果が subagent の責務や handoff に関係する場合、parent は次回の chat で注意するだけで閉じません。
-結果を見て、subagent protocol の更新要否を `workflow_monitoring.md` の behavior event に記録します。
-
-- subagent が読むべき checker result、hook log、dependency scope、review finding が handoff に入っていなかった場合、選択済み workflow の handoff guidance を更新します。
-- 特定 role が同じ失敗を見逃した場合、`.codex/agents/<role>.toml`、この文書、または role に対応する skill / workflow を更新します。
-- tool / hook の誤検知や task-local noise で protocol 変更が不要な場合でも、`subagent_protocol_update=not_required` と `protocol_feedback_reason=<short-reason>` を記録します。
-- reviewer role は、最新 diff だけでなく、hook / tool feedback が parent protocol と subagent protocol の判断まで閉じているかを確認します。
-
-subagent protocol feedback の必須 token セットは次です。
-
-```text
-hook_tool_feedback=reviewed
-parent_protocol_update=<applied|recorded|not_required>
-subagent_protocol_update=<applied|recorded|not_required>
-protocol_feedback_reason=<short-reason>
-```
+実際の結果から手順・role・handoff の欠陥が分かった場合は、その正本を修正します。
+必要な根拠と変更点は会話で伝えます。変更不要の結果ごとに判断台帳、behavior event、
+protocol status token を作成する要求はありません。
 
 ## Pre-Goal Activation
 
-Goal-driven repo-changing tasks prepare subagent fan-out before the final
-`/goal` command when the goal intent is clear. The parent may draft the candidate
-goal, and read-only roles check the draft before implementation. If the active
-runtime requires explicit spawn authorization, persist the handoff packets and
-spawn the roles after authorization.
-
-Candidate pre-goal roles:
-
-- `requirements_organizer`: derive a target-state-complete Objective, non-goals,
-  constraints, and Exit Criteria from the user request and durable repo notes.
-- `explorer`: inspect repo docs, prior notes, dependency surfaces, existing
-  tools, and reuse candidates that affect the goal.
-- `execution_planner`: group the open work in the selected handoff or run-bundle
-  `schedule.md` into the next cohesive slice.
-- `plan_reviewer`: verify that the complete responsibility unit is checkable;
-  checkpoints remain nonblocking observations outside rollback and micro-slice
-  gates.
-
-Start with roles needed for the current responsibility. Add another role only
-when request evidence, an actual dependency, or a distinct review need calls for it.
-
-Activation Conditions:
-
-- These pre-goal agents are read-only for draft checking. A write-capable route
-  proceeds after the user-authorized repository change has a structured handoff
-  with objective, owner boundary, implementation mechanism, and evidence map.
-- Write-capable `worker` / `spark_worker` instances do not wait for a repository
-  mirror of session goal state.
-- Goal-driven and ordinary repo-changing tasks use a structured handoff with
-  bounded `allowed_paths`, write scope, validation plan, and tool-rejection
-  preflight before the selected write-capable implementer. Use a run bundle when
-  coordination or resumption requires durable lifecycle evidence.
-- Use the catalog's intake guidance when it is relevant; a catalog listing alone
-  does not require a role to be started.
-- Handoffs include the objective and evidence map directly. When a run bundle is
-  selected, pass the relevant `schedule.md` work and `work_log.md` results to
-  the next role.
-- Hand the next unchecked `schedule.md` work units to `execution_planner`
-  instead of reconstructing durable progress from chat.
+明示された Goal または現在の依頼と、会話にある契約・方針を使います。
+Goal の存在だけでは、事前 fan-out、schedule、handoff file、進捗台帳を要求しません。
+担当の追加は、その責務や独立した判断が必要な場合に選びます。
 
 ## Codex Command Surface
 
@@ -385,8 +335,7 @@ Activation Conditions:
 - これらは session-level setting で、per-agent TOML には書きません
 - runtime が `/agent` を提供する場合は inventory 確認に使います
 - `/agent` が使えない runtime では `.codex/agents/*.toml` を直接見ます
-- run bundle は coordination、resumption、または selected workflow が durable
-  lifecycle evidence を必要とするときだけ、既存 owner route で用意します
+- 実行・協調・再開には Codex 標準ツールを使い、範囲と結果を Git と会話で引き継ぎます
 - `--task-id` の task-default specialist と default review pack は候補として
   読み込み、owner-critical operation、unresolved branch、または selected
   validation route が有効化したものだけを materialize します
@@ -413,7 +362,7 @@ role / Skills / authority を `$direct-luna-communication` packet に載せま�
 | `change_reviewer` | `diff_triage_reviewer` by default; `python_reviewer`, `cpp_reviewer`, then `reviewer` only with language or broad-review eligibility evidence |
 | `final_reviewer` | `ship_reviewer` checks final diff traceability to the Abstract Design Frame and approved packet; then `reviewer` / `project_reviewer` when final gate escalation is needed |
 | `verifier` | prescribed validation runner |
-| `auditor` | closeout artifact and workflow-monitoring gate |
+| `auditor` | selected completion evidence |
 | `researcher` | `literature_researcher` or `explorer` |
 | `research_reviewer` | `reviewer` |
 | `experimenter` | `experiment_runner` for runs; `worker` only for scoped runtime-output handling |
@@ -578,8 +527,8 @@ require another read.
 - parent は選択済み writer handoff で各 writer の allowed path / directory を管理します
 - write-capable handoff は `writer_target`（絶対 `checkout_root`、固定 `branch`、正規化済み `remote`、`allowed_paths`）を必須とし、branch は handoff 前に `repository-topic-clone.prepare` で用意します
 - 同じ `checkout_root` で write target が衝突する作業は同時に起動せず、reader は同じ checkout を共有できます
-- `repository-topic-clone.prepare` は選択済み mode の prepared checkout の ignored `.agent-canon/writer-target.json` に target と検証済み checkout identity を materialize します。PreToolUse はこの packet を正本として読み、環境変数は readback 一致確認に限って使い、modified path が `allowed_paths` の外なら拒否します。packet が無い checkout や packet 自身の変更は拒否し、read-only command はこの writer path gate の対象外です
-- repository write は `worker`、`spark_worker`、`integration_executor` の各 write-capable route に限定します。IssueWorker の `publisher` は外部 GitHub publication 専用で target を持たず、reviewer と artifact-only role は read-only とします
+- `repository-topic-clone.prepare` は prepared checkout の ignored `.agent-canon/writer-target.json` に target と検証済み checkout identity を materialize します。作業範囲は handoff と Git diff で確認します。PreToolUse は role、identity receipt、spawn 記録、writer packet を編集の許可条件にしません。
+- 選択済みの実行 owner が合意済み範囲を編集します。委譲した reviewer と artifact-only role は read-only、IssueWorker の `publisher` は外部 GitHub publication 専用とします。
 - 同一 path、同一 directory ownership、同一 public API surface、shared Git index/HEAD、generated output、formatter output は順序制約つきの writer に割り当てます
 - write-capable subagent instance を並行させる場合は、checkout roots と write targets の衝突を避けます
 - same directory / same file / same canonical surface を同時に変更せず、衝突する作業は必要に応じて順に行います
@@ -594,7 +543,7 @@ writer target は短命な handoff 値であり、claim file、PID、expiry、da
 `agents/model_profiles.toml` が canonical typed profile authority です。
 `agents/execution_topology.json` は logical role と physical execution profile の
 分離、および direct-Luna default を所有します。
-`tools/agent/orchestration/model_profile_registry.py` は closed generated views として
+`tools/bin/agent-canon evaluate-codex-agent-roles` は closed generated views として
 `.codex/agents/*.toml` と `agents/agents_config.json` を materialize します。
 generated views は projection digest / readback surfaces であり、手動で編集しては
 なりません。model / reasoning の変更は registry / team / runtime source から始め、
@@ -648,40 +597,19 @@ runtime は再生成後に restart し、readback で反映を確認します。
 - generation 後は alignment readback を確認し、load 済み session の projection
   freshness は registry materialization と fresh-session restart/readback で回復します
 
-## Smoke Test
+## Role validation
 
-runtime inventory や review pack を変えたら、まず次を実行します。
+Role inventory and selected review-pack changes use the existing alignment checker:
 
-    python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py
-    python3 eval/checkers/smoke_test_research_perspective_pack.py
+```bash
+tools/bin/agent-canon check-agent-runtime-alignment
+```
 
-この smoke test は次を確認します。
-
-- `agents/task_catalog.yaml` の各 task が有効な specialist / review pack へ展開できる
-- `agents/agents_config.json` の required output が実テンプレートに結び付いている
-- `.codex/config.toml` が `.codex/agents/*.toml` を全 role 登録している
-- `.codex/agents/*.toml` が role ごとの model / reasoning 設定を持っている
-- selected workflow が bundle を必要とする場合だけ temporary run bundle を
-  作り、required output が実際に生成される
-- `agents/agents_config.json` に perspective reviewers と artifact mapping がある
-- `agents/task_catalog.yaml` に `research_perspective_triage` default pack と optional `research_perspective_review` pack がある
-- `.codex/agents/*.toml` に対応 subagent 定義がある
-- perspective review が選択され bundle が必要な場合だけ temporary run bundle を
-  作り、各 perspective review artifact が実際に生成される
-Role and profile selection is owned by the canonical model/profile registry and
-the selected workflow. Sol is the parent; Luna owns ambiguous design, causal
-repair, cross-owner integration, and review; Spark is an implementation option;
-and `skill_evaluator` is selected for explicit empirical evaluation. Model and
-profile policy stays out of `route.py`.
-
-Use native tool results as the evidence of what ran and whether it succeeded;
-preserve actual failures rather than inferring success from a plan or monitor.
-Existing Eval or owner review can assess whether necessary work was missed or
-unnecessary work was done. A different route alone is not a failure.
+This validates role references and model/profile projections independently of task progress files.
 
 ## Capacity And Lifecycle
 
 Use the selected runtime's actual capacity information when it affects the
-chosen work. For child work, retain actual launch, completion or failure, and
-handoff evidence in the selected workflow's existing record; a monitor status
+chosen work. For child work, use actual launch, completion or failure, and
+native handoff results already in context; a monitor status
 alone does not establish completion.

@@ -28,7 +28,9 @@ class CheckToolCatalogTest(unittest.TestCase):
     def run_checker(self, root: Path, *args: str) -> subprocess.CompletedProcess[str]:
         """Run the selected native CLI against a root."""
         if not AGENT_CANON_CLI:
-            raise RuntimeError("AGENT_CANON_CLI must select the current native executable")
+            raise RuntimeError(
+                "AGENT_CANON_CLI must select the current native executable"
+            )
         return subprocess.run(
             [AGENT_CANON_CLI, "tool-catalog", "--root", str(root), *args],
             cwd=PROJECT_ROOT,
@@ -38,34 +40,34 @@ class CheckToolCatalogTest(unittest.TestCase):
         )
 
     def test_catalog_rows_allow_shared_native_dispatcher_path(self) -> None:
-        """Distinct native IDs may share the existing generic dispatcher."""
+        """Distinct native IDs may share the existing Rust dispatcher."""
         catalog = yaml.safe_load(
             (PROJECT_ROOT / "tools" / "catalog.yaml").read_text(encoding="utf-8")
         )
         rows = {
             entry["id"]: entry
             for entry in catalog["entries"]
-            if entry["id"]
-            in {"workflow-monitor", "waterfall-gate-check", "quarto", "vl-convert"}
+            if entry["id"] in {"quarto", "vl-convert"}
         }
         self.assertEqual(
             set(rows),
-            {"workflow-monitor", "waterfall-gate-check", "quarto", "vl-convert"},
+            {"quarto", "vl-convert"},
         )
         self.assertEqual(
-            rows["workflow-monitor"]["path"],
-            "tools/runtime/lifecycle/workflow_monitor.py",
-        )
-        self.assertEqual(
-            rows["waterfall-gate-check"]["path"],
-            "tools/validation/semantic/lifecycle/waterfall_gate_check.py",
-        )
-        self.assertEqual(
-            rows["quarto"]["path"], "tools/runtime/dispatch/tool_dispatch.py"
+            rows["quarto"]["path"],
+            "tools/runtime/dispatch/agent-canon/src/tool_dispatch.rs",
         )
         self.assertEqual(rows["quarto"]["path"], rows["vl-convert"]["path"])
-        self.assertTrue(rows["workflow-monitor"]["writes"])
-        self.assertFalse(rows["waterfall-gate-check"]["writes"])
+        native_capability = next(
+            command
+            for command in catalog["runtime_schema"]["rust_public_commands"]
+            if command["id"] == "rust-capability-route"
+        )
+        self.assertEqual(native_capability["selector"], "capability-route")
+        self.assertEqual(
+            native_capability["path"],
+            "tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs",
+        )
         result = self.run_checker(PROJECT_ROOT, "--format", "json")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
@@ -77,13 +79,14 @@ class CheckToolCatalogTest(unittest.TestCase):
         role_eval = next(
             entry
             for entry in catalog["entries"]
-            if entry["path"] == "eval/producers/evaluate_codex_agent_roles.py"
+            if entry["path"]
+            == "tools/runtime/dispatch/agent-canon/src/codex_agent_role_eval/mod.rs"
         )
         wrapper = (
-            PROJECT_ROOT / "eval" / "producers" / "run_accumulated_agent_evals.py"
+            PROJECT_ROOT / "tools/runtime/dispatch/agent-canon/src/eval_accumulation.rs"
         ).read_text(encoding="utf-8")
         self.assertTrue(role_eval["default_wiring"]["pr_check"])
-        self.assertIn(Path(role_eval["path"]).name, wrapper)
+        self.assertIn('"evaluate-codex-agent-roles"', wrapper)
 
     def test_gpu_admission_route(self) -> None:
         """The catalog exposes only the canonical managed GPU admission entrypoint."""
@@ -565,7 +568,7 @@ class CheckToolCatalogTest(unittest.TestCase):
             "documents/tools/repo-local-tool-imports.md",
             "documents/tools/tool_catalog.md",
             "tools/validation/ci/checks/check_agent_canon_pr.sh",
-            "eval/producers/run_accumulated_agent_evals.py",
+            "tools/runtime/dispatch/agent-canon/src/eval_accumulation.rs",
             "agents/skills/pr-processing.md",
             ".github/PULL_REQUEST_TEMPLATE.md",
             ".github/PULL_REQUEST_TEMPLATE/agent_canon.md",

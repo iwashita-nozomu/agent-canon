@@ -20,7 +20,8 @@ downstream implementation ../../tools/runtime/dispatch/agent-canon/src/graph.rs 
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/structured_analysis.rs owns the shared graph storage schema
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/main.rs dispatches public graph commands
 downstream implementation ../../tools/bin/agent-canon provides the stable bootstrap CLI for public graph commands
-downstream implementation ../../tools/analysis/dependencies/graph_client.py provides the sole Python graph adapter
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/graph_client.rs provides the native typed graph client API
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/source_dependency_graph.rs exports tracked-source dependency review inputs
 downstream design ../structured-analysis/graph-dsl.md maps dependency manifest evidence into Graph DSL Core
 downstream design ../structured-analysis/dependency-header-analysis.md maps manifest graph evidence into structured analysis
 @dependency-end
@@ -153,7 +154,6 @@ dependency manifest を明示的な analysis 注釈として使う場合、file 
 contract design
 responsibility Documents this file's role so agents can identify why it exists.
 upstream design ../../agents/canonical/CODEX_WORKFLOW.md workflow contract
-upstream implementation ../../tools/runtime/lifecycle/bootstrap_agent_run.py consumes workflow metadata
 downstream implementation ../tests/agent_tools/test_bootstrap_and_close.py verifies emitted output
 @dependency-end
 ```
@@ -266,7 +266,6 @@ Markdown:
 contract design
 upstream design ../../agents/canonical/CODEX_WORKFLOW.md workflow contract
 responsibility Provides a Python helper entrypoint for agent run bootstrap.
-downstream implementation ../../tools/runtime/lifecycle/bootstrap_agent_run.py consumes workflow contract
 @dependency-end
 -->
 ```
@@ -277,7 +276,6 @@ Python / shell / TOML:
 # @dependency-start
 # contract tool
 # responsibility Implements one repository tool or runtime helper.
-# upstream implementation ../../tools/agent/orchestration/agent_team.py imports helper contract
 # downstream implementation ../tests/agent_tools/test_bootstrap_and_close.py verifies CLI behavior
 # @dependency-end
 ```
@@ -653,7 +651,7 @@ validation. This shell owns no persisted graph state or runtime status.
 
 Responsibilities:
 
-- consume source-derived dependency projections from `source_dependency_graph.py`
+- consume source-derived dependency projections from the native source graph owner
 - filter explicit dependency facts and project their typed detail
 - fail manifest files that are isolated from the edge graph
 - validate self reference

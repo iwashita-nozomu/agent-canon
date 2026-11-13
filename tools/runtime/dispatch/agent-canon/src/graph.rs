@@ -6,7 +6,7 @@
 // upstream implementation structured_analysis.rs provides the graph storage schema
 // downstream implementation main.rs dispatches the public graph command
 // downstream implementation graph_client.rs invokes existing graph commands in-process
-// downstream implementation ../../../../analysis/dependencies/graph_client.py consumes typed graph responses
+// downstream implementation graph_client.rs consumes typed graph responses
 // @dependency-end
 
 use crate::dependency_manifest::{

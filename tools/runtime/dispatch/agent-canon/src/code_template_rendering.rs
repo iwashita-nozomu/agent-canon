@@ -2,14 +2,17 @@
 // @dependency-start
 // contract implementation
 // responsibility Renders a canonical materializable code template from an explicit source-root capability.
+// upstream implementation ./agent_canon_source_root.rs resolves the current, source, and canon roots from existing overrides.
 // upstream design ../../../../../templates/code/README.md code-template readback contract
-// downstream implementation ../../../manifest/manifest_rendering.py native renderer caller
-// downstream test ../../../../../tests/agent_tools/test_agent_team_templates.py source and consumer graph oracles
 // @dependency-end
 
+use crate::agent_canon_source_root::{
+    resolve_source_roots, CANON_ROOT_OVERRIDE_ENV, SOURCE_ROOT_OVERRIDE_ENV,
+};
+use std::collections::BTreeMap;
 use std::fmt;
 use std::fs;
-use std::io;
+use std::io::{self, Write};
 use std::path::{Component, Path, PathBuf};
 
 #[derive(Debug)]
@@ -161,4 +164,88 @@ pub fn render_code_template(
         path: resolved,
         source,
     })
+}
+
+/// Print one source template through the existing `agent-canon` Shell entrypoint.
+///
+/// Resolve the same source roots as the old imported helper, then write the
+/// selected template bytes to stdout so the caller can choose a destination.
+pub fn run(args: &[String]) -> i32 {
+    let mut root = None;
+    let mut template = None;
+    let mut index = 0;
+    while index < args.len() {
+        let argument = &args[index];
+        if argument == "--help" || argument == "-h" {
+            println!("usage: agent-canon render-code-template [--root SOURCE_ROOT] TEMPLATE");
+            return 0;
+        }
+        if argument == "--root" {
+            index += 1;
+            let Some(value) = args.get(index) else {
+                eprintln!("usage: agent-canon render-code-template [--root SOURCE_ROOT] TEMPLATE");
+                return 2;
+            };
+            root = Some(PathBuf::from(value));
+        } else if let Some(value) = argument.strip_prefix("--root=") {
+            if value.is_empty() || root.is_some() {
+                eprintln!("usage: agent-canon render-code-template [--root SOURCE_ROOT] TEMPLATE");
+                return 2;
+            }
+            root = Some(PathBuf::from(value));
+        } else if argument.starts_with('-') || template.is_some() {
+            eprintln!("usage: agent-canon render-code-template [--root SOURCE_ROOT] TEMPLATE");
+            return 2;
+        } else {
+            template = Some(argument.as_str());
+        }
+        index += 1;
+    }
+
+    let Some(template) = template else {
+        eprintln!("usage: agent-canon render-code-template [--root SOURCE_ROOT] TEMPLATE");
+        return 2;
+    };
+    let raw_root = match root {
+        Some(root) => root,
+        None => match std::env::current_dir() {
+            Ok(root) => root,
+            Err(error) => {
+                eprintln!("CODE_TEMPLATE_RENDER_FAILURE={error}");
+                return 2;
+            }
+        },
+    };
+    let mut environment = std::env::vars().collect::<BTreeMap<_, _>>();
+    if args
+        .iter()
+        .any(|argument| argument == "--root" || argument.starts_with("--root="))
+    {
+        environment.remove(SOURCE_ROOT_OVERRIDE_ENV);
+        environment.remove(CANON_ROOT_OVERRIDE_ENV);
+    }
+    let roots = match resolve_source_roots(&raw_root, &environment) {
+        Ok(roots) => roots,
+        Err(error) => {
+            eprintln!(
+                "CODE_TEMPLATE_RENDER_FAILURE={}:{}",
+                error.code, error.detail
+            );
+            return 2;
+        }
+    };
+    let rendered = match render_code_template(&roots.source_root, template) {
+        Ok(rendered) => rendered,
+        Err(error) => {
+            eprintln!("CODE_TEMPLATE_RENDER_FAILURE={error}");
+            return 2;
+        }
+    };
+    match io::stdout().lock().write_all(rendered.as_bytes()) {
+        Ok(()) => 0,
+        Err(error) => {
+            eprintln!("CODE_TEMPLATE_RENDER_FAILURE={error}");
+            2
+        }
+    }
 }

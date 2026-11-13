@@ -12,7 +12,7 @@ upstream design ../internal-routines/design-implementation-correspondence.md uni
 upstream design ../canonical/ROOT_IMPLEMENTATION.md necessary design conditions and implementation choice boundary
 downstream implementation ../../.codex/personal/skills/oop-type-design/SKILL.md runtime discovery shim
 downstream implementation ../../agents/skills/catalog.yaml public skill and capability metadata
-downstream implementation ../../tools/agent/orchestration/route.py explicit capability route
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs explicit capability route
 @dependency-end
 -->
 
@@ -29,7 +29,7 @@ This is the pre-implementation OOP/type-design route. Invoke it explicitly with
 the capability ID `oop_type_design`:
 
 ```bash
-python3 tools/agent/orchestration/route.py --capability oop_type_design
+tools/bin/agent-canon route --capability oop_type_design
 ```
 
 The `--capability` route selects the owner
@@ -45,9 +45,7 @@ When the changed surface includes a Docstring or template projection, read
 records the responsibility region, selected semantic relation, and projection
 anchor; it does not copy the guide’s clause text or force `Args`, `Returns`,
 `Raises`, or other fixed sections. The catalog capability `oop_type_design` selects this
-language-neutral OOP/type design owner only. After that owner selection, existing
-`agent_team.language_review_candidates` selects `python_reviewer` or `cpp_reviewer` for
-language implementation paths and `docs_workflow_steward` for convention/template docs.
+language-neutral OOP/type design owner only. After that owner selection, use `python_reviewer` or `cpp_reviewer` for language implementation paths and `docs_workflow_steward` for convention/template docs.
 No new routing branch is introduced.
 
 ## Purpose

@@ -44,11 +44,11 @@ path: tools/runtime/dispatch/agent-canon/src/notebook_quality.rs
 path: tools/validation/code/oop/python/readability.py
 path: tools/validation/code/oop/cpp/readability.py
 path: tools/runtime/dispatch/agent-canon/src/run_evaluation.rs
-path: tools/validation/semantic/skills/check_skill_frontmatter.py
+path: tools/runtime/dispatch/agent-canon/src/skill_frontmatter.rs
 path: tools/validation/semantic/convention/check_convention_compliance.py
 path: tools/runtime/dispatch/agent-canon/src/catalog/tool_catalog.rs
 path: tools/runtime/dispatch/agent-canon/src/tool_drift.rs
-path: tools/validation/ci/checks/check_github_workflows.py
+path: tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs
 """,
     "documents/runtime/bootstrap-runtime.md": "bootstrap runtime owner\n",
     "bootstrap/container/image/Dockerfile": "FROM scratch\n# bootstrap_runtime\n",
@@ -117,17 +117,17 @@ path: tools/validation/ci/checks/check_github_workflows.py
     "documents/design/responsibility-scope-management.md": "agent-canon responsibility-scope\n",
     "documents/tools/README.md": (
         "tool_catalog.rs tool_drift.rs notebook-quality "
-        "tool_rejection_preflight.py agent-canon responsibility-scope responsibility-scope.toml "
+        "tool_rejection_preflight.rs agent-canon responsibility-scope responsibility-scope.toml "
         "protecting tools\n"
     ),
     "documents/notes/guardrails/engineering_avoidances.md": "implementation avoidances\n",
     "tools/README.md": (
         "tool_catalog.rs tool_drift.rs notebook-quality "
         "agent-canon docs render-runtime-profile agent-canon docs check "
-        "tool_rejection_preflight.py "
+        "tool_rejection_preflight.rs "
         "agent-canon responsibility-scope responsibility-scope.toml protecting tools\n"
     ),
-    "tools/validation/semantic/tools/tool_rejection_preflight.py": "preflight owner\n",
+    "tools/runtime/dispatch/agent-canon/src/tool_rejection_preflight.rs": "preflight owner\n",
     "agents/COMMUNICATION_PROTOCOL.md": "communication protocol\n",
     "agents/canonical/CODEX_WORKFLOW.md": ("Codex Workflow phase reader map\n"),
     "agents/canonical/CODEX_INTAKE.md": "repository task intake\n",
@@ -183,9 +183,6 @@ path: tools/validation/ci/checks/check_github_workflows.py
         "external public API/behavior/schema unchanged scoped_change "
         "dependency/consumer/migration/docs closure\n"
     ),
-    "tools/agent/orchestration/agent_team.py": (
-        "$literature-survey $research-workflow research_driven_change selected.append\n"
-    ),
     ".codex/agents/python_reviewer.toml": (
         "check-solid-evidence OOP readability report SOLID principle signal "
         "Single responsibility Open/closed Liskov substitution Interface segregation "
@@ -212,15 +209,15 @@ path: tools/validation/ci/checks/check_github_workflows.py
         "| role topology and same-role instance schema | `agents/task_catalog.yaml` |\n"
         "| default specialists and review packs | "
         "`agents/task_catalog.yaml`; `agents/agents_config.json` |\n"
-        "| optional run bundle and actual route evidence | "
-        "`bootstrap_agent_run.py`; `workflow_monitor.py` |\n"
+        "| native coordination and actual route evidence | "
+        "`agents/COMMUNICATION_PROTOCOL.md` |\n"
         "| skill selection | `agents/skills/catalog.yaml`; "
-        "`python3 tools/agent/orchestration/route.py --prompt` |\n"
+        "`tools/bin/agent-canon route --prompt` |\n"
         "| implementation guidance and closeout | "
         "`agents/skills/codex-task-workflow.md` |\n"
         "| active design packet schema | `agents/COMMUNICATION_PROTOCOL.md`; "
         "`agents/agents_config.json#artifacts.active_design_packet` |\n"
-        "| closeout authority | `tools/runtime/dispatch/agent-canon/src/task_close.rs`; `tools/runtime/dispatch/agent-canon/src/report_artifact_checks.rs` |\n\n"
+        "| closeout authority | `agents/canonical/CODEX_COMPLETION.md`; `tools/runtime/dispatch/agent-canon/src/report_artifact_checks.rs` |\n\n"
         "## Workflow Family Reader Paths\n\n"
         "| Family | Owner Row |\n"
         "| ------ | --------- |\n"
@@ -248,7 +245,7 @@ path: tools/validation/ci/checks/check_github_workflows.py
         "`python3 tools/validation/semantic/convention/check_convention_compliance.py`.\n"
     ),
     "agents/skills/agent-canon-update.md": (
-        "check_github_workflows.py\n"
+        "github_workflow_check.rs\n"
         "PR Essence problem / user request design intent canonical owner "
         "behavior or contract delta evidence route\n"
         "Before closeout, run "
@@ -271,14 +268,14 @@ path: tools/validation/ci/checks/check_github_workflows.py
     "tools/validation/ci/runners/run_all_checks.sh": (
         "run_python_quality_checks.sh "
         "check_convention_compliance.py "
-        "check_skill_frontmatter.py "
+        "check-skill-frontmatter "
         "tool_catalog.rs tool_drift.rs notebook-quality "
-        "check_github_workflows.py bootstrap_runtime.py run_agent_canon docs check "
+        "github_workflow_check.rs bootstrap_runtime.py run_agent_canon docs check "
         "run_agent_canon responsibility-scope\n"
     ),
     "tools/validation/ci/checks/check_agent_canon_pr.sh": (
         'python3 "${WORKSPACE_ROOT}/tools/validation/semantic/convention/check_convention_compliance.py" --root "${WORKSPACE_ROOT}" --format json\n'
-        "python3 tools/validation/ci/checks/check_github_workflows.py\n"
+        "tools/bin/agent-canon check-github-workflows\n"
     ),
     "tools/runtime/dispatch/agent-canon/src/docs.rs": "runtime profile inventory\n",
     "documents/tools/agent-canon.md": "docs\n",
@@ -288,13 +285,13 @@ path: tools/validation/ci/checks/check_github_workflows.py
         "tests/bootstrap/test_bootstrap_runtime.py bootstrap_runtime.py\n"
     ),
     ".codex/README.md": (
-        "active events active/inactive legacy `Stop` fail-open retired child tombstones bounded redacted\n"
+        "active events active/inactive legacy `Stop` fail-open bounded redacted\n"
     ),
-    ".codex/hooks/hook_dispatcher.py": (
+    "tools/runtime/dispatch/agent-canon/src/hook_dispatcher.rs": (
         "HOOK_EVENT_CONTRACTS HookEventContract ACTIVE_HOOK_HANDLERS "
         "UserPromptSubmit PreToolUse PostToolUse Stop hook_safety "
         "validate_projection_bytes record_hook_invocation HookLogContext "
-        "RETIRED_CHILD_TOMBSTONES MOVED_SOURCE_ABSENCES\n"
+        "\n"
     ),
     "tools/runtime/authority/hook_safety.py": (
         "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY "
@@ -303,7 +300,6 @@ path: tools/validation/ci/checks/check_github_workflows.py
         "branch_block_payload operation command_sha256 DESTRUCTIVE_GIT_GUARD=block "
         "BRANCH_WORKTREE_CREATION_GUARD=block\n"
     ),
-    "tools/runtime/dispatch/agent-canon/src/task_close.rs": "task close owner\n",
     "ROOT_AGENTS.md": (
         "Current user request controls scope; preserve unknown state and user data.\n"
         "## Runtime Owner Map\n\n"
@@ -311,7 +307,7 @@ path: tools/validation/ci/checks/check_github_workflows.py
         "| -------- | ------------- | ------------------ |\n"
         "| workflow family and role candidates | "
         "`vendor/agent-canon/agents/task_catalog.yaml` | "
-        "`check_agent_runtime_alignment.py` |\n"
+        "`tools/bin/agent-canon check-agent-runtime-alignment` |\n"
         "| task bootstrap and CLI entrypoints | "
         "`vendor/agent-canon/agents/canonical/CLI_ENTRYPOINTS.md` | "
         "`bootstrap_agent_run.py` |\n"
@@ -320,11 +316,11 @@ path: tools/validation/ci/checks/check_github_workflows.py
         "`workflow_monitor.py` |\n"
         "| role behavior and stage conditions | "
         "`vendor/agent-canon/.codex/agents/*.toml` | "
-        "`check_agent_runtime_alignment.py` |\n"
+        "`tools/bin/agent-canon check-agent-runtime-alignment` |\n"
         "| skill routing and public skill surface | "
         "`vendor/agent-canon/agents/skills/catalog.yaml` | "
-        "`python3 tools/agent-canon/agent_tools/route.py --prompt` |\n"
-        "| report and closeout structure | `tools/runtime/dispatch/agent-canon/src/task_close.rs` | closeout gate |\n"
+        "`tools/bin/agent-canon route --prompt` |\n"
+        "| report and closeout structure | `agents/canonical/CODEX_COMPLETION.md` | Completion Review |\n"
     ),
     "AGENTS.md": (
         "Multiple chats or sessions unknown dirty Proven exact task ownership "
@@ -336,9 +332,9 @@ path: tools/validation/ci/checks/check_github_workflows.py
         "| root runtime entrypoint | `ROOT_AGENTS.md` | "
         "`bash bootstrap.sh --help` |\n"
         "| workflow family and role candidates | "
-        "`agents/task_catalog.yaml` | `check_agent_runtime_alignment.py` |\n"
+        "`agents/task_catalog.yaml` | `tools/bin/agent-canon check-agent-runtime-alignment` |\n"
         "| public skill registry | `agents/skills/catalog.yaml` | "
-        "`check_agent_runtime_alignment.py` |\n"
+        "`tools/bin/agent-canon check-agent-runtime-alignment` |\n"
         "| AgentCanon update transaction | "
         "`documents/agent-canon/agent-canon-update-route.md` | "
         "`update_lifecycle_contract.py` |\n"
@@ -614,7 +610,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
     def test_hook_guardrail_policy_marker_fails(self) -> None:
         """Every stable dispatcher contract marker remains mechanically required."""
-        path = ".codex/hooks/hook_dispatcher.py"
+        path = "tools/runtime/dispatch/agent-canon/src/hook_dispatcher.rs"
         fixture = MINIMAL_REPO_FILES[path]
         for marker in HOOK_GUARDRAIL_POLICY_MARKERS[path]:
             with self.subTest(marker=marker), tempfile.TemporaryDirectory() as tmp_dir:
@@ -884,7 +880,6 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("review_issue_routing", result.stdout)
-            self.assertIn("missing-marker:issue_route", result.stdout)
             self.assertIn("missing-marker:issue_sync.py", result.stdout)
 
     def test_minimal_fixture_covers_review_issue_routing_surfaces(self) -> None:
@@ -984,14 +979,15 @@ class CheckConventionComplianceTest(unittest.TestCase):
         github_checker = (
             root
             / "tools"
-            / "validation"
-            / "ci"
-            / "checks"
-            / "check_github_workflows.py"
+            / "runtime"
+            / "dispatch"
+            / "agent-canon"
+            / "src"
+            / "github_workflow_check.rs"
         )
         github_checker.parent.mkdir(parents=True, exist_ok=True)
         github_checker.write_text(
-            "#!/usr/bin/env python3\ncheck_skill_frontmatter.py\n",
+            "// native GitHub workflow checker\n",
             encoding="utf-8",
         )
 

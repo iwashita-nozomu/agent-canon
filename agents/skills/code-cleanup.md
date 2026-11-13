@@ -21,17 +21,18 @@ contract. Keep cleanup within the requested unit.
 
 ## Route
 
-1. Start from the agreed final behavior, target source, current diff, and most
-   recently incorporated path. Read control flow in the target and compare
-   existing capabilities before adding code.
-2. Retire superseded entrypoints, implementation, exclusive support, fixtures,
-   and docs in the requested unit. RC-09 owns retirement; do not add a
-   compatibility layer as a cleanup step.
-3. Remove relay-only packets, wrappers, types, and names. Keep abstractions only
+Use the shared [implementation and deletion sequence](../canonical/CODEX_IMPLEMENTATION.md#5-implementation)
+from the agreed final behavior, target source, current diff, and most recently
+incorporated path. RC-09 owns retirement and necessary caller migration.
+
+- Read control flow in the target and compare existing capabilities before
+  adding code. Do not add a compatibility layer as a cleanup step.
+- Remove relay-only packets, wrappers, types, and names. Keep abstractions only
    for domain meaning, independent behavior, or a demonstrated shared responsibility.
-4. For numerical code, establish equations and convergence semantics before
-   deletion. Use [refactor-loop](refactor-loop.md) for structural migration and
-   [change-review](change-review.md) for the resulting contract and missed deletions.
-5. Validate the changed guarantees in the selected scope.
+- For numerical code, establish the governing equations and required invariants.
+   When retiring numerical corrections, use [stabilization removal](computational-optimization.md#remove-unsupported-stabilization).
+   It specializes the same implementation sequence; follow it once.
+- Use [refactor-loop](refactor-loop.md) for structural migration and
+  [change-review](change-review.md) for the selected contract/retirement review.
 
 No new inventory, handoff schema, or full-repository scan is required by cleanup.

@@ -1,13 +1,14 @@
 # @dependency-start
 # contract test
 # responsibility Tests Codex agent role eval automation.
-# upstream implementation ../../eval/producers/evaluate_codex_agent_roles.py helper
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/codex_agent_role_eval/mod.rs native producer
 # upstream design ../../eval/definitions/README.md role eval contract
 # @dependency-end
 """Tests for Codex agent role eval automation."""
 
 from __future__ import annotations
 
+import hashlib
 import json
 import shutil
 import subprocess
@@ -24,18 +25,9 @@ else:
 import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "eval" / "producers" / "evaluate_codex_agent_roles.py"
+SCRIPT = PROJECT_ROOT / "tools" / "bin" / "agent-canon"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
-from tools.agent.orchestration.team_config import (
-    load_task_catalog,
-    load_team_config,
-    select_roles,
-)  # noqa: E402
-from tools.agent.orchestration.model_profile_registry import (
-    generate_role_views,
-    load_model_profile_registry,
-)  # noqa: E402
 
 FIRST_RUNTIME_TOKENS = 100
 FIRST_RUNTIME_LATENCY_MS = 25
@@ -415,11 +407,51 @@ PRE_CHANGE_LIVE_GOLDEN = {
     },
 }
 
+PRE_CHANGE_ROLE_VIEW_SHA256 = {
+    "artifact_reviewer": "a0419cd6054db1c14c869438c02f107863eea4f06d84ccbc99f905358da72506",
+    "benchmark_reviewer": "575eb79b1a82e48aa342aedf436fc2c28ec7ab5b14e61547b6ef1cd7971dd263",
+    "citation_evidence_reviewer": "834e8c5712bffcf1fabf1701de2f2c87bd4abf75f77d1ba851a5f92c796c4619",
+    "cpp_reviewer": "2d29a34a7a81507075c6518f498e277d32693870ad6d8854de34a71fa92d5d29",
+    "detailed_design_reviewer": "67ba1ed5dab411168a3eb0f0621c44b9811717ee306f60e154b59d6406217022",
+    "detailed_designer": "f98924b64bc35ba1bb78ce0fe906855ff74666be544eead61e4ad465748dac17",
+    "diff_triage_reviewer": "cd54457c40079d06236a817b0b0eb232b045582cd782ba0be5cc041ce3439028",
+    "docs_workflow_steward": "01ad33e9212a317e369c6b180ac4cc6e496227cdeaed0c7b7b000fc378e71a16",
+    "document_flow_reviewer": "9ca29f90f6c62a4fac1cb37ca20baded8f681684a23c03f5d089defc39161034",
+    "execution_planner": "f508162187a60a320d40a832617c63c34a4561f30e8d38536f21ef835c8b489e",
+    "experiment_runner": "185e2108ab9b2e4e3edc243ea45b9b8ed17a7bdd62334d5fef3d77c144aa0dc2",
+    "explorer": "1e717928ebf7b793e50b497bdaa6dd2f6084ec95bd2897ceb78eb388e9cf681a",
+    "fair_data_reviewer": "30adde38e432581b7bc73801682cd1ea5b5f26051ec391f5fa08706077fb9245",
+    "integration_executor": "48e0480c37e9f23b601f7f208abab093abca0b718201b0165c80c509d86f6dbb",
+    "literature_researcher": "252fb89ad4301e935733830f12a3bb515eccb45a599cd81dda420186866b0f84",
+    "logic_gap_reviewer": "a7ed8e566810ddae1ec1baf8b87e5a5d0eb982c8b2a11d312b4b716dd4280148",
+    "long_form_writer": "2a03cfa1a3aad01db012c7e4229a7eac233668783e6b21d253cdd6bc742ad483",
+    "manager_reviewer": "8375c4b3562aa44b616fd69196edcf0d0b8f8ecf45c02994edcbcb547ac01a81",
+    "ml_science_reviewer": "9920f99658139a9d57b52357ad21a9c5f2608e23395b3aa9697011e06e227dc6",
+    "notation_definition_reviewer": "8bb5145693edf047a7362b63bf7d19aee378066998a50fb4bdafb014bd2a33db",
+    "oop_readability_reviewer": "e79c1e8a547c96408ab9276aa07e1da1b7025341bcaf36a0d1d2a74465ca663b",
+    "plan_reviewer": "feb73fe7b7b2a15b707324f9aef6ca025c405b5d605beb46fc5bf9674353c562",
+    "project_reviewer": "5daffa53bf40e4e28fa5e34ca0b862904049dfa9a2ce5c4700ecaea6df8ba440",
+    "prompt_config_reviewer": "8513c8770a82007d8c181e2679eb9135db8a08a67260fb372c2bb84e23ab72b7",
+    "publisher": "0067702a09e7f3fc85eee7de74cb99385ee61d956bce55773f94fa247d5fda21",
+    "python_reviewer": "932cfb6c491dcedd0a882effc01ad3abb9f860e5ebc2cb25af8664a8d9765f29",
+    "report_reviewer": "75a5ad188b26268a912d3bb0d623257337fbab70d0fa1d41e59559e200f30db3",
+    "reproducibility_reviewer": "ade5a51fa28e94f7d1f5097b53adf3cf7576f7fa7d0029919448ec96e0debd7c",
+    "requirements_organizer": "23fc25ffad691be38efd0930cb31e7aaf4ac7ef06af8476bb65f17493aab5af4",
+    "reviewer": "13c8986f19e20b32ec50e39d19933c9d0b6f4823ff1a7d5ea3b0bc3229f6e7a2",
+    "scientific_computing_reviewer": "0442a95241c89db365c834ea9ebae11ff2872c59cee7c019c03634531b3cbd31",
+    "ship_reviewer": "2461457b7e3544c6121f1dd3137666859df4a6a28391d479fa3b1a137e71e021",
+    "skill_evaluator": "7e6e97836919a3afcc095c2380d735940777adcecf0437e7b78427200fbdbc5c",
+    "spark_worker": "794b8529ee25ee9a86906aae5ec11b44b2fd38c4a301d105d2b56500b8608654",
+    "terra": "cc72489f1df3cd4f91d17302125a8cf9b25ccbceb4aaac599101b4d519f909ab",
+    "test_designer": "9fb8b554bd07be84d0c37c4a67eca1d3b83fde576d5326c758cc289f838f34ee",
+    "worker": "0110cb71b8a702b365e68e2f9b4443c8f544474abaa5f5da60744c502c4679b4",
+}
+
 
 def run_eval(*args: str) -> subprocess.CompletedProcess[str]:
     """Run the role eval helper."""
     return subprocess.run(
-        [sys.executable, str(SCRIPT), *args],
+        [str(SCRIPT), "evaluate-codex-agent-roles", *args],
         cwd=PROJECT_ROOT,
         check=False,
         capture_output=True,
@@ -531,21 +563,25 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
             self.assertNotIn("Traceback", result.stderr)
 
     def test_role_candidate_order_comes_from_target_team_config(self) -> None:
-        """Logical role candidates do not depend on a task-graph materializer."""
+        """The native role evaluator rejects a changed canonical candidate order."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             copy_eval_root(root)
-            config = load_team_config(root / "agents" / "agents_config.json")
-            catalog = load_task_catalog(config, root=root)
-            roles = select_roles(
-                config,
-                ["implementer"],
-                full_team=False,
-                catalog=catalog,
-                workflow_family_id="owner_bounded_change",
+            baseline = run_eval("--root", str(root), "--format", "json")
+            self.assertEqual(baseline.returncode, 0, baseline.stdout + baseline.stderr)
+            team_path = root / "agents" / "agents_config.json"
+            team = json.loads(team_path.read_text(encoding="utf-8"))
+            implementer = next(
+                role
+                for role in team["always_on_roles"] + team["specialist_roles"]
+                if role["id"] == "implementer"
             )
-            self.assertEqual(roles[0].id, "implementer")
-            self.assertEqual(roles[0].codex_agents, ("worker", "spark_worker"))
+            implementer["codex_agents"] = ["spark_worker", "worker"]
+            team_path.write_text(json.dumps(team, indent=2) + "\n", encoding="utf-8")
+
+            changed = run_eval("--root", str(root), "--format", "json")
+            self.assertEqual(changed.returncode, 1)
+            self.assertIn("role-candidate-order-expected-", changed.stdout)
 
     def test_evaluator_grammar_is_packet_driven_and_parent_scored(self) -> None:
         """Evaluator execution is a closed view generated from canonical profile truth."""
@@ -570,12 +606,39 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
         self.assertNotIn("score_percent=", evaluator_text)
 
     def test_pre_change_live_golden_is_invariant_for_all_37_roles(self) -> None:
-        """The live materializer preserves the current 37-role metadata golden."""
-        registry = load_model_profile_registry(PROJECT_ROOT)
-        views = {
-            view.role_id: view
-            for view in generate_role_views(registry, PROJECT_ROOT, projection="live")
-        }
+        """Native live generation preserves the independent 37-role golden."""
+        assignment_hashes: dict[str, str] = {}
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir) / "root"
+            copy_eval_root(root)
+            generated = run_eval(
+                "--root",
+                str(root),
+                "--generate-role-views",
+                "--projection",
+                "live",
+            )
+            self.assertEqual(
+                generated.returncode, 0, generated.stdout + generated.stderr
+            )
+            views = {
+                path.stem: tomllib.loads(path.read_text(encoding="utf-8"))
+                for path in (root / ".codex/agents").glob("*.toml")
+            }
+            for role_id in views:
+                assignment_body = (
+                    "\n".join(
+                        line
+                        for line in (root / ".codex/agents" / f"{role_id}.toml")
+                        .read_text(encoding="utf-8")
+                        .splitlines()
+                        if line.strip() and not line.lstrip().startswith("#")
+                    )
+                    + "\n"
+                )
+                assignment_hashes[role_id] = hashlib.sha256(
+                    assignment_body.encode("utf-8")
+                ).hexdigest()
         self.assertEqual(set(views), set(PRE_CHANGE_LIVE_GOLDEN))
         self.assertEqual(len(views), 37)
         fields = (
@@ -587,17 +650,23 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
             "model",
             "model_reasoning_effort",
         )
+        expected_assignment_sha256 = json.loads(
+            (
+                PROJECT_ROOT
+                / "tests/fixtures/model_profiles/live_assignment_sha256.json"
+            ).read_text(encoding="utf-8")
+        )
         for role_id, golden in PRE_CHANGE_LIVE_GOLDEN.items():
             view = views[role_id]
             actual = {
-                "name": view.name,
-                "description": view.description,
-                "nickname_candidates": list(view.nickname_candidates),
-                "sandbox_mode": view.sandbox_mode,
-                "approval_policy": view.approval_policy,
-                "model": view.model,
-                "model_reasoning_effort": view.reasoning_effort,
-                "developer_instructions": view.rendered_instructions,
+                "name": view["name"],
+                "description": view["description"],
+                "nickname_candidates": view["nickname_candidates"],
+                "sandbox_mode": view["sandbox_mode"],
+                "approval_policy": view["approval_policy"],
+                "model": view["model"],
+                "model_reasoning_effort": view["model_reasoning_effort"],
+                "developer_instructions": view["developer_instructions"],
             }
             self.assertEqual(
                 {field: actual[field] for field in fields},
@@ -606,6 +675,24 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
             )
             self.assertIn(
                 f"You are acting as {role_id}", actual["developer_instructions"]
+            )
+            self.assertEqual(
+                assignment_hashes[role_id],
+                expected_assignment_sha256[role_id],
+                role_id,
+            )
+
+    def test_committed_consumer_static_role_view_bytes_match_the_baseline(self) -> None:
+        """The 37 committed static role files retain their independent byte hashes."""
+        role_root = PROJECT_ROOT / ".codex/agents"
+        self.assertEqual(
+            {path.stem for path in role_root.glob("*.toml")},
+            set(PRE_CHANGE_ROLE_VIEW_SHA256),
+        )
+        for role_id, expected in PRE_CHANGE_ROLE_VIEW_SHA256.items():
+            path = role_root / f"{role_id}.toml"
+            self.assertEqual(
+                hashlib.sha256(path.read_bytes()).hexdigest(), expected, role_id
             )
 
     def test_role_eval_rejects_tier_and_service_tier_profile_keys(self) -> None:
@@ -676,6 +763,57 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
                 "skill-evaluator-only-in-skill-evaluation",
                 result.stdout,
             )
+
+    def test_routing_rejects_unknown_task_and_default_pack_roles(self) -> None:
+        """Unknown roles remain invalid instead of being removed from the evaluation."""
+        for source in ("task", "default_pack"):
+            with self.subTest(source=source), tempfile.TemporaryDirectory() as tmp_dir:
+                root = Path(tmp_dir)
+                copy_eval_root(root)
+                path = root / "agents" / "task_catalog.yaml"
+                catalog = yaml.safe_load(path.read_text(encoding="utf-8"))
+                if source == "task":
+                    task = next(task for task in catalog["tasks"] if task["id"] == "T1")
+                    task["specialists"].append("ghost_role")
+                    expected = "not declared in family"
+                else:
+                    pack = next(
+                        pack
+                        for pack in catalog["review_packs"]
+                        if pack["id"] == "research_perspective_triage"
+                    )
+                    pack["default_for_tasks"] = ["T1"]
+                    pack["specialists"].append("ghost_role")
+                    expected = "unknown role: ghost_role"
+                path.write_text(yaml.safe_dump(catalog), encoding="utf-8")
+                result = run_eval("--root", str(root))
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                self.assertIn(expected, result.stderr)
+
+    def test_routing_rejects_non_string_specialist_entries(self) -> None:
+        """Malformed role list items are rejected before role lookup."""
+        for source in ("task", "default_pack"):
+            with self.subTest(source=source), tempfile.TemporaryDirectory() as tmp_dir:
+                root = Path(tmp_dir)
+                copy_eval_root(root)
+                path = root / "agents" / "task_catalog.yaml"
+                catalog = yaml.safe_load(path.read_text(encoding="utf-8"))
+                if source == "task":
+                    next(task for task in catalog["tasks"] if task["id"] == "T1")[
+                        "specialists"
+                    ].append(7)
+                else:
+                    pack = next(
+                        pack
+                        for pack in catalog["review_packs"]
+                        if pack["id"] == "research_perspective_triage"
+                    )
+                    pack["default_for_tasks"] = ["T1"]
+                    pack["specialists"].append(7)
+                path.write_text(yaml.safe_dump(catalog), encoding="utf-8")
+                result = run_eval("--root", str(root))
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                self.assertIn("entries must be strings", result.stderr)
 
     def test_runtime_metrics_are_aggregated(self) -> None:
         """Optional JSONL runtime metrics should be summarized by agent."""

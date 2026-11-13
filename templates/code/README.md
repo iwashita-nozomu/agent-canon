@@ -8,7 +8,7 @@ upstream design ../README.md centralized template index and canonical source bou
 downstream implementation ./python/docstring_template.py parse-valid module/class/function example.
 downstream implementation ./cpp/include/agent_canon_template/status.hpp minimal C++ interface template.
 downstream implementation ./cpp/src/status.cpp matching C++ implementation template.
-downstream implementation ../../tools/agent/templates/code_template_rendering.py code-template renderer/readback route.
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/code_template_rendering.rs native code-template renderer/readback route.
 @dependency-end
 -->
 
@@ -34,8 +34,8 @@ Docstring の意味契約は日本語で記述します。
 
 | source | responsibility | materialization / renderer route |
 | --- | --- | --- |
-| `python/docstring_template.py` | module/class/function Docstring と具体的な state/type boundary の例 | `render_code_template("python/docstring_template.py")` または source copy |
-| `cpp/include/agent_canon_template/status.hpp` + `cpp/src/status.cpp` | one interface/implementation pair for a consumer-selected production path | `render_code_template("cpp/include/agent_canon_template/status.hpp")` and `render_code_template("cpp/src/status.cpp")`; consumer chooses `include/` and `src/` destinations |
+| `python/docstring_template.py` | module/class/function Docstring と具体的な state/type boundary の例 | `tools/bin/agent-canon render-code-template --root <agent-canon-source> python/docstring_template.py` または source copy |
+| `cpp/include/agent_canon_template/status.hpp` + `cpp/src/status.cpp` | one interface/implementation pair for a consumer-selected production path | `tools/bin/agent-canon render-code-template --root <agent-canon-source> cpp/include/agent_canon_template/status.hpp` and `tools/bin/agent-canon render-code-template --root <agent-canon-source> cpp/src/status.cpp`; consumer chooses `include/` and `src/` destinations |
 
 ## Materialization Contract
 
@@ -46,14 +46,8 @@ Docstring の意味契約は日本語で記述します。
 1. renderer を使った場合は rendered source と destination の path/sha256 を read back する。
 
 ```bash
-PYTHONPATH=. python3 - <<'PY'
-from pathlib import Path
-
-from tools.agent.templates.code_template_rendering import render_code_template
-
-source = render_code_template("python/docstring_template.py")
-Path("python/docstring_template.py").write_text(source, encoding="utf-8")
-PY
+tools/bin/agent-canon render-code-template --root <agent-canon-source> python/docstring_template.py \
+  > python/docstring_template.py
 ```
 
 この例の write は destination owner の明示的な materialization route です。template source の

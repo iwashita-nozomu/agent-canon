@@ -7,7 +7,7 @@ responsibility Documents the standalone AgentCanon tool surface and execution-pl
 upstream design ../documents/runtime/bootstrap-runtime.md shared bootstrap user contract
 upstream design ../documents/runtime/runtime-log-archive.md external archive publication contract
 upstream implementation runtime/container/bootstrap_runtime.py lifecycle implementation
-upstream implementation runtime/dispatch/tool_dispatch.py typed dispatch implementation
+upstream implementation runtime/dispatch/agent-canon/src/tool_dispatch.rs typed dispatch implementation
 upstream implementation runtime/artifacts/runtime_artifacts.py external artifact boundary
 upstream design catalog.yaml public tool registry
 downstream implementation runtime/dispatch/agent-canon/src/catalog/tool_catalog.rs validates catalog documentation
@@ -20,20 +20,22 @@ used by AgentCanon. A parent repository does not vendor this directory, copy it
 into its own `tools/`, or create a symlink view. Parent automation and project
 tests stay parent-owned.
 
-`tools/bin/agent-canon` resolves the repository root from its `BASH_SOURCE`
-script location before dispatching to `bootstrap.sh`. It is therefore
-cwd-independent: invoking the wrapper from any working directory uses the same
-source checkout and bootstrap runtime. Runtime and output roots remain the
-explicit control/runtime arguments supplied to the command.
+`tools/bin/agent-canon` resolves its source root from `BASH_SOURCE` and executes
+the selected native CLI. It accepts an explicit `AGENT_CANON_NATIVE_BIN`, an
+existing crate-local build, or the installed CLI on PATH. This selection is
+independent of the caller's working directory. Shared-runtime catalog commands
+use `bootstrap.sh` with the explicit install, control and project roots below.
 
 ## Execution planes
 
 Use the top-level [`bootstrap.sh`](../bootstrap.sh) for the shared AgentCanon
 runtime. It requires an authorized control root. The default runtime is the
-bootstrap-owned ignored `.runtime/` under the install checkout:
+bootstrap-owned ignored `.runtime/` under the explicit control root:
 
 ```bash
-./bootstrap.sh --control-parent-root <authorized-parent-root> <operation>
+/absolute/path/to/agent-canon/bootstrap.sh \
+  --repository-root /absolute/path/to/agent-canon \
+  --control-parent-root <authorized-control-root> <operation>
 ```
 
 | Plane | Owner | Examples | Side-effect rule |
@@ -81,7 +83,9 @@ Python tools are not made into flat global executables. A public catalog entry
 is callable through the namespaced route using its typed descriptor:
 
 ```bash
-./bootstrap.sh --control-parent-root <root> \
+/absolute/path/to/agent-canon/bootstrap.sh \
+  --repository-root /absolute/path/to/agent-canon \
+  --control-parent-root <authorized-control-root> \
   tool run --root <project-root> <catalog-id> -- <args...>
 ```
 
@@ -146,7 +150,8 @@ catalog/checker owners rather than adding a second README registry.
 | theorem graph proof-frontier checks | `tools/bin/agent-canon theorem-graph-circularity-check` |
 | generated artifact guard | `tools/bin/agent-canon generated-artifact-guard` |
 | archive state | `python3 tools/runtime/archive/runtime_log_archive_git.py status` |
-| eval archive structure | `python3 eval/checkers/eval_accumulation_check.py` |
+| Codex runtime summary export | `tools/bin/agent-canon export-codex-runtime-summary` |
+| eval archive structure | `tools/bin/agent-canon eval-accumulation-check` |
 | path-risk/profile selection | `tools/bin/agent-canon classify-path-risk` |
 | one-shot LSP code analysis | `tools/bin/agent-canon lsp-code-analysis analyze --root <root> --format json` |
 | Markdown/links/Mermaid | `tools/bin/agent-canon docs check` |

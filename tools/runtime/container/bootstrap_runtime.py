@@ -67,6 +67,7 @@ KNOWN_SUBDIRS = (
 CONTAINER_RUNTIME_DIR = "container-runtime"
 CONTAINER_RUNTIME_DESTINATION = "/var/lib/agent-canon/runtime"
 RUFF_CACHE_DESTINATION = "/var/lib/agent-canon/cache/ruff"
+NATIVE_CLI_DESTINATION = "/var/lib/agent-canon/cache/bin/agent-canon"
 PRIVATE_LOG_DESTINATION = "/var/lib/agent-canon/private-log"
 REGISTRY_DESTINATION = "/var/lib/agent-canon/mount-registry.toml"
 SOURCE_SYNC_SCHEMA = "agent-canon.source-sync.v1"
@@ -2205,21 +2206,46 @@ class BootstrapRuntime:
             # continue to receive no output capability at all.
             environment = {}
             try:
-                from ..dispatch.tool_dispatch import load_specs  # type: ignore[import-not-found]
-            except ImportError:
-                from tools.runtime.dispatch.tool_dispatch import load_specs  # type: ignore[no-redef]
-            try:
-                specs, _schema = load_specs(self.repository_root)
-                spec = specs.get(catalog_id)
+                native_cli = self.paths.cache / "bin" / "agent-canon"
+                completed = subprocess.run(
+                    [
+                        str(native_cli),
+                        "tool",
+                        "inventory",
+                        "--root",
+                        str(self.repository_root),
+                        "--json",
+                    ],
+                    cwd=self.repository_root,
+                    env={},
+                    stdin=subprocess.DEVNULL,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                if completed.returncode != 0:
+                    raise ValueError("native tool inventory failed")
+                inventory = json.loads(completed.stdout)
+                entries = inventory["entries"]
+                if not isinstance(entries, list):
+                    raise TypeError("native tool inventory entries are invalid")
+                spec = next(
+                    (
+                        entry
+                        for entry in entries
+                        if isinstance(entry, dict) and entry.get("id") == catalog_id
+                    ),
+                    None,
+                )
             except (OSError, ValueError, TypeError, KeyError) as exc:
                 raise BootstrapError(
                     "tool_catalog_invalid", "cannot resolve tool output capability"
                 ) from exc
-            if spec is not None and spec.output_root == "external-runtime":
+            if spec is not None and spec.get("output_root") == "external-runtime":
                 environment = {
                     "AGENT_CANON_OUTPUT_ROOT": f"{CONTAINER_RUNTIME_DESTINATION}/tool-output"
                 }
-            elif spec is not None and spec.output_root == "explicit-target":
+            elif spec is not None and spec.get("output_root") == "explicit-target":
                 environment = {"AGENT_CANON_OUTPUT_ROOT": str(target["root"])}
         return self.exec(
             Path(target["root"]),
@@ -2369,8 +2395,8 @@ class BootstrapRuntime:
                     f"{container_runtime}/tasks/{task_id}/{exchange_nonce}"
                 )
                 command = [
-                    "python3",
-                    f"{TOOL_SOURCE_DESTINATION}/eval/producers/run_accumulated_agent_evals.py",
+                    NATIVE_CLI_DESTINATION,
+                    "run-accumulated-agent-evals",
                     "--root",
                     canon_root,
                     "--target-root",
@@ -2388,6 +2414,9 @@ class BootstrapRuntime:
                     environment={
                         "AGENT_CANON_TARGET_ROOT": target_path,
                         "AGENT_CANON_TASK_ROOT": target_path,
+                        "AGENT_CANON_NATIVE_BIN": os.environ.get(
+                            "AGENT_CANON_NATIVE_BIN", NATIVE_CLI_DESTINATION
+                        ),
                         **_target_git_environment(Path(target_path)),
                     },
                     timeout=int(self.manifest["container"]["task_timeout_seconds"]),
@@ -3859,27 +3888,20 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
     if args.operation == "codex" and args.codex_operation == "hook":
         try:
-            hook_directory = Path(args.repository_root) / ".codex" / "hooks"
-            if hook_directory.is_symlink() or not hook_directory.is_dir():
-                raise BootstrapError(
-                    "codex_hook_source_missing",
-                    "bundled canonical hook source is unavailable",
-                )
-            hook_directory_text = str(hook_directory)
-            if hook_directory_text not in sys.path:
-                sys.path.insert(0, hook_directory_text)
-            import hook_dispatcher
-
-            return hook_dispatcher.dispatch_event(args.event, sys.stdin.buffer.read())
-        except BootstrapError as exc:
+            return subprocess.run(
+                ["agent-canon", "codex-hook", args.event],
+                input=sys.stdin.buffer.read(),
+                check=False,
+            ).returncode
+        except OSError as exc:
             print(
                 _json(
                     {
                         "schema": SCHEMA_RECEIPT,
                         "status": "error",
-                        "code": exc.code,
-                        "detail": exc.detail,
-                        "evidence": exc.evidence,
+                        "code": "codex_hook_source_missing",
+                        "detail": str(exc),
+                        "evidence": {},
                     }
                 ),
                 file=sys.stderr,

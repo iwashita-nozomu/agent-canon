@@ -4,7 +4,8 @@
 # contract test
 # responsibility Verifies standalone static unit source/runtime routing and eval failure evidence retention.
 # upstream implementation ../../tools/validation/ci/runners/run_standalone_static_gate_unit.sh owns contract and eval unit commands
-# upstream implementation ../../eval/producers/run_accumulated_agent_evals.py runs the selected eval producer collection
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/eval_accumulation_check.rs owns the native eval checker command
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/eval_accumulation.rs runs the selected eval producer collection
 # upstream implementation ../../tools/runtime/archive/runtime_log_paths.py defines canonical eval result paths
 # upstream design ../../documents/design/source-owned-dependency-validation.md source and persisted graph authority split
 # downstream implementation ../../.github/workflows/agent-canon-static-gates.yml runs selected unit owners
@@ -91,15 +92,13 @@ def test_all_source_gate_entrypoints_require_distinct_control_and_runtime_roots(
         "regression_status",
         "producer_status",
         "checker_status",
-        "smoke_status",
         "expected_names",
     ),
     [
-        (0, 0, 0, 0, ["regression", "producer", "checker", "smoke"]),
-        (0, 7, 0, 0, ["regression", "producer"]),
-        (0, 0, 9, 0, ["regression", "producer", "checker"]),
-        (0, 0, 0, 11, ["regression", "producer", "checker", "smoke"]),
-        (1, 0, 0, 0, ["regression"]),
+        (0, 0, 0, ["regression", "producer", "checker"]),
+        (0, 7, 0, ["regression", "producer"]),
+        (0, 0, 9, ["regression", "producer", "checker"]),
+        (1, 0, 0, ["regression"]),
     ],
 )
 def test_eval_preserves_failed_producer_logs_until_ci_capture(
@@ -107,7 +106,6 @@ def test_eval_preserves_failed_producer_logs_until_ci_capture(
     regression_status: int,
     producer_status: int,
     checker_status: int,
-    smoke_status: int,
     expected_names: list[str],
 ) -> None:
     """Failed producer logs survive; successful temporary output is still cleaned."""
@@ -125,19 +123,12 @@ def test_eval_preserves_failed_producer_logs_until_ci_capture(
         f"    assert os.environ['AGENT_CANON_RUNTIME_ROOT'] == {str(runtime)!r}\n"
         "    with Path(os.environ['CALLS']).open('a') as stream:\n"
         "        stream.write(json.dumps(['regression', None, None, "
-        "os.environ['AGENT_CANON_RUNTIME_ROOT']]) + '\\n')\n"
+        "os.environ['AGENT_CANON_RUNTIME_ROOT'], "
+        "os.environ.get('AGENT_CANON_NATIVE_BIN')]) + '\\n')\n"
         f"    assert {regression_status} == 0, 'requested prerequisite failure'\n",
         encoding="utf-8",
     )
-    paths = (
-        ("eval/producers/run_accumulated_agent_evals.py", "producer", producer_status),
-        ("eval/checkers/eval_accumulation_check.py", "checker", checker_status),
-        (
-            "eval/checkers/smoke_test_research_perspective_pack.py",
-            "smoke",
-            smoke_status,
-        ),
-    )
+    paths = (("producer_fixture.py", "producer", producer_status),)
     archive_relative = LOG_ARCHIVE_PARENT.as_posix()
     for relative, name, status in paths:
         script = source / relative
@@ -153,14 +144,7 @@ def test_eval_preserves_failed_producer_logs_until_ci_capture(
             "report_dir.mkdir(parents=True, exist_ok=True)\n"
             "(report_dir / 'agent-canon-pr-gate-pass.md').write_text('synthetic report\\n', encoding='utf-8')\n"
             if name == "producer"
-            else (
-                f"report = Path(os.environ['AGENT_CANON_RUNTIME_ROOT']) / {archive_relative!r} / "
-                "'eval-results/workflow-selection/agent-canon-pr-gate-pass.md'\n"
-                "if not report.is_file():\n"
-                "    raise SystemExit(87)\n"
-                if name == "checker"
-                else ""
-            )
+            else ""
         )
         script.write_text(
             "import json, os, sys\n"
@@ -169,11 +153,39 @@ def test_eval_preserves_failed_producer_logs_until_ci_capture(
             f"    stream.write(json.dumps([{name!r}, "
             "os.environ.get('AGENT_CANON_HOOK_ARCHIVE_DIR'), "
             "os.environ.get('AGENT_CANON_LOG_ROOT'), "
-            "os.environ.get('AGENT_CANON_RUNTIME_ROOT')]) + '\\n')\n"
+            "os.environ.get('AGENT_CANON_RUNTIME_ROOT'), "
+            "os.environ.get('AGENT_CANON_NATIVE_BIN')]) + '\\n')\n"
             + producer_logs
             + f"raise SystemExit({status})\n",
             encoding="utf-8",
         )
+    native_cli = source / "tools" / "bin" / "agent-canon"
+    native_cli.parent.mkdir(parents=True, exist_ok=True)
+    native_cli.write_text(
+        "#!/usr/bin/env python3\n"
+        "import json, os, sys\n"
+        "import runpy\n"
+        "from pathlib import Path\n"
+        "if sys.argv[1] == 'run-accumulated-agent-evals':\n"
+        "    sys.argv = [str(Path(__file__).parents[2] / 'producer_fixture.py'), *sys.argv[2:]]\n"
+        "    runpy.run_path(sys.argv[0], run_name='__main__')\n"
+        "    raise SystemExit(0)\n"
+        "if sys.argv[1] != 'eval-accumulation-check':\n"
+        "    raise SystemExit(86)\n"
+        "with Path(os.environ['CALLS']).open('a') as stream:\n"
+        "    stream.write(json.dumps(['checker', "
+        "os.environ.get('AGENT_CANON_HOOK_ARCHIVE_DIR'), "
+        "os.environ.get('AGENT_CANON_LOG_ROOT'), "
+        "os.environ.get('AGENT_CANON_RUNTIME_ROOT'), "
+        "os.environ.get('AGENT_CANON_NATIVE_BIN')]) + '\\n')\n"
+        f"report = Path(os.environ['AGENT_CANON_RUNTIME_ROOT']) / {archive_relative!r} / "
+        "'eval-results/workflow-selection/agent-canon-pr-gate-pass.md'\n"
+        "if not report.is_file():\n"
+        "    raise SystemExit(87)\n"
+        f"raise SystemExit({checker_status})\n",
+        encoding="utf-8",
+    )
+    native_cli.chmod(0o755)
     text = RUNNER.read_text(encoding="utf-8")
     body = (
         "run_eval() ("
@@ -191,6 +203,8 @@ def test_eval_preserves_failed_producer_logs_until_ci_capture(
             "RUNTIME_ROOT": str(source),
             "AGENT_CANON_STATIC_RUNTIME_ROOT": str(runtime),
             "AGENT_CANON_RUNTIME_ROOT": str(runtime),
+            "AGENT_CANON_CLI": str(native_cli),
+            "AGENT_CANON_NATIVE_BIN": "",
             "AGENT_CANON_HOOK_ARCHIVE_DIR": "/var/lib/agent-canon/private-log",
             "AGENT_CANON_LOG_ROOT": "/var/lib/agent-canon/private-log",
             "CALLS": str(calls),
@@ -201,15 +215,14 @@ def test_eval_preserves_failed_producer_logs_until_ci_capture(
         check=False,
     )
     assert result.returncode == (
-        regression_status or producer_status or checker_status or smoke_status
+        regression_status or producer_status or checker_status
     ), result.stdout + result.stderr
     records = [json.loads(line) for line in calls.read_text().splitlines()]
     assert [record[0] for record in records] == expected_names
-    assert all(
-        record[1:] == [None, None, str(runtime)]
-        for record in records
-        if record[0] != "smoke"
-    )
+    assert all(record[1:4] == [None, None, str(runtime)] for record in records)
+    assert [record[4] for record in records] == [
+        str(native_cli) if record[0] == "producer" else "" for record in records
+    ]
     report_path = (
         runtime
         / LOG_ARCHIVE_PARENT
@@ -224,7 +237,7 @@ def test_eval_preserves_failed_producer_logs_until_ci_capture(
     if regression_status:
         assert temporary_logs.is_dir()
         assert not list(temporary_logs.iterdir())
-    elif producer_status or checker_status or smoke_status:
+    elif producer_status or checker_status:
         assert temporary_logs.is_dir()
         assert "producer stdout line 161" in (
             temporary_logs / "02-workflow-selection.stdout.txt"

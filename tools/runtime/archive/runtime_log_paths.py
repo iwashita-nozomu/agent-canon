@@ -3,13 +3,9 @@
 # contract tool
 # responsibility Resolves AgentCanon runtime hook and eval archive paths without mutating repositories.
 # upstream design ../../../documents/runtime/runtime-log-archive.md runtime log archive ownership and branch policy
-# downstream implementation ../../../.codex/hooks/hook_event_log.py writes hook JSONL through this resolver
 # downstream implementation ../../../eval/producers/generate_agent_improvement_guide.py reads mounted hook log archives
-# downstream implementation ./export_codex_runtime_summary.py writes bounded Codex runtime summaries
-# downstream implementation ../../../eval/checkers/eval_accumulation_check.py validates mounted hook log archives
 # downstream implementation ./runtime_log_archive_git.py archives run-bundle agent reports
-# downstream implementation ../../../eval/producers/evaluate_workflow_selection.py writes accumulated eval reports through this resolver
-# downstream implementation ../../../eval/producers/evaluate_codex_agent_roles.py writes accumulated eval reports through this resolver
+# upstream reference ../dispatch/agent-canon/src/eval_archive_paths.rs owns the native archive-path counterpart used by Eval producers
 # downstream implementation ./runtime_log_archive_git.py copies agent reports into this archive
 # @dependency-end
 """Resolve AgentCanon runtime log and eval archive paths."""
@@ -21,6 +17,9 @@ import os
 import re
 import subprocess
 from pathlib import Path
+
+# Read-only legacy archive location; task execution no longer creates this pointer.
+ACTIVE_RUN_POINTER = Path("reports") / "agents" / ".active_run"
 
 try:
     from tools.runtime.artifacts.runtime_artifacts import (

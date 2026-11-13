@@ -2,7 +2,7 @@
 name: agent-log-analysis
 description: "Use when analyzing accumulated AgentCanon skill/tool/workflow/hook/eval logs, missed or late skill invocation, routing misses, weak skills, over-constrained related-skill coverage, or selection gaps; reuse existing structured summaries and use bounded snapshot-qualified drilldown when needed. Archive maintenance, dashboard repair, and eval reruns are separate selected operations, not analysis prerequisites."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"456a9075da4174c96b1002a9f0e07cb464fb43b67b2607be603cf77e96f1045f"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"aeae7bfd68c2d92784b1c58bea2bda8fae293f4e3381345e2bb4e3196b074681"} -->
 
 <!--
 @dependency-start

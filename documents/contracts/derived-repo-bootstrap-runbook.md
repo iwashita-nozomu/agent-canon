@@ -52,15 +52,10 @@ fallback.
 ## Migration write boundary
 
 Migrating an existing parent from a vendored/live AgentCanon integration is a
-management-edge removal, not a project environment refactor. Before editing,
-the current task scope update lists each authorized path with its operation,
-the exact AgentCanon edge being removed/replaced, and owner evidence. This
-`management_write_set` is the complete migration write authority.
-Every row uses an existing exact path and, for a mixed file, an exact span;
-placeholders and directory globs leave `migration_status=unresolved` and grant
-no edit authority.
-An unresolved candidate is reported outside `management_write_set`; annotating
-an inexact row as non-authoritative does not make it a valid row.
+management-edge removal. Before editing, identify the authorized paths, exact
+AgentCanon references, and mixed-file spans in the current conversation. Keep
+parent-owned environment and product behavior within their existing authority.
+No migration write-set table or status ledger is required.
 
 Authorized changes are limited to an evidenced AgentCanon gitlink/submodule
 and `.gitmodules` entry, AgentCanon-owned root projections/source symlinks/
