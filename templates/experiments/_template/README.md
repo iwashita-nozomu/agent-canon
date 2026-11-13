@@ -59,7 +59,7 @@ experiments/<topic>/
 
 ## 実行契約
 
-topic は `tools/experiments/execution/run_managed_experiment.py` から呼び出します。topic の `run.py` を
+topic は `tools/bin/agent-canon run-managed-experiment` から呼び出します。topic の `run.py` を
 直接起動せず、caller が `EXPERIMENT_RUN_DIR`、`EXPERIMENT_RUN_MANIFEST`、
 `EXPERIMENT_VARIANT` を設定した managed route を使います。
 

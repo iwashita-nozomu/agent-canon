@@ -63,7 +63,7 @@ For execution, prefer the caller's established runner. When AgentCanon's
 managed formal or verified route is selected, its existing invocation is:
 
 ```bash
-python3 -m tools.experiments.execution.run_managed_experiment \
+tools/bin/agent-canon run-managed-experiment \
   --topic <topic> --variant <variant> -- <project run command>
 ```
 

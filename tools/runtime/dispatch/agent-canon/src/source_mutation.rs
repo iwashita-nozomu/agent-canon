@@ -1266,6 +1266,18 @@ fn open_file_parent_nofollow(
     relative: &Path,
     create_missing: bool,
 ) -> io::Result<(cap_std::fs::Dir, OsString)> {
+    file_parent_from_root(
+        &open_root_nofollow(root)?,
+        relative,
+        create_missing.then_some(0o777),
+    )
+}
+
+pub(crate) fn file_parent_from_root(
+    root: &cap_std::fs::Dir,
+    relative: &Path,
+    directory_mode: Option<u32>,
+) -> io::Result<(cap_std::fs::Dir, OsString)> {
     let mut components = relative.components().collect::<Vec<_>>();
     let Some(Component::Normal(name)) = components.pop() else {
         return Err(io::Error::new(
@@ -1283,12 +1295,23 @@ fn open_file_parent_nofollow(
             )),
         })
         .collect::<io::Result<Vec<_>>>()?;
-    let mut directory = open_root_nofollow(root)?;
+    let mut directory = root.try_clone()?;
     for part in parent {
         match directory.open_dir_nofollow(&part) {
             Ok(child) => directory = child,
-            Err(error) if create_missing && error.kind() == io::ErrorKind::NotFound => {
-                match directory.create_dir(&part) {
+            Err(error) if directory_mode.is_some() && error.kind() == io::ErrorKind::NotFound => {
+                #[cfg(unix)]
+                let created = rustix::fs::mkdirat(
+                    &directory,
+                    &part,
+                    rustix::fs::Mode::from_bits_truncate(
+                        directory_mode.expect("creation mode selected") as _,
+                    ),
+                )
+                .map_err(io::Error::from);
+                #[cfg(not(unix))]
+                let created = directory.create_dir(&part);
+                match created {
                     Ok(()) => {}
                     Err(create_error) if create_error.kind() == io::ErrorKind::AlreadyExists => {}
                     Err(create_error) => return Err(create_error),

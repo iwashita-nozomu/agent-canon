@@ -346,7 +346,7 @@ hand-picked example だけで終えず、契約に合う property / metamorphic 
 
 ### 4.1 標準出力を表示する
 
-- ファイル単位: `pytest -q -s tests/tools/test_run_managed_experiment.py`
+- managed experiment native owner: `cargo test --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --test managed_experiment_native`
 - 全体: `pytest -q -s`
 
 ### 4.2 `python file.py` での補助実行
