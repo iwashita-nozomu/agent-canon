@@ -176,7 +176,9 @@ impl SourceMutationCapability {
         mode: u32,
         create_parents: bool,
     ) -> Result<()> {
-        self.write_with(path, mode, true, create_parents, |file| file.write_all(text.as_bytes()))
+        self.write_with(path, mode, true, create_parents, |file| {
+            file.write_all(text.as_bytes())
+        })
     }
 
     pub fn atomic_write_bytes(&self, path: &Path, bytes: &[u8], mode: u32) -> Result<()> {
