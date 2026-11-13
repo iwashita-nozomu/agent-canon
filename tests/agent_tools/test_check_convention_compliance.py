@@ -41,8 +41,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     "tools/catalog.yaml": """
 path: tools/analysis/dependencies/run_repo_dependency_review.sh
 path: tools/runtime/dispatch/agent-canon/src/notebook_quality.rs
-path: tools/validation/code/oop/python/readability.py
-path: tools/validation/code/oop/cpp/readability.py
+path: tools/runtime/dispatch/agent-canon/src/oop/python/readability.rs
+path: tools/runtime/dispatch/agent-canon/src/oop/cpp/readability.rs
 path: tools/runtime/dispatch/agent-canon/src/run_evaluation.rs
 path: tools/runtime/dispatch/agent-canon/src/skill_frontmatter.rs
 path: tools/validation/semantic/convention/check_convention_compliance.py
@@ -53,7 +53,7 @@ path: tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs
     "documents/runtime/bootstrap-runtime.md": "bootstrap runtime owner\n",
     "bootstrap/container/image/Dockerfile": "FROM scratch\n# bootstrap_runtime\n",
     "tests/tools/test_bootstrap_container_contract.py": "# bootstrap_runtime\ndef test_bootstrap_container_contract(): pass\n",
-    "tests/bootstrap/test_bootstrap_runtime.py": "# bootstrap_runtime\ndef test_bootstrap_runtime(): pass\n",
+    "tools/runtime/dispatch/agent-canon/tests/bootstrap_runtime_native.rs": "// bootstrap_runtime\n#[test] fn test_bootstrap_runtime() {}\n",
     "documents/conventions/README.md": "conventions\n",
     "documents/conventions/common/01_principles.md": "ruff-magic-values.toml\n",
     "documents/rule/naming.md": "naming\n",
@@ -96,7 +96,7 @@ path: tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs
     "documents/conventions/object-oriented-design.md": "object-oriented design\n",
     "documents/experiments/experiment-registry.md": "experiment registry\n",
     "documents/conventions/REVIEW_PROCESS.md": (
-        "Review Finding Issue Routing issue_route github_issue issue_sync.py private packet\n"
+        "Review Finding Issue Routing issue_route github_issue agent-canon issue-sync private packet\n"
     ),
     "documents/runtime/runtime-profiles-and-check-matrix.md": (
         "Static analysis and reading evidence primary validation evidence "
@@ -270,7 +270,7 @@ path: tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs
         "check_convention_compliance.py "
         "check-skill-frontmatter "
         "tool_catalog.rs tool_drift.rs notebook-quality "
-        "github_workflow_check.rs bootstrap_runtime.py run_agent_canon docs check "
+        "github_workflow_check.rs bootstrap_runtime.rs run_agent_canon docs check "
         "run_agent_canon responsibility-scope\n"
     ),
     "tools/validation/ci/checks/check_agent_canon_pr.sh": (
@@ -282,7 +282,7 @@ path: tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs
     "bootstrap.sh": "runtime boundary\n",
     "agents/skills/environment-maintenance.md": (
         "tests/tools/test_bootstrap_container_contract.py "
-        "tests/bootstrap/test_bootstrap_runtime.py bootstrap_runtime.py\n"
+        "tools/runtime/dispatch/agent-canon/tests/bootstrap_runtime_native.rs bootstrap_runtime.rs\n"
     ),
     ".codex/README.md": (
         "active events active/inactive legacy `Stop` fail-open bounded redacted\n"
@@ -880,7 +880,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("review_issue_routing", result.stdout)
-            self.assertIn("missing-marker:issue_sync.py", result.stdout)
+            self.assertIn("missing-marker:agent-canon issue-sync", result.stdout)
 
     def test_minimal_fixture_covers_review_issue_routing_surfaces(self) -> None:
         """The minimal test fixture includes every review issue route surface."""

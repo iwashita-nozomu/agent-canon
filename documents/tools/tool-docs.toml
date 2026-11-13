@@ -33,7 +33,7 @@ summary = "Remote HTML artifact browser-access command documentation."
 [[tool]]
 id = "oop-python-readability"
 classification = "public"
-tool = "tools/validation/code/oop/python/readability.py"
+tool = "tools/runtime/dispatch/agent-canon/src/oop/python/readability.rs"
 doc = "documents/tools/oop/python/readability.md"
 language = "python"
 summary = "Python OOP readability checker documentation."
@@ -49,7 +49,7 @@ summary = "Python OOP rule inventory documentation."
 [[tool]]
 id = "oop-cpp-readability"
 classification = "public"
-tool = "tools/validation/code/oop/cpp/readability.py"
+tool = "tools/runtime/dispatch/agent-canon/src/oop/cpp/readability.rs"
 doc = "documents/tools/oop/cpp/readability.md"
 language = "cpp"
 summary = "C++ OOP readability checker documentation."
@@ -225,9 +225,9 @@ summary = "Path/risk check matrix classifier documentation."
 [[tool]]
 id = "formal-proof"
 classification = "public"
-tool = "tools/analysis/proof/formal_proof.py"
+tool = "tools/runtime/dispatch/agent-canon/src/formal_proof.rs"
 doc = "documents/tools/formal_proof.md"
-language = "python"
+language = "rust"
 summary = "Formal proof scaffold planner documentation, including natural-language, Python AST, and package-retained trace routes."
 
 [[tool]]
@@ -237,6 +237,14 @@ tool = "tools/runtime/dispatch/agent-canon/src/lean_proof_env.rs"
 doc = "documents/tools/lean_proof_env.md"
 language = "rust"
 summary = "Lean Mathlib/Aesop proof environment setup and checker routing documentation."
+
+[[tool]]
+id = "lean-recursive-proof-search"
+classification = "public"
+tool = "tools/runtime/dispatch/agent-canon/src/lean_recursive_proof_search.rs"
+doc = "documents/tools/lean_recursive_proof_search.md"
+language = "rust"
+summary = "Configured Lean proof attempts and unresolved-goal frontier reporting."
 
 [[tool]]
 id = "tool-proof-coverage"

@@ -3,7 +3,7 @@
 # contract tool
 # responsibility Resolves AgentCanon runtime hook and eval archive paths without mutating repositories.
 # upstream design ../../../documents/runtime/runtime-log-archive.md runtime log archive ownership and branch policy
-# downstream implementation ../../../eval/producers/generate_agent_improvement_guide.py reads mounted hook log archives
+# downstream implementation ../dispatch/agent-canon/src/agent_runtime_dashboard.rs reads mounted hook log archives
 # downstream implementation ./runtime_log_archive_git.py archives run-bundle agent reports
 # upstream reference ../dispatch/agent-canon/src/eval_archive_paths.rs owns the native archive-path counterpart used by Eval producers
 # downstream implementation ./runtime_log_archive_git.py copies agent reports into this archive

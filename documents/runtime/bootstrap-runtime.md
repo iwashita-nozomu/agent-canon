@@ -4,7 +4,7 @@ contract agent-runtime
 responsibility Describes the standalone AgentCanon bootstrap and shared tool-runtime user contract.
 upstream design ../../documents/design/agent-canon-bootstrap-tool-runtime.md shared runtime design
 upstream implementation ../../bootstrap.sh Host entrypoint
-upstream implementation ../../tools/runtime/container/bootstrap_runtime.py lifecycle owner
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/bootstrap_runtime.rs lifecycle owner
 downstream design runtime-profiles-and-check-matrix.md validation profiles
 downstream design runtime-log-archive.md archive publication
 @dependency-end
@@ -17,6 +17,9 @@ project dependency directory. The supported user path is a host bootstrap
 which adopts one shared, bounded tool container from the published
 multi-architecture GHCR image and then
 launches tools against explicitly registered targets.
+
+The native `bootstrap-runtime` controller runs inside the Unix resident. Host
+installations invoke it through the existing bootstrap/Docker route.
 
 The bootstrap owns only shell/Docker/Git adapters. The shared toolresident owns
 Python, Rust, and language-server tools and is distinct from every project

@@ -6,7 +6,7 @@ contract tool
 responsibility Documents the standalone AgentCanon tool surface and execution-plane boundary.
 upstream design ../documents/runtime/bootstrap-runtime.md shared bootstrap user contract
 upstream design ../documents/runtime/runtime-log-archive.md external archive publication contract
-upstream implementation runtime/container/bootstrap_runtime.py lifecycle implementation
+upstream implementation runtime/dispatch/agent-canon/src/bootstrap_runtime.rs lifecycle implementation
 upstream implementation runtime/dispatch/agent-canon/src/tool_dispatch.rs typed dispatch implementation
 upstream implementation runtime/artifacts/runtime_artifacts.py external artifact boundary
 upstream design catalog.yaml public tool registry
@@ -174,10 +174,11 @@ repository. Archive branch/retention belong to that repository. Publication is
 successful only after remote ref/tree/blob readback; failure retains spool and
 receipt for retry. See [Runtime Log Archive](../documents/runtime/runtime-log-archive.md).
 
-`generate_agent_improvement_guide.py` reads the mounted runtime hook archive
-and repository-qualified GitHub Issue URLs from run-local private packets as read-only evidence. Its generated guide is another
-external runtime artifact and is not permission to change source, Issue, or
-archive state.
+`tools/bin/agent-canon generate-agent-improvement-guide` reads the mounted
+runtime hook archive and repository-qualified GitHub Issue URLs from run-local
+private packets as read-only evidence. Its generated guide is another external
+runtime artifact and is not permission to change source, Issue, or archive
+state.
 
 ## Host adapters and credentials
 

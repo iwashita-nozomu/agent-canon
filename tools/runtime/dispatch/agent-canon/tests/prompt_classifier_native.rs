@@ -19,7 +19,7 @@ use std::path::PathBuf;
 
 const GOLDEN: &str =
     include_str!("../../../../../tests/fixtures/prompt_classifier/python_golden.json");
-const GOLDEN_SHA256: &str = "181d0e3ffc83e364417b1f29178c261ac9bd6b06793e07678d267cf29a96e6ea";
+const GOLDEN_SHA256: &str = "9cb92118b3b0aada788448833079cbb59e85aa515302b672516de85374564dea";
 const SOURCE_SHA256: &str = "081f8b851c2f03ed7f0a275db572d2107e416cf52a687a1922a82dda4c73c909";
 
 fn sha256_hex(bytes: &[u8]) -> String {

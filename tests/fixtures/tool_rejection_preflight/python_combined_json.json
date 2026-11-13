@@ -50,7 +50,7 @@
       "path": ".codex/hooks/hook_dispatcher.py"
     },
     {
-      "command": "python3 tools/validation/code/oop/python/readability.py --root . .codex/hooks/hook_dispatcher.py",
+      "command": "tools/bin/agent-canon oop-python-readability --root . .codex/hooks/hook_dispatcher.py",
       "gate": "oop_readability_guard",
       "handoff": "include OOP readability risk, repair plan, and the non-blocking review_oop_boundary_signal / OOP_READABILITY_REVIEW_SIGNAL_FINDINGS disposition before implementation edits",
       "path": ".codex/hooks/hook_dispatcher.py"
@@ -188,7 +188,7 @@
       "path": "scratch/emoji-\ud83d\ude00.py"
     },
     {
-      "command": "python3 tools/validation/code/oop/python/readability.py --root . scratch/emoji-\ud83d\ude00.py",
+      "command": "tools/bin/agent-canon oop-python-readability --root . scratch/emoji-\ud83d\ude00.py",
       "gate": "oop_readability_guard",
       "handoff": "include OOP readability risk, repair plan, and the non-blocking review_oop_boundary_signal / OOP_READABILITY_REVIEW_SIGNAL_FINDINGS disposition before implementation edits",
       "path": "scratch/emoji-\ud83d\ude00.py"
@@ -224,7 +224,7 @@
       "path": "scratch/quote\"file.py"
     },
     {
-      "command": "python3 tools/validation/code/oop/python/readability.py --root . scratch/quote\"file.py",
+      "command": "tools/bin/agent-canon oop-python-readability --root . scratch/quote\"file.py",
       "gate": "oop_readability_guard",
       "handoff": "include OOP readability risk, repair plan, and the non-blocking review_oop_boundary_signal / OOP_READABILITY_REVIEW_SIGNAL_FINDINGS disposition before implementation edits",
       "path": "scratch/quote\"file.py"
@@ -260,7 +260,7 @@
       "path": "scratch/\u65e5\u672c\u8a9e.py"
     },
     {
-      "command": "python3 tools/validation/code/oop/python/readability.py --root . scratch/\u65e5\u672c\u8a9e.py",
+      "command": "tools/bin/agent-canon oop-python-readability --root . scratch/\u65e5\u672c\u8a9e.py",
       "gate": "oop_readability_guard",
       "handoff": "include OOP readability risk, repair plan, and the non-blocking review_oop_boundary_signal / OOP_READABILITY_REVIEW_SIGNAL_FINDINGS disposition before implementation edits",
       "path": "scratch/\u65e5\u672c\u8a9e.py"
@@ -296,7 +296,7 @@
       "path": "src/model.cpp"
     },
     {
-      "command": "python3 tools/validation/code/oop/cpp/readability.py --root . src/model.cpp",
+      "command": "tools/bin/agent-canon oop-cpp-readability --root . src/model.cpp",
       "gate": "oop_readability_guard",
       "handoff": "include C/C++ OOP readability risk before edits",
       "path": "src/model.cpp"
@@ -332,7 +332,7 @@
       "path": "tools/agent_tools/new_shared_checker_oracle.py"
     },
     {
-      "command": "python3 tools/validation/code/oop/python/readability.py --root . tools/agent_tools/new_shared_checker_oracle.py",
+      "command": "tools/bin/agent-canon oop-python-readability --root . tools/agent_tools/new_shared_checker_oracle.py",
       "gate": "oop_readability_guard",
       "handoff": "include OOP readability risk, repair plan, and the non-blocking review_oop_boundary_signal / OOP_READABILITY_REVIEW_SIGNAL_FINDINGS disposition before implementation edits",
       "path": "tools/agent_tools/new_shared_checker_oracle.py"
