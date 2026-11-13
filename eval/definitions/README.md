@@ -4,7 +4,7 @@ contract data
 responsibility Documents active AgentCanon eval definitions and accumulation.
 upstream design ../../agents/canonical/skills.md skill canon registry
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/run_evaluation.rs runs behavior evals
-downstream implementation ../producers/generate_agent_improvement_guide.py summarizes observations without creating task obligations
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/agent_runtime_dashboard.rs summarizes observations without creating task obligations
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/eval_accumulation_check.rs validates accumulated result evidence
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/workflow_selection_eval.rs runs workflow selection evals
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/codex_agent_role_eval/mod.rs runs Codex subagent role evals
@@ -177,7 +177,7 @@ The role eval fails when a role TOML violates this contract:
 
 ## Improvement guide evidence
 
-The [guide producer](../producers/generate_agent_improvement_guide.py) reads
+The [guide command](../../tools/runtime/dispatch/agent-canon/src/agent_runtime_dashboard.rs) reads
 existing private Issue references, knowledge, eval reports, and archived hook
 observations. Its [workflow](../../.github/workflows/agent-improvement-guide.yml)
 runs on its selected producer/test paths or manual dispatch, not ordinary PRs

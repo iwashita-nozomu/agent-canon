@@ -247,8 +247,10 @@ class NativeToolDispatchTests(unittest.TestCase):
             entries["quarto"]["path"],
             "tools/runtime/dispatch/agent-canon/src/tool_dispatch.rs",
         )
+        self.assertEqual(entries["generate-agent-runtime-dashboard"]["runtime"], "rust")
         self.assertEqual(
-            entries["generate-agent-runtime-dashboard"]["runtime"], "python"
+            entries["generate-agent-runtime-dashboard"]["path"],
+            "tools/runtime/dispatch/agent-canon/src/agent_runtime_dashboard.rs",
         )
         for entry in entries.values():
             self.assertIn(entry["runtime"], {"python", "rust", "native"})
