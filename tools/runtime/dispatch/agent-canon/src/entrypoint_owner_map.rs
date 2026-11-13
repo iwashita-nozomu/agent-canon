@@ -59,12 +59,12 @@ const CONTRACTS: &[EntrypointContract] = &[
             &[
                 "workflow family and role candidates",
                 "agents/task_catalog.yaml",
-                "tools/bin/agent-canon check-agent-runtime-alignment",
+                "agent-canon check-agent-runtime-alignment",
             ],
             &[
                 "public skill registry",
                 "agents/skills/catalog.yaml",
-                "tools/bin/agent-canon check-agent-runtime-alignment",
+                "agent-canon check-agent-runtime-alignment",
             ],
             &[
                 "AgentCanon source publication",
