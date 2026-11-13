@@ -138,6 +138,7 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
         """Run a source-owned route from an isolated development clone."""
         with tempfile.TemporaryDirectory() as workspace:
             clone = Path(workspace) / "agent-canon"
+
             def copy_ignore(directory: str, names: list[str]) -> set[str]:
                 """Ignore clone-local state while retaining canonical packages."""
                 ignored = set(
@@ -151,9 +152,10 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
                         ".ruff_cache",
                     )(directory, names)
                 )
-                if Path(directory).resolve() == (
-                    PROJECT_ROOT / "tools" / "repository"
-                ).resolve():
+                if (
+                    Path(directory).resolve()
+                    == (PROJECT_ROOT / "tools" / "repository").resolve()
+                ):
                     ignored.discard("workspace")
                 return ignored
 
@@ -195,9 +197,10 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
                         ".git", ".agent-canon", "reports", "workspace"
                     )(directory, names)
                 )
-                if Path(directory).resolve() == (
-                    PROJECT_ROOT / "tools" / "repository"
-                ).resolve():
+                if (
+                    Path(directory).resolve()
+                    == (PROJECT_ROOT / "tools" / "repository").resolve()
+                ):
                     ignored.discard("workspace")
                 return ignored
 
@@ -237,11 +240,7 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
             script = root / "tools" / "agent_tool.sh"
             script.parent.mkdir(parents=True, exist_ok=True)
             script.write_text(
-                "#!/usr/bin/env sh\n"
-                "if [ \"$1\" = \"pass\" ]; then\n"
-                "  exit 0\n"
-                "fi\n"
-                "exit 1\n"
+                '#!/usr/bin/env sh\nif [ "$1" = "pass" ]; then\n  exit 0\nfi\nexit 1\n'
             )
             script.chmod(stat.S_IXUSR | stat.S_IRUSR)
 

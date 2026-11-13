@@ -28,7 +28,9 @@ import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 AGENT_CANON_CLI = Path(
-    os.environ.get("AGENT_CANON_CLI", str(PROJECT_ROOT / "tools" / "bin" / "agent-canon"))
+    os.environ.get(
+        "AGENT_CANON_CLI", str(PROJECT_ROOT / "tools" / "bin" / "agent-canon")
+    )
 )
 CAPABILITY_ROUTE_GOLDEN = (
     PROJECT_ROOT / "tests" / "fixtures" / "capability_route" / "python_golden.json"
@@ -229,7 +231,9 @@ class RouteToolTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("STATUS=alias", result.stdout)
         self.assertIn("CANONICAL_AREA=surface", result.stdout)
-        self.assertIn("CANONICAL_TOOL=tools/bin/agent-canon route --area surface", result.stdout)
+        self.assertIn(
+            "CANONICAL_TOOL=tools/bin/agent-canon route --area surface", result.stdout
+        )
         self.assertIn("CANONICAL_SKILL=task-routing", result.stdout)
 
     def test_long_proposed_skill_name_resolves_to_task_routing(self) -> None:
@@ -257,7 +261,9 @@ class RouteToolTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("CANONICAL_AREA=search", result.stdout)
-        self.assertIn("CANONICAL_TOOL=tools/bin/agent-canon route --area search", result.stdout)
+        self.assertIn(
+            "CANONICAL_TOOL=tools/bin/agent-canon route --area search", result.stdout
+        )
 
     def test_private_subagent_startup_aliases_are_unknown_names(self) -> None:
         """Historical startup labels should not resolve as route aliases."""
@@ -1471,7 +1477,10 @@ class RouteToolTest(unittest.TestCase):
 
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 self.assertIn("CANONICAL_AREA=structure", result.stdout)
-                self.assertIn("CANONICAL_TOOL=tools/bin/agent-canon route --area structure", result.stdout)
+                self.assertIn(
+                    "CANONICAL_TOOL=tools/bin/agent-canon route --area structure",
+                    result.stdout,
+                )
 
     def test_prompt_routes_contextual_routing_redesign_to_architecture_stack(
         self,

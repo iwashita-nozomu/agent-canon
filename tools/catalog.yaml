@@ -1064,7 +1064,7 @@ entries:
     role: runner
     status: canonical
     command: tools/bin/agent-canon run-accumulated-agent-evals --run-id <run-id>
-    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "run-accumulated-agent-evals", "--run-id", "<run-id>"]}
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "run-accumulated-agent-evals"]}
     writes: true
     default_wiring:
       ci: true

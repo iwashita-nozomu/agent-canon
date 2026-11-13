@@ -47,7 +47,7 @@ def test_native_collector_runs_registered_families_and_captures_external_logs(
         "printf 'parent_capability=%s\\n' \"$AGENT_CANON_PARENT_ROOT_CAPABILITY\"\n"
         "printf 'target_capability=%s\\n' \"$AGENT_CANON_TARGET_ROOT_CAPABILITY\"\n"
         "printf 'stderr for %s\\n' \"$selector\" >&2\n"
-        "if [ \"$selector\" = evaluate-workflow-selection ]; then exit 4; fi\n",
+        'if [ "$selector" = evaluate-workflow-selection ]; then exit 4; fi\n',
         encoding="utf-8",
     )
     tool.chmod(0o755)

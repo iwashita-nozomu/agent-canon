@@ -47,7 +47,9 @@ def test_changed_iterations_routes_math_before_jit() -> None:
     assert "environment-maintenance" not in skills
 
 
-def test_same_trajectory_compile_cost_keeps_math_as_gate_and_forbids_math_edit() -> None:
+def test_same_trajectory_compile_cost_keeps_math_as_gate_and_forbids_math_edit() -> (
+    None
+):
     """An isolated compile cost is a sibling handoff after math evidence."""
     skills = _active_skills(
         "修正して。solver residual performance は same trajectory same iterations。"
@@ -86,9 +88,9 @@ def test_nonnumeric_cpp_performance_keeps_existing_route() -> None:
 
 def test_diagnosis_docs_bind_cost_decomposition_and_post_run_order() -> None:
     """The three owners expose one consistent post-run decomposition and order."""
-    optimization = (PROJECT_ROOT / "agents/skills/computational-optimization.md").read_text(
-        encoding="utf-8"
-    )
+    optimization = (
+        PROJECT_ROOT / "agents/skills/computational-optimization.md"
+    ).read_text(encoding="utf-8")
     cpp = (PROJECT_ROOT / "agents/skills/cpp-review.md").read_text(encoding="utf-8")
     experiment = (
         PROJECT_ROOT / "documents/experiments/experiment-critical-review.md"
@@ -139,10 +141,13 @@ def test_catalog_exposes_only_narrow_numeric_performance_route() -> None:
     assert '["iterative", "algorithm", "performance"]' in computational
     assert '["performance"]' not in computational
 
-    optimization = (PROJECT_ROOT / "agents/skills/computational-optimization.md").read_text(
-        encoding="utf-8"
+    optimization = (
+        PROJECT_ROOT / "agents/skills/computational-optimization.md"
+    ).read_text(encoding="utf-8")
+    assert (
+        "tools/bin/agent-canon numeric-performance --input <post-run-observations.json>"
+        in optimization
     )
-    assert "tools/bin/agent-canon numeric-performance --input <post-run-observations.json>" in optimization
 
 
 def test_numeric_solver_performance_trigger_is_not_generic() -> None:

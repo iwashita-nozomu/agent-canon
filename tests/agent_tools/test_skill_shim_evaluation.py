@@ -29,7 +29,9 @@ HOST_EVALUATIONS = PROJECT_ROOT / "tests/fixtures/skill-runtime-shim/host-evalua
 class SkillShimEvaluationTest(unittest.TestCase):
     """Verify native producer outputs through the public CLI boundary."""
 
-    def run_producer(self, *args: str, runtime_root: Path) -> subprocess.CompletedProcess[str]:
+    def run_producer(
+        self, *args: str, runtime_root: Path
+    ) -> subprocess.CompletedProcess[str]:
         environment = os.environ.copy()
         environment["AGENT_CANON_RUNTIME_ROOT"] = str(runtime_root)
         return subprocess.run(
@@ -41,14 +43,20 @@ class SkillShimEvaluationTest(unittest.TestCase):
             check=False,
         )
 
-    def test_route_golden_uses_native_selector_and_external_runtime_receipt(self) -> None:
+    def test_route_golden_uses_native_selector_and_external_runtime_receipt(
+        self,
+    ) -> None:
         """Frozen prompts are routed natively and written under the explicit runtime root."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             runtime_root = Path(tmp_dir) / "runtime"
             output = runtime_root / "reports/route-golden.json"
             source_tmp = PROJECT_ROOT / ".agent-canon/tmp"
             before = (
-                tuple(sorted(path.relative_to(source_tmp) for path in source_tmp.rglob("*")))
+                tuple(
+                    sorted(
+                        path.relative_to(source_tmp) for path in source_tmp.rglob("*")
+                    )
+                )
                 if source_tmp.exists()
                 else ()
             )
@@ -73,7 +81,11 @@ class SkillShimEvaluationTest(unittest.TestCase):
                 payload["cases"][0]["invocation"]["cli"], "tools/bin/agent-canon route"
             )
             after = (
-                tuple(sorted(path.relative_to(source_tmp) for path in source_tmp.rglob("*")))
+                tuple(
+                    sorted(
+                        path.relative_to(source_tmp) for path in source_tmp.rglob("*")
+                    )
+                )
                 if source_tmp.exists()
                 else ()
             )

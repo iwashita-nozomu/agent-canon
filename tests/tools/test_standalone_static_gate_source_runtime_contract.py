@@ -128,9 +128,7 @@ def test_eval_preserves_failed_producer_logs_until_ci_capture(
         f"    assert {regression_status} == 0, 'requested prerequisite failure'\n",
         encoding="utf-8",
     )
-    paths = (
-        ("producer_fixture.py", "producer", producer_status),
-    )
+    paths = (("producer_fixture.py", "producer", producer_status),)
     archive_relative = LOG_ARCHIVE_PARENT.as_posix()
     for relative, name, status in paths:
         script = source / relative

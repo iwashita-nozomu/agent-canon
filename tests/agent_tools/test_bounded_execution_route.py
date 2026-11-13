@@ -28,9 +28,22 @@ RISK_VALUES = ("routine", "focused", "profile", "shared", "large")
 def decide_execution(root: Path, context: dict[str, object]) -> dict[str, object]:
     """Query the native route owner for a bounded closeout decision."""
     result = subprocess.run(
-        [str(AGENT_CANON_CLI), "route", "--root", str(root), "--area", "closeout",
-         "--execution-context", "-", "--format", "json"],
-        input=json.dumps(context), text=True, capture_output=True, check=False,
+        [
+            str(AGENT_CANON_CLI),
+            "route",
+            "--root",
+            str(root),
+            "--area",
+            "closeout",
+            "--execution-context",
+            "-",
+            "--format",
+            "json",
+        ],
+        input=json.dumps(context),
+        text=True,
+        capture_output=True,
+        check=False,
     )
     if result.returncode != 0:
         raise ValueError(result.stderr.strip())

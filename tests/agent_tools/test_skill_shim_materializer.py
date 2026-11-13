@@ -49,7 +49,9 @@ def source_fixture() -> Iterator[Path]:
 
 
 def mutation_capability(root: Path) -> str:
-    catalog = yaml.safe_load((root / "agents/skills/catalog.yaml").read_text(encoding="utf-8"))
+    catalog = yaml.safe_load(
+        (root / "agents/skills/catalog.yaml").read_text(encoding="utf-8")
+    )
     paths = [entry["shim"] for entry in catalog["skill_families"]]
     return json.dumps(
         {
@@ -105,7 +107,9 @@ def materialize(root: Path) -> subprocess.CompletedProcess[str]:
 
 def legacy_receipt(result: subprocess.CompletedProcess[str]) -> list[dict[str, Any]]:
     prefix = "SKILL_SHIM_MATERIALIZER_LEGACY_RECEIPT="
-    line = next((line for line in result.stdout.splitlines() if line.startswith(prefix)), None)
+    line = next(
+        (line for line in result.stdout.splitlines() if line.startswith(prefix)), None
+    )
     if line is None:
         raise AssertionError(result.stdout + result.stderr)
     return json.loads(line[len(prefix) :])
@@ -119,7 +123,9 @@ class SkillShimMaterializerTest(unittest.TestCase):
         environment["AGENT_CANON_SOURCE_ROOT"] = "/opt/agent-canon/source"
         environment["AGENT_CANON_CANON_ROOT"] = "/opt/agent-canon/source"
         with source_fixture() as source:
-            aliased = run_materializer(source, "check", "--all", "--format", "json", env=environment)
+            aliased = run_materializer(
+                source, "check", "--all", "--format", "json", env=environment
+            )
             explicit = run_materializer(source, "check", "--all", "--format", "json")
         self.assertEqual(report(aliased), report(explicit))
 
@@ -134,7 +140,9 @@ class SkillShimMaterializerTest(unittest.TestCase):
                 tool.chmod(0o755)
             environment = os.environ.copy()
             environment["PATH"] = str(fake_bin)
-            result = run_materializer(source, "check", "--all", "--format", "json", env=environment)
+            result = run_materializer(
+                source, "check", "--all", "--format", "json", env=environment
+            )
         self.assertIn(report(result)["status"], {"pass", "fail"})
         self.assertFalse(marker.exists())
 
@@ -161,7 +169,9 @@ class SkillShimMaterializerTest(unittest.TestCase):
         self.assertEqual(readback["schema"], "agent_canon.skill_runtime_shim.readback")
         self.assertEqual(readback["status"], "pass")
         self.assertEqual(readback["readback_count"], len(readback["record_digests"]))
-        self.assertEqual(set(readback["record_digests"]), set(readback["projection_digests"]))
+        self.assertEqual(
+            set(readback["record_digests"]), set(readback["projection_digests"])
+        )
 
     def test_record_digest_drift_is_detected_from_generated_bytes(self) -> None:
         with source_fixture() as source:
@@ -172,9 +182,13 @@ class SkillShimMaterializerTest(unittest.TestCase):
             original = path.read_text(encoding="utf-8")
             self.assertIn(f'"record_digest":"{digest}"', original)
             path.write_text(original.replace(digest, "0" * 64, 1), encoding="utf-8")
-            result = report(run_materializer(source, "check", "--all", "--format", "json"))
+            result = report(
+                run_materializer(source, "check", "--all", "--format", "json")
+            )
         self.assertEqual(result["status"], "fail")
-        self.assertIn(path.relative_to(source).as_posix(), result["content_delta_paths"])
+        self.assertIn(
+            path.relative_to(source).as_posix(), result["content_delta_paths"]
+        )
 
     def test_legacy_tool_commands_are_blocked_with_locators(self) -> None:
         with source_fixture() as source:
@@ -203,7 +217,7 @@ class SkillShimMaterializerTest(unittest.TestCase):
             skill = "agent-orchestration"
             path = source / ".codex/personal/skills" / skill / "SKILL.md"
             path.write_text(
-                "---\nname: agent-orchestration\ndescription: \"Legacy\"\n---\n"
+                '---\nname: agent-orchestration\ndescription: "Legacy"\n---\n'
                 "# Legacy\n\n## Reader Map\n\nUnmatched prose.\n",
                 encoding="utf-8",
             )
@@ -211,7 +225,9 @@ class SkillShimMaterializerTest(unittest.TestCase):
         row = next(item for item in receipt if item["skill_id"] == skill)
         blocks = row["unmatched_blocks"]
         self.assertEqual(len(blocks), 2)
-        self.assertTrue(all("locator" in block and "digest" in block for block in blocks))
+        self.assertTrue(
+            all("locator" in block and "digest" in block for block in blocks)
+        )
 
     def test_legacy_complete_schema_without_owner_link_is_blocked(self) -> None:
         with source_fixture() as source:

@@ -73,9 +73,7 @@ class RunAllChecksScriptTest(unittest.TestCase):
         text = SCRIPT.read_text(encoding="utf-8")
 
         standalone_marker = "accumulated_eval_args=("
-        standalone_eval_run = (
-            'run_agent_canon run-accumulated-agent-evals "${accumulated_eval_args[@]}" 2>&1; then'
-        )
+        standalone_eval_run = 'run_agent_canon run-accumulated-agent-evals "${accumulated_eval_args[@]}" 2>&1; then'
 
         self.assertIn(standalone_marker, text)
         self.assertIn(standalone_eval_run, text)

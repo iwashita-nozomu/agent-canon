@@ -1093,7 +1093,11 @@ pub fn check_tool_docs_manifest(root: &Path, catalog_entries: &[&Yaml]) -> Vec<F
         if !resolve_repo_path(root, doc, None).is_file() {
             findings.push(Finding::new("tool_docs", doc, "missing-doc"));
         }
-        if !tool_doc_name_matches(tool, doc) {
+        let public_command_name = Path::new(doc)
+            .file_stem()
+            .and_then(|value| value.to_str())
+            .is_some_and(|name| name.replace('_', "-") == id.replace('_', "-"));
+        if !tool_doc_name_matches(tool, doc) && !public_command_name {
             findings.push(Finding::new("tool_docs", doc, "tool-doc-name-mismatch"));
         }
         if !string_list(mapping_value(catalog_entry, "docs")).contains(doc) {

@@ -30,7 +30,6 @@ CANON_ROOT_OVERRIDE_ENV = "AGENT_CANON_ROOT"
 SOURCE_PREFIX_ENV = "AGENT_CANON_PREFIX"
 
 
-
 @dataclass
 class SourceRootFailure(ValueError):
     """Typed failure raised when source-root resolution is not deterministic."""
@@ -104,7 +103,9 @@ class RepositoryRoots:
             # symlink into the source pin) distinct from canonical source
             # containment.  The source executable check owns source bytes;
             # public argv validation owns this view when it is materialized.
-            object.__setattr__(self, "public_tool_root", self.public_tool_root.absolute())
+            object.__setattr__(
+                self, "public_tool_root", self.public_tool_root.absolute()
+            )
 
 
 def _default_pythonpath(*, root: Path) -> str:
@@ -127,7 +128,10 @@ def _default_pythonpath(*, root: Path) -> str:
                 ) from exc
             if canonical == source_tools:
                 continue
-            if canonical == source_tools / "agent_tools" and "agent-canon" in candidate.parts:
+            if (
+                canonical == source_tools / "agent_tools"
+                and "agent-canon" in candidate.parts
+            ):
                 # The standalone public self-view aliases the selected source
                 # tools tree; retain only the canonical source tools entry.
                 continue
@@ -168,7 +172,9 @@ def _resolve_executable(root_resolution: RootResolution, command: str) -> Path:
 def _run_subcommand(resolution: RootResolution, command: Sequence[str]) -> int:
     """Execute a delegated command inside the resolved AgentCanon owner root."""
     if not command:
-        raise SourceRootFailure("agent_canon_source_root_command_missing", "No command provided")
+        raise SourceRootFailure(
+            "agent_canon_source_root_command_missing", "No command provided"
+        )
     interpreter = command[0] in {"python", "python3", sys.executable}
     if interpreter and len(command) > 1:
         executable = _resolve_executable(resolution, command[1])
@@ -263,7 +269,9 @@ def _resolve_path(path: Path, *, failure_code: str, root: Path) -> Path:
     try:
         resolved = path.resolve()
     except (OSError, RuntimeError) as exc:
-        raise SourceRootFailure(failure_code, f"Unable to resolve {path}: {exc}") from exc
+        raise SourceRootFailure(
+            failure_code, f"Unable to resolve {path}: {exc}"
+        ) from exc
     if not _is_within(resolved, root):
         raise SourceRootFailure(
             failure_code,
@@ -283,8 +291,12 @@ def _same_canonical_entity(left: Path, right: Path) -> bool:
 def _explicit_resolution(raw_root: Path, source: Path, canon: Path) -> RootResolution:
     """Resolve explicit source and canon roots without collapsing their identities."""
     current_root = _find_current_repository_root(raw_root)
-    source = _resolve_path(source, failure_code="agent_canon_source_root_override_invalid", root=source)
-    canon = _resolve_path(canon, failure_code="agent_canon_canon_root_override_invalid", root=canon)
+    source = _resolve_path(
+        source, failure_code="agent_canon_source_root_override_invalid", root=source
+    )
+    canon = _resolve_path(
+        canon, failure_code="agent_canon_canon_root_override_invalid", root=canon
+    )
     if not _has_catalog(source):
         raise SourceRootFailure(
             "agent_canon_source_root_override_missing",
