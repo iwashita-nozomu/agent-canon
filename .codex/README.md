@@ -10,7 +10,7 @@ upstream design ../agents/canonical/CODEX_SUBAGENTS.md subagent routing
 downstream implementation ./hooks.json project-local hook declarations
 downstream implementation ../tools/runtime/dispatch/agent-canon/src/hook_dispatcher.rs owns the in-process active lifecycle contract
 downstream implementation ../tools/runtime/dispatch/agent-canon/src/hook_safety.rs owns pure secret and destructive-Git leaves
-downstream implementation ../tools/runtime/container/execution_resource_projection.py validates exact PostToolUse projection bytes
+downstream implementation ../tools/runtime/dispatch/agent-canon/src/execution_resource_projection.rs validates exact PostToolUse projection bytes
 downstream design ../tools/runtime/dispatch/agent-canon/src/hook_dispatcher.rs RETIRED_HOOK_ROUTES assigns former child routes to explicit owners
 @dependency-end
 -->
