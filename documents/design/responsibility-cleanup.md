@@ -208,7 +208,7 @@ Git に未収録の変更・untracked の作業とユーザー/runtime データ
 
 | clause | implementation owner | target | reverse readback |
 | --- | --- | --- | --- |
-| RC-01 tree observation and boundary classification | `responsibility-cleanup` / `structure-refactor` | `tree -a -J --noreport`, `tools/validation/semantic/structure/repo_structure_contract.py`, `tools/runtime/dispatch/agent-canon/src/responsibility_scope.rs` | tree snapshot と owner/surface classification |
+| RC-01 tree observation and boundary classification | `responsibility-cleanup` / `structure-refactor` | `tree -a -J --noreport`, `tools/runtime/dispatch/agent-canon/src/repo_structure_contract.rs`, `tools/runtime/dispatch/agent-canon/src/responsibility_scope.rs` | tree snapshot と owner/surface classification |
 | RC-02 dependency closure and responsibility boundary | `responsibility-cleanup` / `dependency-analysis` | [documents/design/responsibility-cleanup.md](responsibility-cleanup.md) 責務境界と依存 | 依存と利用側を含む完成状態 |
 | RC-03 environment route | `environment-cleanup` | [agents/skills/dependency-design.md](../../agents/skills/dependency-design.md), [agents/skills/environment-maintenance.md](../../agents/skills/environment-maintenance.md) | dependency design と maintenance validation |
 | RC-04 code route | `code-cleanup` | [agents/skills/dependency-analysis.md](../../agents/skills/dependency-analysis.md), [agents/skills/refactor-loop.md](../../agents/skills/refactor-loop.md), [agents/skills/change-review.md](../../agents/skills/change-review.md) | impact、refactor、review の連続 evidence |

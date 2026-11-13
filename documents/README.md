@@ -72,6 +72,6 @@ downstream implementation ../tools/runtime/dispatch/agent-canon/src/structured_a
 - 文書の分割判断: [rule](./rule/)
 - cross-run の知見: [notes](./notes/)
 
-構造確認は `tree` と `repo_structure_contract.py` を使います。直下ファイルが
+構造確認は `tree` と `repo-structure-contract` を使います。直下ファイルが
 `README.md` 以外に増えた場合は、責務を分類して適切な directory owner document を
 更新します。

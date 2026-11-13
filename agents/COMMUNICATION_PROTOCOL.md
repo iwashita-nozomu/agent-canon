@@ -213,7 +213,7 @@ next_decision_changed=<routing|edit-location|validation|review|handoff|deferral>
 Canonical tool commands:
 
 ```bash
-python3 tools/validation/semantic/structure/repo_structure_contract.py --root <root> --format json > <run>/repo_structure_contract.json
+agent-canon repo-structure-contract --root <root> --format json > <run>/repo_structure_contract.json
 tools/bin/agent-canon responsibility-scope --root <root> --format json > <run>/responsibility_scope.json
 agent-canon file-surface-inventory --root <root> --root-only --json-out <run>/file_surface_inventory.json --markdown-out <run>/file_surface_inventory.md
 agent-canon structured-analysis document-inventory --root <root> > <run>/document_inventory.txt
