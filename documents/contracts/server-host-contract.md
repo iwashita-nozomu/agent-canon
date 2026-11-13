@@ -70,7 +70,7 @@ server workflow や Docker builder は layout で選択した場合だけ host r
 
 - local PC から SSH で HPC host に入り、その上の container で HTML report を生成する場合、local browser は container 内の `127.0.0.1` を直接見られません。この閲覧経路は任意で、選んだときだけ host Python を使います
 - HTML artifact は、ファイルが見えている shell で `python3 -m http.server` を立て、local PC から HPC host への SSH tunnel で見る導線を既定にします
-- canonical command generator は `python3 tools/experiments/artifacts/html_artifact_access.py <report.html>` です。`AGENT_CANON_SSH_HOST` または `SSH_CONNECTION` から SSH target を推定し、推定できない場合だけ tunnel command 内の `<ssh-host>` を置き換えます
+- canonical command generator は `agent-canon html-artifact-access <report.html>` です。`AGENT_CANON_SSH_HOST` または `SSH_CONNECTION` から SSH target を推定し、推定できない場合だけ tunnel command 内の `<ssh-host>` を置き換えます
 - container 内だけにある report では `--use-container-ip` を使い、出力された server、tunnel、local URL を closeout evidence に残します
 - default bind は `127.0.0.1` です。container-direct mode では container IP へ tunnel するため、container 内の server は `0.0.0.0` bind を使います
 

@@ -656,7 +656,7 @@ fn read_text(path: &Path) -> io::Result<String> {
     fs::read_to_string(path)
 }
 
-fn shell_join(parts: &[String]) -> String {
+pub(crate) fn shell_join(parts: &[String]) -> String {
     parts
         .iter()
         .map(|part| shell_quote(part))
