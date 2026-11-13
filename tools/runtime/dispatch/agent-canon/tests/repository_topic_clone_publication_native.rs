@@ -5,6 +5,8 @@
 // upstream implementation ../src/update_lifecycle_contract.rs materializes publication readback receipts
 // @dependency-end
 
+#![cfg(target_os = "linux")]
+
 use agent_canon::repository_topic_clone::{prepare, CheckoutMode, RepositoryTopicCloneRequest};
 use agent_canon::update_lifecycle_contract::{
     materialize_publication_readback_receipt, pull_request_branch_table,
