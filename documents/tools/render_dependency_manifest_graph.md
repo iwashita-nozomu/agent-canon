@@ -102,6 +102,12 @@ Git-tree document, and node payloads retain the selected commit for readback.
 
 ## Bundle Outputs
 
+Atomic bundle publication uses the retained parent directory and the operating
+system's exclusive rename on Linux and Apple platforms. Other platforms return
+an explicit unsupported-operation error and preserve existing output.
+Named projections remain available through their existing
+file-writing path.
+
 Bundle mode requires `--bundle-dir` and emits:
 
 - `dependency_graph.tsv`

@@ -256,14 +256,21 @@ impl SourceMutationCapability {
                 )))
             }
         }
-        rustix::fs::renameat_with(
+        #[cfg(any(target_os = "linux", target_vendor = "apple"))]
+        let published = rustix::fs::renameat_with(
             &parent,
             staged_name,
             &parent,
             target_name,
             rustix::fs::RenameFlags::NOREPLACE,
         )
-        .map_err(|error| {
+        .map_err(io::Error::from);
+        #[cfg(not(any(target_os = "linux", target_vendor = "apple")))]
+        let published: io::Result<()> = Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "atomic directory publication without replacement is unavailable on this platform",
+        ));
+        published.map_err(|error| {
             SourceMutationError::new(format!(
                 "cannot publish directory without replacement: {error}"
             ))

@@ -591,6 +591,17 @@ fn source_capability_publishes_staged_directory_without_replacing_target() {
             "reports/dependency-graph",
         ],
     );
+    if !cfg!(any(target_os = "linux", target_vendor = "apple")) {
+        let error = grant
+            .publish_directory_noreplace(&staging, &target)
+            .expect_err("unsupported atomic publication is explicit");
+        assert!(error
+            .to_string()
+            .contains("atomic directory publication without replacement is unavailable"));
+        assert!(staging.join("manifest.json").is_file());
+        assert!(!target.exists());
+        return;
+    }
     grant
         .publish_directory_noreplace(&staging, &target)
         .expect("staged directory publishes atomically");
