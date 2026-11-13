@@ -8,7 +8,7 @@
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 #[cfg(target_os = "linux")]
 use std::process::Command;
 
@@ -186,6 +186,7 @@ fn retrieve(remote: &str, commit: &str) -> Result<Vec<u8>> {
     use crate::source_mutation::open_root_nofollow;
     use cap_fs_ext::{DirExt, MetadataExt};
     use std::os::fd::AsRawFd;
+    use std::path::PathBuf;
     let parent = std::env::var_os("AGENT_CANON_PARENT_ROOT")
         .filter(|value| !value.is_empty())
         .ok_or("policy_inventory_parent_root_required")?;
