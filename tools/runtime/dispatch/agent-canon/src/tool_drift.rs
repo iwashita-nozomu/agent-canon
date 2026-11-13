@@ -12,7 +12,7 @@
 // upstream design ../../../../../documents/tools/tool-docs.toml one-to-one tool documentation map
 // upstream implementation catalog/tool_catalog.rs validates catalog structure and resolves source paths
 // upstream implementation catalog/path_policy.rs owns retired tool path policy
-// upstream implementation ../../../../validation/semantic/convention/check_convention_compliance.py verifies skill-routing markers
+// upstream implementation convention_compliance.rs verifies skill-routing markers
 // upstream implementation graph_client.rs provides typed source-derived dependency facts
 // downstream implementation ../../../../validation/ci/runners/run_all_checks.sh runs the native drift checker
 // downstream implementation ../../../../../tests/agent_tools/test_tool_drift.py tests the CLI contract
@@ -260,7 +260,7 @@ const CONTRACTS: &[ToolContract] = &[
             direct_link(".github/PULL_REQUEST_TEMPLATE.md"),
             direct_link("tools/runtime/dispatch/agent-canon/src/report_artifact_checks.rs"),
             direct_link("tools/runtime/dispatch/agent-canon/src/runtime_alignment.rs"),
-            direct_link("tools/validation/semantic/convention/check_convention_compliance.py"),
+            direct_link("tools/runtime/dispatch/agent-canon/src/convention_compliance.rs"),
             direct_link("tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs"),
         ],
         text_checks: &[TextCheck {
@@ -272,7 +272,7 @@ const CONTRACTS: &[ToolContract] = &[
     },
     ToolContract {
         name: "convention_compliance",
-        tool: "tools/validation/semantic/convention/check_convention_compliance.py",
+        tool: "tools/runtime/dispatch/agent-canon/src/convention_compliance.rs",
         links: &[
             direct_link("documents/conventions/README.md"),
             direct_link("agents/canonical/CODEX_COMPLETION.md"),

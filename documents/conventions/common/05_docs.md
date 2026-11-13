@@ -6,7 +6,7 @@ upstream design ../../../agents/skills/formal-proof-workflow.md mathematical cla
 downstream design ../../../agents/skills/structure-planning.md applies responsibility and reading-activation split decisions
 downstream design ../../../agents/skills/structure-refactor.md repairs overloaded document boundaries
 downstream implementation ../../../tools/runtime/dispatch/agent-canon/src/docs.rs enforces Markdown math notation and fence rules
-downstream implementation ../../../tools/validation/semantic/convention/check_convention_compliance.py validates document claim grounding
+downstream implementation ../../../tools/runtime/dispatch/agent-canon/src/convention_compliance.rs validates document claim grounding
 @dependency-end
 -->
 
@@ -144,6 +144,6 @@ downstream implementation ../../../tools/validation/semantic/convention/check_co
 
 ## 検証
 
-- この文書の規範表現、positive label、検証経路は `python3 tools/validation/semantic/convention/check_convention_compliance.py` で確認します。
+- この文書の規範表現、positive label、検証経路は `agent-canon check-convention-compliance` で確認します。
 - `claim grounding`、provisional wording、proof obligation の wiring は
-  `python3 tools/validation/semantic/convention/check_convention_compliance.py` で確認します。
+  `agent-canon check-convention-compliance` で確認します。

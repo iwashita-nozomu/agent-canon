@@ -66,7 +66,7 @@ edit.
 
 ```bash
 agent-canon structured-analysis document-inventory --root .
-python3 tools/validation/semantic/convention/check_convention_compliance.py
+agent-canon check-convention-compliance
 ```
 
 残す finding は、生成 evidence のように「非正本だが必要」なものだけにします。
