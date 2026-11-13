@@ -3,7 +3,7 @@
 # contract test
 # responsibility Exercises public ExecutionResourcePlan resource, environment, certificate, lock, readback, terminal, cleanup, and completion observables.
 # upstream implementation ../../tools/experiments/execution/execution_resource_plan.py canonical resource-plan owner
-# downstream implementation ../../tools/runtime/container/execution_resource_projection.py validates exact projected bytes
+# downstream implementation ../../tools/runtime/dispatch/agent-canon/src/execution_resource_projection.rs validates exact projected bytes
 # downstream implementation ../../tools/runtime/dispatch/agent-canon/src/hook_dispatcher.rs forwards only validator-approved projection output
 # upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md approved AgentCanon GPU admission R5 test frame
 # upstream design ../../documents/design/experiment_runner.md ExperimentRunner lifecycle and scheduler boundary

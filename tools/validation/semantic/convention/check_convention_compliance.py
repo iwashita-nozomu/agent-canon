@@ -221,7 +221,7 @@ HOOK_GUARDRAIL_POLICY_MARKERS = {
         "record_hook_invocation",
         "HookLogContext",
     ),
-    "tools/runtime/authority/hook_safety.py": (
+    "tools/runtime/dispatch/agent-canon/src/hook_safety.rs": (
         "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY",
         "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY",
         "branch_block_payload",

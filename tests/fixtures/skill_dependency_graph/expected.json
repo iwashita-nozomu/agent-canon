@@ -5,8 +5,8 @@
   "command_count": 0,
   "tool_count": 0,
   "edge_count": 307,
-  "graph_digest": "4e6d2a92e09ecb1d227248ccf034cb2f18817d080195b3f855b727e6e87d0dfa",
-  "json_digest": "db044e6375672c4a582f8942efcfa1890590e34a6cf57b14bd1381a15d423fef",
-  "mermaid_digest": "2229e79a597c1cc5e1e2ccfa15eb8dae9d4c0cb9997de8e0b7f8ea9d6717327c",
-  "json_sha256": "db1433b0133941531f008230954b035c35239df5523a244ce2398c975aae266a"
+  "graph_digest": "aacfb8d2830b7509fb8a3ab94589036a62d980ced39027d891e41a6430e2421b",
+  "json_digest": "180f01bb3c0e031c877ac8000d3a2817b12173d752b5de52dc221f6f538fd90a",
+  "mermaid_digest": "616e651a6c0208c1451f9777895e28abe73472701771457a270f81965ce36bb0",
+  "json_sha256": "7b85dc5cabe7fa456cd06e041b93a889e864086cae5cce341fb68194ec2bafa0"
 }

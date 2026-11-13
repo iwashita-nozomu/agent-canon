@@ -293,7 +293,7 @@ path: tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs
         "validate_projection_bytes record_hook_invocation HookLogContext "
         "\n"
     ),
-    "tools/runtime/authority/hook_safety.py": (
+    "tools/runtime/dispatch/agent-canon/src/hook_safety.rs": (
         "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY "
         "AGENT_CANON_BRANCH_WORKTREE_REASON AGENT_CANON_DESTRUCTIVE_GIT_REASON "
         "explicit_user_approval user_request agent_canon_workflow same-segment "
@@ -634,7 +634,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            (root / "tools" / "runtime" / "authority" / "hook_safety.py").write_text(
+            (root / "tools" / "runtime" / "dispatch" / "agent-canon" / "src" / "hook_safety.rs").write_text(
                 "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY "
                 "explicit_user_approval\n",
                 encoding="utf-8",
@@ -644,7 +644,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn(
-                "hook_guardrail_policy:tools/runtime/authority/hook_safety.py",
+                "hook_guardrail_policy:tools/runtime/dispatch/agent-canon/src/hook_safety.rs",
                 result.stdout,
             )
             self.assertIn("missing-marker:operation", result.stdout)
