@@ -586,14 +586,27 @@ entries:
   - id: formal-proof
     public: true
     summary: Builds natural-language or Python AST-sourced formal-proof scaffold plans, Python-package trace modules, existing-proof search queries, and checker commands.
-    path: tools/analysis/proof/formal_proof.py
+    path: tools/runtime/dispatch/agent-canon/src/formal_proof.rs
     family: agent_tools
     role: helper
     status: canonical
     audience: skill
     placement: skill_helper
-    command: python3 tools/analysis/proof/formal_proof.py
-    dispatch: {argv: ["python3", "tools/analysis/proof/formal_proof.py"]}
+    command: tools/bin/agent-canon formal-proof
+    dispatch:
+      runtime: rust
+      argv: [tools/bin/agent-canon, formal-proof]
+      execution_plane: tool-container
+      cwd: source-root
+      env: allowlisted
+      stdin: inherited
+      stdout: captured
+      stderr: captured
+      exit: propagate
+      signal: propagate
+      side_effect: external-artifact
+      output_root: external-runtime
+      written_paths: []
     writes: true
     default_wiring:
       ci: false
@@ -632,6 +645,41 @@ entries:
     tests:
       - tests/agent_tools/test_lean_proof_env.py
       - tools/runtime/dispatch/agent-canon/tests/lean_proof_env_native.rs
+
+  - id: lean-recursive-proof-search
+    public: true
+    summary: Runs configured recursive Lean proof attempts and reports verified targets, suggested tactics, and unresolved goal frontiers.
+    path: tools/runtime/dispatch/agent-canon/src/lean_recursive_proof_search.rs
+    family: agent_tools
+    role: helper
+    status: canonical
+    audience: skill
+    placement: skill_helper
+    command: tools/bin/agent-canon lean-recursive-proof-search --config <config.json>
+    dispatch:
+      runtime: rust
+      argv: [tools/bin/agent-canon, lean-recursive-proof-search]
+      execution_plane: tool-container
+      cwd: target-root
+      env: allowlisted
+      stdin: inherited
+      stdout: captured
+      stderr: captured
+      exit: propagate
+      signal: propagate
+      side_effect: explicit-target-write
+      output_root: explicit-target
+      written_paths: []
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - documents/tools/lean_recursive_proof_search.md
+      - documents/tools/lean_capability_matrix.md
+      - agents/skills/formal-proof-workflow.md
+    tests:
+      - tests/agent_tools/test_lean_recursive_proof_search.py
 
   - id: tool-proof-coverage
     public: true
