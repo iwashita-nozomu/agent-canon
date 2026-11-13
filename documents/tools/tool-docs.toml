@@ -137,7 +137,7 @@ summary = "gh-backed GitHub branch and PR publish tool documentation."
 [[tool]]
 id = "wiki-publish"
 classification = "public"
-tool = "tools/repository/github/wiki_publish.py"
+tool = "tools/runtime/dispatch/agent-canon/src/wiki_publish.rs"
 doc = "documents/tools/wiki_publish.md"
 language = "python"
 summary = "Deterministic AgentCanon wiki publication to repo.wiki.git with default-branch-only and source-commit binding."
