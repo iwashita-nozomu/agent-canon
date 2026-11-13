@@ -53,6 +53,8 @@ tools/bin/agent-canon template-bundle committed-tree --source-root <root> --sour
 tools/bin/agent-canon test-design check <test-paths...>
 tools/bin/agent-canon render-code-template --root <agent-canon-source> <template-path>
 tools/bin/agent-canon run-accumulated-agent-evals --root <root> --runtime-root <external-root> --run-id <id>
+tools/bin/agent-canon evaluate-codex-agent-roles --root <root> --generate-role-views [--projection live|consumer-static]
+tools/bin/agent-canon evaluate-codex-agent-roles --root <root> --check-role-views [--projection live|consumer-static]
 tools/bin/agent-canon skill-shim-materializer {check,materialize,readback} --root <root> --all
 agent-canon codex-config --source-config <read-only-source-config>
 tools/bin/agent-canon route --prompt "<request>" --mode routing-only --format json

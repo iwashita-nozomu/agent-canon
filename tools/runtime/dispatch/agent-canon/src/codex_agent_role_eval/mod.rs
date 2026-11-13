@@ -163,13 +163,16 @@ struct Options {
     results_dir: String,
     run_id: String,
     json: bool,
+    role_view_operation: Option<bool>,
+    projection: Option<String>,
 }
 
-const HELP: &str = "usage: agent-canon evaluate-codex-agent-roles [--root ROOT] [--runtime-root PATH] [--runtime-log PATH] [--report-out PATH] [--compact-out PATH] [--accumulate] [--results-dir PATH] [--run-id ID] [--format text|json]\n\nEvaluate checked-in role configuration and optional runtime metrics.\n";
+const HELP: &str = "usage: agent-canon evaluate-codex-agent-roles [--root ROOT] [--runtime-root PATH] [--runtime-log PATH] [--report-out PATH] [--compact-out PATH] [--accumulate] [--results-dir PATH] [--run-id ID] [--format text|json] [--generate-role-views|--check-role-views] [--projection live|consumer-static]\n\nEvaluate checked-in role configuration and optional runtime metrics, or generate/check canonical role views.\n";
 
 fn arguments(args: &[String]) -> Result<Option<Options>, String> {
     let mut options = Options {
         root: std::env::current_dir().map_err(|error| error.to_string())?,
+        projection: None,
         ..Options::default()
     };
     let names = [
@@ -182,6 +185,9 @@ fn arguments(args: &[String]) -> Result<Option<Options>, String> {
         "--results-dir",
         "--run-id",
         "--format",
+        "--generate-role-views",
+        "--check-role-views",
+        "--projection",
     ];
     let known = names
         .iter()
@@ -202,22 +208,35 @@ fn arguments(args: &[String]) -> Result<Option<Options>, String> {
         let selected = match resolve_long_option_prefix(name, &known) {
             Ok(selected) => selected,
             Err(LongOptionError::Unrecognized) => {
-                return Err(format!("unrecognized arguments: {argument}"))
+                return Err(format!("unrecognized arguments: {argument}"));
             }
             Err(LongOptionError::Ambiguous(matches)) => {
                 return Err(format!(
                     "ambiguous option: {name} could match {}",
                     matches.join(", ")
-                ))
-            }
-        };
-        if selected == 5 {
-            if let Some(value) = inline {
-                return Err(format!(
-                    "argument --accumulate: ignored explicit argument '{value}'"
                 ));
             }
-            options.accumulate = true;
+        };
+        if selected == 5 || selected == 9 || selected == 10 {
+            if let Some(value) = inline {
+                return Err(format!(
+                    "argument {}: ignored explicit argument '{value}'",
+                    names[selected]
+                ));
+            }
+            match selected {
+                5 => options.accumulate = true,
+                9 | 10 => {
+                    if options.role_view_operation.is_some() {
+                        return Err(
+                            "--generate-role-views and --check-role-views are mutually exclusive"
+                                .to_owned(),
+                        );
+                    }
+                    options.role_view_operation = Some(selected == 9);
+                }
+                _ => unreachable!(),
+            }
         } else {
             let value = if let Some(value) = inline {
                 value.to_owned()
@@ -241,8 +260,16 @@ fn arguments(args: &[String]) -> Result<Option<Options>, String> {
                     "json" => options.json = true,
                     _ => {
                         return Err(format!(
-                        "argument --format: invalid choice: '{value}' (choose from 'text', 'json')"
-                    ))
+                            "argument --format: invalid choice: '{value}' (choose from 'text', 'json')"
+                        ));
+                    }
+                },
+                11 => match value.as_str() {
+                    "live" | "consumer-static" => options.projection = Some(value),
+                    _ => {
+                        return Err(format!(
+                            "argument --projection: invalid choice: '{value}' (choose from 'live', 'consumer-static')"
+                        ));
                     }
                 },
                 _ => unreachable!(),
@@ -441,13 +468,38 @@ pub fn run(args: &[String]) -> i32 {
             print!("{HELP}");
             0
         }
-        Ok(Some(options)) => match execute(options) {
-            Ok(status) => status,
-            Err(error) => {
-                eprintln!("evaluate_codex_agent_roles.py: runtime_root_required: {error}");
+        Ok(Some(options)) => {
+            if let Some(generate) = options.role_view_operation {
+                let has_eval_options = options.runtime_root.is_some()
+                    || !options.runtime_logs.is_empty()
+                    || options.report_out.is_some()
+                    || options.compact_out.is_some()
+                    || options.accumulate
+                    || !options.results_dir.is_empty()
+                    || !options.run_id.is_empty();
+                if has_eval_options {
+                    eprintln!(
+                        "evaluate-codex-agent-roles: role-view operation cannot be combined with Eval options"
+                    );
+                    return 2;
+                }
+                let projection = options.projection.as_deref().unwrap_or("consumer-static");
+                model_profiles::run_role_view_operation(&options.root, projection, generate)
+            } else if options.projection.is_some() {
+                eprintln!(
+                    "evaluate-codex-agent-roles: --projection requires --generate-role-views or --check-role-views"
+                );
                 2
+            } else {
+                match execute(options) {
+                    Ok(status) => status,
+                    Err(error) => {
+                        eprintln!("evaluate_codex_agent_roles.py: runtime_root_required: {error}");
+                        2
+                    }
+                }
             }
-        },
+        }
         Err(error) => {
             eprintln!("{HELP}evaluate-codex-agent-roles: error: {error}");
             2
