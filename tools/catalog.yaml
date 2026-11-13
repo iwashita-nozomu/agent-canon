@@ -2520,12 +2520,12 @@ entries:
 
   - id: save-experiment-result-annex
     summary: Saves one experiment result as one deterministic git-annex archive.
-    path: tools/experiments/artifacts/save_experiment_result_annex.py
+    path: tools/runtime/dispatch/agent-canon/src/annex_retention.rs
     family: experiments
     role: experiment
     status: canonical
-    command: python3 -m tools.experiments.artifacts.save_experiment_result_annex
-    dispatch: {argv: ["python3", "-m", "tools.experiments.artifacts.save_experiment_result_annex"]}
+    command: tools/bin/agent-canon save-experiment-result-annex
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "save-experiment-result-annex"]}
     writes: true
     default_wiring:
       ci: false
