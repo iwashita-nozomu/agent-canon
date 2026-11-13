@@ -93,6 +93,16 @@ def native_cli_input() -> Path:
     return binary
 
 
+@pytest.fixture(scope="session")
+def controller_test_driver() -> Path:
+    """Select the non-shipped native driver for fake resident mount namespaces."""
+    configured = os.environ.get("AGENT_CANON_CONTROLLER_TEST_DRIVER")
+    assert configured, "AGENT_CANON_CONTROLLER_TEST_DRIVER must select the test-only controller driver"
+    binary = Path(configured).resolve(strict=True)
+    assert binary.is_file() and os.access(binary, os.X_OK)
+    return binary
+
+
 @pytest.fixture(autouse=True)
 def bootstrap_test_isolation(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -133,9 +143,30 @@ def bootstrap_test_isolation(
     monkeypatch.setenv("XDG_CONFIG_HOME", str(xdg_config))
     monkeypatch.setenv("AGENT_CANON_TEST_ROOT", str(tmp_path))
     monkeypatch.setenv("AGENT_CANON_TEST_SYSTEMCTL_LOG", str(systemctl_log))
+    controller_test_driver = os.environ.get("AGENT_CANON_CONTROLLER_TEST_DRIVER")
+    native_cli = os.environ.get("AGENT_CANON_CLI")
+    native_bin = os.environ.get("AGENT_CANON_NATIVE_BIN")
+    fake_image_environment = {
+        f"FAKE_DOCKER_{key}": os.environ.get(key)
+        for key in (
+            "AGENT_CANON_IMAGE_ROOT",
+            "AGENT_CANON_IMAGE_DEPENDENCIES_ROOT",
+            "AGENT_CANON_IMAGE_MARKER_DIGEST",
+            "AGENT_CANON_RUNTIME_MARKER_DIGEST",
+        )
+    }
     for key in tuple(os.environ):
         if key.startswith("AGENT_CANON_") and not key.startswith("AGENT_CANON_TEST_"):
             monkeypatch.delenv(key, raising=False)
+    if controller_test_driver:
+        monkeypatch.setenv("FAKE_DOCKER_CONTROLLER_TEST_DRIVER", controller_test_driver)
+    if native_cli:
+        monkeypatch.setenv("AGENT_CANON_CLI", native_cli)
+    if native_bin:
+        monkeypatch.setenv("AGENT_CANON_NATIVE_BIN", native_bin)
+    for key, value in fake_image_environment.items():
+        if value:
+            monkeypatch.setenv(key, value)
     monkeypatch.setenv("PATH", f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}")
     yield
 

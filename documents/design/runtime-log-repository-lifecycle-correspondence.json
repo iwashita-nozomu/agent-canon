@@ -1,7 +1,7 @@
 {
   "request_id": "runtime-log-repository-lifecycle-post-merge-20260730",
   "design_locator": "documents/design/runtime-log-repository-lifecycle.md",
-  "design_sha256": "7317bd436c46dfb24d0da0a73050631d2f91ceccce21e672613bf00b29472672",
+  "design_sha256": "5eb976f14c840f7a7a97f032a2c66caf4dd2817779d6ef169f5a559c44936713",
   "clause_ids": [
     "RL-001",
     "RL-002",
@@ -46,14 +46,22 @@
     {"path": "documents/tools/README.md", "owner_stage": "design", "change_kind": "modify"},
     {"path": "tests/agent_tools/test_runtime_log_archive_git.py", "owner_stage": "validation", "change_kind": "modify"},
     {"path": "tests/tools/test_bootstrap_container_contract.py", "owner_stage": "validation", "change_kind": "modify"},
-    {"path": "tests/bootstrap/test_bootstrap_runtime.py", "owner_stage": "validation", "change_kind": "modify"},
+    {"path": "tools/runtime/dispatch/agent-canon/tests/bootstrap_runtime_native.rs", "owner_stage": "validation", "change_kind": "modify"},
     {"path": "tools/runtime/dispatch/agent-canon/src/runtime_log_archive.rs", "owner_stage": "implementation", "change_kind": "modify"},
-    {"path": "tools/runtime/container/bootstrap_runtime.py", "owner_stage": "implementation", "change_kind": "modify"}
+    {"path": "tools/runtime/dispatch/agent-canon/src/runtime_log_archive/context_discovery.rs", "owner_stage": "implementation", "change_kind": "add"},
+    {"path": "tools/runtime/dispatch/agent-canon/src/runtime_log_archive/github_eval_delivery.rs", "owner_stage": "implementation", "change_kind": "add"},
+    {"path": "tools/runtime/dispatch/agent-canon/src/runtime_log_archive/hook_spool.rs", "owner_stage": "implementation", "change_kind": "add"},
+    {"path": "tools/runtime/dispatch/agent-canon/src/runtime_log_archive/runtime_event.rs", "owner_stage": "implementation", "change_kind": "add"},
+    {"path": "tools/runtime/dispatch/agent-canon/tests/runtime_log_archive_native.rs", "owner_stage": "validation", "change_kind": "modify"},
+    {"path": "tools/runtime/dispatch/agent-canon/src/bootstrap_runtime.rs", "owner_stage": "implementation", "change_kind": "modify"}
   ],
   "validation_route": [
-    {"argv": ["python3", "-m", "pytest", "-q", "tests/agent_tools/test_runtime_log_archive_git.py", "-k", "context_discovery"], "cwd": ".", "owner_stage": "validation"},
+    {"argv": ["cargo", "test", "--manifest-path", "tools/runtime/dispatch/agent-canon/Cargo.toml", "--lib"], "cwd": ".", "owner_stage": "validation"},
+    {"argv": ["cargo", "test", "--manifest-path", "tools/runtime/dispatch/agent-canon/Cargo.toml", "--test", "runtime_log_archive_native"], "cwd": ".", "owner_stage": "validation"},
+    {"argv": ["python3", "-m", "pytest", "-q", "tests/agent_tools/test_runtime_log_archive_git.py"], "cwd": ".", "owner_stage": "validation"},
     {"argv": ["python3", "-m", "pytest", "-q", "tests/tools/test_bootstrap_container_contract.py"], "cwd": ".", "owner_stage": "validation"},
-    {"argv": ["python3", "-m", "pytest", "-q", "tests/bootstrap/test_bootstrap_runtime.py"], "cwd": ".", "owner_stage": "validation"},
+    {"argv": ["cargo", "test", "--manifest-path", "tools/runtime/dispatch/agent-canon/Cargo.toml", "--test", "bootstrap_runtime_native"], "cwd": ".", "owner_stage": "validation"},
+    {"argv": ["cargo", "test", "--manifest-path", "tools/runtime/dispatch/agent-canon/Cargo.toml", "--test", "runtime_log_archive_native"], "cwd": ".", "owner_stage": "validation"},
     {"argv": ["bash", "tools/validation/semantic/dependencies/check_dependency_header_format.sh", "--root", ".", "--changed"], "cwd": ".", "owner_stage": "validation"},
     {"argv": ["tools/bin/agent-canon", "docs", "check-bootstrap", "--root", "."], "cwd": ".", "owner_stage": "validation"},
     {"argv": ["git", "diff", "--check"], "cwd": ".", "owner_stage": "validation"}

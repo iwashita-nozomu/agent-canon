@@ -20,7 +20,7 @@
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/workflow_selection_eval.rs validates workflow selection routing cases
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/github_workflow_check.rs validates GitHub workflow and PR checklist contracts
 # upstream implementation ../../../../bootstrap/container/image/Dockerfile defines the shared tool image
-# upstream implementation ../../../runtime/container/bootstrap_runtime.py owns lifecycle readback
+# upstream implementation ../../../runtime/dispatch/agent-canon/src/bootstrap_runtime.rs owns lifecycle readback
 # @dependency-end
 set -euo pipefail
 
@@ -445,8 +445,7 @@ else
   EXIT_CODE=1
 fi
 if "$PYTHON_BIN" -m pytest -q \
-  tests/tools/test_bootstrap_container_contract.py \
-  tests/bootstrap/test_bootstrap_runtime.py 2>&1; then
+  tests/tools/test_bootstrap_container_contract.py 2>&1; then
   echo "✅ bootstrap container / lifecycle contract checks 成功"
 else
   echo "❌ bootstrap container / lifecycle contract checks 失敗"

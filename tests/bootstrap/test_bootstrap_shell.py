@@ -33,7 +33,7 @@ def test_host_entrypoint_has_no_python_fallback() -> None:
     assert "docker.sock" not in text
     assert "AGENT_CANON_CONTAINER_NETWORK" in text
     assert "docker-rpc" not in text
-    controller = (ROOT / "tools/runtime/container/bootstrap_runtime.py").read_text(
+    controller = (ROOT / "tools/runtime/dispatch/agent-canon/src/bootstrap_runtime.rs").read_text(
         encoding="utf-8"
     )
     assert "AGENT_CANON_DOCKER_RPC" not in controller
@@ -90,6 +90,7 @@ _agent_canon_remove_global_links
 def test_codex_hook_routes_register_only_trusted_project_targets(
     tmp_path: Path,
     native_cli_input: Path,
+    controller_test_driver: Path,
 ) -> None:
     """Both hook routes reuse the resident and target API with exact file cleanup."""
     home = tmp_path / "home"
@@ -126,6 +127,7 @@ def test_codex_hook_routes_register_only_trusted_project_targets(
         "FAKE_DOCKER_CALLS": str(calls_path),
         "FAKE_DOCKER_VALID_IMAGE_IDS": "1",
         "FAKE_DOCKER_NATIVE_BIN": str(native_binary),
+        "FAKE_DOCKER_CONTROLLER_TEST_DRIVER": str(controller_test_driver),
         "AGENT_CANON_RUNTIME_ROOT": str(control / ".runtime"),
     }
     source_common = [
@@ -2120,8 +2122,8 @@ def test_concurrent_target_add_serializes_resident_replacement(
     second_stdout, second_stderr = second.communicate(timeout=120)
     assert first.returncode == 0, first_stderr or first_stdout
     assert second.returncode == 0, second_stderr or second_stdout
-    assert '"code": "target_registered"' in first_stdout
-    assert '"code": "target_registered"' in second_stdout
+    assert json.loads(first_stdout)["code"] == "target_registered"
+    assert json.loads(second_stdout)["code"] == "target_registered"
     assert not (tracker / "overlap").exists()
     assert (tracker / "active.count").read_text(encoding="utf-8").strip() == "0"
 
@@ -3997,8 +3999,8 @@ def test_private_log_source_is_read_back_from_the_owned_mount() -> None:
     assert "AGENT_CANON_PRIVATE_LOG_ROOT=$AGENT_CANON_PRIVATE_LOG_DESTINATION" in text
     assert "_agent_canon_volume_copy import private-log" in text
     assert 'AGENT_CANON_PRIVATE_LOG_DESTINATION"' in text
-    assert 'control_parent_root / "private-log"' not in (
-        ROOT / "tools/runtime/container/bootstrap_runtime.py"
+    assert '"AGENT_CANON_PRIVATE_LOG_ROOT"' in (
+        ROOT / "tools/runtime/dispatch/agent-canon/src/bootstrap_runtime.rs"
     ).read_text(encoding="utf-8")
 
 
@@ -4017,18 +4019,18 @@ def test_uninstall_preserves_foreign_links_and_restores_owned_config() -> None:
 
 
 def test_container_controller_routes_non_docker_public_operations() -> None:
-    """Documented non-Docker operations enter the resident Python owner."""
-    controller = (ROOT / "tools/runtime/container/bootstrap_runtime.py").read_text(
+    """Documented non-Docker operations enter the resident Rust owner."""
+    controller = (ROOT / "tools/runtime/dispatch/agent-canon/src/bootstrap_runtime.rs").read_text(
         encoding="utf-8"
     )
     for marker in (
-        'if operation == "tool" and args.tool_operation == "run":',
-        'if operation == "template" and args.template_operation == "export":',
-        'if operation == "eval" and args.eval_operation == "collect":',
-        'if operation == "task" and args.task_operation == "admit":',
-        'if operation == "gc":',
-        'if operation == "codex":',
-        'if operation == "source-identity":',
+        '"tool" => self.tool_run(&args)',
+        '"template" => self.template_export(&args.options)',
+        'Some("collect") => self.eval_collect(&args.options)',
+        'Some("admit") => self.admit_task(&args.options)',
+        '"gc" => self.gc(args.flags.contains("--dry-run"))',
+        '"codex" => match args.options.get("--codex-operation")',
+        'if args.operation == "source-identity"',
     ):
         assert marker in controller
 
@@ -4117,6 +4119,59 @@ def test_operation_help_has_no_path_or_docker_side_effects(
     assert not (tmp_path / "docker.calls").exists()
 
 
+def _resident_controller_mounts(repository: Path, control_root: Path) -> list[dict]:
+    """Model the mounted source, resident runtime and readonly registry binds."""
+    runtime = control_root / "runtime"
+    for name in (
+        "receipts",
+        "generations",
+        "tasks",
+        "spool",
+        "archive",
+        "cache",
+        "codex-home",
+        "container-runtime",
+        "container-state",
+    ):
+        (runtime / name).mkdir(parents=True, exist_ok=True, mode=0o700)
+    (runtime / "lifecycle.lock").touch(mode=0o600, exist_ok=True)
+    (control_root / "private-log").mkdir(mode=0o700, exist_ok=True)
+    registry = runtime / "container-state" / "mounts.toml"
+    registry.write_text(
+        'schema = "agent-canon.mount-registry.v2"\n\n[targets]\n',
+        encoding="utf-8",
+    )
+    registry.chmod(0o444)
+    return [
+        {
+            "Type": "bind",
+            "Source": str(runtime),
+            "Destination": "/var/lib/agent-canon/runtime",
+            "RW": True,
+        },
+        {
+            "Type": "bind",
+            "Source": str(control_root),
+            "Destination": "/var/lib/agent-canon",
+            "RW": True,
+        },
+        {
+            "Type": "bind",
+            "Source": str(repository.resolve()),
+            "Destination": "/opt/agent-canon/source",
+            "RW": False,
+            "Mode": "ro",
+        },
+        {
+            "Type": "bind",
+            "Source": str(registry),
+            "Destination": "/var/lib/agent-canon/mount-registry.toml",
+            "RW": False,
+            "Mode": "ro",
+        },
+    ]
+
+
 def _gc_fixture(
     tmp_path: Path,
     *,
@@ -4146,11 +4201,19 @@ def _gc_fixture(
         ],
         check=True,
     )
+    manifest = repository / "bootstrap" / "host" / "manifest.toml"
+    manifest.parent.mkdir(parents=True)
+    shutil.copyfile(ROOT / "bootstrap/host/manifest.toml", manifest)
     runtime_root = control / ".runtime"
     if runtime:
         (runtime_root / "host-state").mkdir(parents=True)
         (runtime_root / "container-state").mkdir()
         (runtime_root / "host-state" / "replacement.lock").touch()
+    # The resident has its own mounted control/runtime roots. Keep that Docker
+    # state separate from the host runtime so dry-run GC can prove it leaves the
+    # host runtime absent or byte-identical.
+    resident_root = tmp_path / "resident-volume"
+    resident_mounts = _resident_controller_mounts(repository, resident_root)
     digest = hashlib.sha256(str(control.resolve()).encode("utf-8")).hexdigest()
     container_name = f"agent-canon-tools-{digest[:16]}"
     owned = {
@@ -4194,15 +4257,7 @@ def _gc_fixture(
     # The host entrypoint now discovers an existing resident's authoritative
     # runtime through the bind-mounted mount registry before GC/update work.
     # Model that protocol boundary instead of relying on the old empty mount list.
-    containers[container_name]["Mounts"] = [
-        {
-            "Type": "bind",
-            "Source": str(runtime_root / "container-state" / "mounts.toml"),
-            "Destination": "/var/lib/agent-canon/mount-registry.toml",
-            "RW": False,
-            "Mode": "ro",
-        }
-    ]
+    containers[container_name]["Mounts"] = resident_mounts
     containers["agent-canon-tools-stale"]["Name"] = "/agent-canon-tools-stale"
     containers["foreign-resident"]["Name"] = "/foreign-resident"
     state = {"images": images, "containers": containers, "next": 1}
@@ -4404,7 +4459,7 @@ def test_gc_invokes_container_state_gc_and_combines_receipt(tmp_path: Path) -> N
     completed = _run_gc(repository, control, environment)
     assert completed.returncode == 0, completed.stderr
     receipt = json.loads(completed.stdout)
-    assert receipt["details"]["state"]["code"] == "state_gc_complete"
+    assert receipt["details"]["state"]["code"] == "gc_complete"
     calls = (tmp_path / "docker.calls").read_text(encoding="utf-8")
     assert "exec" in calls and "gc" in calls
 
@@ -4424,6 +4479,14 @@ def test_gc_dry_run_keeps_resident_rollback_preview_read_only(
     volume_name = f"agent-canon-runtime-{digest}"
     volume_root = tmp_path / f".fake-volume-{volume_name}"
     volume_root.mkdir()
+    resident_mounts = _resident_controller_mounts(repository, volume_root)
+    resident_mounts[1] = {
+        "Type": "volume",
+        "Name": volume_name,
+        "Source": str(volume_root),
+        "Destination": "/var/lib/agent-canon",
+        "RW": True,
+    }
     state["volumes"] = {
         volume_name: {
             "Name": volume_name,
@@ -4435,15 +4498,7 @@ def test_gc_dry_run_keeps_resident_rollback_preview_read_only(
         }
     }
     state["containers"][name]["Config"]["User"] = "1000:1000"
-    state["containers"][name]["Mounts"] = [
-        {
-            "Type": "volume",
-            "Name": volume_name,
-            "Source": str(volume_root),
-            "Destination": "/var/lib/agent-canon",
-            "RW": True,
-        }
-    ]
+    state["containers"][name]["Mounts"] = resident_mounts
     state_path.write_text(json.dumps(state), encoding="utf-8")
     if expired_target:
         plan = runtime / "container-state" / "rollback-plan.tsv"
@@ -4456,6 +4511,12 @@ def test_gc_dry_run_keeps_resident_rollback_preview_read_only(
         for path in runtime.rglob("*")
         if path.is_file()
     }
+    volume_before = {
+        path.relative_to(volume_root): path.read_bytes()
+        for path in volume_root.rglob("*")
+        if path.is_file() and "receipts" not in path.relative_to(volume_root).parts
+    }
+    receipt_files_before = set((volume_root / "runtime" / "receipts").glob("*.json"))
 
     completed = _run_gc_locked(repository, control, runtime, environment)
 
@@ -4474,7 +4535,14 @@ def test_gc_dry_run_keeps_resident_rollback_preview_read_only(
         "clear" in line
         for line in (tmp_path / "docker.calls").read_text(encoding="utf-8").splitlines()
     )
-    assert not list(volume_root.iterdir())
+    assert {
+        path.relative_to(volume_root): path.read_bytes()
+        for path in volume_root.rglob("*")
+        if path.is_file() and "receipts" not in path.relative_to(volume_root).parts
+    } == volume_before
+    receipt_files_after = set((volume_root / "runtime" / "receipts").glob("*.json"))
+    assert len(receipt_files_after - receipt_files_before) == 1
+    assert receipt_files_before <= receipt_files_after
 
 
 def test_container_exec_does_not_swallow_volume_copy_failure(tmp_path: Path) -> None:
@@ -5955,7 +6023,7 @@ def test_public_clean_install_uses_tracked_skills_and_first_target(
         env=environment,
     )
     assert repeated_add.returncode == 0, repeated_add.stderr
-    assert '"code": "target_registered"' in repeated_add.stdout
+    assert json.loads(repeated_add.stdout)["code"] == "target_registered"
     assert (
         len(
             (home / ".runtime" / "container-state" / "mounts.tsv")
@@ -6515,8 +6583,8 @@ def test_container_controller_status_never_requires_docker(tmp_path: Path) -> No
     (control / "runtime").mkdir()
     completed = subprocess.run(
         [
-            "python3",
-            str(ROOT / "tools/runtime/container/bootstrap_runtime.py"),
+            str(ROOT / "tools/bin/agent-canon"),
+            "bootstrap-runtime",
             "--repository-root",
             str(ROOT),
             "--control-parent-root",
@@ -6649,16 +6717,10 @@ _agent_canon_sync_operation
 
 def test_target_generation_uses_reversible_shared_rollback_plan() -> None:
     """Target-only generations keep the same host rollback protocol."""
-    controller = (ROOT / "tools/runtime/container/bootstrap_runtime.py").read_text(
+    controller = (ROOT / "tools/runtime/dispatch/agent-canon/src/bootstrap_runtime.rs").read_text(
         encoding="utf-8"
     )
-    target_control = controller.split("def _container_control_run", 1)[1].split(
-        "\ndef build_parser", 1
-    )[0]
-    assert (
-        target_control.count("_container_materialize_rollback_plan(runtime, state)")
-        >= 2
-    )
+    assert controller.count("self.materialize_rollback_plan(&state)?") >= 2
     assert '"image_ref": image.get("tag")' in controller
     rollback = (
         ADAPTER.read_text(encoding="utf-8")
@@ -6756,18 +6818,15 @@ def test_archive_and_codex_crossings_are_host_owned() -> None:
     )[0]
     assert "if ((exec_tool_rc == 0))" in exec_tool_route
     assert "_agent_canon_private_feedback_sync_current_locked" in exec_tool_route
-    controller = (ROOT / "tools/runtime/container/bootstrap_runtime.py").read_text(
+    controller = (ROOT / "tools/runtime/dispatch/agent-canon/src/bootstrap_runtime.rs").read_text(
         encoding="utf-8"
     )
-    assert "source_identity = sub.add_parser" in controller
+    assert '"source-identity"' in controller
     assert "normalize_remote" in controller
-    container_control = controller.split("def _container_control_run", 1)[1].split(
-        "\ndef build_parser", 1
-    )[0]
-    assert "runtime_log_archive_git" not in container_control
-    assert "_host_private_feedback_sync" not in container_control
-    eval_sync_prepare = controller.split("    def eval_sync_prepare(", 1)[1].split(
-        "    def gc(", 1
+    assert "runtime_log_archive_git" not in controller
+    assert "_host_private_feedback_sync" not in controller
+    eval_sync_prepare = controller.split("fn eval_sync_prepare(", 1)[1].split(
+        "fn eval_collect(", 1
     )[0]
     assert "runtime_log_archive_git" not in eval_sync_prepare
     assert '"host_archive_requested"' in eval_sync_prepare

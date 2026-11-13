@@ -107,9 +107,9 @@ mod tool_rejection_preflight;
 use agent_canon::runtime_boundary;
 use agent_canon::{
     catalog, codex_runtime_summary, compare_agent_run_paths, entrypoint_composer, extract_docx,
-    generated_completeness, native_release, report_artifact_checks, run_evaluation,
-    stablehlo_value_closure, template_bundle, theorem_graph_board, theorem_graph_circularity_check,
-    tool_dispatch, tool_proof_coverage,
+    formal_proof, generated_completeness, lean_recursive_proof_search, native_release,
+    report_artifact_checks, run_evaluation, stablehlo_value_closure, template_bundle,
+    theorem_graph_board, theorem_graph_circularity_check, tool_dispatch, tool_proof_coverage,
 };
 use std::env;
 
@@ -174,6 +174,8 @@ Commands:
   oop-python-rule-inventory|oop-cpp-rule-inventory [--root <repo-root>] [--format text|json|markdown]
   oop-python-readability|oop-cpp-readability [paths...] [--root ROOT] [options]
   lean-proof-env <init|smoke|agent-smoke|counterexample-smoke|all-smoke|check-file> [options]
+  formal-proof (--claim CLAIM|--claim-file PATH|--python-symbol PATH::QUALNAME) [options]
+  lean-recursive-proof-search --config PATH [options]
   check-semantic-responsibility-contract [paths...] [--root ROOT] [--template TEMPLATE] [--instance INSTANCE] [--artifact-root ARTIFACT_ROOT] [--format text|json]
   check-solid-evidence [paths...] [--root ROOT] [--changed] [--base-ref BASE_REF] [--evidence EVIDENCE] [--exclude EXCLUDE] [--verbose] [--format text|json]
   rust-migration-audit --root <repo-root>
@@ -197,6 +199,7 @@ Commands:
   create-experiment-topic <topic> [options]
   server-readiness [--layout <layout.toml>]
   environment-dependencies <validate|dry-run|install|boundary|project-install|image-install|image-verify> [options]
+  bootstrap-runtime --repository-root ROOT --control-parent-root ROOT --runtime-root ROOT <command> [options]
   check-skill-frontmatter [--root ROOT] [--format text|json]
   chatgpt-codex-route --input <packet.json|->
   rust-migration-plan --root <repo-root> [--limit N] [--format text|json]
@@ -298,6 +301,9 @@ fn main() {
         std::process::exit(theorem_graph_circularity_check::run(&args[2..]));
     }
 
+    if args.len() >= 2 && args[1] == "bootstrap-runtime" {
+        std::process::exit(agent_canon::bootstrap_runtime::run(&args[2..]));
+    }
     if args.len() >= 2
         && ["oop-python-readability", "oop-cpp-readability"].contains(&args[1].as_str())
     {
@@ -432,6 +438,12 @@ fn main() {
 
     if args.len() >= 2 && args[1] == agent_canon::lean_proof_env::SELECTOR {
         std::process::exit(agent_canon::lean_proof_env::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == formal_proof::SELECTOR {
+        std::process::exit(formal_proof::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == lean_recursive_proof_search::SELECTOR {
+        std::process::exit(lean_recursive_proof_search::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == check_solid_evidence::SELECTOR {
