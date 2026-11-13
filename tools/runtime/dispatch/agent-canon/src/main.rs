@@ -169,6 +169,7 @@ Commands:
   check-semantic-responsibility-contract [paths...] [--root ROOT] [--template TEMPLATE] [--instance INSTANCE] [--artifact-root ARTIFACT_ROOT] [--format text|json]
   check-solid-evidence [paths...] [--root ROOT] [--changed] [--base-ref BASE_REF] [--evidence EVIDENCE] [--exclude EXCLUDE] [--verbose] [--format text|json]
   rust-migration-audit --root <repo-root>
+  check-proof-trace-alignment --trace-module PATH [options]
   reference-materializer --url URL [--input PATH|--fetch] [options]
   repo-structure-contract [--root ROOT] [--contract PATH] [options]
   check-agent-canon-log-policy [--input PATH|--remote URL] [--commit SHA]
@@ -403,6 +404,9 @@ fn main() {
     }
     if args.len() >= 2 && args[1] == "rust-migration-audit" {
         std::process::exit(migration_audit::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "check-proof-trace-alignment" {
+        std::process::exit(agent_canon::check_proof_trace_alignment::run(&args[2..]));
     }
     if args.len() >= 2 && args[1] == "reference-materializer" {
         std::process::exit(agent_canon::reference_materializer::run(&args[2..]));
