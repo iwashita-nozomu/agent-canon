@@ -4,7 +4,7 @@
 // upstream design ../../../../../documents/experiments/gpu-admission-r5-source-packet.md owns the existing transaction contract
 // upstream implementation runtime_boundary.rs owns external artifact paths and stable files
 // upstream implementation execution_resource_projection.rs owns the coarse Hook projection
-// downstream test ../../../../../tests/tools/test_execution_resource_plan.py preserves the transaction properties
+// downstream test ./tests/direct_gpu_native.rs and ./tests/managed_experiment_native.rs preserve admission and managed transaction properties
 // @dependency-end
 
 use regex::Regex;
@@ -1682,6 +1682,49 @@ mod tests {
     }
     #[cfg(target_os = "linux")]
     #[test]
+    fn dropped_unproven_reservation_keeps_active_record_and_cannot_be_reacquired() {
+        use std::os::unix::fs::PermissionsExt;
+        let root = tempfile::tempdir_in(
+            std::env::temp_dir()
+                .canonicalize()
+                .expect("canonical temporary parent"),
+        )
+        .expect("lock fixture");
+        let uuid = "GPU-unproven-lifecycle";
+        let path = root.path().join(format!("gpu-{uuid}.lock"));
+        std::fs::write(&path, b"").expect("empty lock input");
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o660))
+            .expect("shared lock permissions");
+
+        let mut unproven = transaction_fixture(root.path());
+        let receipt = unproven
+            .try_reserve(&[uuid.into()], &BTreeSet::new(), 1)
+            .expect("initial lock acquired");
+        assert_eq!(receipt.disposition, "ACQUIRED");
+        let active_record = std::fs::read(&path).expect("active record reads");
+        assert_eq!(
+            serde_json::from_slice::<Value>(&active_record).unwrap()["schema_version"],
+            "gpu-reservation/v1"
+        );
+
+        drop(unproven);
+
+        assert_eq!(
+            std::fs::read(&path).expect("record remains active"),
+            active_record
+        );
+        let mut retry = transaction_fixture(root.path());
+        let rejected = retry
+            .try_reserve(&[uuid.into()], &BTreeSet::new(), 1)
+            .expect_err("unproven active record cannot be reacquired");
+        assert_eq!(rejected.code, "gpu_lock_record_tampered");
+        assert_eq!(
+            std::fs::read(&path).expect("record remains active"),
+            active_record
+        );
+    }
+    #[cfg(target_os = "linux")]
+    #[test]
     fn symlink_lock_preserves_referent_and_reservation_is_one_shot() {
         use std::os::unix::fs::symlink;
         let root = tempfile::tempdir_in(
@@ -1811,6 +1854,35 @@ mod tests {
             observation.process_inventory_visibility["units"]
                 ["GPU-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]["process_count"],
             0
+        );
+    }
+    #[test]
+    fn unresolved_unselected_inventory_remains_unknown_not_free() {
+        let allocated = "GPU-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_owned();
+        let unresolved = "GPU-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_owned();
+        let inventory = NvidiaInventory {
+            schema_version: "nvidia-inventory/v1".into(),
+            physical_uuids: vec![allocated.clone(), unresolved.clone()],
+            mig_uuids: Vec::new(),
+            joins: Vec::new(),
+            driver_version: None,
+            evidence_fingerprint: "fixture-inventory".into(),
+        };
+        let occupancy = process_occupancy(
+            &inventory,
+            42,
+            &[],
+            &BTreeSet::from([unresolved.clone()]),
+            false,
+            "COMPLETE_EMPTY",
+        )
+        .expect("complete process inventory with an unresolved holder");
+        assert_eq!(occupancy.occupied_uuids, Vec::<String>::new());
+        assert_eq!(occupancy.unknown_uuids, vec![unresolved.clone()]);
+        assert_eq!(occupancy.unit_states[&allocated], GpuUnitDisposition::Free);
+        assert_eq!(
+            occupancy.unit_states[&unresolved],
+            GpuUnitDisposition::Unknown
         );
     }
     #[test]

@@ -140,9 +140,9 @@
       "path": "experiments/registry.toml"
     },
     {
-      "command": "if [ -e experiments/registry.toml ]; then tools/bin/agent-canon experiment-registry; else echo EXPERIMENT_REGISTRY_CHECK=skipped_no_project_registry; fi && python3 -m pytest tests/tools/test_run_managed_experiment.py -q",
+      "command": "if [ -e experiments/registry.toml ]; then tools/bin/agent-canon experiment-registry; else echo EXPERIMENT_REGISTRY_CHECK=skipped_no_project_registry; fi && cargo test --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --test managed_experiment_native",
       "gate": "experiment_execution_surface_guard",
-      "handoff": "route planned edits through $experiment-lifecycle and $test-design; preserve the managed runner, registry checker, registry contract, and deterministic raw-only git-annex retention contract with lightweight registry and runner validation evidence",
+      "handoff": "route planned edits through $experiment-lifecycle and $test-design; preserve the native managed CLI, registry checker, registry contract, and deterministic raw-only git-annex retention contract with protocol fixture evidence",
       "path": "experiments/registry.toml"
     },
     {

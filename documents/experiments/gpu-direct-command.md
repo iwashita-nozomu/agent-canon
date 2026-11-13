@@ -8,7 +8,7 @@ upstream design ./gpu-admission-r5-source-packet.md canonical GPU discovery, occ
 upstream design ./gpu-admission-r5-nvidia-visibility.md strict NVIDIA topology and full UUID evidence boundary
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/execution_resource_plan.rs canonical NVIDIA evidence, BUSY/UNKNOWN/FREE classification, UUID lock, and admission receipt owners
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/gpu_command_admission.rs direct admission composition, immutable plan, exact environment, execution lifecycle, and release owner
-downstream implementation ../../tools/experiments/execution/run_managed_experiment.py optional managed provider adapter
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/managed_experiment.rs optional managed provider adapter
 downstream implementation ../../tools/validation/ci/runners/run_gpu_container.sh single-entry Docker injection adapter with internal CDI/all selection
 downstream implementation ../../tools/runtime/dispatch/agent-canon/tests/direct_gpu_native.rs fake NVIDIA, race, environment, lifecycle, and provider-independence acceptance tests
 downstream implementation ../../tests/tools/test_run_gpu_container.py Docker argv, route selection, and exact environment acceptance tests
@@ -50,7 +50,7 @@ agent-canon run-gpu-command \
   -- <argv...>
 ```
 
-Use `run_managed_experiment.py` only when the request needs managed topic/registry identity,
+Use `tools/bin/agent-canon run-managed-experiment` only when the request needs managed topic/registry identity,
 case expansion, source snapshotting, provider-owned artifact schemas, lifecycle result schemas,
 or completion coverage. Provider discovery and provider contract validation are therefore
 conditional on managed mode only.

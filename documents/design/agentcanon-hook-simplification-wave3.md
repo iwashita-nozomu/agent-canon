@@ -100,7 +100,7 @@ Issue history is recreated as a compatibility surface.
 
 | group | current child/caller | reusable responsibility | one target owner |
 | --- | --- | --- | --- |
-| B1 | `execution_resource_plan_projection_guard.py` → dispatcher and projection tests | exact normalized input and projection byte validation | new `tools/runtime/dispatch/agent-canon/src/execution_resource_projection.rs`; producer authority remains `tools/experiments/execution/execution_resource_plan.py` |
+| B1 | `execution_resource_plan_projection_guard.py` → dispatcher and projection tests | exact normalized input and projection byte validation | new `tools/runtime/dispatch/agent-canon/src/execution_resource_projection.rs`; managed producer authority is `tools/runtime/dispatch/agent-canon/src/execution_resource_plan.rs` |
 | B2 | `skill_usage_logger.py` → evaluator and prompt-eval tests | pure prompt-to-workflow/skill classification | new `tools/runtime/dispatch/agent-canon/src/prompt_classifier.rs`; evaluator imports it directly |
 | B3 | `prompt_secret_guard.py` → prompt safety and dispatcher | secret classification and redacted block payload | `tools/runtime/dispatch/agent-canon/src/hook_safety.rs` |
 | B4 | `branch_worktree_guard.py` and workflow docs → dispatcher | destructive Git intent, same-segment authority, redacted payload | the same `tools/runtime/dispatch/agent-canon/src/hook_safety.rs`; policy wording remains [agents/canonical/CODEX_WORKFLOW.md](../../agents/canonical/CODEX_WORKFLOW.md) |

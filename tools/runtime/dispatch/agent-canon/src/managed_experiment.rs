@@ -12,11 +12,13 @@ use crate::experiment_identity::ExperimentIdentity;
 use crate::experiment_registry::{store, RegistryValue};
 use crate::python_json::{self, JsonObject, JsonString, JsonValue};
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 type Result<T> = std::result::Result<T, String>;
+pub const SELECTOR: &str = "run-managed-experiment";
 #[derive(Default)]
 struct Options {
     repo_root: Option<PathBuf>,
@@ -33,7 +35,7 @@ struct Options {
 }
 enum ParsedOptions {
     Help,
-    Run(Options),
+    Run(Box<Options>),
 }
 fn parse_options(args: &[String]) -> Result<ParsedOptions> {
     let options = [
@@ -122,7 +124,7 @@ fn parse_options(args: &[String]) -> Result<ParsedOptions> {
     if result.topic.is_none() || result.variant.is_none() {
         return Err("the following arguments are required: --topic, --variant".into());
     }
-    Ok(ParsedOptions::Run(result))
+    Ok(ParsedOptions::Run(Box::new(result)))
 }
 #[derive(Clone)]
 struct RegistryContext {
@@ -829,8 +831,9 @@ struct ReservationReceipt {
     raw_id: (u64, u64),
     marker_id: (u64, u64),
     report_id: Option<(u64, u64)>,
-    parents: Vec<(PathBuf, bool, Option<(u64, u64)>)>,
+    parents: Vec<ReservationParent>,
 }
+type ReservationParent = (PathBuf, bool, Option<(u64, u64)>);
 fn metadata_id(metadata: &cap_std::fs::Metadata) -> (u64, u64) {
     use cap_std::fs::MetadataExt;
     (metadata.dev(), metadata.ino())
@@ -1835,12 +1838,14 @@ struct ManagedEvidence {
     source: Option<crate::execution_resource_plan::SourceFreezeReceipt>,
     admission: Option<crate::execution_resource_plan::RunGpuAdmissionReceipt>,
     lifecycle: Option<ManagedLifecycle>,
+    effective_environment: Option<BTreeMap<String, String>>,
     primary: Option<crate::execution_resource_plan::Failure>,
     secondary: Vec<Value>,
     releases: Vec<crate::execution_resource_plan::FdReleaseEvidence>,
     attempted: std::collections::BTreeSet<&'static str>,
     chunks: Vec<String>,
     exit_code: i32,
+    reservation_active: bool,
 }
 fn normalized_failure(error: &crate::execution_resource_plan::Failure, operation: &str) -> Value {
     json!({"schema_version":"gpu-failure/v1","kind":error.code,"operation":operation,"message":format!("{}: {}",error.code,error.message),"evidence":error.details})
@@ -1862,6 +1867,13 @@ fn evidence_fingerprint(value: &Value) -> AdmissionResult<Value> {
     Ok(json!(
         crate::execution_resource_plan::canonical_fingerprint(value)?
     ))
+}
+fn cleanup_complete(evidence: &ManagedEvidence) -> bool {
+    (!evidence.reservation_active || !evidence.releases.is_empty())
+        && evidence
+            .releases
+            .iter()
+            .all(|item| item.close_attempts == 1 && item.error_kind.is_none())
 }
 fn write_managed_coverage(context: &RunContext, evidence: &ManagedEvidence) -> AdmissionResult<()> {
     use crate::execution_resource_plan::{canonical_fingerprint, write_json_once};
@@ -1914,7 +1926,18 @@ fn write_managed_coverage(context: &RunContext, evidence: &ManagedEvidence) -> A
     let mut values = BTreeMap::<&str, Value>::new();
     values.insert("source_freeze_evidence", source);
     for name in &names[1..] {
-        values.insert(name, admission.get(*name).cloned().unwrap_or(Value::Null));
+        values.insert(
+            name,
+            if *name == "effective_environment" {
+                evidence
+                    .effective_environment
+                    .as_ref()
+                    .map(|value| json!(value))
+                    .unwrap_or_else(|| admission.get(*name).cloned().unwrap_or(Value::Null))
+            } else {
+                admission.get(*name).cloned().unwrap_or(Value::Null)
+            },
+        );
     }
     let mut absences = Vec::new();
     let mut missing = Vec::new();
@@ -1956,10 +1979,7 @@ fn write_managed_coverage(context: &RunContext, evidence: &ManagedEvidence) -> A
     }
     let input_fingerprint = canonical_fingerprint(&input)?;
     let reached_complete = missing.is_empty();
-    let cleanup_complete = evidence
-        .releases
-        .iter()
-        .all(|item| item.close_attempts == 1 && item.error_kind.is_none());
+    let cleanup_complete = cleanup_complete(evidence);
     let all_chunks = reached_complete
         && !evidence.chunks.is_empty()
         && evidence.primary.is_none()
@@ -1977,7 +1997,7 @@ fn write_managed_coverage(context: &RunContext, evidence: &ManagedEvidence) -> A
         .map_err(|error| admission_error("CompletionCoverageFailure", &error.to_string()))?;
     parent_for(
         &root,
-        &runtime
+        runtime
             .join("completion_coverage.json")
             .strip_prefix(&context.root)
             .map_err(|error| admission_error("CompletionCoverageFailure", &error.to_string()))?,
@@ -2051,6 +2071,7 @@ fn resource_request(
     config: &JsonValue,
     observation: &crate::execution_resource_plan::ResourceObservation,
 ) -> Result<crate::execution_resource_plan::ResourceRequest> {
+    let config = config_field(config, "config").unwrap_or(config);
     let gpu = config_integer(config, "gpu_requested_count", 0)?;
     let gpu_count = usize::try_from(gpu).map_err(|error| error.to_string())?;
     let provenance = config_text(config, "gpu_allocation_provenance", "")?;
@@ -2195,4 +2216,915 @@ fn build_provider_request(
     write_value(context, &request_path, &payload)
         .map_err(|error| admission_error("admitted_runner_request_write_failed", &error))?;
     Ok((request_path, result_path, payload))
+}
+
+fn launch_provider(
+    context: &RunContext,
+    request_path: &Path,
+    result_path: &Path,
+    lifecycle_path: &Path,
+    request: &Value,
+    environment: &BTreeMap<String, String>,
+) -> AdmissionResult<(ManagedExecution, ManagedLifecycle)> {
+    use std::fs::OpenOptions;
+    let configured = std::env::var("AGENT_CANON_EXPERIMENT_RUNNER_ADMITTED")
+        .unwrap_or_else(|_| PROVIDER_EXECUTABLE.into());
+    let executable = crate::tool_dispatch::find_executable(&configured)
+        .or_else(|| {
+            let path = Path::new(&configured);
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                if path.is_file()
+                    && std::fs::metadata(path)
+                        .is_ok_and(|metadata| metadata.permissions().mode() & 0o111 != 0)
+                {
+                    return std::fs::canonicalize(path).ok();
+                }
+            }
+            None
+        })
+        .ok_or_else(|| {
+            admission_error(
+                "admitted_runner_cli_missing",
+                "experiment-runner-admitted CLI is unavailable",
+            )
+        })?;
+    let stdout = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&context.paths.stdout)
+        .map_err(|error| admission_error("admitted_runner_launch_failed", &error.to_string()))?;
+    let stderr = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&context.paths.stderr)
+        .map_err(|error| admission_error("admitted_runner_launch_failed", &error.to_string()))?;
+    let mut process = Command::new(&executable)
+        .arg("--request")
+        .arg(request_path)
+        .arg("--result")
+        .arg(result_path)
+        .current_dir(context.paths.result.join("source_snapshot"))
+        .env_clear()
+        .envs(environment)
+        .stdin(Stdio::null())
+        .stdout(Stdio::from(stdout))
+        .stderr(Stdio::from(stderr))
+        .spawn()
+        .map_err(|_| {
+            admission_error(
+                "admitted_runner_launch_failed",
+                "experiment-runner-admitted could not be launched",
+            )
+        })?;
+    let process_status = process
+        .wait()
+        .map_err(|error| admission_error("admitted_runner_launch_failed", &error.to_string()))?;
+    #[cfg(unix)]
+    let process_returncode = {
+        use std::os::unix::process::ExitStatusExt;
+        process_status
+            .code()
+            .unwrap_or_else(|| -process_status.signal().unwrap_or(1))
+    };
+    #[cfg(not(unix))]
+    let process_returncode = process_status.code().unwrap_or(1);
+    let (execution, lifecycle, result) =
+        validate_provider_result(result_path, request, process_returncode)?;
+
+    let mut lifecycle_payload = serde_json::to_value(&lifecycle).map_err(|error| {
+        admission_error(
+            "experiment_runner_lifecycle_write_failed",
+            &error.to_string(),
+        )
+    })?;
+    lifecycle_payload
+        .as_object_mut()
+        .expect("lifecycle object")
+        .extend(
+            context
+                .identity
+                .to_value()
+                .as_object()
+                .expect("identity object")
+                .clone(),
+        );
+    write_value(context, lifecycle_path, &lifecycle_payload)
+        .map_err(|error| admission_error("experiment_runner_lifecycle_write_failed", &error))?;
+    let result_fingerprint = crate::execution_resource_plan::canonical_fingerprint(&result)
+        .map_err(|error| admission_error("admitted_runner_result_corrupt", &error.message))?;
+    let receipt = json!({
+        "schema_version":"agentcanon-managed-run-receipt/v1",
+        "provider_contract":provider_contract().map_err(|error|admission_error("admitted_runner_cli_missing",&error))?,
+        "executable":PROVIDER_EXECUTABLE,
+        "resolved_executable":executable,
+        "argv":[executable,"--request",request_path,"--result",result_path],
+        "request_fingerprint":request["fingerprint"],
+        "result_content_fingerprint":result_fingerprint,
+        "process_returncode":process_returncode,
+        "worker_pid":lifecycle.child_process_ids.first().copied(),
+        "identity":context.identity.to_value()["identity"],
+    });
+    let receipt_path = context
+        .paths
+        .result
+        .join("runtime/managed-run-receipt.json");
+    write_value(context, &receipt_path, &receipt)
+        .map_err(|error| admission_error("managed_run_receipt_write_failed", &error))?;
+    Ok((execution, lifecycle))
+}
+
+fn execute_managed_run(
+    context: &RunContext,
+    config: &JsonValue,
+) -> AdmissionResult<ManagedExecution> {
+    use crate::execution_resource_plan::{
+        build_admitted_environment, canonical_fingerprint, discover_resources, process_occupancy,
+        AbsolutePosixPath, ExecutionResourcePlan, GpuAllocation, GpuReservationTransaction,
+        GpuRunRequest, RunGpuAdmissionReceipt,
+    };
+    use crate::execution_source_freeze::SourceFreezeOwner;
+    use std::os::unix::fs::MetadataExt;
+
+    let mut request = resource_request(
+        context,
+        config,
+        &discover_resources(&run_environment(context), 0)?,
+    )
+    .map_err(|error| admission_error("managed_resource_request_invalid", &error))?;
+    let source_paths = crate::execution_source_freeze::source_path_set(
+        &context.root,
+        &context.identity.topic,
+        &context.command,
+    )?;
+    let source_request = GpuRunRequest {
+        gpu_count: request.gpu_requested_count,
+        minimum_memory_bytes_per_unit: request.gpu_requested_memory_bytes,
+        max_workers: 1,
+        host_memory_bytes: request.host_memory_bytes,
+        cuda_runtime_library_path: config_field(
+            config_field(config, "config").unwrap_or(config),
+            "cuda_runtime_library_path",
+        )
+        .and_then(|value| match value {
+            JsonValue::String(value) => value.to_text(),
+            _ => None,
+        }),
+        environment: request.environment.clone(),
+        source_root: AbsolutePosixPath::parse(&context.root.to_string_lossy())?,
+        runtime_route: "MANAGED_CONTAINER".into(),
+        source_paths: source_paths.clone(),
+        planned_chunk_ids: request.requested_chunks.clone(),
+    };
+    let mut evidence = ManagedEvidence {
+        chunks: request.requested_chunks.clone(),
+        ..ManagedEvidence::default()
+    };
+    evidence.attempted.insert("source_freeze_evidence");
+    let mut source_owner = SourceFreezeOwner::new(AbsolutePosixPath::parse(
+        &context.paths.result.to_string_lossy(),
+    )?);
+    let mut source_frozen = false;
+    let mut reservation_transaction: Option<GpuReservationTransaction> = None;
+    let mut runner_started = false;
+    let phase_result = (|| -> AdmissionResult<ManagedExecution> {
+        let source = source_owner.freeze(&source_request)?;
+        source_frozen = true;
+        evidence.source = Some(source.clone());
+
+        let initial_observation =
+            discover_resources(&request.environment, request.gpu_requested_count)?;
+        let mut runtime_route = None;
+        let mut namespace_inode = 0u64;
+        let mut runtime_identity_fingerprint = String::new();
+        let mut admission = None;
+        let mut allocation;
+        let final_observation;
+        if request.gpu_requested_count > 0 {
+            runtime_route = request
+                .environment
+                .get("AGENT_CANON_RUNTIME_ROUTE")
+                .cloned();
+            if runtime_route.as_deref() != Some("MANAGED_CONTAINER") {
+                return Err(admission_error(
+                    "runtime_identity_route_invalid",
+                    "managed GPU admission requires the selected project runtime route",
+                ));
+            }
+            namespace_inode = std::fs::metadata("/proc/self/ns/pid")
+                .map_err(|error| {
+                    admission_error("gpu_namespace_identity_unproven", &error.to_string())
+                })?
+                .ino();
+            runtime_identity_fingerprint = canonical_fingerprint(
+                &json!({"runtime_route":runtime_route,"namespace_id":format!("pid:[{namespace_inode}]")}),
+            )?;
+            let inventory = initial_observation
+                .nvidia_inventory
+                .as_ref()
+                .ok_or_else(|| {
+                    admission_error(
+                        "gpu_inventory_unproven",
+                        "GPU admission requires the strict NVIDIA inventory owner output",
+                    )
+                })?;
+            let first = process_occupancy(
+                inventory,
+                namespace_inode,
+                &initial_observation.process_identities,
+                &initial_observation.unknown_gpu_ids,
+                false,
+                if initial_observation.process_identities.is_empty() {
+                    "COMPLETE_EMPTY"
+                } else {
+                    "COMPLETE"
+                },
+            )?;
+            let candidates = initial_observation
+                .caller_allocated_ids
+                .iter()
+                .cloned()
+                .collect::<Vec<_>>();
+            let occupied = first
+                .occupied_uuids
+                .iter()
+                .cloned()
+                .collect::<std::collections::BTreeSet<_>>();
+            let unknown = first
+                .unknown_uuids
+                .iter()
+                .cloned()
+                .collect::<std::collections::BTreeSet<_>>();
+            let eligible = candidates
+                .iter()
+                .filter(|uuid| {
+                    !occupied.contains(*uuid)
+                        && !unknown.contains(*uuid)
+                        && initial_observation
+                            .free_memory_bytes
+                            .get(*uuid)
+                            .copied()
+                            .unwrap_or(0)
+                            >= request.gpu_requested_memory_bytes
+                })
+                .cloned()
+                .collect::<Vec<_>>();
+            let mut transaction = GpuReservationTransaction::new(
+                &AbsolutePosixPath::parse(&request.lock_root.to_string_lossy())?,
+                &AbsolutePosixPath::parse(&request.runtime_root.to_string_lossy())?,
+            )?;
+            evidence.attempted.insert("lock_readback");
+            let reservation =
+                transaction.try_reserve(&eligible, &occupied, request.gpu_requested_count)?;
+            let reservation_ids = transaction.reservation_ids();
+            evidence.reservation_active = !reservation.selected_uuids.is_empty();
+            reservation_transaction = Some(transaction);
+            if reservation.disposition != "ACQUIRED"
+                || reservation.selected_uuids.len() != request.gpu_requested_count
+            {
+                return Err(admission_error(
+                    "gpu_candidate_unavailable",
+                    "the exact UUID candidate frontier could not satisfy the request",
+                ));
+            }
+            let observed = discover_resources(&request.environment, request.gpu_requested_count)?;
+            if observed.observation_event_id == initial_observation.observation_event_id {
+                return Err(admission_error(
+                    "gpu_run_admission_raced",
+                    "final NVIDIA evidence did not provide a new admission snapshot",
+                ));
+            }
+            let final_inventory = observed.nvidia_inventory.as_ref().ok_or_else(|| {
+                admission_error(
+                    "gpu_inventory_unproven",
+                    "GPU admission requires the strict final NVIDIA inventory owner output",
+                )
+            })?;
+            evidence.attempted.insert("actual_gpu_processes");
+            let last = process_occupancy(
+                final_inventory,
+                namespace_inode,
+                &observed.process_identities,
+                &observed.unknown_gpu_ids,
+                false,
+                if observed.process_identities.is_empty() {
+                    "COMPLETE_EMPTY"
+                } else {
+                    "COMPLETE"
+                },
+            )?;
+            let occupied_final = last
+                .occupied_uuids
+                .iter()
+                .cloned()
+                .collect::<std::collections::BTreeSet<_>>();
+            let unknown_final = last
+                .unknown_uuids
+                .iter()
+                .cloned()
+                .collect::<std::collections::BTreeSet<_>>();
+            if reservation.selected_uuids.iter().any(|uuid| {
+                !observed.caller_allocated_ids.contains(uuid)
+                    || occupied_final.contains(uuid)
+                    || unknown_final.contains(uuid)
+                    || observed.free_memory_bytes.get(uuid).copied().unwrap_or(0)
+                        < request.gpu_requested_memory_bytes
+            }) {
+                return Err(admission_error(
+                    "gpu_run_admission_raced",
+                    "final UUID, occupancy, or memory evidence changed after reservation",
+                ));
+            }
+            let selected = reservation.selected_uuids.clone();
+            let readback = reservation.locks.first().cloned().ok_or_else(|| {
+                admission_error(
+                    "gpu_lock_readback_missing",
+                    "GPU reservation returned no lock readback for an acquired reservation",
+                )
+            })?;
+            evidence.attempted.extend([
+                "concurrent_run_evidence",
+                "mig_evidence",
+                "os_safe_lock_placement",
+            ]);
+            let final_eligible = observed
+                .caller_allocated_ids
+                .iter()
+                .filter(|uuid| {
+                    !occupied_final.contains(*uuid)
+                        && !unknown_final.contains(*uuid)
+                        && observed.free_memory_bytes.get(*uuid).copied().unwrap_or(0)
+                            >= request.gpu_requested_memory_bytes
+                })
+                .cloned()
+                .collect::<Vec<_>>();
+            let lock_value = json!({
+                "reservation_owner":"GpuReservationTransaction",
+                "reservation_evidence_fingerprint":reservation.evidence_fingerprint,
+                "initial_observation_fingerprint":initial_observation.fingerprint,
+                "admission_observation_fingerprint":observed.fingerprint,
+                "final_eligible_ids":&final_eligible,
+            });
+            let readback_fingerprint = canonical_fingerprint(&lock_value)?;
+            let memory_bytes = observed
+                .gpu_devices
+                .iter()
+                .filter(|device| selected.contains(&device.uuid))
+                .map(|device| (device.uuid.clone(), device.memory_bytes))
+                .collect::<BTreeMap<_, _>>();
+            allocation = GpuAllocation {
+                plan_fingerprint: "pending".into(),
+                caller_allocated_ids: candidates.clone(),
+                candidate_ids: candidates.clone(),
+                occupied_ids: occupied_final
+                    .iter()
+                    .chain(unknown_final.iter())
+                    .cloned()
+                    .collect::<std::collections::BTreeSet<_>>()
+                    .into_iter()
+                    .collect(),
+                reserved_ids: Vec::new(),
+                eligible_ids: final_eligible.clone(),
+                selected_ids: selected.clone(),
+                reservation_ids,
+                free_memory_bytes: observed.free_memory_bytes.clone(),
+                occupied_process_identities: observed.process_identities.clone(),
+                process_identities: observed.process_identities.clone(),
+                allocation_id: reservation.evidence_fingerprint.clone(),
+                lock_root: request.lock_root.clone(),
+                selection_order: final_eligible,
+                memory_bytes,
+                slot_id: None,
+                requested_count: request.gpu_requested_count,
+                requested_memory_bytes: request.gpu_requested_memory_bytes,
+                readback_fingerprint: readback_fingerprint.clone(),
+                lock_readback: lock_value,
+                allocation_provenance: request.gpu_allocation_provenance.clone(),
+                admission_fingerprint: None,
+            };
+            let mut occupancy_hash = Sha256::new();
+            occupancy_hash.update(initial_observation.fingerprint.as_bytes());
+            occupancy_hash.update(b"|");
+            occupancy_hash.update(observed.fingerprint.as_bytes());
+            let mut receipt = RunGpuAdmissionReceipt {
+                schema_version: "gpu-admission/v1".into(),
+                candidate_uuids: candidates,
+                occupied_uuids: occupied_final.iter().cloned().collect(),
+                reserved_uuids: allocation.reserved_ids.clone(),
+                selected_uuids: selected.clone(),
+                inventory_fingerprint: final_inventory.evidence_fingerprint.clone(),
+                occupancy_fingerprint: format!("{:x}", occupancy_hash.finalize()),
+                reservation_fingerprint: readback_fingerprint,
+                runtime_identity_fingerprint: runtime_identity_fingerprint.clone(),
+                plan_fingerprint: None,
+                admission_fingerprint: String::new(),
+                lock_readback: Some(readback.clone()),
+                effective_environment: None,
+                actual_gpu_processes: Some(vec![first.clone(), last.clone()]),
+                concurrent_run_evidence: Some(json!({
+                    "initial_snapshot_fingerprint":initial_observation.fingerprint,
+                    "admission_snapshot_fingerprint":observed.fingerprint,
+                    "final_snapshot_fingerprint":observed.fingerprint,
+                    "initial_event_id":initial_observation.observation_event_id,
+                    "admission_event_id":observed.observation_event_id,
+                    "final_event_id":observed.observation_event_id,
+                    "fingerprint":canonical_fingerprint(&json!({"initial":initial_observation.fingerprint,"admission":observed.fingerprint,"final":observed.fingerprint}))?
+                })),
+                mig_evidence: Some(json!({
+                    "parent_by_uuid":final_inventory.joins.iter().map(|join| (join.mig_uuid.clone(), join.parent_uuid.clone())).collect::<BTreeMap<_,_>>(),
+                    "executable_leaf_uuids":final_inventory.mig_uuids,
+                    "selected_physical_uuids":selected.iter().filter(|uuid| final_inventory.physical_uuids.contains(uuid)).collect::<Vec<_>>(),
+                    "fingerprint":canonical_fingerprint(&json!({
+                        "parents":final_inventory.joins.iter().map(|join| (join.mig_uuid.clone(), join.parent_uuid.clone())).collect::<Vec<_>>(),
+                        "leaves":final_inventory.mig_uuids
+                    }))?
+                })),
+                container_visible_uuid_mapping: None,
+                os_safe_lock_placement: Some(json!({
+                    "runtime_root":readback.runtime_root,
+                    "filesystem_type":readback.filesystem_type,
+                    "filesystem_source":request.lock_root,
+                    "device":readback.device,
+                    "inode":readback.inode,
+                    "group_name":"agent-canon-runtime",
+                    "mode":"0660",
+                    "local_flock_filesystem":true,
+                    "fingerprint":canonical_fingerprint(&json!({"runtime_root":readback.runtime_root,"filesystem_type":readback.filesystem_type,"filesystem_source":request.lock_root,"device":readback.device,"inode":readback.inode,"mode":"0660"}))?
+                })),
+                descendant_retention_evidence: None,
+            };
+            receipt.refresh_fingerprint()?;
+            allocation.admission_fingerprint = Some(receipt.admission_fingerprint.clone());
+            admission = Some(receipt);
+            evidence.admission = admission.clone();
+            final_observation = observed;
+        } else {
+            final_observation = initial_observation.clone();
+            allocation = GpuAllocation {
+                plan_fingerprint: "pending".into(),
+                caller_allocated_ids: Vec::new(),
+                candidate_ids: Vec::new(),
+                occupied_ids: Vec::new(),
+                reserved_ids: Vec::new(),
+                eligible_ids: Vec::new(),
+                selected_ids: Vec::new(),
+                reservation_ids: Vec::new(),
+                free_memory_bytes: BTreeMap::new(),
+                occupied_process_identities: Vec::new(),
+                process_identities: Vec::new(),
+                allocation_id: "none".into(),
+                lock_root: request.lock_root.clone(),
+                selection_order: Vec::new(),
+                memory_bytes: BTreeMap::new(),
+                slot_id: None,
+                requested_count: 0,
+                requested_memory_bytes: 0,
+                readback_fingerprint: canonical_fingerprint(&json!("gpu-unrequested"))?,
+                lock_readback: json!({"reservation_owner":"GpuReservationTransaction","gpu_requested":false}),
+                allocation_provenance: "not_applicable".into(),
+                admission_fingerprint: None,
+            };
+        }
+        if request.gpu_requested_count > 0 {
+            request.environment.remove("CUDA_VISIBLE_DEVICES");
+            request.environment.remove("NVIDIA_VISIBLE_DEVICES");
+        }
+        request.cwd = context.paths.result.join("source_snapshot");
+        let plan = ExecutionResourcePlan::freeze(&request, &final_observation, allocation)?;
+        if let Some(receipt) = admission.as_mut() {
+            receipt.plan_fingerprint = Some(plan.plan_fingerprint().to_owned());
+        }
+        evidence.admission = admission.clone();
+        evidence.attempted.insert("effective_environment");
+        if request.gpu_requested_count > 0 {
+            evidence.attempted.insert("container_visible_uuid_mapping");
+        }
+        let admitted = build_admitted_environment(
+            &plan,
+            runtime_route.as_deref(),
+            admission
+                .as_ref()
+                .map(|receipt| receipt.admission_fingerprint.as_str()),
+        )?;
+        let environment = admitted
+            .exact_env_map
+            .iter()
+            .cloned()
+            .collect::<BTreeMap<_, _>>();
+        evidence.effective_environment = Some(environment.clone());
+        if let Some(receipt) = admission.as_mut() {
+            receipt.effective_environment = Some(environment.clone());
+            let visibility = json!({
+                "cuda_visible_devices":admitted.cuda_visible_devices,
+                "nvidia_visible_devices":admitted.nvidia_visible_devices,
+                "disposition":"explicit",
+                "visible_uuids":plan.gpu_allocation().selected_ids,
+                "namespace_id":format!("pid:[{namespace_inode}]"),
+                "runtime_identity_fingerprint":runtime_identity_fingerprint,
+            });
+            receipt.container_visible_uuid_mapping = Some(json!({
+                "cuda_visible_devices":visibility["cuda_visible_devices"],
+                "nvidia_visible_devices":visibility["nvidia_visible_devices"],
+                "disposition":visibility["disposition"],
+                "visible_uuids":visibility["visible_uuids"],
+                "namespace_id":visibility["namespace_id"],
+                "runtime_identity_fingerprint":visibility["runtime_identity_fingerprint"],
+                "fingerprint":canonical_fingerprint(&visibility)?,
+            }));
+        }
+        evidence.admission = admission.clone();
+        evidence.attempted.insert("effective_environment");
+        if request.gpu_requested_count > 0 {
+            evidence.attempted.insert("os_safe_lock_placement");
+        }
+        let (request_path, result_path, payload) =
+            build_provider_request(context, &request, &plan, &admitted, &source_paths)?;
+        let lifecycle_path = context
+            .paths
+            .result
+            .join("runtime/managed-run-lifecycle.json");
+        runner_started = true;
+        if request.gpu_requested_count > 0 {
+            evidence.attempted.insert("descendant_retention_evidence");
+        }
+        let (execution, lifecycle) = launch_provider(
+            context,
+            &request_path,
+            &result_path,
+            &lifecycle_path,
+            &payload,
+            &environment,
+        )?;
+        evidence.lifecycle = Some(lifecycle);
+        evidence.exit_code = execution.raw_exit_code;
+        Ok(execution)
+    })();
+    let mut result_error = phase_result.as_ref().err().cloned();
+    let execution = phase_result.ok();
+    if let Some(error) = result_error.as_ref() {
+        evidence.primary = Some(error.clone());
+        evidence.exit_code = 1;
+    } else if let Some(execution) = execution.as_ref() {
+        evidence.exit_code = execution.raw_exit_code;
+    }
+    if runner_started && request.gpu_requested_count > 0 {
+        evidence.attempted.insert("descendant_retention_evidence");
+        if let Some(receipt) = evidence.admission.as_mut() {
+            let lifecycle = evidence.lifecycle.as_ref();
+            let quiescent = lifecycle.is_some_and(ManagedLifecycle::quiescent);
+            receipt.descendant_retention_evidence = Some(json!({
+                "child_process_ids":lifecycle.map(|value| &value.child_process_ids),
+                "process_group_ids":lifecycle.map(|value| &value.process_group_ids),
+                "descendant_quiescence":if quiescent{"PROVEN"}else{"UNPROVEN"},
+                "retained_gpu_process_uuids":[],
+                "release_blocked":!quiescent,
+                "fingerprint":canonical_fingerprint(&json!({"runner_lifecycle":lifecycle,"quiescent":quiescent}))?
+            }));
+        }
+    }
+    if let Some(transaction) = reservation_transaction.as_mut() {
+        let safe_to_close = !runner_started
+            || evidence
+                .lifecycle
+                .as_ref()
+                .is_some_and(ManagedLifecycle::quiescent);
+        if safe_to_close {
+            match transaction.close() {
+                Ok(releases) => evidence.releases = releases,
+                Err(error) => {
+                    if result_error.is_none() {
+                        result_error = Some(error.clone());
+                    }
+                    evidence
+                        .secondary
+                        .push(normalized_failure(&error, "gpu_reservation_close"));
+                }
+            }
+        } else if let Some(transaction) = reservation_transaction.take() {
+            drop(transaction);
+        }
+    }
+    if source_frozen {
+        if let Err(error) = source_owner.close() {
+            if result_error.is_none() {
+                result_error = Some(error.clone());
+            }
+            evidence
+                .secondary
+                .push(normalized_failure(&error, "source_freeze_close"));
+        }
+    }
+    if let Some(error) = result_error.as_ref() {
+        evidence.primary = Some(error.clone());
+        evidence.exit_code = 1;
+    }
+    write_managed_coverage(context, &evidence)?;
+    if let Some(error) = result_error {
+        return Err(error);
+    }
+    execution.ok_or_else(|| {
+        admission_error(
+            "managed_execution_result_missing",
+            "managed provider returned no typed execution result",
+        )
+    })
+}
+
+fn run_cli(options: Options) -> Result<i32> {
+    use std::time::Instant;
+    let context = build_context(&options)?;
+    if context.command.is_empty() {
+        return Err("a command is required".into());
+    }
+    let patterns = eval_patterns(&context.registry)?;
+    let explicit = parse_config(&options)?;
+    let mut manifest = build_manifest(&context)?;
+    let mut config = build_config(&context, explicit)?;
+    let reservation = reserve_paths(&context, options.skip_report)?;
+    let start = Instant::now();
+    let source_config = match write_initial_artifacts(&context, &mut manifest, &mut config) {
+        Ok(value) => value,
+        Err(error) => {
+            reservation.rollback();
+            return Err(error);
+        }
+    };
+    if !reservation.release_marker() {
+        return Err(
+            "reservation marker ownership changed before initial artifacts completed".into(),
+        );
+    }
+    if source_config.get("status").and_then(Value::as_str) == Some("missing") {
+        let message = format!(
+            "missing required source config.yaml: {}; create the checked-in topic config before running a managed experiment",
+            context.topic.join("config.yaml").display()
+        );
+        eprintln!("{message}");
+        set_field(
+            &mut manifest,
+            "preflight_error",
+            as_python(&json!({"kind":"missing_source_config","message":message}))?,
+        )?;
+        startup_event(
+            &context,
+            "preflight_failed",
+            json!({"exit_code":2,"message":message}),
+        )?;
+        finalize_manifest(&context, &mut manifest, start, 2, &patterns)?;
+        return Ok(2);
+    }
+    startup_event(
+        &context,
+        "command_start",
+        json!({"command":context.command,"command_source":context.command_source}),
+    )?;
+    let execution = execute_managed_run(&context, &config)
+        .map_err(|error| format!("{}: {}", error.code, error.message))?;
+    let exit_code = execution.raw_exit_code;
+    startup_event(&context, "command_exit", json!({"exit_code":exit_code}))?;
+    finalize_manifest(&context, &mut manifest, start, exit_code, &patterns)?;
+    Ok(exit_code)
+}
+
+pub fn run(args: &[String]) -> i32 {
+    match parse_options(args) {
+        Ok(ParsedOptions::Help) => {
+            println!("usage: agent-canon {SELECTOR} --topic TOPIC --variant VARIANT [options] -- COMMAND ...");
+            0
+        }
+        Ok(ParsedOptions::Run(options)) => match run_cli(*options) {
+            Ok(code) => code,
+            Err(error) => {
+                eprintln!("{error}");
+                2
+            }
+        },
+        Err(error) => {
+            eprintln!("{error}");
+            2
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    fn reservation_context(root: &Path, run_name: &str) -> RunContext {
+        let identity = ExperimentIdentity::new("demo_topic", "formal", run_name).unwrap();
+        let topic = root.join("experiments/demo_topic");
+        let result = root.join(identity.result_relative_path());
+        let raw = root.join(identity.raw_relative_path());
+        let logs = raw.join("logs");
+        RunContext {
+            root: root.to_path_buf(),
+            identity,
+            topic,
+            paths: RunPaths {
+                result: result.clone(),
+                raw: raw.clone(),
+                logs: logs.clone(),
+                report: root
+                    .join("experiments/demo_topic/report")
+                    .join(format!("{run_name}.md")),
+                manifest: result.join("run_manifest.json"),
+                eval: result.join("eval_manifest.json"),
+                artifacts: result.join("artifact_manifest.json"),
+                command: result.join("command.json"),
+                environment: result.join("environment.json"),
+                snapshot: result.join("source_snapshot.json"),
+                source_config: result.join("config_source.yaml"),
+                config: result.join("config.json"),
+                run_log: result.join("run.log"),
+                startup: logs.join("startup.jsonl"),
+                stdout: logs.join("stdout.log"),
+                stderr: logs.join("stderr.log"),
+            },
+            registry: RegistryContext {
+                path: root.join("experiments/registry.toml"),
+                entry: RegistryValue::Table(Vec::new()),
+                defaults: RegistryValue::Table(Vec::new()),
+                available: false,
+            },
+            command: vec!["python3".into(), "experiments/demo_topic/run.py".into()],
+            command_source: "manual".into(),
+            registered_match: None,
+            created: "2026-01-01T00:00:00Z".into(),
+            branch: Some("main".into()),
+            commit: Some("a".repeat(40)),
+            status: Vec::new(),
+        }
+    }
+
+    fn protocol_request() -> Value {
+        ExperimentIdentity::new("demo_topic", "formal", "managed-run")
+            .unwrap()
+            .to_value()
+            .as_object()
+            .map(|identity| {
+                let mut request = identity.clone();
+                request.extend(json!({"schema":"agentcanon-managed-run/v1","run_id":"managed-run","fingerprint":"a".repeat(64)}).as_object().unwrap().clone());
+                Value::Object(request)
+            })
+            .unwrap()
+    }
+
+    fn protocol_result(request: &Value) -> Value {
+        let pid = 42u64;
+        json!({
+            "schema":"agentcanon-managed-run-result/v1",
+            "identity":request["identity"],
+            "run_id":request["run_id"],
+            "request_fingerprint":request["fingerprint"],
+            "status":"ok",
+            "worker_pid":pid,
+            "worker_pids":[pid],
+            "lifecycle":{
+                "run_id":request["run_id"],
+                "terminal_event_id":"terminal-1",
+                "observed_at_ns":1,
+                "terminal_status":"finished",
+                "total_case_count_at_start":1,
+                "completion_count_before":0,
+                "completion_count_after":1,
+                "scheduler_completed":true,
+                "admitted_case_count":1,
+                "terminal_notification_count":1,
+                "child_process_ids":[pid],
+                "process_group_ids":[pid],
+                "terminal_coverage_complete":true,
+                "requested_case_coverage_complete":true,
+                "quiescence_complete":true,
+                "completion_coverage_complete":true,
+                "descendant_quiescence":"proved",
+                "cleanup_failures":[]
+            },
+            "descendant_quiescence":"proved",
+            "quiescence":{
+                "direct_children_quiescent":true,
+                "descendant_quiescence":"proved",
+                "complete":true,
+                "cleanup_failures":[]
+            },
+            "exit":{"code":0,"error":null},
+            "exit_code":0,
+            "error":null,
+            "completions":[{"case":{},"result":{"status":"ok"}}]
+        })
+    }
+
+    fn validate_fixture(result: &Value) -> AdmissionResult<()> {
+        let root = tempfile::tempdir()
+            .map_err(|error| admission_error("fixture_write_failed", &error.to_string()))?;
+        let path = root.path().join("result.json");
+        std::fs::write(&path, serde_json::to_vec(result).unwrap())
+            .map_err(|error| admission_error("fixture_write_failed", &error.to_string()))?;
+        let request = protocol_request();
+        validate_provider_result(&path, &request, 0).map(|_| ())
+    }
+
+    #[test]
+    fn provider_result_accepts_only_matching_schema_identity_fingerprint_and_quiescence() {
+        let request = protocol_request();
+        let valid = protocol_result(&request);
+        assert!(validate_fixture(&valid).is_ok());
+
+        let mut wrong_schema = valid.clone();
+        wrong_schema["schema"] = json!("agentcanon-managed-run-result/v2");
+        assert_eq!(
+            validate_fixture(&wrong_schema).unwrap_err().code,
+            "admitted_runner_result_schema_mismatch"
+        );
+
+        let mut wrong_fingerprint = valid.clone();
+        wrong_fingerprint["request_fingerprint"] = json!("b".repeat(64));
+        assert_eq!(
+            validate_fixture(&wrong_fingerprint).unwrap_err().code,
+            "admitted_runner_result_fingerprint_mismatch"
+        );
+
+        let mut wrong_identity = valid.clone();
+        wrong_identity["identity"]["run_name"] = json!("other-run");
+        assert_eq!(
+            validate_fixture(&wrong_identity).unwrap_err().code,
+            "admitted_runner_result_identity_mismatch"
+        );
+
+        let mut unproven_cleanup = valid;
+        unproven_cleanup["lifecycle"]["quiescence_complete"] = json!(false);
+        assert_eq!(
+            validate_fixture(&unproven_cleanup).unwrap_err().code,
+            "admitted_runner_descendant_quiescence_unproven"
+        );
+    }
+
+    #[test]
+    fn unproven_provider_quiescence_keeps_reservation_cleanup_blocked() {
+        let mut evidence = ManagedEvidence {
+            reservation_active: true,
+            ..ManagedEvidence::default()
+        };
+        assert!(!cleanup_complete(&evidence));
+        evidence
+            .releases
+            .push(crate::execution_resource_plan::FdReleaseEvidence {
+                component: "gpu-reservation-lock".into(),
+                uuid: Some("GPU-fixture".into()),
+                disposition: "released".into(),
+                close_attempts: 1,
+                error_kind: None,
+                fingerprint: "fixture".into(),
+            });
+        assert!(cleanup_complete(&evidence));
+    }
+
+    #[test]
+    fn owned_empty_reservation_rolls_back_but_nonempty_result_is_preserved() {
+        let temporary = tempfile::tempdir().expect("repository fixture");
+        let root = std::fs::canonicalize(temporary.path()).expect("repository resolves");
+        std::fs::create_dir_all(root.join("experiments/demo_topic"))
+            .expect("topic directory creates");
+        let empty = reservation_context(&root, "empty-run");
+        let receipt = reserve_paths(&empty, false).expect("reservation creates");
+        assert!(empty.paths.result.is_dir());
+        assert!(empty.paths.raw.is_dir());
+        assert!(empty.paths.report.is_file());
+        assert!(receipt.rollback());
+        assert!(!empty.paths.result.exists());
+        assert!(!empty.paths.raw.exists());
+        assert!(!empty.paths.report.exists());
+
+        let nonempty = reservation_context(&root, "nonempty-run");
+        let receipt = reserve_paths(&nonempty, false).expect("second reservation creates");
+        let artifact = nonempty.paths.result.join("partial.json");
+        std::fs::write(&artifact, b"{}\n").expect("partial artifact writes");
+        assert!(!receipt.rollback());
+        assert_eq!(std::fs::read(&artifact).unwrap(), b"{}\n");
+        assert!(nonempty.paths.report.is_file());
+    }
+
+    #[test]
+    fn reservation_rollback_rejects_same_bytes_marker_replacement() {
+        let temporary = tempfile::tempdir().expect("repository fixture");
+        let root = std::fs::canonicalize(temporary.path()).expect("repository resolves");
+        std::fs::create_dir_all(root.join("experiments/demo_topic"))
+            .expect("topic directory creates");
+        let context = reservation_context(&root, "replaced-marker");
+        let receipt = reserve_paths(&context, true).expect("reservation creates");
+        let marker = context.root.join(&receipt.marker);
+        let bytes = std::fs::read(&marker).expect("marker reads");
+        let replacement = marker.with_file_name("replacement-marker.json");
+        std::fs::write(&replacement, bytes).expect("replacement marker writes");
+        std::fs::rename(&replacement, &marker).expect("replacement marker swaps in");
+        use std::os::unix::fs::MetadataExt;
+        assert_ne!(
+            std::fs::metadata(&marker).unwrap().ino(),
+            receipt.marker_id.1
+        );
+        assert!(!receipt.rollback());
+        assert!(context.paths.result.is_dir());
+        assert!(marker.is_file());
+    }
 }

@@ -4,8 +4,8 @@
 # contract test
 # responsibility Tests JIT-canonical IR extraction and backend trace capture.
 # upstream implementation ../../tools/analysis/proof/jit_canonical_ir.py extracts StableHLO-derived IR.
-# upstream implementation ../../tools/experiments/execution/execution_resource_plan.py owns GPU discovery/reservation.
-# upstream implementation ../../tools/experiments/execution/run_managed_experiment.py owns the only managed GPU launch route.
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/execution_resource_plan.rs owns GPU discovery/reservation.
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/managed_experiment.rs owns the only managed GPU launch route.
 # upstream design ../../documents/tools/jit_canonical_ir.md defines the extraction contract.
 # upstream design ../../documents/tools/jit_ir_to_lean.md defines the Lean evidence boundary.
 # @dependency-end

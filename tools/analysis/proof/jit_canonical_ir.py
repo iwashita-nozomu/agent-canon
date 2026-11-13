@@ -3,8 +3,8 @@
 # contract tool
 # responsibility Extracts JIT-canonical operational IR and backend witnesses from a lowered Python root.
 # upstream design ../../../documents/tools/jit_canonical_ir.md defines StableHLO/backend witness extraction.
-# upstream implementation ../../experiments/execution/execution_resource_plan.py owns GPU discovery, reservation, and the frozen admission plan.
-# upstream implementation ../../experiments/execution/run_managed_experiment.py owns the only managed ExperimentRunner entrypoint and applies the admitted environment.
+# upstream implementation ../../runtime/dispatch/agent-canon/src/execution_resource_plan.rs owns GPU discovery, reservation, and the frozen admission plan.
+# upstream implementation ../../runtime/dispatch/agent-canon/src/managed_experiment.rs owns the only managed ExperimentRunner entrypoint and applies the admitted environment.
 # downstream implementation ../../runtime/dispatch/agent-canon/src/jit_ir_to_lean.rs lowers this JSON into Lean defs.
 # downstream implementation ../../../tests/agent_tools/test_jit_canonical_ir.py validates the schema on a tiny JAX root.
 # @dependency-end
@@ -139,7 +139,7 @@ def resolve_cuda_visible_devices(requested: str | None) -> str:
     del requested
     raise SystemExit(
         "gpu_route_blocked=canonical_managed_experiment_runner_required:"
-        "tools/experiments/execution/run_managed_experiment.py"
+        "tools/bin/agent-canon run-managed-experiment"
     )
 
 
