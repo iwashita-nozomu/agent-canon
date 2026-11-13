@@ -59,7 +59,7 @@ const PYTHON_ENTRIES: &[InventoryEntry] = &[
     },
     InventoryEntry {
         kind: "tool",
-        path: "tools/validation/code/oop/python/readability.py",
+        path: "tools/runtime/dispatch/agent-canon/src/oop/python/readability.rs",
         purpose: "Python-specific OOP readability analyzer entrypoint.",
     },
     InventoryEntry {
@@ -107,7 +107,7 @@ const CPP_ENTRIES: &[InventoryEntry] = &[
     },
     InventoryEntry {
         kind: "tool",
-        path: "tools/validation/code/oop/cpp/readability.py",
+        path: "tools/runtime/dispatch/agent-canon/src/oop/cpp/readability.rs",
         purpose: "C++-specific OOP readability analyzer entrypoint.",
     },
     InventoryEntry {

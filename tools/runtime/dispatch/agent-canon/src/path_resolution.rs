@@ -20,7 +20,13 @@ use std::path::{Component, Path, PathBuf};
 /// path normalization and sorting after expansion.
 pub fn python_glob_paths(pattern: &str) -> Result<Vec<PathBuf>, String> {
     let (base, components, directory_only) = split_glob_pattern(pattern)?;
-    Ok(glob_paths(&base, &components, directory_only))
+    Ok(glob_paths(&base, &components, directory_only, false))
+}
+
+/// Expand `Path.glob` patterns, including hidden names and keeping recursive symlink directories unexpanded.
+pub(crate) fn python_pathlib_glob_paths(pattern: &str) -> Result<Vec<PathBuf>, String> {
+    let (base, components, directory_only) = split_glob_pattern(pattern)?;
+    Ok(glob_paths(&base, &components, directory_only, true))
 }
 
 /// Match one filename or component using Python's case-sensitive fnmatch rules.
@@ -149,7 +155,12 @@ fn split_glob_pattern(pattern: &str) -> Result<(PathBuf, Vec<String>, bool), Str
     Ok((base, patterns, directory_only))
 }
 
-fn glob_paths(base: &Path, components: &[String], directory_only: bool) -> Vec<PathBuf> {
+fn glob_paths(
+    base: &Path,
+    components: &[String],
+    directory_only: bool,
+    pathlib: bool,
+) -> Vec<PathBuf> {
     let mut matches = Vec::new();
     let mut pending = vec![(base.to_path_buf(), 0_usize)];
     let mut visited = HashSet::new();
@@ -179,13 +190,18 @@ fn glob_paths(base: &Path, components: &[String], directory_only: bool) -> Vec<P
                 let Some(name) = name.to_str() else {
                     continue;
                 };
-                if name.starts_with('.') {
+                if !pathlib && name.starts_with('.') {
                     continue;
                 }
                 if index + 1 == components.len() {
                     pending.push((path.clone(), index + 1));
                 }
-                if fs::metadata(&path).is_ok_and(|metadata| metadata.is_dir()) {
+                let directory = if pathlib {
+                    entry.file_type().is_ok_and(|kind| kind.is_dir())
+                } else {
+                    fs::metadata(&path).is_ok_and(|metadata| metadata.is_dir())
+                };
+                if directory {
                     pending.push((path, index));
                 }
             }
@@ -219,10 +235,15 @@ fn glob_paths(base: &Path, components: &[String], directory_only: bool) -> Vec<P
             let Some(name_text) = name.to_str() else {
                 continue;
             };
-            if name_text.starts_with('.') && !pattern.starts_with('.') {
+            if !pathlib && name_text.starts_with('.') && !pattern.starts_with('.') {
                 continue;
             }
-            if python_fnmatch_case(name_text, pattern) {
+            let matches = if pathlib && cfg!(windows) {
+                python_fnmatch_case(&name_text.to_lowercase(), &pattern.to_lowercase())
+            } else {
+                python_fnmatch_case(name_text, pattern)
+            };
+            if matches {
                 pending.push((entry.path(), index + 1));
             }
         }

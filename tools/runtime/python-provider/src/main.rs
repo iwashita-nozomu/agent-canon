@@ -96,6 +96,27 @@ fn runtime(py: Python<'_>) -> PyResult<Value> {
     }))
 }
 
+fn module_location(py: Python<'_>, name: &str) -> PyResult<Value> {
+    let spec = py
+        .import("importlib.util")?
+        .getattr("find_spec")?
+        .call1((name,))?;
+    if spec.is_none() {
+        return Ok(json!({"origin":null,"submodule_search_locations":[]}));
+    }
+    let origin = spec.getattr("origin")?.extract::<Option<String>>()?;
+    let locations = spec.getattr("submodule_search_locations")?;
+    let locations = if locations.is_none() {
+        Vec::new()
+    } else {
+        locations
+            .try_iter()?
+            .map(|value| value?.extract::<String>())
+            .collect::<PyResult<Vec<_>>>()?
+    };
+    Ok(json!({"origin":origin,"submodule_search_locations":locations}))
+}
+
 fn pdf(py: Python<'_>, bytes: &[u8]) -> PyResult<Value> {
     let input = py
         .import("io")?
@@ -172,6 +193,7 @@ fn main() {
     }
     let result = match command {
         "runtime" if args.len() == 1 => Python::attach(runtime),
+        "module-location" if args.len() == 2 => Python::attach(|py| module_location(py, &args[1])),
         "pdf-extract" | "html-extract" if args.len() == 1 => {
             let mut bytes = Vec::new();
             if let Err(error) = io::stdin().read_to_end(&mut bytes) {

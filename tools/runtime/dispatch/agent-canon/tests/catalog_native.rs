@@ -26,6 +26,70 @@ use yaml_rust2::YamlLoader;
 
 static TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
+#[test]
+fn point_of_use_handoffs_remain_candidates_until_selected() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .ancestors()
+        .nth(4)
+        .unwrap();
+    let rules = load_skill_route_rules(root).unwrap();
+    let index = build_capability_index(&rules);
+    for (source, target) in [
+        ("cpp-review", "computational-optimization"),
+        ("python-review", "change-review"),
+        ("codex-task-workflow", "integration"),
+    ] {
+        let rule = index.rules_by_skill.get(&source.to_owned()).unwrap();
+        assert!(rule.related_skills.iter().any(|skill| skill == target));
+        assert!(!rule
+            .required_prerequisites
+            .iter()
+            .any(|skill| skill == target));
+        assert!(!rule.successors.iter().any(|skill| skill == target));
+        let selected = vec![source.to_owned()];
+        let (related, candidates) =
+            related_skill_candidates(&selected, &index.rules_by_skill, &selected);
+        assert!(related
+            .get(&source.to_owned())
+            .unwrap()
+            .iter()
+            .any(|skill| skill == target));
+        assert!(candidates.iter().any(|skill| skill == target));
+        let complete = vec![source.to_owned(), target.to_owned()];
+        let (related, candidates) =
+            related_skill_candidates(&selected, &index.rules_by_skill, &complete);
+        assert!(!related
+            .get(&source.to_owned())
+            .is_some_and(|skills| skills.iter().any(|skill| skill == target)));
+        assert!(!candidates.iter().any(|skill| skill == target));
+    }
+}
+
+#[test]
+fn capability_index_owns_independent_catalog_values() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .ancestors()
+        .nth(4)
+        .unwrap();
+    let mut rules = load_skill_route_rules(root).unwrap();
+    let index = build_capability_index(&rules);
+    let rule = rules
+        .iter_mut()
+        .find(|rule| rule.skill == "oop-type-design")
+        .unwrap();
+    let original = rule.clone();
+    rule.related_skills.clear();
+    rule.capabilities.clear();
+    assert_eq!(
+        index.rules_by_skill.get(&"oop-type-design".to_owned()),
+        Some(&original)
+    );
+    assert_eq!(
+        index.routes.get(&"oop_type_design".to_owned()),
+        original.capabilities.first()
+    );
+}
+
 struct TempRoot(PathBuf);
 
 impl TempRoot {

@@ -5,7 +5,7 @@
 # upstream design ../../agents/evals/README.md eval evidence contract
 # upstream implementation ../../tools/runtime/dispatch/agent-canon/src/eval_accumulation_check.rs validates accumulated evidence
 # upstream implementation ../../tools/runtime/dispatch/agent-canon/src/eval_accumulation.rs produces accumulated eval evidence
-# upstream implementation ../../eval/producers/generate_agent_runtime_dashboard.py renders dashboard artifact
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/agent_runtime_dashboard.rs renders dashboard artifact
 # upstream implementation ../../tools/catalog.yaml registers the dashboard producer route
 # upstream implementation ../../bootstrap/host/lifecycle/entrypoint.sh exports dashboard reports from the named runtime volume
 # upstream implementation ../../tools/runtime/source/agent_canon_source_root.py resolves the canonical Graph CLI

@@ -109,11 +109,11 @@ TOOL_GATES = {
         (TOOL_CATALOG_PATH,),
     ),
     "oop_readability": (
-        "tools/validation/code/oop/python/readability.py",
+        "tools/runtime/dispatch/agent-canon/src/oop/python/readability.rs",
         (TOOL_CATALOG_PATH,),
     ),
     "oop_cpp_readability": (
-        "tools/validation/code/oop/cpp/readability.py",
+        "tools/runtime/dispatch/agent-canon/src/oop/cpp/readability.rs",
         (TOOL_CATALOG_PATH,),
     ),
     "behavior_eval": (
@@ -200,7 +200,7 @@ MATHEMATICAL_NECESSITY_MARKERS = {
 REVIEW_ISSUE_ROUTING_MARKERS = {
     "documents/conventions/REVIEW_PROCESS.md": (
         "Review Finding Issue Routing",
-        "issue_sync.py",
+        "agent-canon issue-sync",
         "private packet",
     ),
 }

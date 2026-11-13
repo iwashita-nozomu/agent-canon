@@ -11,7 +11,7 @@ downstream implementation ../../tools/runtime/dispatch/agent-canon/src/entrypoin
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/entrypoint_owner_map.rs structural verification
 downstream implementation ../../tools/validation/semantic/convention/convention_compliance_contracts.toml canonical marker ownership
 downstream implementation ../../tests/agent_tools/test_check_entrypoint_owner_map.py entrypoint regression
-downstream implementation ../../tests/agent_tools/test_point_of_use_skill_routes.py conditional candidate regression
+downstream implementation ../../tools/runtime/dispatch/agent-canon/tests/catalog_native.rs conditional candidate regression
 downstream design ../../agents/canonical/ROOT_DELIVERY.md source delivery detail
 downstream design ../../agents/canonical/ROOT_EXECUTION.md source execution detail
 downstream design ../../agents/canonical/ROOT_IMPLEMENTATION.md source implementation detail
@@ -132,7 +132,7 @@ checker does not infer prose activation, dynamically execute routes, or claim ac
 agent reading. Existing focused tests exercise the minimal source overlay, rejection
 of shared/phase sections added to it, missing/moved directives, wrong or unlinked
 destinations, missing targets, equivalent relative paths, and prior grammar
-rejections. `test_point_of_use_skill_routes.py` uses the production catalog loader
+rejections. `catalog_native.rs` uses the production catalog loader
 and candidate projector to check the three repaired conditional handoffs.
 
 Review checks conditions before branch bodies, complete required behavior, and the
