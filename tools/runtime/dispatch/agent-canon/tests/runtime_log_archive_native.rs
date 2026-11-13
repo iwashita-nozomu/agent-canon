@@ -200,8 +200,13 @@ fn append_and_materialize_bind_the_exact_rollout_or_reject_unsupported_publicati
     );
     if !cfg!(target_os = "linux") {
         assert!(!append.status.success());
-        assert!(String::from_utf8_lossy(&append.stdout).contains("CONTEXT_DISCOVERY_ERROR_CODE=context_publication_failure"));
-        assert!(!fs::read_dir(&active).unwrap().any(|entry| entry.unwrap().file_name().to_string_lossy().starts_with("context_discovery.")));
+        assert!(String::from_utf8_lossy(&append.stdout)
+            .contains("CONTEXT_DISCOVERY_ERROR_CODE=context_publication_failure"));
+        assert!(!fs::read_dir(&active).unwrap().any(|entry| entry
+            .unwrap()
+            .file_name()
+            .to_string_lossy()
+            .starts_with("context_discovery.")));
         return;
     }
     assert!(
