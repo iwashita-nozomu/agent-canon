@@ -11,6 +11,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyInt, PyString};
 use serde_json::{json, Value};
 use std::collections::BTreeSet;
+use std::fs;
 use std::path::{Path, PathBuf};
 
 const CONTRACT_KEYS: &[&str] = &[
@@ -463,4 +464,145 @@ pub fn run(root: PathBuf, trace_path: &str, symbol: &str, format: &str) -> i32 {
             1
         }
     }
+}
+
+/// Extract proof-planning metadata from a Python AST symbol without importing it.
+pub fn proof_source(path: &str, qualname: &str, root: &str) -> PyResult<Value> {
+    Python::attach(|py| {
+        let source_path = Path::new(path);
+        let source = fs::read_to_string(source_path)
+            .map_err(|error| PyValueError::new_err(error.to_string()))?;
+        let ast = py.import("ast")?.into_any();
+        let module = match ast.call_method1("parse", (&source, path)) {
+            Ok(module) => module,
+            Err(error) if error.is_instance_of::<PySyntaxError>(py) => {
+                let message = error.value(py).getattr("msg")?.extract::<String>()?;
+                return Err(PyValueError::new_err(format!(
+                    "Python AST parse failed for {path}: {message}"
+                )));
+            }
+            Err(error) => return Err(error),
+        };
+        let node = match find_symbol(py, &ast, &module, qualname) {
+            Ok(node) => node,
+            Err(error) if error.is_instance_of::<PyValueError>(py) => {
+                return Err(PyValueError::new_err(format!(
+                    "Python AST symbol not found: {qualname}"
+                )));
+            }
+            Err(error) => return Err(error),
+        };
+        let node_type = node.get_type();
+        let node_kind = node_type.getattr("__name__")?.extract::<String>()?;
+        let unparse = ast.getattr("unparse")?;
+        let compact_unparse = |value: &Bound<'_, PyAny>| -> PyResult<String> {
+            compact(py, &unparse.call1((value,))?.extract::<String>()?)
+        };
+        let signature = match node_kind.as_str() {
+            "ClassDef" => {
+                let bases = sequence(py, &node.getattr("bases")?)?
+                    .iter()
+                    .map(compact_unparse)
+                    .collect::<PyResult<Vec<_>>>()?
+                    .join(", ");
+                let suffix = if bases.is_empty() {
+                    String::new()
+                } else {
+                    format!("({bases})")
+                };
+                format!(
+                    "class {}{suffix}",
+                    node.getattr("name")?.extract::<String>()?
+                )
+            }
+            "FunctionDef" | "AsyncFunctionDef" => {
+                let prefix = if node_kind == "AsyncFunctionDef" {
+                    "async def"
+                } else {
+                    "def"
+                };
+                let name = node.getattr("name")?.extract::<String>()?;
+                let arguments = compact_unparse(&node.getattr("args")?.into_any())?;
+                let returns = node.getattr("returns")?;
+                let annotation = if returns.is_none() {
+                    String::new()
+                } else {
+                    format!(" -> {}", compact_unparse(&returns)?)
+                };
+                format!("{prefix} {name}({arguments}){annotation}")
+            }
+            _ => {
+                return Err(PyValueError::new_err(format!(
+                    "unsupported Python AST symbol: {qualname}"
+                )))
+            }
+        };
+        let mut return_expressions = Vec::new();
+        let mut branch_count = 0usize;
+        for inner in ast.call_method1("walk", (&node,))?.try_iter()? {
+            let inner = inner?;
+            let is_return = inner.is_instance(&ast.getattr("Return")?)?;
+            if is_return {
+                let value = inner.getattr("value")?;
+                return_expressions.push(if value.is_none() {
+                    "None".to_owned()
+                } else {
+                    compact_unparse(&value)?
+                });
+            }
+            for kind in [
+                "If", "For", "AsyncFor", "While", "Try", "Match", "BoolOp", "IfExp",
+            ] {
+                if inner.is_instance(&ast.getattr(kind)?)? {
+                    branch_count += 1;
+                    break;
+                }
+            }
+        }
+        return_expressions.truncate(8);
+        let get_docstring = ast.getattr("get_docstring")?;
+        let kwargs = PyDict::new(py);
+        kwargs.set_item("clean", true)?;
+        let docstring = get_docstring
+            .call((node.clone(),), Some(&kwargs))?
+            .extract::<Option<String>>()?;
+        let lineno = node.getattr("lineno")?.extract::<usize>()?;
+        let end_lineno = node.getattr("end_lineno")?.extract::<Option<usize>>()?;
+        let pathlib = py.import("pathlib")?.getattr("Path")?;
+        let path_object = pathlib.call1((path,))?;
+        let root_object = pathlib.call1((root,))?;
+        let resolved_path = path_object.call_method0("resolve")?;
+        let resolved_root = root_object.call_method0("resolve")?;
+        let relative_path = match resolved_path.call_method1("relative_to", (&resolved_root,)) {
+            Ok(value) => value.call_method0("as_posix")?.extract::<String>()?,
+            Err(_) => path.to_owned(),
+        };
+        let mut proof_obligations = vec![
+            format!("Formalize Python AST source without importing or executing: {relative_path}::{qualname}"),
+            format!("Formalize extracted signature: {signature}"),
+        ];
+        if !return_expressions.is_empty() {
+            proof_obligations.push(format!(
+                "Prove or encode extracted return expressions: {}",
+                return_expressions.join("; ")
+            ));
+        }
+        if branch_count > 0 {
+            proof_obligations.push(format!(
+                "Split proof obligations across {branch_count} AST branch node(s)."
+            ));
+        }
+        Ok(json!({
+            "path": relative_path,
+            "qualname": qualname,
+            "node_kind": node_kind,
+            "signature": signature,
+            "docstring": docstring,
+            "lineno": lineno,
+            "end_lineno": end_lineno,
+            "branch_count": branch_count,
+            "return_expressions": return_expressions,
+            "proof_obligations": proof_obligations
+        }))
+    })
 }
