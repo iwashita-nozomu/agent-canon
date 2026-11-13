@@ -918,7 +918,7 @@ def test_container_control_rejects_unallowlisted_structured_tool_environment(
     request = {
         "schema": "agent-canon.tool-exec-request.v1",
         "tool_id": "route",
-        "argv": ["python3", "tools/agent/orchestration/route.py"],
+        "argv": ["tools/bin/agent-canon", "route"],
         "child_args": ["--help"],
         "source_root": str(REPOSITORY_ROOT),
         "cwd": str(target),

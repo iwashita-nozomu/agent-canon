@@ -151,7 +151,7 @@ const GITHUB_GATE_TEMPLATES: &[GateTemplate] = &[GateTemplate {
 }];
 const HOOK_RUNTIME_GATE_TEMPLATES: &[GateTemplate] = &[GateTemplate {
     gate: "codex_hook_runtime_alignment",
-    command_template: "python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py && python3 -m pytest tests/agent_tools/test_codex_hooks.py -q",
+    command_template: "tools/bin/agent-canon check-agent-runtime-alignment && python3 -m pytest tests/agent_tools/test_codex_hooks.py -q",
     handoff: "include hook wiring, quiet-pass behavior, and runtime alignment evidence",
 }];
 const AGENT_PROTOCOL_GATE_TEMPLATES: &[GateTemplate] = &[GateTemplate {

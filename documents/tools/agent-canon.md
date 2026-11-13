@@ -23,7 +23,7 @@ stdout, which the host writes to its same-directory temporary file before the
 atomic replacement. This helper does not create a separate host configuration
 route.
 Deterministic prompt-to-skill routing is owned by
-`python3 tools/agent/orchestration/route.py --prompt`.
+`tools/bin/agent-canon route --prompt`.
 
 Use `tools/bin/agent-canon docs -h` as the option contract before opening
 implementation files. The help output lists commands, shared options, and
@@ -36,8 +36,8 @@ examples in a compact text block.
 - Main path: Commands and Legacy Entrypoints.
 - Read this before using `agent-canon docs` or deciding whether a legacy
   Python entrypoint should forward to the Rust wrapper.
-- Boundary: prompt-to-skill routing remains owned by
-  `python3 tools/agent/orchestration/route.py --prompt`.
+- Boundary: prompt-to-skill routing is owned by
+  `tools/bin/agent-canon route --prompt`.
 
 ## Commands
 
@@ -51,9 +51,22 @@ tools/bin/agent-canon docs check-bootstrap [--root <path>] [--static-seed-consum
 tools/bin/agent-canon template-bundle export --source-root <root> --source-ref <commit-ish> --profile static-seed --output <directory>
 tools/bin/agent-canon template-bundle committed-tree --source-root <root> --source-ref <commit-ish>
 tools/bin/agent-canon test-design check <test-paths...>
+tools/bin/agent-canon render-code-template --root <agent-canon-source> <template-path>
+tools/bin/agent-canon run-accumulated-agent-evals --root <root> --runtime-root <external-root> --run-id <id>
+tools/bin/agent-canon check-agent-runtime-alignment --root <root>
+tools/bin/agent-canon evaluate-codex-agent-roles --root <root> --generate-role-views [--projection live|consumer-static]
+tools/bin/agent-canon evaluate-codex-agent-roles --root <root> --check-role-views [--projection live|consumer-static]
+tools/bin/agent-canon skill-shim-materializer {check,materialize,readback} --root <root> --all
 agent-canon codex-config --source-config <read-only-source-config>
-python3 tools/agent/orchestration/route.py --prompt "<request>" --mode routing-only --format json
+tools/bin/agent-canon route --prompt "<request>" --mode routing-only --format json
 ```
+
+`render-code-template` writes the selected canonical template bytes to stdout;
+the caller selects a destination. `run-accumulated-agent-evals` runs the
+registered native role and workflow producers and captures their output under
+the external runtime owner. `skill-shim-materializer` uses the catalog-derived
+native v3 owner for checks, external readback, or capability-scoped source
+materialization.
 
 `check` invokes the configured `markdownlint-cli2` and offline `lychee` commands
 for the selected Markdown paths, parses each file with Quarto's embedded
@@ -92,7 +105,7 @@ mock/output/prose assertions, time coupling, unseeded randomness, and
 property/metamorphic candidates. Its detailed contract lives in
 [test_design.md](test_design.md).
 
-`route.py --prompt` returns the full selected `SKILLS`, `ACTIVE_SKILLS` for the
+`agent-canon route --prompt` returns the full selected `SKILLS`, `ACTIVE_SKILLS` for the
 current stage, and `DEFERRED_SKILLS` for dynamic wave triggers. Use it before
 broad skill-selection prose or subagent fan-out.
 

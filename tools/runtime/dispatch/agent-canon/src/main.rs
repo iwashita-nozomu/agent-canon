@@ -119,8 +119,10 @@ Usage: agent-canon <command> [arguments]
 
 Commands:
   evaluate-codex-agent-roles [--root ROOT] [--runtime-root PATH] [--accumulate] [--format text|json]
+  check-agent-runtime-alignment [--root ROOT] [--format text|json]
   evaluate-workflow-selection [--root ROOT] [--manifest PATH] [--accumulate] [--runtime-root PATH]
   check-skill-tool-invocation-graph [--root ROOT]
+  skill-dependency-map <check|graph> [options]
   knowledge|k <search|read|add|status|sync|capture>
   feedback|f <add|status|sync|capture>
   graph <build|status|query|context> [options]
@@ -152,6 +154,7 @@ Commands:
   tool-catalog [--root <repo-root>] [--format text|json|markdown]
   tool <run|inventory|rust-cli> [options]
   capability-route [--capability ID] [--mode routing-only|repo-changing] [--format text|json|markdown] [--root PATH]
+  route [--area AREA] [--prompt TEXT|--prompt-file PATH] [options]
   tool-drift [--root <repo-root>] [--contract NAME]... [--format text|json]
   tool-proof-coverage [--root <repo-root>] [--format text|json|markdown] [--tool-id ID]... [--require-lean-verified]
   theorem-graph-board --graph <path> [--out <path>] [--format json|markdown] [--fail-on-open] [--fail-on-unknown]
@@ -176,6 +179,10 @@ Commands:
   check-agent-canon-log-policy [--input PATH|--remote URL] [--commit SHA]
   wiki-publish --wiki-root PATH --source-root PATH --source-commit SHA [options]
   orphan-lifecycle <inventory|authorize-cleanup> [options]
+  render-code-template [--root SOURCE_ROOT] TEMPLATE
+  skill-shim-materializer <check|materialize|readback> [options]
+  skill-shim-evaluation [options]
+  run-accumulated-agent-evals [options]
   update-latest-result RESULT_ROOT --variant VARIANT [--result-dir PATH]
   parent-repository-audit <list|check> --root ROOT [options]
   html-artifact-access REPORT_PATH [options]
@@ -285,6 +292,18 @@ fn main() {
     if args.len() >= 2 && args[1] == "save-experiment-result-annex" {
         std::process::exit(agent_canon::annex_retention::run(&args[2..]));
     }
+    if args.len() >= 2 && args[1] == "render-code-template" {
+        std::process::exit(agent_canon::code_template_rendering::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "skill-shim-materializer" {
+        std::process::exit(catalog::skill_materialization::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "skill-shim-evaluation" {
+        std::process::exit(agent_canon::skill_shim_evaluation::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "run-accumulated-agent-evals" {
+        std::process::exit(agent_canon::eval_accumulation::run(&args[2..]));
+    }
     if args.len() >= 2 && args[1] == "update-latest-result" {
         std::process::exit(agent_canon::latest_result::run(&args[2..]));
     }
@@ -300,6 +319,9 @@ fn main() {
     if args.len() >= 2 && args[1] == "check-skill-tool-invocation-graph" {
         std::process::exit(catalog::skill_dependency_graph::run(&args[2..]));
     }
+    if args.len() >= 2 && args[1] == "skill-dependency-map" {
+        std::process::exit(catalog::skill_dependency_graph::run_graph_cli(&args[2..]));
+    }
 
     if args.len() >= 2 && args[1] == "tool" {
         std::process::exit(tool_dispatch::run_cli(&args[2..]));
@@ -307,6 +329,9 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "capability-route" {
         std::process::exit(catalog::skill_routes::run_capability_route(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "route" {
+        std::process::exit(catalog::skill_routes::run_task_route(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "check-github-workflows" {
@@ -429,6 +454,9 @@ fn main() {
     }
     if args.len() >= 2 && args[1] == agent_canon::codex_agent_role_eval::SELECTOR {
         std::process::exit(agent_canon::codex_agent_role_eval::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "check-agent-runtime-alignment" {
+        std::process::exit(agent_canon::runtime_alignment::run(&args[2..]));
     }
     if args.len() >= 2 && args[1] == agent_canon::server_readiness::SELECTOR {
         std::process::exit(agent_canon::server_readiness::run(&args[2..]));

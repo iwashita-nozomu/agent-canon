@@ -12,8 +12,10 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools" / "agent_tools"))
+from tools.agent.orchestration.tool_calls import (
+    build_issue_receipt_stage_command,  # noqa: E402
+)
 from tools.runtime.archive.runtime_log_paths import repo_log_key  # noqa: E402
-from tools.agent.orchestration.tool_calls import materialize_issue_worker_tool_call  # noqa: E402
 
 LIVE_DOCKER = os.environ.get("AGENT_CANON_LIVE_DOCKER") == "1"
 
@@ -24,7 +26,9 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def run_bootstrap(source: Path, control: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
+def run_bootstrap(
+    source: Path, control: Path, *arguments: str
+) -> subprocess.CompletedProcess[str]:
     """Run the source checkout's host bootstrap with one isolated control root."""
     environment = os.environ.copy()
     environment["AGENT_CANON_ALLOW_BUILD"] = "1"
@@ -47,7 +51,9 @@ def run_bootstrap(source: Path, control: Path, *arguments: str) -> subprocess.Co
 
 def git(*arguments: str, cwd: Path) -> None:
     """Run one test-owned Git setup command."""
-    subprocess.run(["git", *arguments], cwd=cwd, check=True, capture_output=True, text=True)
+    subprocess.run(
+        ["git", *arguments], cwd=cwd, check=True, capture_output=True, text=True
+    )
 
 
 def test_resident_dashboard_route_uses_target_and_private_archive(
@@ -67,7 +73,13 @@ def test_resident_dashboard_route_uses_target_and_private_archive(
         capture_output=True,
         text=True,
     )
-    git("remote", "set-url", "origin", "https://github.com/iwashita-nozomu/agent-canon.git", cwd=source)
+    git(
+        "remote",
+        "set-url",
+        "origin",
+        "https://github.com/iwashita-nozomu/agent-canon.git",
+        cwd=source,
+    )
     target.mkdir()
     control.mkdir()
     private_log.mkdir()
@@ -102,7 +114,13 @@ def test_resident_dashboard_route_uses_target_and_private_archive(
         "target marker",
         cwd=target,
     )
-    git("remote", "add", "origin", "https://github.com/example/live-target.git", cwd=target)
+    git(
+        "remote",
+        "add",
+        "origin",
+        "https://github.com/example/live-target.git",
+        cwd=target,
+    )
     log_dir = private_log / "hook-runs" / repo_log_key(target) / "live"
     log_dir.mkdir(parents=True)
     (log_dir / "behavior_events.jsonl").write_text(
@@ -152,7 +170,16 @@ def test_resident_dashboard_route_uses_target_and_private_archive(
     try:
         installed = run_bootstrap(source, control, "install")
         assert installed.returncode == 0, installed.stdout + installed.stderr
-        registered = run_bootstrap(source, control, "target", "add", "--root", str(target), "--mode", "read-only")
+        registered = run_bootstrap(
+            source,
+            control,
+            "target",
+            "add",
+            "--root",
+            str(target),
+            "--mode",
+            "read-only",
+        )
         assert registered.returncode == 0, registered.stdout + registered.stderr
         runtime = control / "runtime" / "container-state"
         target_head = subprocess.run(
@@ -168,35 +195,63 @@ def test_resident_dashboard_route_uses_target_and_private_archive(
             "head": target_head,
             "remote": "example/live-target",
         }
-        tool_call = materialize_issue_worker_tool_call(
-            handoff={
-                "repository": "example/live-target",
-                "owner": "issue-worker",
-                "fix": "stage body-free receipt",
-            },
-            publisher_agent_id="publisher-live",
-            checkout_repository="example/live-target",
-            checkout_identity=checkout_identity,
-            runtime_root=str(control / "runtime"),
-            agentcanon_source_root=str(source),
-            target_root=str(target),
-            control_parent_root=str(control),
+        command_common = {
+            "repository": "example/live-target",
+            "runtime_root": str(control / "runtime"),
+            "agentcanon_source_root": str(source),
+            "target_root": str(target),
+            "control_parent_root": str(control),
+            "checkout_identity": checkout_identity,
+            "bootstrap": str(source / "bootstrap.sh"),
+        }
+        materialized_preflight = build_issue_receipt_stage_command(
+            **command_common,
+            execution="run",
+            preflight=True,
         )
-        tool_arguments = tool_call["arguments"]
-        assert tool_arguments["agentcanon_source_root"] == str(source)
-        assert tool_arguments["target_root"] == str(target)
-        materialized_preflight = tuple(tool_arguments["receipt_preflight_command"])
-        materialized_stage = tuple(tool_arguments["receipt_stage_command"])
-        assert materialized_preflight[materialized_preflight.index("--root") + 1] == str(target)
+        materialized_stage = build_issue_receipt_stage_command(
+            **command_common,
+            number="<issue-number>",
+            url="<issue-url>",
+            state="<issue-state>",
+            action="<issue-action>",
+            execution="run",
+        )
+        assert materialized_preflight[
+            materialized_preflight.index("--root") + 1
+        ] == str(target)
         assert materialized_stage[materialized_stage.index("--root") + 1] == str(target)
-        assert "--runtime-root" not in materialized_preflight[materialized_preflight.index("--") + 1 :]
-        assert "--checkout-root" not in materialized_preflight[materialized_preflight.index("--") + 1 :]
-        assert "--runtime-root" not in materialized_stage[materialized_stage.index("--") + 1 :]
-        assert "--checkout-root" not in materialized_stage[materialized_stage.index("--") + 1 :]
-        assert str(control / "runtime") not in materialized_preflight[materialized_preflight.index("--") + 1 :]
-        assert str(target) not in materialized_preflight[materialized_preflight.index("--") + 1 :]
-        assert str(control / "runtime") not in materialized_stage[materialized_stage.index("--") + 1 :]
-        assert str(target) not in materialized_stage[materialized_stage.index("--") + 1 :]
+        assert (
+            "--runtime-root"
+            not in materialized_preflight[materialized_preflight.index("--") + 1 :]
+        )
+        assert (
+            "--checkout-root"
+            not in materialized_preflight[materialized_preflight.index("--") + 1 :]
+        )
+        assert (
+            "--runtime-root"
+            not in materialized_stage[materialized_stage.index("--") + 1 :]
+        )
+        assert (
+            "--checkout-root"
+            not in materialized_stage[materialized_stage.index("--") + 1 :]
+        )
+        assert (
+            str(control / "runtime")
+            not in materialized_preflight[materialized_preflight.index("--") + 1 :]
+        )
+        assert (
+            str(target)
+            not in materialized_preflight[materialized_preflight.index("--") + 1 :]
+        )
+        assert (
+            str(control / "runtime")
+            not in materialized_stage[materialized_stage.index("--") + 1 :]
+        )
+        assert (
+            str(target) not in materialized_stage[materialized_stage.index("--") + 1 :]
+        )
         command_environment = os.environ.copy()
         command_environment["AGENT_CANON_ALLOW_BUILD"] = "1"
         receipt_preflight = subprocess.run(
@@ -229,23 +284,35 @@ def test_resident_dashboard_route_uses_target_and_private_archive(
             timeout=900,
             env=command_environment,
         )
-        assert receipt_stage.returncode == 0, receipt_stage.stdout + receipt_stage.stderr
-        assert not (runtime / "spool" / "private-feedback" / "sync-request.json").exists()
+        assert receipt_stage.returncode == 0, (
+            receipt_stage.stdout + receipt_stage.stderr
+        )
+        assert not (
+            runtime / "spool" / "private-feedback" / "sync-request.json"
+        ).exists()
         archive_receipt = (
-            private_log / "feedback" / "issue-packets" / "published"
-            / "example" / "live-target" / "1.json"
+            private_log
+            / "feedback"
+            / "issue-packets"
+            / "published"
+            / "example"
+            / "live-target"
+            / "1.json"
         )
         assert archive_receipt.is_file()
         receipt_text = archive_receipt.read_text(encoding="utf-8")
         assert "body" not in receipt_text
         assert "private" not in receipt_text
-        assert subprocess.run(
-            ["git", "status", "--porcelain"],
-            cwd=private_log,
-            check=True,
-            capture_output=True,
-            text=True,
-        ).stdout == ""
+        assert (
+            subprocess.run(
+                ["git", "status", "--porcelain"],
+                cwd=private_log,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout
+            == ""
+        )
         dashboard = run_bootstrap(
             source,
             control,
@@ -265,22 +332,40 @@ def test_resident_dashboard_route_uses_target_and_private_archive(
             "reports/live-dashboard/api.json",
         )
         assert dashboard.returncode == 0, dashboard.stdout + dashboard.stderr
-        api = json.loads((runtime / "reports/live-dashboard/api.json").read_text(encoding="utf-8"))
+        api = json.loads(
+            (runtime / "reports/live-dashboard/api.json").read_text(encoding="utf-8")
+        )
         assert api["root"].startswith("/targets/")
         assert api["hook_files"] == 1
         assert api["hook_entries"] == 1
         assert (runtime / "reports/live-dashboard/dashboard.md").is_file()
         assert (runtime / "reports/live-dashboard/compact.md").is_file()
-        dashboard_text = (runtime / "reports/live-dashboard/dashboard.md").read_text(encoding="utf-8")
+        dashboard_text = (runtime / "reports/live-dashboard/dashboard.md").read_text(
+            encoding="utf-8"
+        )
         assert "/var/lib/agent-canon/private-log" in dashboard_text
         assert not (target / "reports").exists()
         assert not (source / "reports/live-dashboard").exists()
-        assert subprocess.run(
-            ["git", "status", "--porcelain"], cwd=target, check=True, capture_output=True, text=True
-        ).stdout == target_status_before
-        assert subprocess.run(
-            ["git", "status", "--porcelain"], cwd=source, check=True, capture_output=True, text=True
-        ).stdout == source_status_before
+        assert (
+            subprocess.run(
+                ["git", "status", "--porcelain"],
+                cwd=target,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout
+            == target_status_before
+        )
+        assert (
+            subprocess.run(
+                ["git", "status", "--porcelain"],
+                cwd=source,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout
+            == source_status_before
+        )
     finally:
         removed = run_bootstrap(source, control, "uninstall")
         assert removed.returncode == 0, removed.stdout + removed.stderr

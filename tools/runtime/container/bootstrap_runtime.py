@@ -2395,8 +2395,8 @@ class BootstrapRuntime:
                     f"{container_runtime}/tasks/{task_id}/{exchange_nonce}"
                 )
                 command = [
-                    "python3",
-                    f"{TOOL_SOURCE_DESTINATION}/eval/producers/run_accumulated_agent_evals.py",
+                    NATIVE_CLI_DESTINATION,
+                    "run-accumulated-agent-evals",
                     "--root",
                     canon_root,
                     "--target-root",

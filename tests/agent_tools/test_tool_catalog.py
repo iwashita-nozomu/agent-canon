@@ -83,10 +83,10 @@ class CheckToolCatalogTest(unittest.TestCase):
             == "tools/runtime/dispatch/agent-canon/src/codex_agent_role_eval/mod.rs"
         )
         wrapper = (
-            PROJECT_ROOT / "eval" / "producers" / "run_accumulated_agent_evals.py"
+            PROJECT_ROOT / "tools/runtime/dispatch/agent-canon/src/eval_accumulation.rs"
         ).read_text(encoding="utf-8")
         self.assertTrue(role_eval["default_wiring"]["pr_check"])
-        self.assertIn(Path(role_eval["path"]).name, wrapper)
+        self.assertIn('"evaluate-codex-agent-roles"', wrapper)
 
     def test_gpu_admission_route(self) -> None:
         """The catalog exposes only the canonical managed GPU admission entrypoint."""
@@ -568,7 +568,7 @@ class CheckToolCatalogTest(unittest.TestCase):
             "documents/tools/repo-local-tool-imports.md",
             "documents/tools/tool_catalog.md",
             "tools/validation/ci/checks/check_agent_canon_pr.sh",
-            "eval/producers/run_accumulated_agent_evals.py",
+            "tools/runtime/dispatch/agent-canon/src/eval_accumulation.rs",
             "agents/skills/pr-processing.md",
             ".github/PULL_REQUEST_TEMPLATE.md",
             ".github/PULL_REQUEST_TEMPLATE/agent_canon.md",

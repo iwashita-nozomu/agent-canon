@@ -53,6 +53,18 @@ runtime_schema:
   # one-file catalog entry below. Keeping this inventory here prevents the
   # dispatcher from silently dropping a first-class Rust route.
   rust_public_commands:
+    - id: rust-skill-shim-evaluation
+      selector: skill-shim-evaluation
+      path: tools/runtime/dispatch/agent-canon/src/skill_shim_evaluation.rs
+    - id: rust-skill-shim-materializer
+      selector: skill-shim-materializer
+      path: tools/runtime/dispatch/agent-canon/src/catalog/skill_materialization.rs
+    - id: rust-render-code-template
+      selector: render-code-template
+      path: tools/runtime/dispatch/agent-canon/src/code_template_rendering.rs
+    - id: rust-skill-dependency-map
+      selector: skill-dependency-map
+      path: tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs
     - id: rust-check-agent-canon-log-policy
       selector: check-agent-canon-log-policy
       path: tools/runtime/dispatch/agent-canon/src/log_policy.rs
@@ -1053,12 +1065,12 @@ entries:
 
   - id: run-accumulated-agent-evals
     summary: Runs registered AgentCanon eval producers with append-only accumulation before archive validation.
-    path: eval/producers/run_accumulated_agent_evals.py
+    path: tools/runtime/dispatch/agent-canon/src/eval_accumulation.rs
     family: agent_tools
     role: runner
     status: canonical
-    command: python3 eval/producers/run_accumulated_agent_evals.py --run-id <run-id>
-    dispatch: {argv: ["python3", "eval/producers/run_accumulated_agent_evals.py", "--run-id", "<run-id>"]}
+    command: tools/bin/agent-canon run-accumulated-agent-evals --run-id <run-id>
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "run-accumulated-agent-evals"]}
     writes: true
     default_wiring:
       ci: true
@@ -1398,15 +1410,15 @@ entries:
   - id: route
     public: true
     summary: Maps long proposed tool/skill names to short task-routing areas and owns deterministic prompt skill routing.
-    path: tools/agent/orchestration/route.py
+    path: tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs
     family: agent_tools
     role: workflow
     status: canonical
-    command: python3 tools/agent/orchestration/route.py
+    command: tools/bin/agent-canon route
     writes: false
     dispatch:
-      runtime: python
-      argv: [python3, tools/agent/orchestration/route.py]
+      runtime: rust
+      argv: [tools/bin/agent-canon, route]
       execution_plane: tool-container
       cwd: target-root
       env: allowlisted
@@ -1832,12 +1844,12 @@ entries:
 
   - id: check-agent-runtime-alignment
     summary: Verifies runtime entrypoints and agent config mirrors stay aligned.
-    path: tools/validation/semantic/runtime/check_agent_runtime_alignment.py
+    path: tools/runtime/dispatch/agent-canon/src/runtime_alignment.rs
     family: agent_tools
     role: checker
     status: canonical
-    command: python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py
-    dispatch: {argv: ["python3", "tools/validation/semantic/runtime/check_agent_runtime_alignment.py"]}
+    command: tools/bin/agent-canon check-agent-runtime-alignment
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "check-agent-runtime-alignment"]}
     writes: false
     default_wiring:
       ci: false

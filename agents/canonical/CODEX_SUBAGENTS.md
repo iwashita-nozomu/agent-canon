@@ -20,7 +20,7 @@ downstream implementation ../../.codex/agents/oop_readability_reviewer.toml OOP 
 shared workflow は [agents/canonical/CODEX_WORKFLOW.md](CODEX_WORKFLOW.md) に置き、この文書は inventory、mapping、activation に寄せます。
 permanent team role ownership、required output、write policy は `agents/agents_config.json` を正本にします。
 role profile/instruction authority は `agents/model_profiles.toml` と
-`tools/agent/orchestration/model_profile_registry.py` が所有し、`.codex/agents/*.toml`
+`tools/bin/agent-canon evaluate-codex-agent-roles` が所有し、`.codex/agents/*.toml`
 は closed generated readback view です。
 project-level subagent registration と runtime limits は `.codex/config.toml` の `[agents]` と `[agents.<name>]` を正本にします。
 prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` を先に通し、
@@ -543,7 +543,7 @@ writer target は短命な handoff 値であり、claim file、PID、expiry、da
 `agents/model_profiles.toml` が canonical typed profile authority です。
 `agents/execution_topology.json` は logical role と physical execution profile の
 分離、および direct-Luna default を所有します。
-`tools/agent/orchestration/model_profile_registry.py` は closed generated views として
+`tools/bin/agent-canon evaluate-codex-agent-roles` は closed generated views として
 `.codex/agents/*.toml` と `agents/agents_config.json` を materialize します。
 generated views は projection digest / readback surfaces であり、手動で編集しては
 なりません。model / reasoning の変更は registry / team / runtime source から始め、
@@ -602,7 +602,7 @@ runtime は再生成後に restart し、readback で反映を確認します。
 Role inventory and selected review-pack changes use the existing alignment checker:
 
 ```bash
-python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py
+tools/bin/agent-canon check-agent-runtime-alignment
 ```
 
 This validates role references and model/profile projections independently of task progress files.

@@ -165,11 +165,22 @@ impl SourceMutationCapability {
 
     /// Atomically replace one approved UTF-8 source file without following a path symlink.
     pub fn atomic_write_text(&self, path: &Path, text: &str, mode: u32) -> Result<()> {
-        self.atomic_write_bytes(path, text.as_bytes(), mode)
+        self.atomic_write_text_with_parents(path, text, mode, false)
+    }
+
+    /// Create missing parents beneath the same exact source capability.
+    pub fn atomic_write_text_with_parents(
+        &self,
+        path: &Path,
+        text: &str,
+        mode: u32,
+        create_parents: bool,
+    ) -> Result<()> {
+        self.write_with(path, mode, true, create_parents, |file| file.write_all(text.as_bytes()))
     }
 
     pub fn atomic_write_bytes(&self, path: &Path, bytes: &[u8], mode: u32) -> Result<()> {
-        self.write_with(path, mode, true, |file| file.write_all(bytes))
+        self.write_with(path, mode, true, false, |file| file.write_all(bytes))
     }
 
     /// Stream a new file without replacing a pre-existing directory entry.
@@ -179,7 +190,7 @@ impl SourceMutationCapability {
         mode: u32,
         writer: impl FnOnce(&mut cap_std::fs::File) -> io::Result<()>,
     ) -> Result<()> {
-        self.write_with(path, mode, false, writer)
+        self.write_with(path, mode, false, false, writer)
     }
 
     fn write_with(
@@ -187,6 +198,7 @@ impl SourceMutationCapability {
         path: &Path,
         mode: u32,
         replace: bool,
+        create_parents: bool,
         writer: impl FnOnce(&mut cap_std::fs::File) -> io::Result<()>,
     ) -> Result<()> {
         use std::sync::atomic::{AtomicU64, Ordering};
@@ -208,12 +220,14 @@ impl SourceMutationCapability {
             )));
         };
         let (directory, target_name) =
-            open_file_parent_nofollow(&self.source_root, relative, false).map_err(|error| {
-                SourceMutationError::new(format!(
-                    "cannot open mutation parent for {}: {error}",
-                    path.display()
-                ))
-            })?;
+            open_file_parent_nofollow(&self.source_root, relative, create_parents).map_err(
+                |error| {
+                    SourceMutationError::new(format!(
+                        "cannot open mutation parent for {}: {error}",
+                        path.display()
+                    ))
+                },
+            )?;
         match directory.symlink_metadata(name) {
             Ok(metadata) if metadata.is_file() && replace => {}
             Ok(metadata) if metadata.is_file() => {

@@ -4,7 +4,7 @@
 # responsibility Owns the external AgentCanon runtime artifact boundary and typed root capabilities.
 # upstream design ../../../documents/design/agent-canon-bootstrap-tool-runtime.md runtime-root ownership and side-effect boundary
 # downstream implementation ../archive/runtime_log_paths.py resolves external runtime paths
-# downstream implementation ../../../eval/producers/run_accumulated_agent_evals.py propagates runtime capabilities to producers
+# downstream implementation ../dispatch/agent-canon/src/eval_accumulation.rs propagates runtime capabilities to producers
 # downstream implementation ../../../tests/agent_tools/test_runtime_artifacts.py validates source exclusion and atomic writes
 # @dependency-end
 """Resolve and publish AgentCanon runtime artifacts outside source trees.
