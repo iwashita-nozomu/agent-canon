@@ -29,11 +29,6 @@ NATIVE = (
     or os.environ.get("AGENT_CANON_CLI")
     or str(PROJECT_ROOT / "tools" / "bin" / "agent-canon")
 )
-from tools.runtime.lifecycle.update_lifecycle_contract import (  # noqa: E402
-    materialize_publication_readback_receipt,
-    pull_request_branch_table,
-)
-
 CHECKOUT_MODE_LINKED = "linked-worktree"
 CHECKOUT_MODE_INDEPENDENT = "independent-clone"
 MARKER_PREFIX = "repository-topic-clone"
@@ -419,136 +414,6 @@ def init_workspace_parent(
 
 def init_file(path: Path, filename: str, content: str) -> None:
     path.write_text(content, encoding="utf-8")
-
-
-def lifecycle_binding(candidate_sha: str, candidate_tree: str) -> dict[str, object]:
-    return {
-        "transaction_id": "tx:" + "1" * 64,
-        "snapshot_id": "snapshot:" + "2" * 64,
-        "candidate_sha": candidate_sha,
-        "tree_sha": candidate_tree,
-        "input_digest": "sha256:" + "5" * 64,
-        "tool_id": "publication-integrator",
-        "tool_version": "test.v1",
-        "evidence_ref": "evidence:" + "6" * 64,
-        "evidence_digest": "sha256:" + "7" * 64,
-        "timing": {
-            "started_at": "2026-07-18T00:00:00Z",
-            "finished_at": "2026-07-18T00:00:00Z",
-            "last_attempt_at": "2026-07-18T00:00:00Z",
-            "duration_ms": 0,
-            "attempt": 1,
-            "replayed": False,
-        },
-    }
-
-
-def publication_artifacts(
-    clone: Path,
-    *,
-    branch: str,
-    repo_name: str,
-    state: str,
-    merge_sha: str | None = None,
-    merge_tree: str | None = None,
-) -> tuple[dict[str, object], dict[str, object], dict[str, object] | None]:
-    """Build canonical CAS, PR lifecycle, and optional merged readback."""
-    candidate_sha = run_git(clone, "rev-parse", "HEAD")
-    candidate_tree = run_git(clone, "rev-parse", "HEAD^{tree}")
-    base_sha = run_git(clone, "rev-parse", "origin/main")
-    base_tree = run_git(clone, "rev-parse", "origin/main^{tree}")
-    binding = lifecycle_binding(candidate_sha, candidate_tree)
-    cas_binding = dict(binding)
-    cas_binding["evidence_ref"] = "evidence:" + "8" * 64
-    cas_binding["evidence_digest"] = "sha256:" + "8" * 64
-    cas: dict[str, object] = {
-        "schema": "agent-canon.candidate-cas-receipt.v1",
-        "cas_receipt_id": "cas:" + "9" * 64,
-        "binding": cas_binding,
-        "predecessor_evidence_id": binding["evidence_ref"],
-        "rebind_receipt_evidence_id": "rebind:" + "a" * 64,
-        "candidate_identity": {
-            "candidate_sha": candidate_sha,
-            "tree_sha": candidate_tree,
-        },
-        "cas_base_identity": {"commit_sha": base_sha, "tree_sha": base_tree},
-        "cas_evidence_ref": "evidence:" + "8" * 64,
-        "cas_stage": "cas",
-    }
-    lifecycle_binding_value = dict(cas_binding)
-    lifecycle_binding_value["evidence_ref"] = "evidence:" + "b" * 64
-    lifecycle_binding_value["evidence_digest"] = "sha256:" + "b" * 64
-    ref = f"refs/heads/{branch}"
-    lifecycle: dict[str, object] = {
-        "schema": "agent-canon.pull-request-lifecycle.v1",
-        "kind": "user",
-        "binding": lifecycle_binding_value,
-        "state": state,
-        "remote_identity": {
-            "repo_owner": "owner",
-            "repo_name": repo_name,
-            "remote_name": "origin",
-            "url_digest": "sha256:" + "c" * 64,
-            "ref": ref,
-            "commit_sha": candidate_sha,
-            "tree_sha": candidate_tree,
-        },
-        "base_identity": {
-            "repo_owner": "owner",
-            "repo_name": repo_name,
-            "ref": "refs/heads/main",
-            "commit_sha": base_sha,
-            "tree_sha": base_tree,
-        },
-        "head_identity": {
-            "repo_owner": "owner",
-            "repo_name": repo_name,
-            "ref": ref,
-            "commit_sha": candidate_sha,
-            "tree_sha": candidate_tree,
-        },
-        "branch": pull_request_branch_table(),
-        "permission_identity": {
-            "actor_id": "github-user:7",
-            "permission_state": "verified_true",
-            "permission_evidence_id": "evidence:" + "d" * 64,
-            "authority_source": "fixture GitHub readback",
-            "assumption_forbidden": True,
-        },
-        "pr_essence": {
-            "problem": "topic source change",
-            "intent": "publish exact topic head",
-            "canonical_owner": "repository-topic-clone",
-            "contract_delta": "generic lifecycle fixture",
-            "evidence_refs": ["evidence:" + "e" * 64],
-        },
-        "reviews": [],
-        "user_identity": {
-            "actor_id": "github-user:7",
-            "display_name": "Lifecycle Test",
-        },
-    }
-    if state != "merged":
-        return cas, lifecycle, None
-    assert merge_sha is not None and merge_tree is not None
-    readback = materialize_publication_readback_receipt(
-        candidate_cas_receipt=cas,
-        pull_request_lifecycle=lifecycle,
-        authoritative_pr_readback={
-            "number": 7,
-            "state": "MERGED",
-            "baseRefName": "main",
-            "baseRefOid": merge_sha,
-            "mergeCasBaseOid": base_sha,
-            "mergeCasBaseTreeOid": base_tree,
-            "headRefName": branch,
-            "headRefOid": candidate_sha,
-            "headRepository": {"nameWithOwner": f"owner/{repo_name}"},
-            "mergeCommit": {"oid": merge_sha},
-            "mergeTreeOid": merge_tree,
-        },
-    )
-    return cas, lifecycle, readback
 
 
 def install_legacy_module_markers(
@@ -2406,7 +2271,7 @@ def test_cleanup_rejects_partial_optional_publication_packet(tmp_path: Path) -> 
         )
 
 
-def test_cleanup_uses_canonical_pr_and_merged_receipts_after_root_ignore_drifts(
+def test_cleanup_holds_repository_mismatch_after_root_ignore_drifts(
     tmp_path: Path,
 ) -> None:
     remote, remote_url = init_remote(tmp_path)
@@ -2456,23 +2321,7 @@ def test_cleanup_uses_canonical_pr_and_merged_receipts_after_root_ignore_drifts(
     )
     assert drift_probe.returncode == 1, drift_probe.stdout + drift_probe.stderr
 
-    cas, lifecycle, _ = publication_artifacts(
-        request.clone,
-        branch="feature/cleanup",
-        repo_name=repo_name,
-        state="ready",
-    )
-    cas_path = tmp_path / "candidate-cas.json"
-    lifecycle_path = tmp_path / "pr-lifecycle.json"
-    cas_path.write_text(json.dumps(cas), encoding="utf-8")
-    lifecycle_path.write_text(json.dumps(lifecycle), encoding="utf-8")
-
-    proof = rtc.cleanup(
-        request.request,
-        candidate_cas=cas_path,
-        pr_lifecycle=lifecycle_path,
-        apply=False,
-    )
+    proof = rtc.cleanup(request.request, apply=False)
     assert not proof.removed
 
     run_git(
@@ -2484,8 +2333,6 @@ def test_cleanup_uses_canonical_pr_and_merged_receipts_after_root_ignore_drifts(
     with pytest.raises(rtc.RepositoryTopicCloneError, match="repository-mismatch"):
         rtc.cleanup(
             request.request,
-            candidate_cas=cas_path,
-            pr_lifecycle=lifecycle_path,
             apply=False,
         )
     run_git(
@@ -2495,64 +2342,8 @@ def test_cleanup_uses_canonical_pr_and_merged_receipts_after_root_ignore_drifts(
         repo_name,
     )
 
-    source = tmp_path / "source"
-    run_git(source, "fetch", "origin", "feature/cleanup")
-    subprocess.run(
-        [
-            "git",
-            "-C",
-            str(source),
-            "-c",
-            "user.name=Test",
-            "-c",
-            "user.email=test@example.invalid",
-            "merge",
-            "--no-ff",
-            "--no-edit",
-            "origin/feature/cleanup",
-        ],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    run_git(source, "push", "origin", "main")
-    merge_sha = run_git(source, "rev-parse", "HEAD")
-    merge_tree = run_git(source, "rev-parse", "HEAD^{tree}")
-    cas, lifecycle, readback = publication_artifacts(
-        request.clone,
-        branch="feature/cleanup",
-        repo_name=repo_name,
-        state="merged",
-        merge_sha=merge_sha,
-        merge_tree=merge_tree,
-    )
-    assert readback is not None
-    cas_path.write_text(json.dumps(cas), encoding="utf-8")
-    lifecycle_path.write_text(json.dumps(lifecycle), encoding="utf-8")
-    readback_path = tmp_path / "publication-readback.json"
-    readback_path.write_text(json.dumps(readback), encoding="utf-8")
-
-    with pytest.raises(
-        rtc.RepositoryTopicCloneError,
-        match="merged state requires publication readback",
-    ):
-        rtc.cleanup(
-            request.request,
-            candidate_cas=cas_path,
-            pr_lifecycle=lifecycle_path,
-            apply=False,
-        )
-
-    proof = rtc.cleanup(
-        request.request,
-        candidate_cas=cas_path,
-        pr_lifecycle=lifecycle_path,
-        publication_readback=readback_path,
-        apply=True,
-    )
-    assert proof.removed
-    assert not request.clone.exists()
-    assert sibling.exists()
+    assert request.clone.exists()
+    assert sibling.read_text(encoding="utf-8") == "keep"
 
 
 def test_failure_when_receipt_is_arbitrary_mapping_or_missing(
