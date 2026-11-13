@@ -131,7 +131,7 @@ fn native_cli_exposes_all_archive_subcommands() {
 }
 
 #[test]
-fn append_and_materialize_bind_the_exact_rollout_and_confirmed_receipt() {
+fn append_and_materialize_bind_the_exact_rollout_or_reject_unsupported_publication() {
     let (_temporary, source, canon, archive, runtime, sessions) = fixture();
     let context_id = "11111111-1111-4111-8111-111111111111";
     let parent_id = "22222222-2222-4222-8222-222222222222";
@@ -198,6 +198,12 @@ fn append_and_materialize_bind_the_exact_rollout_and_confirmed_receipt() {
         ],
         Some(&sessions),
     );
+    if !cfg!(target_os = "linux") {
+        assert!(!append.status.success());
+        assert!(String::from_utf8_lossy(&append.stdout).contains("CONTEXT_DISCOVERY_ERROR_CODE=context_publication_failure"));
+        assert!(!fs::read_dir(&active).unwrap().any(|entry| entry.unwrap().file_name().to_string_lossy().starts_with("context_discovery.")));
+        return;
+    }
     assert!(
         append.status.success(),
         "{}",
