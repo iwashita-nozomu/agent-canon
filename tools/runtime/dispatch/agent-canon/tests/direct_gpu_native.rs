@@ -102,6 +102,10 @@ fn public_cli_reports_preflight_without_a_managed_provider() {
         serde_json::from_slice(&output.stderr).expect("structured failure");
     assert_eq!(record["failure_code"], "gpu_command_argv_invalid");
     assert_eq!(
+        record["message"],
+        "gpu_command_argv_invalid: a direct command argv is required after --"
+    );
+    assert_eq!(
         record["schema_version"],
         "agentcanon-gpu-command-cli-error/v1"
     );

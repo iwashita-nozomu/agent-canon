@@ -1391,7 +1391,7 @@ pub fn run_direct_command_with(
                 "direct command reservation release was incomplete",
             );
         }
-        let record = serde_json::json!({"schema_version":"agentcanon-gpu-command-failure/v1","failure_code":error.code,"message":error.message,"evidence":error.details,"plan_fingerprint":plan.as_ref().map(|plan|&plan.plan_fingerprint),"environment_fingerprint":environment.as_ref().map(|environment|&environment.environment_fingerprint),"admission_fingerprint":admission.as_ref().map(|admission|&admission.admission_fingerprint),"release_dispositions":dispositions,"release_close_failure":release_failure.map(|message|serde_json::json!({"type":"TypedPreflightFailure","message":message})),"managed_provider_required":false,"child_started":execution.is_some(),"descendant_quiescence_proven":execution.is_some(),"release_blocked":false,"lifecycle":execution.as_ref().map(|execution|execution.lifecycle.record())});
+        let record = serde_json::json!({"schema_version":"agentcanon-gpu-command-failure/v1","failure_code":error.code,"message":error.to_string(),"evidence":error.details,"plan_fingerprint":plan.as_ref().map(|plan|&plan.plan_fingerprint),"environment_fingerprint":environment.as_ref().map(|environment|&environment.environment_fingerprint),"admission_fingerprint":admission.as_ref().map(|admission|&admission.admission_fingerprint),"release_dispositions":dispositions,"release_close_failure":release_failure.map(|message|serde_json::json!({"type":"TypedPreflightFailure","message":message})),"managed_provider_required":false,"child_started":execution.is_some(),"descendant_quiescence_proven":execution.is_some(),"release_blocked":false,"lifecycle":execution.as_ref().map(|execution|execution.lifecycle.record())});
         if !output
             .entry_exists(std::path::Path::new("gpu_command_failure.json"))
             .map_err(|error| failure("gpu_command_output_invalid", &error.to_string()))?
@@ -1621,7 +1621,7 @@ pub fn run(args: &[String]) -> i32 {
         Err(error) => {
             eprintln!(
                 "{}",
-                serde_json::json!({"schema_version":"agentcanon-gpu-command-cli-error/v1","failure_code":error.code,"message":error.message,"output_dir":output})
+                serde_json::json!({"schema_version":"agentcanon-gpu-command-cli-error/v1","failure_code":error.code,"message":error.to_string(),"output_dir":output})
             );
             125
         }

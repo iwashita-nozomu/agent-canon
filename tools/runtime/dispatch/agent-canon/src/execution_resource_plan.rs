@@ -52,6 +52,12 @@ pub struct Failure {
     pub message: String,
     pub details: BTreeMap<String, Value>,
 }
+impl std::fmt::Display for Failure {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(formatter, "{}: {}", self.code, self.message)
+    }
+}
+impl std::error::Error for Failure {}
 impl Failure {
     fn new(code: &str, message: impl Into<String>) -> Self {
         Self {
