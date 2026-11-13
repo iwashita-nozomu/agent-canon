@@ -630,6 +630,18 @@ fn main() {
         std::process::exit(test_design::run(&args[2..]));
     }
 
+    if args.len() >= 2
+        && matches!(
+            args[1].as_str(),
+            "run-container-pack"
+                | "run-in-repo-container"
+                | "run-python-in-dockerfile"
+                | "run-repo-program"
+        )
+    {
+        std::process::exit(agent_canon::container_runtime::run(&args[1], &args[2..]));
+    }
+
     if args.len() >= 2 && args[1] == "notebook-quality" {
         std::process::exit(notebook_quality::run(&args[2..]));
     }
