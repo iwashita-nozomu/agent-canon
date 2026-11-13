@@ -1633,7 +1633,11 @@ mod tests {
                 .env(ISOLATED, "1")
                 .output()
                 .expect("isolated reservation-drop fixture process");
-            assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
             return;
         }
         let root = tempfile::tempdir_in(
