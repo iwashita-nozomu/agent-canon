@@ -415,49 +415,85 @@ fn github_read_projects_clauses_and_saves_the_same_summary() {
 #[cfg(unix)]
 #[test]
 fn retry_uses_exact_readback_and_keeps_packet_when_receipt_staging_fails() {
+    use sha2::{Digest, Sha256};
     use std::os::unix::fs::PermissionsExt;
-    use sha2::{Digest,Sha256};
-    let root=fixture();
-    assert!(Command::new("git").arg("-C").arg(root.path())
-        .args(["remote","add","origin","git@github.com:owner/repo.git"])
-        .status().unwrap().success());
-    let private=tempfile::tempdir().unwrap();
-    let log=private.path().join("log");
-    let pending=log.join("feedback/issue-packets/pending/input.json");
+    let root = fixture();
+    assert!(Command::new("git")
+        .arg("-C")
+        .arg(root.path())
+        .args(["remote", "add", "origin", "git@github.com:owner/repo.git"])
+        .status()
+        .unwrap()
+        .success());
+    let private = tempfile::tempdir().unwrap();
+    let log = private.path().join("log");
+    let pending = log.join("feedback/issue-packets/pending/input.json");
     fs::create_dir_all(pending.parent().unwrap()).unwrap();
-    let body=private.path().join("body.md");
-    fs::write(&body,b"Issue body\n").unwrap();
-    let packet=json!({"schema":"agent-canon.feedback.issue-packet.v1","status":"pending",
+    let body = private.path().join("body.md");
+    fs::write(&body, b"Issue body\n").unwrap();
+    let packet = json!({"schema":"agent-canon.feedback.issue-packet.v1","status":"pending",
         "repository":"owner/repo","title":"Finding","body_locator":body,
         "body_digest":format!("sha256:{:x}",Sha256::digest(b"Issue body\n")),
         "route":"issue-publication","input_mode":"structured-log"});
-    fs::write(&pending,serde_json::to_vec(&packet).unwrap()).unwrap();
-    let record=private.path().join("record.json");
-    fs::write(&record,serde_json::to_vec(&json!({"number":42,"title":"Finding","body":"Issue body\n",
-        "state":"OPEN","url":"https://github.com/owner/repo/issues/42"})).unwrap()).unwrap();
-    let gh=private.path().join("gh");
+    fs::write(&pending, serde_json::to_vec(&packet).unwrap()).unwrap();
+    let record = private.path().join("record.json");
+    fs::write(
+        &record,
+        serde_json::to_vec(&json!({"number":42,"title":"Finding","body":"Issue body\n",
+        "state":"OPEN","url":"https://github.com/owner/repo/issues/42"}))
+        .unwrap(),
+    )
+    .unwrap();
+    let gh = private.path().join("gh");
     fs::write(&gh,"#!/bin/sh\nprintf '%s ' \"$@\" >> \"$TRACE\"\nprintf '\\n' >> \"$TRACE\"\ncase \"$2\" in list) printf '[{\"number\":42}]\\n';; view) /bin/cat \"$RECORD\";; *) exit 77;; esac\n").unwrap();
-    let bootstrap=private.path().join("bootstrap.sh");
+    let bootstrap = private.path().join("bootstrap.sh");
     fs::write(&bootstrap,"#!/bin/sh\nprintf '%s ' \"$@\" >> \"$TRACE\"\nprintf '\\n' >> \"$TRACE\"\ncase \" $* \" in *' --stage-publication-receipt '*) exit \"$STAGE_EXIT\";; *) exit 0;; esac\n").unwrap();
-    for script in [&gh,&bootstrap] { fs::set_permissions(script,fs::Permissions::from_mode(0o700)).unwrap(); }
-    let trace=private.path().join("trace");
-    let source=Path::new(env!("CARGO_MANIFEST_DIR")).ancestors().nth(4).unwrap();
-    let path=std::env::join_paths(std::iter::once(private.path().to_path_buf())
-        .chain(std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default()))).unwrap();
-    let invoke=|stage_exit:&str| Command::new(env!("CARGO_BIN_EXE_agent-canon"))
-        .args(["issue-sync","--sync-pending","--log-root"]).arg(&log)
-        .arg("--runtime-root").arg(private.path().join("runtime"))
-        .current_dir(root.path()).env("PATH",&path).env("TRACE",&trace).env("RECORD",&record)
-        .env("STAGE_EXIT",stage_exit).env("AGENT_CANON_BOOTSTRAP",&bootstrap)
-        .env("AGENT_CANON_SOURCE_ROOT",source).env_remove("AGENT_CANON_ROOT").output().unwrap();
-    let failed=invoke("8");
-    assert_eq!(failed.status.code(),Some(2),"{}",String::from_utf8_lossy(&failed.stderr));
+    for script in [&gh, &bootstrap] {
+        fs::set_permissions(script, fs::Permissions::from_mode(0o700)).unwrap();
+    }
+    let trace = private.path().join("trace");
+    let source = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .ancestors()
+        .nth(4)
+        .unwrap();
+    let path = std::env::join_paths(std::iter::once(private.path().to_path_buf()).chain(
+        std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default()),
+    ))
+    .unwrap();
+    let invoke = |stage_exit: &str| {
+        Command::new(env!("CARGO_BIN_EXE_agent-canon"))
+            .args(["issue-sync", "--sync-pending", "--log-root"])
+            .arg(&log)
+            .arg("--runtime-root")
+            .arg(private.path().join("runtime"))
+            .current_dir(root.path())
+            .env("PATH", &path)
+            .env("TRACE", &trace)
+            .env("RECORD", &record)
+            .env("STAGE_EXIT", stage_exit)
+            .env("AGENT_CANON_BOOTSTRAP", &bootstrap)
+            .env("AGENT_CANON_SOURCE_ROOT", source)
+            .env_remove("AGENT_CANON_ROOT")
+            .output()
+            .unwrap()
+    };
+    let failed = invoke("8");
+    assert_eq!(
+        failed.status.code(),
+        Some(2),
+        "{}",
+        String::from_utf8_lossy(&failed.stderr)
+    );
     assert!(String::from_utf8_lossy(&failed.stderr).contains("issue_receipt_write_failed"));
     assert!(pending.is_file());
-    let succeeded=invoke("0");
-    assert!(succeeded.status.success(),"{}",String::from_utf8_lossy(&succeeded.stderr));
+    let succeeded = invoke("0");
+    assert!(
+        succeeded.status.success(),
+        "{}",
+        String::from_utf8_lossy(&succeeded.stderr)
+    );
     assert!(!pending.exists());
-    let trace=fs::read_to_string(trace).unwrap();
+    let trace = fs::read_to_string(trace).unwrap();
     assert!(!trace.contains("issue create"));
     assert!(trace.contains("--receipt-action noop"));
     assert!(!trace.contains("Issue body"));
