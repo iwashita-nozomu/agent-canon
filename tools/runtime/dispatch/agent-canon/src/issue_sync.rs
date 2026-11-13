@@ -3,7 +3,7 @@
 // responsibility Reads repository-qualified GitHub Issues and projects existing Issue clauses.
 // upstream design ../../../../../documents/runtime/private-feedback-knowledge.md owns private offline packet storage
 // upstream design ../../../../../agents/skills/issue-finding-report.md owns Issue publication decisions
-// downstream test ../../../../../tests/agent_tools/test_issue_sync.py verifies readback and offline identities
+// downstream test ../tests/issue_sync_native.rs verifies readback and offline identities
 // @dependency-end
 
 use crate::python_text::{python_splitlines, python_strip};
@@ -291,6 +291,7 @@ fn stage_receipt(
         }) || old["schema"] != "agent-canon.private-feedback-sync-request.v1"
             || old["operation"] != "sync"
             || old["execution_plane"] != "agentcanon_tool_container"
+            || !old["requested_at"].is_string()
             || !old["source_commit"].as_str().is_some_and(valid_commit)
         {
             return Err(fail(
@@ -310,9 +311,10 @@ fn stage_receipt(
     )?;
     validate_receipt(payload)?;
     let mut payload = payload.clone();
+    let prior = directory.read_stable(&path).map_err(io)?;
     if payload["action"] == "noop" {
-        if let Some(bytes) = directory.read(&path).map_err(io)? {
-            let old: Value = serde_json::from_slice(&bytes).map_err(io)?;
+        if let Some((bytes, _)) = &prior {
+            let old: Value = serde_json::from_slice(bytes).map_err(io)?;
             validate_receipt(&old)?;
             if payload
                 .as_object()
@@ -326,20 +328,31 @@ fn stage_receipt(
         }
     }
     let bytes = format!("{}\n", serde_json::to_string_pretty(&payload).map_err(io)?);
-    directory
-        .atomic_write_bytes(&path, bytes.as_bytes(), 0o600)
-        .map_err(io)?;
-    let read = directory.read(&path).map_err(io)?.ok_or_else(|| {
-        fail(
-            "issue_receipt_readback_failed",
-            "publication receipt is missing",
-        )
-    })?;
-    if read != bytes.as_bytes() {
-        return Err(fail(
-            "issue_receipt_readback_failed",
-            "publication receipt readback differs",
-        ));
+    let result = (|| {
+        directory
+            .atomic_write_bytes(&path, bytes.as_bytes(), 0o600)
+            .map_err(io)?;
+        let read = directory.read(&path).map_err(io)?;
+        if read.as_deref() != Some(bytes.as_bytes()) {
+            return Err(fail(
+                "issue_receipt_readback_failed",
+                "publication receipt readback differs",
+            ));
+        }
+        Ok(())
+    })();
+    if let Err(error) = result {
+        // Restore only our replacement: a concurrent writer retains its bytes.
+        if directory.read(&path).map_err(io)?.as_deref() == Some(bytes.as_bytes()) {
+            if let Some((prior, snapshot)) = prior {
+                directory
+                    .atomic_write_bytes(&path, &prior, snapshot.mode & 0o777)
+                    .map_err(io)?;
+            } else {
+                directory.remove_file(&path).map_err(io)?;
+            }
+        }
+        return Err(error);
     }
     Ok(spool.join(path))
 }
@@ -351,6 +364,44 @@ fn valid_commit(value: &str) -> bool {
 }
 fn now() -> Result<String> {
     OffsetDateTime::now_utc().format(&Rfc3339).map_err(io)
+}
+fn configured_path(explicit: &str, variable: &str, code: &'static str) -> Result<PathBuf> {
+    let configured = if explicit.is_empty() {
+        std::env::var(variable).unwrap_or_default()
+    } else {
+        explicit.to_owned()
+    };
+    if python_strip(&configured).is_empty() {
+        return Err(fail(
+            code,
+            format!("{variable} or an explicit path is required"),
+        ));
+    }
+    let expanded = crate::path_expansion::expand_user_path(Path::new(&configured)).map_err(io)?;
+    crate::path_resolution::resolve_non_strict(&expanded).map_err(io)
+}
+fn log_root(explicit: &str) -> Result<PathBuf> {
+    if explicit.is_empty()
+        && std::env::var("AGENT_CANON_LOG_ROOT")
+            .unwrap_or_default()
+            .trim()
+            .is_empty()
+    {
+        if let Ok(parent) = std::env::var("AGENT_CANON_CONTROL_PARENT_ROOT") {
+            if !parent.trim().is_empty() {
+                return configured_path(
+                    &Path::new(&parent).join("agent-canon-log").to_string_lossy(),
+                    "AGENT_CANON_LOG_ROOT",
+                    "private_log_root_required",
+                );
+            }
+        }
+    }
+    configured_path(
+        explicit,
+        "AGENT_CANON_LOG_ROOT",
+        "private_log_root_required",
+    )
 }
 fn find_receipt(root: &Path, repository: &str, payload: &Value) -> Result<Option<Value>> {
     if !root.is_dir() {
@@ -658,6 +709,118 @@ fn cohesive_issue(record: &Issue, handoff: &Value) -> bool {
     })
 }
 
+/// Host GitHub operations stage receipts through the existing resident route.
+struct ContainerReceiptStager {
+    prefix: Vec<String>,
+    checkout_head: String,
+    checkout_repository: String,
+}
+
+impl ContainerReceiptStager {
+    fn new(runtime: &Path, checkout: &Path, repository: &str) -> Result<Self> {
+        let environment = std::env::vars().collect::<BTreeMap<_, _>>();
+        let source = crate::agent_canon_source_root::resolve_source_roots(checkout, &environment)
+            .map_err(|error| fail(error.code, error.detail))?
+            .source_root;
+        let bootstrap = std::env::var_os("AGENT_CANON_BOOTSTRAP")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| source.join("bootstrap.sh"));
+        let bootstrap = if bootstrap.is_absolute() {
+            bootstrap
+        } else {
+            source.join(bootstrap)
+        };
+        if !bootstrap.is_file() {
+            return Err(fail(
+                "issue_receipt_route_unavailable",
+                "AgentCanon bootstrap entrypoint is unavailable",
+            ));
+        }
+        let checkout = checkout.canonicalize().map_err(io)?;
+        let head = Command::new("git")
+            .arg("-C")
+            .arg(&checkout)
+            .args(["rev-parse", "--verify", "HEAD"])
+            .output()
+            .map_err(io)?;
+        let head = String::from_utf8_lossy(&head.stdout).trim().to_owned();
+        if !valid_commit(&head) {
+            return Err(fail(
+                "checkout-identity-unresolved",
+                "receipt staging checkout commit is unavailable",
+            ));
+        }
+        Ok(Self {
+            prefix: vec![
+                bootstrap.to_string_lossy().into_owned(),
+                "--control-parent-root".into(),
+                std::env::var("AGENT_CANON_CONTROL_PARENT_ROOT")
+                    .unwrap_or_else(|_| "<control-parent-root>".into()),
+                "--runtime-root".into(),
+                runtime.to_string_lossy().into_owned(),
+                "tool".into(),
+                "run".into(),
+                "--root".into(),
+                checkout.to_string_lossy().into_owned(),
+                "issue-sync".into(),
+                "--".into(),
+            ],
+            checkout_head: head,
+            checkout_repository: repository.to_owned(),
+        })
+    }
+
+    fn execute(&self, payload: Option<&Value>) -> Result<()> {
+        let mut args = self.prefix.clone();
+        args.push(
+            if payload.is_some() {
+                "--stage-publication-receipt"
+            } else {
+                "--receipt-preflight"
+            }
+            .into(),
+        );
+        args.extend([
+            "--checkout-head".into(),
+            self.checkout_head.clone(),
+            "--checkout-repository".into(),
+            self.checkout_repository.clone(),
+        ]);
+        if let Some(payload) = payload {
+            for (flag, field) in [
+                ("--repo", "repository"),
+                ("--receipt-number", "number"),
+                ("--receipt-url", "url"),
+                ("--receipt-state", "state"),
+                ("--receipt-action", "action"),
+                ("--receipt-source-finding-kind", "source_finding_kind"),
+            ] {
+                args.extend([flag.into(), payload[field].as_str().unwrap_or("").into()]);
+            }
+            for (flag, field) in [
+                ("--receipt-responsibility", "responsibility"),
+                ("--receipt-occurrence-location", "occurrence_locations"),
+            ] {
+                for value in payload[field].as_array().into_iter().flatten() {
+                    args.extend([flag.into(), value.as_str().unwrap_or("").into()]);
+                }
+            }
+        }
+        let result = Command::new(&args[0]).args(&args[1..]).output();
+        if result.is_ok_and(|result| result.status.success()) {
+            return Ok(());
+        }
+        Err(fail(
+            if payload.is_some() {
+                "issue_receipt_write_failed"
+            } else {
+                "issue_receipt_route_unavailable"
+            },
+            "container receipt command failed",
+        ))
+    }
+}
+
 fn sync_packets(log: &Path, runtime: &Path, source: &Path) -> Result<Value> {
     let remote = Command::new("git")
         .arg("-C")
@@ -679,6 +842,11 @@ fn sync_packets(log: &Path, runtime: &Path, source: &Path) -> Result<Value> {
     paths.retain(|path| path.extension().is_some_and(|value| value == "json"));
     paths.sort();
     let mut urls = Vec::new();
+    let stager = if paths.is_empty() {
+        None
+    } else {
+        Some(ContainerReceiptStager::new(runtime, source, &repository)?)
+    };
     for path in paths {
         let bytes = log_directory
             .read(&path)
@@ -719,7 +887,10 @@ fn sync_packets(log: &Path, runtime: &Path, source: &Path) -> Result<Value> {
             )
         })?);
         let body = read_private_body(body_path, payload["body_digest"].as_str().unwrap_or(""))?;
-        stage_receipt(runtime, source, None, "")?;
+        stager
+            .as_ref()
+            .expect("nonempty packet queue has a stager")
+            .execute(None)?;
         let existing = find_receipt(
             &runtime.join("spool/private-feedback"),
             &repository,
@@ -859,7 +1030,10 @@ fn sync_packets(log: &Path, runtime: &Path, source: &Path) -> Result<Value> {
             action = "reopen";
         }
         let receipt = json!({"repository":record.repository,"number":record.number,"url":record.url,"state":record.state,"action":action,"responsibility":packet_responsibility(&payload),"occurrence_locations":payload.get("handoff").and_then(|value|value.get("occurrence_locations")).cloned().unwrap_or_else(||json!([])),"source_finding_kind":payload.get("handoff").and_then(|value|value["source_finding_kind"].as_str()).or_else(||payload["source_finding_kind"].as_str()).unwrap_or(""),"timestamp":now()?});
-        stage_receipt(runtime, source, Some(&receipt), "")?;
+        stager
+            .as_ref()
+            .expect("nonempty packet queue has a stager")
+            .execute(Some(&receipt))?;
         urls.push(record.url);
         log_directory.remove_file(&path).map_err(io)?;
     }
@@ -962,10 +1136,40 @@ pub fn run(args: &[String]) -> i32 {
     ];
     let mut values = BTreeMap::<String, Vec<String>>::new();
     let mut flags = BTreeSet::new();
+    let flag_names = [
+        "--github-check",
+        "--sync-pending",
+        "--receipt-preflight",
+        "--stage-publication-receipt",
+        "--record-publication-receipt",
+        "--help",
+    ];
+    let options = names
+        .iter()
+        .chain(flag_names.iter())
+        .map(|name| (*name, *name))
+        .collect::<Vec<_>>();
     let mut index = 0;
     while index < args.len() {
-        let name = args[index].as_str();
-        if ["-h", "--help"].contains(&name) {
+        let (raw, inline) = args[index]
+            .split_once('=')
+            .map_or((args[index].as_str(), None), |(name, value)| {
+                (name, Some(value))
+            });
+        let name = if raw == "-h" {
+            "--help"
+        } else if options.iter().any(|(name, _)| *name == raw) {
+            raw
+        } else {
+            match crate::python_cli_options::resolve_long_option_prefix(raw, &options) {
+                Ok(name) => name,
+                Err(_) => {
+                    eprintln!("{USAGE}");
+                    return 2;
+                }
+            }
+        };
+        if name == "--help" && inline.is_none() {
             println!("{USAGE}");
             return 0;
         }
@@ -978,19 +1182,31 @@ pub fn run(args: &[String]) -> i32 {
         ]
         .contains(&name)
         {
+            if inline.is_some() {
+                eprintln!("{USAGE}");
+                return 2;
+            }
             flags.insert(name);
             index += 1;
             continue;
         }
-        if !names.contains(&name) || index + 1 == args.len() {
+        if !names.contains(&name) || (inline.is_none() && index + 1 == args.len()) {
+            eprintln!("{USAGE}");
+            return 2;
+        }
+        let value = inline.unwrap_or_else(|| args[index + 1].as_str());
+        if inline.is_none()
+            && value.starts_with('-')
+            && !crate::python_cli_integer::is_argparse_negative_number(value)
+        {
             eprintln!("{USAGE}");
             return 2;
         }
         values
             .entry(name.into())
             .or_default()
-            .push(args[index + 1].clone());
-        index += 2;
+            .push(value.to_owned());
+        index += if inline.is_some() { 1 } else { 2 };
     }
     let get = |name: &str| {
         values
@@ -1004,11 +1220,11 @@ pub fn run(args: &[String]) -> i32 {
             || flags.contains("--stage-publication-receipt")
             || flags.contains("--record-publication-receipt")
         {
-            let runtime = if get("--runtime-root").is_empty() {
-                std::env::var("AGENT_CANON_RUNTIME_ROOT").map_err(io)?
-            } else {
-                get("--runtime-root").into()
-            };
+            let runtime = configured_path(
+                get("--runtime-root"),
+                "AGENT_CANON_RUNTIME_ROOT",
+                "runtime-root-required",
+            )?;
             let source = if get("--checkout-root").is_empty() {
                 std::env::current_dir().map_err(io)?
             } else {
@@ -1029,12 +1245,7 @@ pub fn run(args: &[String]) -> i32 {
                     json!({"repository":repo,"number":get("--receipt-number"),"url":get("--receipt-url"),"state":state(get("--receipt-state"))?,"action":get("--receipt-action"),"responsibility":values.get("--receipt-responsibility").cloned().unwrap_or_default(),"occurrence_locations":values.get("--receipt-occurrence-location").cloned().unwrap_or_default(),"source_finding_kind":get("--receipt-source-finding-kind"),"timestamp":if get("--receipt-timestamp").is_empty(){now()?}else{get("--receipt-timestamp").into()}}),
                 )
             };
-            let path = stage_receipt(
-                Path::new(&runtime),
-                &source,
-                payload.as_ref(),
-                get("--checkout-head"),
-            )?;
+            let path = stage_receipt(&runtime, &source, payload.as_ref(), get("--checkout-head"))?;
             return Ok(if payload.is_none() {
                 json!({"status":"preflight","runtime_root":runtime})
             } else {
@@ -1042,6 +1253,15 @@ pub fn run(args: &[String]) -> i32 {
             });
         }
         if !get("--offline-title").is_empty() {
+            if get("--repo").is_empty()
+                || get("--body-locator").is_empty()
+                || get("--body-digest").is_empty()
+            {
+                return Err(fail(
+                    "offline_packet_incomplete",
+                    "--repo, --offline-title, --body-locator, and --body-digest are required",
+                ));
+            }
             let digest = get("--body-digest");
             if !digest.strip_prefix("sha256:").is_some_and(|value| {
                 value.len() == 64
@@ -1060,12 +1280,7 @@ pub fn run(args: &[String]) -> i32 {
                     "private body locator is required",
                 ));
             }
-            let log = if get("--log-root").is_empty() {
-                std::env::var("AGENT_CANON_LOG_ROOT").map_err(io)?
-            } else {
-                get("--log-root").into()
-            };
-            let root = crate::path_resolution::resolve_non_strict(Path::new(&log)).map_err(io)?;
+            let root = log_root(get("--log-root"))?;
             let directory = crate::runtime_boundary::RuntimeDirectory::open_nofollow(&root, true)
                 .map_err(io)?;
             let title = get("--offline-title");
@@ -1105,21 +1320,13 @@ pub fn run(args: &[String]) -> i32 {
             );
         }
         if flags.contains("--sync-pending") {
-            let log = if get("--log-root").is_empty() {
-                std::env::var("AGENT_CANON_LOG_ROOT").map_err(io)?
-            } else {
-                get("--log-root").into()
-            };
-            let runtime = if get("--runtime-root").is_empty() {
-                std::env::var("AGENT_CANON_RUNTIME_ROOT").map_err(io)?
-            } else {
-                get("--runtime-root").into()
-            };
-            return sync_packets(
-                Path::new(&log),
-                Path::new(&runtime),
-                &std::env::current_dir().map_err(io)?,
-            );
+            let log = log_root(get("--log-root"))?;
+            let runtime = configured_path(
+                get("--runtime-root"),
+                "AGENT_CANON_RUNTIME_ROOT",
+                "runtime-root-required",
+            )?;
+            return sync_packets(&log, &runtime, &std::env::current_dir().map_err(io)?);
         }
         let Some(references) = values.get("--issue-url") else {
             return Err(fail("lookup_required", "GITHUB_ISSUE_LOOKUP_REQUIRED=1"));
@@ -1141,19 +1348,22 @@ pub fn run(args: &[String]) -> i32 {
         Ok(report) => {
             let rendered = serde_json::to_string_pretty(&report).unwrap();
             if !get("--summary-file").is_empty() {
-                let source = std::env::current_dir().unwrap_or_default();
-                let boundary = match crate::runtime_boundary::RuntimeArtifactBoundary::for_source(
-                    &source, None, true,
-                ) {
-                    Ok(value) => value,
-                    Err(error) => {
-                        eprintln!("{error}");
-                        return 2;
-                    }
-                };
-                if let Err(error) =
-                    boundary.atomic_write_text(Path::new(get("--summary-file")), &rendered, 0o644)
-                {
+                let output = Path::new(get("--summary-file"));
+                let result = (|| -> std::result::Result<(), String> {
+                    let output = crate::path_resolution::resolve_non_strict(output)?;
+                    let parent = output.parent().ok_or("summary parent missing")?;
+                    let directory =
+                        crate::runtime_boundary::RuntimeDirectory::open_nofollow(parent, true)
+                            .map_err(|error| error.to_string())?;
+                    directory
+                        .atomic_write_bytes(
+                            Path::new(output.file_name().ok_or("summary filename missing")?),
+                            format!("{rendered}\n").as_bytes(),
+                            0o644,
+                        )
+                        .map_err(|error| error.to_string())
+                })();
+                if let Err(error) = result {
                     eprintln!("{error}");
                     return 2;
                 }

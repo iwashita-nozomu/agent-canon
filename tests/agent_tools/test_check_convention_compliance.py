@@ -96,7 +96,7 @@ path: tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs
     "documents/conventions/object-oriented-design.md": "object-oriented design\n",
     "documents/experiments/experiment-registry.md": "experiment registry\n",
     "documents/conventions/REVIEW_PROCESS.md": (
-        "Review Finding Issue Routing issue_route github_issue issue_sync.py private packet\n"
+        "Review Finding Issue Routing issue_route github_issue agent-canon issue-sync private packet\n"
     ),
     "documents/runtime/runtime-profiles-and-check-matrix.md": (
         "Static analysis and reading evidence primary validation evidence "
@@ -880,7 +880,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("review_issue_routing", result.stdout)
-            self.assertIn("missing-marker:issue_sync.py", result.stdout)
+            self.assertIn("missing-marker:agent-canon issue-sync", result.stdout)
 
     def test_minimal_fixture_covers_review_issue_routing_surfaces(self) -> None:
         """The minimal test fixture includes every review issue route surface."""

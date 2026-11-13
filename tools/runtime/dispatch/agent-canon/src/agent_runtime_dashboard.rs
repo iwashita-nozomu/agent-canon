@@ -2539,7 +2539,7 @@ fn dashboard_outputs(
             .filter(|reference| !published.contains(reference.as_str()))
             .collect::<Vec<_>>();
         if let Some(reference) = pending.first() {
-            next_actions.push(json!({"priority":"P2","action":"triage oldest open durable issue","reason":format!("{} repository-qualified GitHub Issue references are pending",pending.len()),"evidence":reference,"owner_surface":"GitHub Issue URL/number and private packet locator","command":"python3 tools/repository/github/issue_sync.py --sync-pending","done_condition":"GitHub Issue URL/number is read back or lookup is explicitly deferred","issue":format!("`{reference}`"),"automation":"human-review"}));
+            next_actions.push(json!({"priority":"P2","action":"triage oldest open durable issue","reason":format!("{} repository-qualified GitHub Issue references are pending",pending.len()),"evidence":reference,"owner_surface":"GitHub Issue URL/number and private packet locator","command":"agent-canon issue-sync --sync-pending","done_condition":"GitHub Issue URL/number is read back or lookup is explicitly deferred","issue":format!("`{reference}`"),"automation":"human-review"}));
         }
     }
     next_actions.sort_by(|left, right| {
