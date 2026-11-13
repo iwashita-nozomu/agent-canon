@@ -11,7 +11,7 @@ downstream design ../documents/tools/README.md documents operator-facing tool en
 downstream design ../documents/tools/lean_capability_matrix.md records Lean feature routing adopted from bibliography sources.
 downstream design ../tools/README.md documents root tool inventory.
 downstream implementation ../tools/runtime/dispatch/agent-canon/src/semantic_index/mod.rs implements the semantic vector cache.
-downstream implementation ../tools/analysis/documents/reference_materializer.py materializes consulted external sources.
+downstream implementation ../tools/runtime/dispatch/agent-canon/src/reference_materializer.rs materializes consulted external sources.
 @dependency-end
 -->
 

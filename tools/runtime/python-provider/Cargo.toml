@@ -1,0 +1,22 @@
+# @dependency-start
+# contract implementation
+# responsibility Builds the optional safe native connection to the selected external CPython runtime.
+# upstream design ../../../documents/design/rust-agent-tool-migration.md preserves external Python provider APIs
+# downstream implementation src/main.rs invokes existing PDF and proof-trace providers
+# @dependency-end
+
+[package]
+name = "agent-canon-python-provider"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+
+[dependencies]
+pyo3 = { version = "=0.29.3", default-features = false, features = ["auto-initialize"] }
+serde_json = "1"
+
+[dev-dependencies]
+tempfile = "3"
+
+[lints.rust]
+unsafe_code = "forbid"

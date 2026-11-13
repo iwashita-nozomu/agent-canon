@@ -54,7 +54,7 @@ RUN --mount=type=bind,source=bootstrap/container/image/dependencies.toml,target=
     apt-get update; \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
       ca-certificates git \
-      python3.12 python3-packaging python3-yaml build-essential curl gdb valgrind \
+      python3.12 python3.12-dev python3-packaging python3-yaml build-essential curl gdb valgrind \
       strace lsof procps util-linux; \
     case "$TARGETOS/$TARGETARCH" in \
       linux/amd64) rustup_target=x86_64-unknown-linux-gnu; rustup_sha=20a06e644b0d9bd2fbdbfd52d42540bdde820ea7df86e92e533c073da0cdd43c ;; \

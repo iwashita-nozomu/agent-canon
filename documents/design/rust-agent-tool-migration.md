@@ -141,6 +141,24 @@ no-follow handling, locks, and authenticated handoffs to avoid that work.
 replace all guarantees of `parent_root_side_effects.py` and
 `runtime_artifacts.py`.
 
+The optional native CPython connection lives at
+`tools/runtime/python-provider`. It uses PyO3's safe, interpreter-bound object
+APIs to call the selected external modules and existing consumer code. Build
+this provider for the Python runtime selected with `PYO3_PYTHON`; its shared
+library remains owned by that environment. Keep the standalone AgentCanon CLI
+independent of this link so ordinary commands retain their Python-free startup.
+Provider selection and module/function calls belong in Rust. Existing consumer
+Python remains an input; no AgentCanon Python source or inline program is added.
+The initial consumers are PDF extraction and retained proof-trace loading;
+JAX extraction remains unfinished until its existing dynamic API is connected.
+
+This split follows PyO3's documented
+[dynamic embedding and interpreter selection](https://github.com/PyO3/pyo3/blob/main/guide/src/building-and-distribution.md#embedding-python-in-rust)
+and its [Python object lifetime contract](https://github.com/PyO3/pyo3/blob/main/guide/src/python-from-rust.md#the-py-lifetime).
+Verify the provider against controlled external modules and the consuming
+public CLI, including unavailable runtime/module failures, before retiring each
+owning Python implementation.
+
 The native parent-root authority accepts an explicit `AttestationRequest`.
 `ParentRootAttestor::attest` validates only that request; it does not construct
 child identity bindings or consume an environment token. A caller that chooses
