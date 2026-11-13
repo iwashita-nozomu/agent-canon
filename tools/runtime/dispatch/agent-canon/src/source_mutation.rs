@@ -1223,7 +1223,7 @@ pub(crate) fn file_parent_from_root(
                     &directory,
                     &part,
                     rustix::fs::Mode::from_bits_truncate(
-                        directory_mode.expect("creation mode selected"),
+                        directory_mode.expect("creation mode selected") as _,
                     ),
                 )
                 .map_err(io::Error::from);

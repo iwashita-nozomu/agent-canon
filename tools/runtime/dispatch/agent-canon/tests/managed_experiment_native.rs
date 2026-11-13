@@ -6,6 +6,8 @@
 // upstream implementation ../src/execution_resource_plan.rs owns source and GPU admission evidence
 // @dependency-end
 
+#![cfg(target_os = "linux")]
+
 use serde_json::Value;
 use std::fs;
 use std::path::{Path, PathBuf};
