@@ -1634,14 +1634,14 @@ entries:
 
   - id: orphan-lifecycle
     summary: Inventories semantic branch, PR-head, and worktree lifecycle state and authorizes exact cleanup candidates without performing mutation.
-    path: tools/repository/git/orphan_lifecycle.py
+    path: tools/runtime/dispatch/agent-canon/src/orphan_lifecycle.rs
     family: agent_tools
     role: inventory
     status: canonical
     audience: agent
     placement: workflow_helper
-    command: python3 tools/repository/git/orphan_lifecycle.py
-    dispatch: {argv: ["python3", "tools/repository/git/orphan_lifecycle.py"]}
+    command: tools/bin/agent-canon orphan-lifecycle
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "orphan-lifecycle"]}
     writes: true
     default_wiring:
       ci: false
