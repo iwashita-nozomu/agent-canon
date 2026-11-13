@@ -170,6 +170,8 @@ Commands:
   check-solid-evidence [paths...] [--root ROOT] [--changed] [--base-ref BASE_REF] [--evidence EVIDENCE] [--exclude EXCLUDE] [--verbose] [--format text|json]
   rust-migration-audit --root <repo-root>
   semantic-provider-html-report --compare-json PATH --output PATH [options]
+  check-proof-trace-alignment --trace-module PATH [options]
+  reference-materializer --url URL [--input PATH|--fetch] [options]
   repo-structure-contract [--root ROOT] [--contract PATH] [options]
   check-agent-canon-log-policy [--input PATH|--remote URL] [--commit SHA]
   wiki-publish --wiki-root PATH --source-root PATH --source-commit SHA [options]
@@ -180,6 +182,7 @@ Commands:
   sync-experiment-registry-context --topic TOPIC [options]
   create-experiment-topic <topic> [options]
   server-readiness [--layout <layout.toml>]
+  environment-dependencies <validate|dry-run|install|boundary|project-install|image-install|image-verify> [options]
   check-skill-frontmatter [--root ROOT] [--format text|json]
   chatgpt-codex-route --input <packet.json|->
   rust-migration-plan --root <repo-root> [--limit N] [--format text|json]
@@ -287,6 +290,9 @@ fn main() {
     }
     if args.len() >= 2 && args[1] == "html-artifact-access" {
         std::process::exit(agent_canon::html_artifact_access::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "environment-dependencies" {
+        std::process::exit(agent_canon::environment_dependencies::run_cli(&args[2..]));
     }
     if args.len() >= 2 && args[1] == "check-skill-tool-invocation-graph" {
         std::process::exit(catalog::skill_dependency_graph::run(&args[2..]));
@@ -404,6 +410,12 @@ fn main() {
         std::process::exit(semantic_index::semantic_provider_html_report::run(
             &args[2..],
         ));
+    }
+    if args.len() >= 2 && args[1] == "check-proof-trace-alignment" {
+        std::process::exit(agent_canon::check_proof_trace_alignment::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "reference-materializer" {
+        std::process::exit(agent_canon::reference_materializer::run(&args[2..]));
     }
     if args.len() >= 2 && args[1] == "repo-structure-contract" {
         std::process::exit(agent_canon::repo_structure_contract::run(&args[2..]));

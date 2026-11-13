@@ -6,7 +6,7 @@ responsibility Defines the host bootstrap, shared AgentCanon tool runtime, exter
 upstream design ../../README.md standalone AgentCanon source entrypoint and user journey
 upstream design ../runtime/runtime-log-archive.md agent-canon-log publication and append-only archive policy
 upstream design ../../agents/skills/agent-canon-update.md AgentCanon source and parent integration workflow
-upstream implementation ../../tools/runtime/container/devcontainer_dependencies.py reusable dependency planning and image installation logic
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/environment_dependencies.rs native dependency planning and image installation logic
 upstream implementation ../../tools/runtime/archive/runtime_log_archive_git.py existing archive publication owner
 downstream implementation ../../bootstrap.sh host bootstrap entrypoint
 downstream implementation ../../bootstrap/container/image/Dockerfile shared Python, Rust, and native CLI tool image
