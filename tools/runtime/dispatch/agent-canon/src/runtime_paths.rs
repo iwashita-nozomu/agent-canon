@@ -229,7 +229,9 @@ fn run_inner(args: &[String]) -> Result<i32, String> {
             let result = match action.as_str() {
                 "root" => boundary.root().to_path_buf(),
                 "path" => boundary.resolve(Path::new(required(&values, "candidate")?))?,
-                "ensure-dir" => boundary.ensure_directory(Path::new(required(&values, "candidate")?))?,
+                "ensure-dir" => {
+                    boundary.ensure_directory(Path::new(required(&values, "candidate")?))?
+                }
                 "temp-dir" => boundary.temporary_directory(
                     Path::new(required(&values, "candidate")?),
                     required(&values, "prefix")?,
