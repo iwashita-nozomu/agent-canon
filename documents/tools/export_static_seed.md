@@ -33,7 +33,7 @@ allowlist と payload は同じ commit から読みます。worktree file を直
 role view は export 前に canonical materializer の static mode で生成します。
 
 ```bash
-python3 tools/agent/orchestration/model_profile_registry.py \
+tools/bin/agent-canon evaluate-codex-agent-roles \
   --root . --generate-role-views --projection consumer-static
 ```
 

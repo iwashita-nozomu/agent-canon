@@ -8,7 +8,7 @@
 # upstream design ../../../../agents/internal-routines/README.md internal routine surface contract
 # upstream design ../../../../agents/skills/catalog.yaml public skill routing and related-skill catalog
 # upstream implementation ../../../agent/skills/skill_route_catalog.py canonical skill-route rules and capability metadata
-# upstream implementation ../../../agent/orchestration/model_profile_registry.py owns canonical model/profile projections
+# upstream implementation ../../../runtime/dispatch/agent-canon/src/codex_agent_role_eval/model_profiles.rs owns native role/profile projections
 # upstream implementation ../../../agent/orchestration/packets.py owns active design packet normalization and materialization
 # upstream implementation ../../../agent/orchestration/team_config.py owns team and role configuration resolution
 # upstream implementation ../../../repository/workspace/workspace_scope.py owns typed workspace/source/report roots
@@ -23,9 +23,10 @@ import os
 import re
 import subprocess
 import sys
-import tomllib
 from collections.abc import Collection
 from pathlib import Path
+
+import tomllib
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
@@ -33,7 +34,6 @@ if __package__ in (None, ""):
 
 from typing import cast
 
-from tools.agent.orchestration import model_profile_registry
 import yaml
 
 from tools.agent.orchestration.team_config import (
@@ -46,10 +46,7 @@ from tools.agent.orchestration.team_config import (
     resolve_workflow_family,
     task_ids,
 )
-
-
 from tools.agent.skills.skill_route_catalog import load_skill_route_rules
-
 
 PROJECT_CONFIG_PATH = ROOT / ".codex" / "config.toml"
 COLLABORATION_OPERATIONS = (
@@ -71,7 +68,6 @@ EXPECTED_JOB_MAX_RUNTIME_SECONDS = 3600
 EVALUATOR_AGENT_ID = "skill_evaluator"
 EVALUATOR_ACTIVATION = "explicit_empirical_skill_evaluation"
 FORBIDDEN_AGENT_PROFILE_KEYS = {"tier", "service_tier", "flex"}
-GENERATED_ROLE_VIEW_MATERIALIZER = "generate_role_views"
 SCOPED_MODEL_POLICY_KEYS = {
     "model",
     "model_reasoning_effort",
@@ -198,20 +194,50 @@ def load_project_config_toml() -> dict[str, object]:
 def validate_project_config() -> None:
     """Check that the shared project config exposes the review route."""
     config = load_project_config_toml()
-    registry = model_profile_registry.load_model_profile_registry(ROOT)
-    common_return = model_profile_registry.validate_common_return_schema(registry)
+    raw_registry = require_mapping(
+        tomllib.loads(
+            (ROOT / "agents/model_profiles.toml").read_text(encoding="utf-8")
+        ),
+        "model profile registry must be a mapping",
+    )
+    profiles = require_list(
+        raw_registry.get("model_profiles"), "model profiles must be a list"
+    )
+    profile_rows = [
+        require_mapping(profile, "model profile must be a mapping")
+        for profile in profiles
+    ]
+    profile_ids = {
+        require_string(profile.get("id"), "model profile id must be text"): profile
+        for profile in profile_rows
+    }
     ensure(
-        common_return.valid,
+        {
+            require_string(
+                profile.get("return_schema_id"),
+                "model profile return_schema_id must be text",
+            )
+            for profile in profile_rows
+        }
+        == {"claim_evidence_v1"},
         "all canonical profiles must use the common claim/evidence return schema",
     )
-    writer_policy = registry.writer_isolation_policy
+    writer_policy = require_mapping(
+        raw_registry.get("writer_isolation_policy"),
+        "writer isolation policy must be a mapping",
+    )
     ensure(
         writer_policy.get("current_checkout_mode")
         == "parallel_only_for_disjoint_paths_without_shared_state",
         "writer isolation policy must protect shared current-checkout state",
     )
     ensure(
-        writer_policy["parallel_requirements"]
+        tuple(
+            require_string_list(
+                writer_policy.get("parallel_requirements"),
+                "writer isolation requirements must be a list",
+            )
+        )
         == (
             "disjoint_paths",
             "no_shared_git_index_or_head",
@@ -230,7 +256,11 @@ def validate_project_config() -> None:
         "isolated worktrees are reserved for explicit alternative implementation experiments",
     )
     repository_writers = {"worker", "spark_worker", "integration_executor", "publisher"}
-    for role_id, sandbox in registry.role_sandbox_bindings.items():
+    role_sandbox_bindings = require_mapping(
+        raw_registry.get("role_sandbox_bindings"),
+        "role sandbox bindings must be a mapping",
+    )
+    for role_id, sandbox in role_sandbox_bindings.items():
         expected_sandbox = (
             "workspace-write" if role_id in repository_writers else "read-only"
         )
@@ -238,18 +268,22 @@ def validate_project_config() -> None:
             sandbox == expected_sandbox,
             f"{role_id} sandbox/write policy contradiction: expected {expected_sandbox}",
         )
-    parent_profile = registry.by_profile("sol_parent_high")
-    review_profile = registry.by_profile("luna_reasoning_high")
+    parent_profile = profile_ids.get("sol_parent_high")
+    review_profile = profile_ids.get("luna_reasoning_high")
+    if parent_profile is None:
+        raise RuntimeError("model profile registry must retain sol_parent_high")
+    if review_profile is None:
+        raise RuntimeError("model profile registry must retain luna_reasoning_high")
     ensure(
-        config.get("model") == parent_profile.model,
+        config.get("model") == parent_profile.get("model"),
         "parent model must project sol_parent_high",
     )
     ensure(
-        config.get("model_reasoning_effort") == parent_profile.reasoning_effort,
+        config.get("model_reasoning_effort") == parent_profile.get("reasoning_effort"),
         "parent reasoning effort must project sol_parent_high",
     )
     ensure(
-        config.get("review_model") == review_profile.model,
+        config.get("review_model") == review_profile.get("model"),
         "review_model must project luna_reasoning_high",
     )
     forbidden_project_keys = sorted({"service_tier", "flex", "tier"} & set(config))
@@ -465,169 +499,50 @@ def validate_project_hooks() -> None:
 
 def validate_generated_role_views() -> None:
     """Validate generated role-view parity against canonical sources."""
-    config = load_team_config()
-    raw = config.raw
-    agent_views = require_mapping(
-        raw.get("agent_views"), "agents_config.agent_views must be a mapping"
+    dispatcher = os.environ.get("AGENT_CANON_CLI") or str(
+        ROOT / "tools/bin/agent-canon"
     )
-    bindings_raw = require_list(raw.get("roles"), "agents_config.roles must be a list")
-    bindings: dict[str, dict[str, object]] = {}
-    for raw_binding in bindings_raw:
-        binding = require_mapping(
-            raw_binding, "agents_config.roles entries must be mappings"
-        )
-        role_id = require_string(
-            binding.get("id"), "agents_config.roles[].id must be a string"
-        )
-        ensure(role_id not in bindings, f"duplicate generated role binding: {role_id}")
-        bindings[role_id] = binding
-    configs = parse_codex_agents()
-    expected_fields = {
-        "name",
-        "description",
-        "nickname_candidates",
-        "sandbox_mode",
-        "approval_policy",
-        "model",
-        "model_reasoning_effort",
-        "developer_instructions",
-    }
-    registry = model_profile_registry.load_model_profile_registry(ROOT)
-    registry_ids = {profile.id for profile in registry.model_profiles}
-    generated = {
-        view.role_id: view
-        for view in model_profile_registry.generate_role_views(
-            registry,
-            root=ROOT,
-            projection="consumer-static",
-        )
-    }
-    role_view_issues = model_profile_registry.role_view_issues(
-        ROOT,
-        projection="consumer-static",
+    result = subprocess.run(
+        [
+            dispatcher,
+            "evaluate-codex-agent-roles",
+            "--root",
+            str(ROOT),
+            "--check-role-views",
+            "--projection",
+            "consumer-static",
+        ],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
     )
     ensure(
-        not role_view_issues,
-        "committed consumer-static role bytes must match the canonical materializer: "
-        + "; ".join(issue.message for issue in role_view_issues),
+        result.returncode == 0,
+        "native generated-role readback failed: " + result.stdout + result.stderr,
     )
-    ensure(
-        set(configs) == set(agent_views) == set(bindings),
-        "generated role-view sets must be identical",
-    )
-    ensure(
-        len(configs) == len(registry.role_profile_bindings),
-        "generated role-view projection must contain every canonical role view",
-    )
-    ensure("sol_parent_high" in registry_ids, "registry must retain sol_parent_high")
-    team = require_mapping(raw.get("team", {}), "team config must be a mapping")
-    ensure(
-        team.get("parent_profile_id", "sol_parent_high") == "sol_parent_high",
-        "team parent profile must be Sol",
-    )
-    for role_id, config_view in sorted(configs.items()):
-        source = require_mapping(
-            agent_views.get(role_id), f"agent_views.{role_id} must be a mapping"
-        )
-        binding = bindings[role_id]
-        view = generated[role_id]
-        for field in expected_fields:
-            projected = {
-                "name": view.name,
-                "description": view.description,
-                "nickname_candidates": list(view.nickname_candidates),
-                "sandbox_mode": view.sandbox_mode,
-                "approval_policy": view.approval_policy,
-                "model": view.model,
-                "model_reasoning_effort": view.reasoning_effort,
-                "developer_instructions": view.rendered_instructions,
-            }[field]
-            ensure(
-                config_view.get(field) == projected,
-                f"{role_id} {field} must project canonical registry materialization",
-            )
-            ensure(
-                source.get(field) == projected,
-                f"{role_id} agents_config projection diverges for {field}",
-            )
-        profile_id = require_string(
-            source.get("profile_id"),
-            f"agent_views.{role_id}.profile_id must be a string",
-        )
-        ensure(
-            profile_id in registry_ids,
-            f"{role_id} profile is not in model profile registry",
-        )
-        ensure(
-            binding.get("profile_id") == profile_id,
-            f"{role_id} profile binding diverges from agent view",
-        )
-        ensure(
-            binding.get("capsule_schema_id")
-            == view.capsule_schema_id
-            == source.get("capsule_schema_id"),
-            f"{role_id} capsule schema diverges",
-        )
-        logical_role_id = require_string(
-            source.get("logical_role_id"),
-            f"agent_views.{role_id}.logical_role_id must be a string",
-        )
-        ensure(bool(logical_role_id), "logical role id must be non-empty")
-        role_contract_ref = require_string(
-            source.get("role_contract_ref"),
-            f"agent_views.{role_id}.role_contract_ref must be a string",
-        )
-        ensure(bool(role_contract_ref), "role contract ref must be non-empty")
-        ensure(
-            tuple(
-                require_string_list(
-                    binding.get("capabilities"), f"roles.{role_id}.capabilities"
-                )
-            )
-            == view.capabilities,
-            f"{role_id} capabilities diverge",
-        )
-        ensure(
-            binding.get("projection_digest")
-            == view.source_canonical_digest
-            == source.get("projection_digest"),
-            f"{role_id} projection digest diverges",
-        )
-        ensure(
-            binding.get("return_schema_id")
-            == view.return_schema_id
-            == source.get("return_schema_id"),
-            f"{role_id} return schema diverges",
-        )
-        ensure(
-            binding.get("checkpoint_policy")
-            == view.checkpoint_policy
-            == source.get("checkpoint_policy"),
-            f"{role_id} checkpoint policy diverges",
-        )
-        ensure(
-            binding.get("continuation_policy")
-            == view.continuation_policy
-            == source.get("continuation_policy"),
-            f"{role_id} continuation policy diverges",
-        )
-        ensure(
-            "generated_role_view_v1"
-            in (CODEX_AGENT_ROOT / f"{role_id}.toml").read_text(encoding="utf-8"),
-            f"{role_id} missing generated header",
-        )
 
 
 def validate_codex_agent_settings() -> None:
     """Check executable settings and the canonical generated role projection."""
     configs = parse_codex_agents()
-    registry = model_profile_registry.load_model_profile_registry(ROOT)
-    generated = {
-        view.role_id: view
-        for view in model_profile_registry.generate_role_views(
-            registry,
-            ROOT,
-            projection="consumer-static",
+    registry = require_mapping(
+        tomllib.loads(
+            (ROOT / "agents/model_profiles.toml").read_text(encoding="utf-8")
+        ),
+        "model profile registry must be a mapping",
+    )
+    profile_bindings = require_mapping(
+        registry.get("role_profile_bindings"),
+        "role profile bindings must be a mapping",
+    )
+    profiles = {
+        require_string(profile.get("id"), "model profile id must be text"): profile
+        for profile in (
+            require_mapping(item, "model profile must be a mapping")
+            for item in require_list(
+                registry.get("model_profiles"), "model profiles must be a list"
+            )
         )
     }
     valid_efforts = {"low", "medium", "high", "xhigh"}
@@ -650,14 +565,20 @@ def validate_codex_agent_settings() -> None:
             and config.get("model_reasoning_effort") in valid_efforts,
             f"{role_id} model_reasoning_effort must be valid",
         )
-        view = generated[role_id]
+        profile_id = require_string(
+            profile_bindings.get(role_id),
+            f"{role_id} model profile binding must be text",
+        )
+        profile = profiles.get(profile_id)
+        if profile is None:
+            raise RuntimeError(f"{role_id} profile is not in model profile registry")
         ensure(
-            config.get("model") == view.model,
-            f"{role_id} model must project registry profile {view.profile_id}",
+            config.get("model") == profile.get("model"),
+            f"{role_id} model must project registry profile {profile_id}",
         )
         ensure(
-            config.get("model_reasoning_effort") == view.reasoning_effort,
-            f"{role_id} reasoning must project registry profile {view.profile_id}",
+            config.get("model_reasoning_effort") == profile.get("reasoning_effort"),
+            f"{role_id} reasoning must project registry profile {profile_id}",
         )
     validate_generated_role_views()
 
@@ -1194,7 +1115,7 @@ def validate_registry_authority_docs() -> None:
         )
         for marker in (
             "agents/model_profiles.toml",
-            "model_profile_registry.py",
+            "tools/bin/agent-canon evaluate-codex-agent-roles",
             "generated",
             "readback",
             "restart",

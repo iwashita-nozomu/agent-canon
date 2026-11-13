@@ -343,7 +343,7 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
         """Canonical source and generated-readback wording remains valid."""
         valid_claim = (
             "agents/model_profiles.toml is the canonical typed profile authority. "
-            "tools/agent/orchestration/model_profile_registry.py materializes closed generated "
+            "tools/bin/agent-canon evaluate-codex-agent-roles materializes closed generated "
             ".codex/agents/*.toml and agents/agents_config.json views. Generated views "
             "are projection digest/readback surfaces and must never be edited manually; "
             "change registry/team/runtime source, regenerate, restart, and validate readback."

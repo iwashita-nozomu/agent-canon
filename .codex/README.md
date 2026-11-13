@@ -121,8 +121,8 @@ waive workflow gates and do not authorize dropping decision-relevant context.
 - `agents/model_profiles.toml` is the canonical typed authority for every
   parent and child model, reasoning, capability, context, return, checkpoint,
   and continuation field.
-- `tools/agent/orchestration/model_profile_registry.py` materializes closed
-  `.codex/agents/*.toml` and `agents/agents_config.json` generated views.
+- `tools/bin/agent-canon evaluate-codex-agent-roles` materializes and checks
+  closed `.codex/agents/*.toml` and `agents/agents_config.json` generated views.
 - `tools/validation/semantic/runtime/check_agent_runtime_alignment.py` and
   `eval/producers/evaluate_codex_agent_roles.py` validate the materialized
   agent TOML files directly.
