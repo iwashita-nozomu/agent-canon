@@ -160,22 +160,13 @@ fn find_current_repository_root(raw_root: &Path) -> Result<PathBuf, String> {
 
 fn resolve_override(value: &str) -> Result<PathBuf, String> {
     let expanded = expand_user_path(Path::new(value)).map_err(|error| error.to_string())?;
-    let resolved = resolve_non_strict(&expanded)?;
-    if !is_within(&resolved, &expanded) {
-        return Err(format!(
-            "source-root override resolves outside its declared root: {}",
-            resolved.display()
-        ));
-    }
-    Ok(resolved)
+    // Source selection is read-only. Compare and return physical paths; mutation
+    // authority remains with the separate no-follow filesystem capabilities.
+    resolve_non_strict(&expanded)
 }
 
 pub(crate) fn has_catalog(root: &Path) -> bool {
     root.join("agents/skills/catalog.yaml").is_file()
-}
-
-fn is_within(path: &Path, root: &Path) -> bool {
-    path == root || root.is_absolute() && path.starts_with(root)
 }
 
 fn env_value(environment: &BTreeMap<String, String>, key: &str) -> String {
@@ -263,6 +254,24 @@ mod tests {
         let failure = resolve_source_roots(&current, &environment).unwrap_err();
 
         assert_eq!(failure.code, "agent_canon_source_root_override_missing");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn explicit_alias_selects_the_same_physical_source_catalog() {
+        let temporary = tempfile::tempdir().expect("temporary root");
+        let source = temporary.path().join("source");
+        let alias = temporary.path().join("alias");
+        catalog(&source);
+        std::os::unix::fs::symlink(&source, &alias).expect("source alias");
+        let environment = BTreeMap::from([(
+            SOURCE_ROOT_OVERRIDE_ENV.to_owned(),
+            alias.display().to_string(),
+        )]);
+        let roots = resolve_source_roots(&source, &environment).expect("read-only source alias");
+        assert_eq!(roots.source_root, source.canonicalize().unwrap());
+        assert_eq!(roots.canon_root, source.canonicalize().unwrap());
+        assert_eq!(roots.layout, LAYOUT_EXTERNAL);
     }
 
     #[test]
