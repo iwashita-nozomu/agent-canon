@@ -274,3 +274,191 @@ fn candidate_qualification_preserves_authority_and_transient_finding_boundaries(
         "checkout-identity-unresolved"
     );
 }
+
+#[test]
+fn cli_preserves_unique_prefix_equals_and_rejects_flag_values() {
+    let root = fixture();
+    let log = tempfile::tempdir().unwrap();
+    let output = run(
+        root.path(),
+        &[
+            "--repo=owner/repo",
+            "--offline-t=Alias finding",
+            "--body-locator=/private/body.md",
+            "--body-digest=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "--log-root",
+            log.path().to_str().unwrap(),
+        ],
+    );
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let payload: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(payload["title"], "Alias finding");
+    assert_eq!(
+        run(root.path(), &["--receipt-preflight=yes"]).status.code(),
+        Some(2)
+    );
+    assert_eq!(run(root.path(), &["--receipt"]).status.code(), Some(2));
+}
+
+#[cfg(unix)]
+#[test]
+fn failed_resident_preflight_preserves_packet_before_any_github_operation() {
+    use std::os::unix::fs::PermissionsExt;
+    let root = fixture();
+    assert!(Command::new("git")
+        .arg("-C")
+        .arg(root.path())
+        .args([
+            "remote",
+            "add",
+            "origin",
+            "https://github.com/owner/repo.git"
+        ])
+        .status()
+        .unwrap()
+        .success());
+    let private = tempfile::tempdir().unwrap();
+    let body = private.path().join("body.md");
+    fs::write(&body, b"Issue body\n").unwrap();
+    let log = private.path().join("log");
+    let pending = log.join("feedback/issue-packets/pending/input.json");
+    fs::create_dir_all(pending.parent().unwrap()).unwrap();
+    use sha2::{Digest, Sha256};
+    fs::write(
+        &pending,
+        serde_json::to_vec(&json!({
+            "schema":"agent-canon.feedback.issue-packet.v1","status":"pending",
+            "repository":"owner/repo","title":"Finding","body_locator":body,
+            "body_digest":format!("sha256:{:x}",Sha256::digest(b"Issue body\n")),
+            "route":"issue-publication","input_mode":"issue-publication-initial"
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    let trace = private.path().join("commands");
+    let bootstrap = private.path().join("bootstrap.sh");
+    fs::write(
+        &bootstrap,
+        "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$TRACE\"\nexit 9\n",
+    )
+    .unwrap();
+    fs::set_permissions(&bootstrap, fs::Permissions::from_mode(0o700)).unwrap();
+    let source = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .ancestors()
+        .nth(4)
+        .unwrap();
+    let result = Command::new(env!("CARGO_BIN_EXE_agent-canon"))
+        .args(["issue-sync", "--sync-pending", "--log-root"])
+        .arg(&log)
+        .arg("--runtime-root")
+        .arg(private.path().join("runtime"))
+        .current_dir(root.path())
+        .env("AGENT_CANON_SOURCE_ROOT", source)
+        .env_remove("AGENT_CANON_ROOT")
+        .env("AGENT_CANON_BOOTSTRAP", &bootstrap)
+        .env("TRACE", &trace)
+        .output()
+        .unwrap();
+    assert_eq!(result.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&result.stderr).contains("issue_receipt_route_unavailable"));
+    assert!(pending.is_file());
+    let args = fs::read_to_string(trace).unwrap();
+    assert!(args.contains("tool\nrun\n--root\n"));
+    assert!(args.contains("issue-sync\n--\n--receipt-preflight\n"));
+    assert!(args.contains("--checkout-repository\nowner/repo\n"));
+}
+
+#[cfg(unix)]
+#[test]
+fn github_read_projects_clauses_and_saves_the_same_summary() {
+    use std::os::unix::fs::PermissionsExt;
+    let root = fixture();
+    let tools = tempfile::tempdir().unwrap();
+    let gh = tools.path().join("gh");
+    fs::write(&gh,"#!/bin/sh\nprintf '%s\\n' '{\"number\":882,\"title\":\"Issue authority\",\"body\":\"## Problem\\nEvidence: run-1.\\n\\n## Done\\nAdvisory cleanup.\",\"state\":\"OPEN\",\"url\":\"https://github.com/owner/repo/issues/882\"}'\n").unwrap();
+    fs::set_permissions(&gh, fs::Permissions::from_mode(0o700)).unwrap();
+    let summary = tools.path().join("nested/summary.json");
+    let result = Command::new(env!("CARGO_BIN_EXE_agent-canon"))
+        .args([
+            "issue-sync",
+            "--repo=owner/repo",
+            "--issue-url=882",
+            "--github-check",
+            "--summary-file",
+        ])
+        .arg(&summary)
+        .env("PATH", tools.path())
+        .current_dir(root.path())
+        .output()
+        .unwrap();
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    assert_eq!(fs::read(&summary).unwrap(), result.stdout);
+    let report: Value = serde_json::from_slice(&result.stdout).unwrap();
+    assert_eq!(report["github_checked"], 1);
+    assert_eq!(report["issues"][0]["state"], "open");
+    assert_eq!(report["issues"][0]["clauses"][0]["state"], "grounded");
+    assert_eq!(report["issues"][0]["clauses"][2]["state"], "advisory");
+    assert_eq!(
+        report["issues"][0]["clauses"][0]["repository"],
+        "owner/repo"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn retry_uses_exact_readback_and_keeps_packet_when_receipt_staging_fails() {
+    use std::os::unix::fs::PermissionsExt;
+    use sha2::{Digest,Sha256};
+    let root=fixture();
+    assert!(Command::new("git").arg("-C").arg(root.path())
+        .args(["remote","add","origin","git@github.com:owner/repo.git"])
+        .status().unwrap().success());
+    let private=tempfile::tempdir().unwrap();
+    let log=private.path().join("log");
+    let pending=log.join("feedback/issue-packets/pending/input.json");
+    fs::create_dir_all(pending.parent().unwrap()).unwrap();
+    let body=private.path().join("body.md");
+    fs::write(&body,b"Issue body\n").unwrap();
+    let packet=json!({"schema":"agent-canon.feedback.issue-packet.v1","status":"pending",
+        "repository":"owner/repo","title":"Finding","body_locator":body,
+        "body_digest":format!("sha256:{:x}",Sha256::digest(b"Issue body\n")),
+        "route":"issue-publication","input_mode":"structured-log"});
+    fs::write(&pending,serde_json::to_vec(&packet).unwrap()).unwrap();
+    let record=private.path().join("record.json");
+    fs::write(&record,serde_json::to_vec(&json!({"number":42,"title":"Finding","body":"Issue body\n",
+        "state":"OPEN","url":"https://github.com/owner/repo/issues/42"})).unwrap()).unwrap();
+    let gh=private.path().join("gh");
+    fs::write(&gh,"#!/bin/sh\nprintf '%s ' \"$@\" >> \"$TRACE\"\nprintf '\\n' >> \"$TRACE\"\ncase \"$2\" in list) printf '[{\"number\":42}]\\n';; view) /bin/cat \"$RECORD\";; *) exit 77;; esac\n").unwrap();
+    let bootstrap=private.path().join("bootstrap.sh");
+    fs::write(&bootstrap,"#!/bin/sh\nprintf '%s ' \"$@\" >> \"$TRACE\"\nprintf '\\n' >> \"$TRACE\"\ncase \" $* \" in *' --stage-publication-receipt '*) exit \"$STAGE_EXIT\";; *) exit 0;; esac\n").unwrap();
+    for script in [&gh,&bootstrap] { fs::set_permissions(script,fs::Permissions::from_mode(0o700)).unwrap(); }
+    let trace=private.path().join("trace");
+    let source=Path::new(env!("CARGO_MANIFEST_DIR")).ancestors().nth(4).unwrap();
+    let path=std::env::join_paths(std::iter::once(private.path().to_path_buf())
+        .chain(std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default()))).unwrap();
+    let invoke=|stage_exit:&str| Command::new(env!("CARGO_BIN_EXE_agent-canon"))
+        .args(["issue-sync","--sync-pending","--log-root"]).arg(&log)
+        .arg("--runtime-root").arg(private.path().join("runtime"))
+        .current_dir(root.path()).env("PATH",&path).env("TRACE",&trace).env("RECORD",&record)
+        .env("STAGE_EXIT",stage_exit).env("AGENT_CANON_BOOTSTRAP",&bootstrap)
+        .env("AGENT_CANON_SOURCE_ROOT",source).env_remove("AGENT_CANON_ROOT").output().unwrap();
+    let failed=invoke("8");
+    assert_eq!(failed.status.code(),Some(2),"{}",String::from_utf8_lossy(&failed.stderr));
+    assert!(String::from_utf8_lossy(&failed.stderr).contains("issue_receipt_write_failed"));
+    assert!(pending.is_file());
+    let succeeded=invoke("0");
+    assert!(succeeded.status.success(),"{}",String::from_utf8_lossy(&succeeded.stderr));
+    assert!(!pending.exists());
+    let trace=fs::read_to_string(trace).unwrap();
+    assert!(!trace.contains("issue create"));
+    assert!(trace.contains("--receipt-action noop"));
+    assert!(!trace.contains("Issue body"));
+}
