@@ -23,6 +23,10 @@ use std::process::Command;
 
 mod lexicon;
 
+pub(crate) fn analyze_prose_lexicon(texts: &[String], prompt: &str) -> Value {
+    lexicon::analyze_texts(texts, prompt)
+}
+
 const DOC_SUFFIXES: &[&str] = &["md", "rst", "txt"];
 const HEADER_SCAN_LINES: usize = 120;
 const HEADER_SCAN_BYTES: usize = 64 * 1024;

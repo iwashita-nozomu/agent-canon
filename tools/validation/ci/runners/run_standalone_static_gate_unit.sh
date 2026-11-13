@@ -218,7 +218,7 @@ run_contracts() {
   AGENT_CANON_NATIVE_BIN="${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" \
     python3 -m pytest -p no:cacheprovider -q tests/agent_tools/test_evaluate_agent_run.py
   python3 -m pytest -p no:cacheprovider \
-    tests/agent_tools/test_prose_reasoning_graph.py::ProseReasoningGraphTest::test_missing_dependency_annotation_is_not_a_blocker
+    tests/agent_tools/test_prose_reasoning_graph.py::ProseReasoningGraphTest::test_check_document_preserves_missing_manifest_severity
   "${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" tool-catalog
   "${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" tool-proof-coverage
   "${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" responsibility-scope --root "${ROOT}"

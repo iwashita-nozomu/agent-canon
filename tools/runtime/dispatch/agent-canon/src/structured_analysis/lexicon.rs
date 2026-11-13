@@ -147,6 +147,15 @@ impl Lexicon {
     }
 }
 
+pub(super) fn analyze_texts(texts: &[String], prompt: &str) -> Value {
+    let request = Request {
+        texts: texts.to_vec(),
+        prompt: prompt.to_owned(),
+    };
+    serde_json::to_value(Lexicon::new().analyze(&request))
+        .expect("prose lexicon response serializes")
+}
+
 fn cue_present(text: &str, cue: &str) -> bool {
     if !cue.is_ascii() {
         return text.contains(cue);
