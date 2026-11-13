@@ -4202,12 +4202,13 @@ _agent_canon_archive_eval_sync() {
     printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"warning","operation":"eval_sync","code":"host_adapter_deferred","execution_plane":"host_archive_adapter"}\n' >&2
     return 75
   }
-  if ! command -v python3 >/dev/null 2>&1; then
+  local archive_cli=${AGENT_CANON_NATIVE_BIN:-${AGENT_CANON_CLI:-$AGENT_CANON_REPOSITORY_ROOT/tools/bin/agent-canon}}
+  if ! "$archive_cli" --version >/dev/null 2>&1; then
     printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"warning","operation":"eval_sync","code":"host_adapter_deferred","execution_plane":"host_archive_adapter"}\n' >&2
     return 75
   fi
   local adapter_rc=0
-  python3 "$AGENT_CANON_REPOSITORY_ROOT/tools/runtime/archive/runtime_log_archive_git.py" \
+  "$archive_cli" runtime-log-archive-git \
     --source-root "$resolved_source" \
     --canon-root "$AGENT_CANON_REPOSITORY_ROOT" \
     --archive-root "$AGENT_CANON_PRIVATE_LOG_ROOT" \

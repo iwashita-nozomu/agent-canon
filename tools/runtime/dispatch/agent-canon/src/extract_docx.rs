@@ -1159,6 +1159,12 @@ fn decode_zip_name_untruncated(raw_name: &[u8], utf8_name: bool) -> Result<Strin
     Ok(raw_name.iter().copied().map(cp437_char).collect())
 }
 
+/// Decode one ZIP header name with the same UTF-8/CP437 policy used by the
+/// bounded DOCX reader.
+pub fn decode_zip_member_name(raw_name: &[u8], utf8_name: bool) -> Result<String, String> {
+    decode_zip_name_untruncated(raw_name, utf8_name)
+}
+
 fn python_repr(value: &str) -> String {
     rustpython_ast::Constant::Str(value.to_owned()).to_string()
 }

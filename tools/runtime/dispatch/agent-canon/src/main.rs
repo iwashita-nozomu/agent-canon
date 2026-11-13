@@ -88,6 +88,7 @@ use agent_canon::python_text;
 mod responsibility_scope;
 mod result_logs;
 mod rule_inventory;
+mod runtime_log_archive;
 mod run_log_contract;
 mod rust_migration_plan;
 mod semantic_index;
@@ -209,6 +210,7 @@ Commands:
   compose-consumer-entrypoint --base <path> --specific <path> --output <path> [--source-root <path>]
   template-bundle <export|committed-tree|verify|native-package|native-verify|native-version> [options]
   native-release <prepare|select-artifacts|publish|compare-reproducible> [options]
+  runtime-log-archive-git <archive command> [options]
 
 Options:
   -h, --help     Print help
@@ -249,6 +251,10 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "run-evaluation" {
         std::process::exit(run_evaluation::run_cli(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "runtime-log-archive-git" {
+        std::process::exit(runtime_log_archive::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == agent_canon::eval_accumulation_check::SELECTOR {

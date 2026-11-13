@@ -176,27 +176,38 @@ fn runtime_environment_value<'a>(
     environment.get(name).map(|value| value.as_str())
 }
 
+/// Return the configured raw source remote, falling back to the selected Git
+/// remote in the supplied source root.
+pub fn source_remote_from_runtime_env(
+    root: Option<&Path>,
+    environment: &std::collections::BTreeMap<String, String>,
+) -> Result<String, SourceRepositoryIdentityError> {
+    let remote = runtime_environment_value(environment, SOURCE_REMOTE_ENV)
+        .map(python_strip)
+        .unwrap_or_default();
+    if !remote.is_empty() {
+        return Ok(remote.to_owned());
+    }
+    let Some(root) = root else {
+        return Ok(String::new());
+    };
+    let remote_name = runtime_environment_value(environment, SOURCE_REMOTE_NAME_ENV)
+        .map(python_strip)
+        .unwrap_or("origin");
+    remote_from_git_config(root, if remote_name.is_empty() { "origin" } else { remote_name })
+}
+
+/// Resolve the raw source remote from process environment and local Git config.
+pub fn source_remote(root: &Path) -> Result<String, SourceRepositoryIdentityError> {
+    let environment = std::env::vars().collect::<std::collections::BTreeMap<_, _>>();
+    source_remote_from_runtime_env(Some(root), &environment)
+}
+
 pub fn stable_source_id_from_runtime_env(
     root: Option<&Path>,
     environment: &std::collections::BTreeMap<String, String>,
 ) -> Result<String, SourceRepositoryIdentityError> {
-    let mut remote = runtime_environment_value(environment, SOURCE_REMOTE_ENV)
-        .map(python_strip)
-        .unwrap_or_default()
-        .to_owned();
-    if remote.is_empty() {
-        if let Some(root) = root {
-            let remote_name = runtime_environment_value(environment, SOURCE_REMOTE_NAME_ENV)
-                .map(python_strip)
-                .unwrap_or("origin");
-            let remote_name = if remote_name.is_empty() {
-                "origin"
-            } else {
-                remote_name
-            };
-            remote = remote_from_git_config(root, remote_name)?;
-        }
-    }
+    let remote = source_remote_from_runtime_env(root, environment)?;
     if remote.is_empty() {
         return Ok(UNIDENTIFIED_SOURCE.to_owned());
     }
