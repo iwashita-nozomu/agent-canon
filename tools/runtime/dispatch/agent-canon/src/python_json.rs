@@ -287,6 +287,13 @@ pub fn parse_json_reject_duplicates(input: &str) -> Result<JsonValue, String> {
     JsonParser::new(input.as_bytes(), true).parse()
 }
 
+/// Preserve json.loads' constants while rejecting repeated keys at every depth.
+pub fn parse_json_unique_keys(input: &str) -> Result<JsonValue, String> {
+    let mut parser = JsonParser::new(input.as_bytes(), true);
+    parser.reject_nonfinite = false;
+    parser.parse()
+}
+
 fn append_wtf8(codepoint: u32, output: &mut Vec<u8>) -> Result<(), String> {
     match codepoint {
         0x00..=0x7f => output.push(codepoint as u8),
@@ -429,6 +436,24 @@ fn decode_utf32_surrogatepass(bytes: &[u8], little_endian: bool) -> Result<Vec<u
 
 /// Decode Python json.loads(bytes) encodings with surrogatepass semantics.
 pub fn parse_json_bytes(bytes: &[u8]) -> Result<JsonValue, String> {
+    parse_json_python_string(&decode_json_bytes(bytes)?)
+}
+
+pub fn parse_json_bytes_unique_keys(bytes: &[u8]) -> Result<JsonValue, String> {
+    let value = decode_json_bytes(bytes)?;
+    if let Some(text) = value.to_text() {
+        return parse_json_unique_keys(&text);
+    }
+    let mut encoded = Vec::new();
+    for codepoint in value.0 {
+        append_wtf8(codepoint, &mut encoded)?;
+    }
+    let mut parser = JsonParser::new(&encoded, true);
+    parser.reject_nonfinite = false;
+    parser.parse()
+}
+
+fn decode_json_bytes(bytes: &[u8]) -> Result<JsonString, String> {
     let (encoding, bom_length) = detect_json_byte_encoding(bytes);
     let payload = &bytes[bom_length..];
     let codepoints = match encoding {
@@ -438,7 +463,7 @@ pub fn parse_json_bytes(bytes: &[u8]) -> Result<JsonValue, String> {
         JsonByteEncoding::Utf32Le => decode_utf32_surrogatepass(payload, true)?,
         JsonByteEncoding::Utf32Be => decode_utf32_surrogatepass(payload, false)?,
     };
-    parse_json_python_string(&JsonString(codepoints))
+    Ok(JsonString(codepoints))
 }
 
 // Python accepts 9,994 arrays nested inside the record object (9,995 containers total).
@@ -507,6 +532,7 @@ struct JsonParser<'a> {
     bytes: &'a [u8],
     index: usize,
     strict: bool,
+    reject_nonfinite: bool,
 }
 
 impl<'a> JsonParser<'a> {
@@ -515,6 +541,7 @@ impl<'a> JsonParser<'a> {
             bytes,
             index: 0,
             strict,
+            reject_nonfinite: strict,
         }
     }
 
@@ -685,21 +712,21 @@ impl<'a> JsonParser<'a> {
             }
             Some(b'N') => {
                 self.consume_literal("NaN")?;
-                if self.strict {
+                if self.reject_nonfinite {
                     return Err("non-finite JSON constants are not accepted".to_owned());
                 }
                 Ok(Some(JsonValue::Number(JsonNumber::Float(f64::NAN))))
             }
             Some(b'I') => {
                 self.consume_literal("Infinity")?;
-                if self.strict {
+                if self.reject_nonfinite {
                     return Err("non-finite JSON constants are not accepted".to_owned());
                 }
                 Ok(Some(JsonValue::Number(JsonNumber::Float(f64::INFINITY))))
             }
             Some(b'-') if self.bytes[self.index..].starts_with(b"-Infinity") => {
                 self.consume_literal("-Infinity")?;
-                if self.strict {
+                if self.reject_nonfinite {
                     return Err("non-finite JSON constants are not accepted".to_owned());
                 }
                 Ok(Some(JsonValue::Number(JsonNumber::Float(

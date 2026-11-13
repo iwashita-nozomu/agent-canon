@@ -107,7 +107,7 @@ tools/bin/agent-canon jsonl-to-md <input.jsonl> <output.md>
 tools/bin/agent-canon summarize-hlo-jsonl <hlo.jsonl> > summary.json
 python3 tools/experiments/artifacts/html_artifact_access.py <report.html>
 git annex add <archive-path>
-python3 -m tools.experiments.artifacts.update_latest_result experiments/<topic>/result --variant <variant>
+agent-canon update-latest-result experiments/<topic>/result --variant <variant>
 dot -V
 ```
 

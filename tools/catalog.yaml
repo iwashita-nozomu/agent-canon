@@ -129,7 +129,6 @@ family_values:
   - oop_cpp
   - data
   - hlo
-  - audit
   - experiments
   - validation
   - root
@@ -199,11 +198,6 @@ families:
     root: tools/analysis/hlo
     summary: HLO result summarization helpers.
     audience: agent
-    placement: support_library
-  audit:
-    root: tools/audit/logging
-    summary: Portable audit log schema and writer helpers.
-    audience: internal
     placement: support_library
   experiments:
     root: tools/experiments
@@ -2441,42 +2435,6 @@ entries:
     tests:
       - tests/tools/test_result_log_tools.py
 
-  - id: audit-log-schema
-    summary: Defines the portable audit log schema.
-    path: tools/audit/logging/audit_log_schema.py
-    family: audit
-    role: audit
-    status: canonical
-    command: python3 tools/audit/logging/audit_log_schema.py
-    dispatch: {argv: ["python3", "tools/audit/logging/audit_log_schema.py"]}
-    writes: false
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-    tests: []
-    test_exempt_reason: Library-style schema support used by audit_logger.py.
-
-  - id: audit-logger
-    summary: Writes portable automation events to JSONL audit logs.
-    path: tools/audit/logging/audit_logger.py
-    family: audit
-    role: audit
-    status: canonical
-    command: python3 tools/audit/logging/audit_logger.py
-    dispatch: {argv: ["python3", "tools/audit/logging/audit_logger.py"]}
-    writes: true
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-    tests: []
-    test_exempt_reason: Portable helper; covered by repo-local audit use.
-
   - id: run-managed-experiment
     summary: Creates and tracks shared managed experiment runs.
     path: tools/experiments/execution/run_managed_experiment.py
@@ -2519,12 +2477,12 @@ entries:
 
   - id: update-latest-result
     summary: Updates LATEST pointers for experiment result roots.
-    path: tools/experiments/artifacts/update_latest_result.py
+    path: tools/runtime/dispatch/agent-canon/src/latest_result.rs
     family: experiments
     role: experiment
     status: canonical
-    command: python3 -m tools.experiments.artifacts.update_latest_result
-    dispatch: {argv: ["python3", "-m", "tools.experiments.artifacts.update_latest_result"]}
+    command: tools/bin/agent-canon update-latest-result
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "update-latest-result"]}
     writes: true
     default_wiring:
       ci: false

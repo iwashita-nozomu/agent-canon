@@ -5,7 +5,6 @@
 # upstream design ../../../documents/experiments/experiment-registry.md defines experiment identity.
 # downstream implementation ../execution/run_managed_experiment.py consumes this owner
 # downstream implementation ../artifacts/save_experiment_result_annex.py consumes this owner
-# downstream implementation ../artifacts/update_latest_result.py consumes this owner
 # @dependency-end
 """Canonical identity and path helpers for managed experiment runs.
 

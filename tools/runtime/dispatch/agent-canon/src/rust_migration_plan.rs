@@ -510,7 +510,7 @@ fn build_plan(root: &Path, limit: usize) -> Result<Plan, String> {
     for relative in SCAN_ROOTS {
         if root.join(relative).exists() {
             collect_sources(root, Path::new(relative), &mut paths)?;
-        } else {
+        } else if *relative != ".codex/hooks" {
             findings.push(format!("inventory-root-missing:{relative}"));
         }
     }
@@ -760,6 +760,16 @@ mod tests {
             "owned-python-implementation"
         );
         assert_eq!(classification("tools/view.py", "", true), "source-view");
+    }
+
+    #[test]
+    fn retired_python_hooks_need_no_empty_directory_in_a_source_checkout() {
+        let root = fixture();
+        fs::remove_dir(root.join(".codex/hooks")).unwrap();
+        let plan = build_plan(&root, 12).unwrap();
+        assert!(plan.findings.is_empty());
+        assert!(plan.owned_python_by_scope.is_empty());
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
