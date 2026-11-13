@@ -8,7 +8,7 @@ upstream design ../canonical/skills.md shared skill canon registry
 upstream design ../../documents/rule/dependency-module-changes.md detailed dependency module policy
 upstream design ../../documents/contracts/github-first-module-and-devcontainer-policy.md canonical topic workspace and VS Code workspace boundary
 upstream design ../../documents/design/request-intent-and-update-relation.md immediate dependency-checkout cleanup projection
-downstream implementation ../../tools/repository/workspace/dependency_module_change.py lifecycle tool
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/dependency_module_change.rs native lifecycle command
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/runtime_alignment.rs validates skill registration
 @dependency-end
 -->
@@ -63,9 +63,8 @@ topological order で進めます。未解決 edge / cycle は design / order is
 変更しません。
 
 ```bash
-python3 tools/repository/workspace/dependency_module_change.py --root <parent-root> prepare \
-  --topic <topic> --module <path> --branch <branch> \
-  [--allowed-path <relative-path> ...]
+tools/bin/agent-canon dependency-module-change --root <parent-root> prepare \
+  --topic <topic> --module <path> --branch <branch>
 ```
 
 通常の closeout cleanup は canonical lifecycle artifact を materialize せず、manifest から
@@ -74,9 +73,8 @@ python3 tools/repository/workspace/dependency_module_change.py --root <parent-ro
 同じ call に渡します。dry-run も同じ選択された proof を検証し、pass 後だけ `--apply` します。
 
 ```bash
-python3 tools/repository/workspace/dependency_module_change.py --root <parent-root> cleanup \
+tools/bin/agent-canon dependency-module-change --root <parent-root> cleanup \
   --topic <topic> --module <path> --branch <branch> \
-  [--allowed-path <relative-path> ...] \
   [--candidate-cas <candidate-cas.json> --pr-lifecycle <pr-lifecycle.json> \
   [--publication-readback <publication-readback.json>]] [--apply]
 ```
@@ -85,10 +83,8 @@ completion evidence は generic prepare/merge receipt、dependency identity read
 pin/projection validation、および必要に応じた canonical publication evidence と `CleanupProof`
 です。
 
-`prepare`、`merge-main`、`cleanup` は write-capable generic lifecycle に `allowed_paths` を
-明示的に渡します。`--allowed-path` を省略した canonical dependency operation は checkout 全体を
-所有するため `.` を明示値として使い、狭い責務を持つ caller は repeated option で範囲を
-指定します。adapter や generic lifecycle 側で scope を暗黙補完しません。
+`prepare`、`merge-main`、`cleanup` は computed checkout path と selected Git identity を使います。
+caller は current task scope と Git diff を確認し、unknown state を保持します。
 
 completion ではこの skill が canonical `cleanup` を dispatch し、computed checkout path、owner
 evidence/marker、clean branch、および fetch した `origin/<branch>` の head/tree 一致を検証

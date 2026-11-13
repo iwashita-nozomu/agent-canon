@@ -185,7 +185,7 @@ summary = "Semantic responsibility contract schema, identity, and reference chec
 [[tool]]
 id = "repository-topic-clone"
 classification = "public"
-tool = "tools/repository/workspace/repository_topic_clone.py"
+tool = "tools/runtime/dispatch/agent-canon/src/repository_topic_clone.rs"
 doc = "documents/tools/repository_topic_clone.md"
 language = "python"
 summary = "Generic repository topic checkout lifecycle and reconstructibility cleanup documentation."
@@ -209,7 +209,7 @@ summary = "Creates a selected Python or C++ experiment topic and registers it in
 [[tool]]
 id = "dependency-module-change"
 classification = "public"
-tool = "tools/repository/workspace/dependency_module_change.py"
+tool = "tools/runtime/dispatch/agent-canon/src/dependency_module_change.rs"
 doc = "documents/tools/dependency_module_change.md"
 language = "python"
 summary = "Dependency policy decorator for the generic repository topic clone lifecycle."
