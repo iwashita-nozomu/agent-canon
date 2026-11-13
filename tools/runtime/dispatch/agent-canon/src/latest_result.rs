@@ -604,7 +604,7 @@ mod tests {
     #[test]
     fn second_pointer_failure_restores_first_and_leaves_no_temporary() {
         let temporary = tempfile::tempdir().expect("temporary root");
-        let path = temporary.path().join("experiments/demo/result");
+        let path = temporary.path().canonicalize().expect("canonical fixture root").join("experiments/demo/result");
         fs::create_dir_all(&path).expect("result root");
         let root = LockedRoot::open(&path).expect("locked root");
         let names = ["LATEST.smoke.json".to_owned(), "LATEST.smoke.md".to_owned()];

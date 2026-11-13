@@ -191,6 +191,36 @@ fn source_capability_writes_only_the_approved_file() {
 }
 
 #[test]
+fn streaming_publication_preserves_collisions_and_cleans_partial_output() {
+    use std::io::Write;
+
+    let root = TempRoot::new();
+    root.write("archive/keep.txt", "keep\n");
+    let target = root.0.join("archive/result.tar.gz");
+    let capability = capability(&root.0, &["archive/result.tar.gz"]);
+    capability
+        .publish_noreplace_with(&target, 0o644, |file| file.write_all(b"archive bytes"))
+        .expect("first publication succeeds");
+    assert!(capability
+        .publish_noreplace_with(&target, 0o644, |file| file.write_all(b"replacement"))
+        .is_err());
+    assert_eq!(fs::read(&target).unwrap(), b"archive bytes");
+    fs::remove_file(&target).unwrap();
+    assert!(capability
+        .publish_noreplace_with(&target, 0o644, |file| {
+            file.write_all(b"partial")?;
+            Err(std::io::Error::other("injected writer failure"))
+        })
+        .is_err());
+    assert!(!target.exists());
+    let names: Vec<_> = fs::read_dir(root.0.join("archive"))
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name())
+        .collect();
+    assert_eq!(names, vec![std::ffi::OsString::from("keep.txt")]);
+}
+
+#[test]
 fn source_capability_removes_only_the_approved_file() {
     let root = TempRoot::new();
     let approved = root.write("docs/approved.md", "remove me\n");

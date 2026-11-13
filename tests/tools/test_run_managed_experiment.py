@@ -375,10 +375,6 @@ def test_rollback_rejects_replaced_report_parent_inode(tmp_path: Path) -> None:
             "tools/experiments/execution/run_managed_experiment.py",
             "tools.experiments.execution.run_managed_experiment",
         ),
-        (
-            "tools/experiments/artifacts/save_experiment_result_annex.py",
-            "tools.experiments.artifacts.save_experiment_result_annex",
-        ),
     ),
 )
 def test_public_experiment_entrypoints_support_direct_and_module_forms(

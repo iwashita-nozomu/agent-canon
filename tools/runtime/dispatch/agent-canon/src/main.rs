@@ -169,6 +169,7 @@ Commands:
   check-semantic-responsibility-contract [paths...] [--root ROOT] [--template TEMPLATE] [--instance INSTANCE] [--artifact-root ARTIFACT_ROOT] [--format text|json]
   check-solid-evidence [paths...] [--root ROOT] [--changed] [--base-ref BASE_REF] [--evidence EVIDENCE] [--exclude EXCLUDE] [--verbose] [--format text|json]
   rust-migration-audit --root <repo-root>
+  save-experiment-result-annex --raw-dir PATH [--annex-repo PATH] [options]
   update-latest-result RESULT_ROOT --variant VARIANT [--result-dir PATH]
   html-artifact-access REPORT_PATH [options]
   sync-experiment-registry-context --topic TOPIC [options]
@@ -272,6 +273,9 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "tool-catalog" {
         std::process::exit(catalog::tool_catalog::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "save-experiment-result-annex" {
+        std::process::exit(agent_canon::annex_retention::run(&args[2..]));
     }
     if args.len() >= 2 && args[1] == "update-latest-result" {
         std::process::exit(agent_canon::latest_result::run(&args[2..]));
