@@ -1,20 +1,20 @@
 <!--
 @dependency-start
 contract reference
-responsibility Documents tools/analysis/code/cpp_source_canonical_ir.py usage and output contract.
-upstream implementation ../../tools/analysis/proof/jit_canonical_ir.py defines the shared thin operational IR shape.
-downstream implementation ../../tools/analysis/proof/cpp_template_to_lean.py owns the canonical C++ to Lean route.
-downstream implementation ../../tools/analysis/code/cpp_source_canonical_ir.py extracts C++ source-canonical IR.
+responsibility Documents the native cpp-source-canonical-ir command and output contract.
+upstream design jit_canonical_ir.md defines the shared thin operational IR shape.
+downstream implementation cpp_template_to_lean.md owns the canonical C++ to Lean route.
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/cpp_source_canonical_ir.rs extracts C++ source-canonical IR.
 downstream implementation ../../tests/agent_tools/test_cpp_source_canonical_ir.py validates C++ source extraction.
 @dependency-end
 -->
 
-# cpp_source_canonical_ir.py
+# cpp-source-canonical-ir
 
-`tools/analysis/code/cpp_source_canonical_ir.py` extracts a source-only C++ slice
-and emits the same nested thin operational IR used by the JIT-canonical Python
+`agent-canon cpp-source-canonical-ir` extracts a source-only C++ slice
+and emits the same nested thin operational IR used by the JIT-canonical
 frontend. It is the internal source envelope producer and diagnostic record
-tool behind `cpp_template_to_lean.py`; it is not the canonical user-facing C++
+tool behind `cpp-template-to-lean`; it is not the canonical user-facing C++
 to Lean route.
 
 ## Reader Map
@@ -22,14 +22,14 @@ to Lean route.
 - Owns the diagnostic C++ source-canonical IR extraction contract.
 - Main path: Command, Output Contract, and Boundary.
 - Read this when inspecting or debugging the C++ source envelope behind
-  `cpp_template_to_lean.py`.
+  `cpp-template-to-lean`.
 - Boundary: this is not the canonical user-facing C++ to Lean route; use
-  `cpp_template_to_lean.py` for full expansion and Lean output.
+  `cpp-template-to-lean` for full expansion and Lean output.
 
 ## Command
 
 ```bash
-python3 tools/analysis/code/cpp_source_canonical_ir.py \
+tools/bin/agent-canon cpp-source-canonical-ir \
   --root . \
   --cpp-symbol include/algorithm.hpp::solve \
   --format json \
@@ -85,7 +85,7 @@ idea and joins the current operational IR surface.
 For C++ template algorithm roots, use the single full-expansion route:
 
 ```bash
-python3 tools/analysis/proof/cpp_template_to_lean.py \
+tools/bin/agent-canon cpp-template-to-lean \
   --root . \
   --cpp-symbol include/algorithm.hpp::solve \
   --namespace Generated.CppSolve \
@@ -94,7 +94,7 @@ python3 tools/analysis/proof/cpp_template_to_lean.py \
   --record-out reports/cpp-source-ir/solve.json
 ```
 
-That command invokes this extractor internally, checks complete operational and
+That command invokes the native extractor internally, checks complete operational and
 code-path coverage, and renders Lean evidence only after the selected C++ source
 route has no unresolved call targets, no unassigned operation rows, and no
 reachable function missing a code-path row. It does not emit StableHLO/backend

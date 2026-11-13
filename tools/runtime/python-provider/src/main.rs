@@ -12,6 +12,7 @@ use std::io::{self, Read};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
+mod jit_runtime;
 mod proof_trace_alignment;
 
 #[derive(Default)]
@@ -207,7 +208,7 @@ fn main() {
     let args: Vec<_> = std::env::args().skip(1).collect();
     let Some(command) = args.first().map(String::as_str) else {
         eprintln!(
-            "usage: agent-canon-python-provider <html-extract|pdf-extract|trace-json|proof-source|runtime> [arguments]"
+            "usage: agent-canon-python-provider <html-extract|pdf-extract|trace-json|proof-source|jit-lower|module-location|runtime> [arguments]"
         );
         std::process::exit(2);
     };
@@ -236,6 +237,23 @@ fn main() {
                     "{}",
                     serde_json::json!({"status":"fail","available":!unavailable,"error":error.to_string()})
                 );
+                std::process::exit(1);
+            }
+        }
+    }
+    if command == "jit-lower" && (args.len() == 3 || args.len() == 4 || args.len() == 5) {
+        let input_device = args
+            .get(3)
+            .filter(|value| !value.is_empty())
+            .map(String::as_str);
+        let compile_for_dump = args.get(4).is_some_and(|value| value == "true");
+        match jit_runtime::jit_lower(&args[1], &args[2], input_device, compile_for_dump) {
+            Ok(value) => {
+                println!("{value}");
+                std::process::exit(0);
+            }
+            Err(error) => {
+                println!("{}", json!({"status":"fail","error":error.to_string()}));
                 std::process::exit(1);
             }
         }
