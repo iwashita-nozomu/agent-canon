@@ -264,7 +264,7 @@ class NativeToolDispatchTests(unittest.TestCase):
             )
         self.assertEqual(
             entries["issue-sync"]["argv"],
-            ["python3", "tools/repository/github/issue_sync.py"],
+            ["tools/bin/agent-canon", "issue-sync"],
         )
         self.assertEqual(entries["issue-sync"]["output_root"], "external-runtime")
         self.assertEqual(

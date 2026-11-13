@@ -3,7 +3,7 @@
 // responsibility Reads repository-qualified GitHub Issues and projects existing Issue clauses.
 // upstream design ../../../../../documents/runtime/private-feedback-knowledge.md owns private offline packet storage
 // upstream design ../../../../../agents/skills/issue-finding-report.md owns Issue publication decisions
-// downstream test ../../../../../tests/agent_tools/test_issue_sync.py verifies readback and offline identities
+// downstream test ../tests/issue_sync_native.rs verifies readback and offline identities
 // @dependency-end
 
 use crate::python_text::{python_splitlines, python_strip};
