@@ -1626,6 +1626,16 @@ mod tests {
     #[test]
     fn dropped_unproven_reservation_keeps_active_record_and_cannot_be_reacquired() {
         use std::os::unix::fs::PermissionsExt;
+        const ISOLATED: &str = "AGENT_CANON_TEST_ISOLATED_FLOCK";
+        if std::env::var_os(ISOLATED).is_none() {
+            let output = std::process::Command::new(std::env::current_exe().expect("test executable"))
+                .args(["--exact", "execution_resource_plan::tests::dropped_unproven_reservation_keeps_active_record_and_cannot_be_reacquired", "--nocapture"])
+                .env(ISOLATED, "1")
+                .output()
+                .expect("isolated reservation-drop fixture process");
+            assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+            return;
+        }
         let root = tempfile::tempdir_in(
             std::env::temp_dir()
                 .canonicalize()
