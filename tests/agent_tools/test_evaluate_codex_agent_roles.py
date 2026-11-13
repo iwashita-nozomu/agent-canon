@@ -28,11 +28,6 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "bin" / "agent-canon"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
-from tools.agent.orchestration.team_config import (
-    load_task_catalog,
-    load_team_config,
-    select_roles,
-)  # noqa: E402
 
 FIRST_RUNTIME_TOKENS = 100
 FIRST_RUNTIME_LATENCY_MS = 25
@@ -568,21 +563,25 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
             self.assertNotIn("Traceback", result.stderr)
 
     def test_role_candidate_order_comes_from_target_team_config(self) -> None:
-        """Logical role candidates do not depend on a task-graph materializer."""
+        """The native role evaluator rejects a changed canonical candidate order."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             copy_eval_root(root)
-            config = load_team_config(root / "agents" / "agents_config.json")
-            catalog = load_task_catalog(config, root=root)
-            roles = select_roles(
-                config,
-                ["implementer"],
-                full_team=False,
-                catalog=catalog,
-                workflow_family_id="owner_bounded_change",
+            baseline = run_eval("--root", str(root), "--format", "json")
+            self.assertEqual(baseline.returncode, 0, baseline.stdout + baseline.stderr)
+            team_path = root / "agents" / "agents_config.json"
+            team = json.loads(team_path.read_text(encoding="utf-8"))
+            implementer = next(
+                role
+                for role in team["always_on_roles"] + team["specialist_roles"]
+                if role["id"] == "implementer"
             )
-            self.assertEqual(roles[0].id, "implementer")
-            self.assertEqual(roles[0].codex_agents, ("worker", "spark_worker"))
+            implementer["codex_agents"] = ["spark_worker", "worker"]
+            team_path.write_text(json.dumps(team, indent=2) + "\n", encoding="utf-8")
+
+            changed = run_eval("--root", str(root), "--format", "json")
+            self.assertEqual(changed.returncode, 1)
+            self.assertIn("role-candidate-order-expected-", changed.stdout)
 
     def test_evaluator_grammar_is_packet_driven_and_parent_scored(self) -> None:
         """Evaluator execution is a closed view generated from canonical profile truth."""

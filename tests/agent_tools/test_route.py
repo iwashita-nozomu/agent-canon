@@ -20,10 +20,10 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import tomllib
 import unittest
 from pathlib import Path
 
+import tomllib
 import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -37,11 +37,6 @@ CAPABILITY_ROUTE_GOLDEN = (
 )
 sys.path.insert(0, str(PROJECT_ROOT))
 import tools.agent.skills.skill_route_catalog as catalog_module  # noqa: E402
-from tools.agent.orchestration.team_config import (  # noqa: E402
-    default_specialists_for_task,
-    load_task_catalog,
-    load_team_config,
-)
 
 
 def _route_environment(
@@ -385,35 +380,49 @@ class RouteToolTest(unittest.TestCase):
 
     def test_research_tasks_put_math_route_before_generic_specialists(self) -> None:
         """T4/T5 expose a conditional math route before generic specialists."""
-        config = load_team_config()
-        catalog = load_task_catalog(config)
+        alignment = subprocess.run(
+            [
+                str(AGENT_CANON_CLI),
+                "check-agent-runtime-alignment",
+                "--root",
+                str(PROJECT_ROOT),
+            ],
+            cwd=PROJECT_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(alignment.returncode, 0, alignment.stdout + alignment.stderr)
+        catalog = yaml.safe_load(
+            (PROJECT_ROOT / "agents/task_catalog.yaml").read_text(encoding="utf-8")
+        )
+        route = catalog["math_intent_routes"]["mathematical_correction"]
+        self.assertEqual(
+            route,
+            {
+                "id": "mathematical_correction",
+                "requires_math_intent": True,
+                "activation": "mathematical_or_numerical_correction_evidence",
+                "owner_skill": "computational-optimization",
+                "reviewer": "mathematical_correctness_reviewer",
+                "required_packet": "mathematical_intent_packet",
+            },
+        )
+        research_family = next(
+            family
+            for family in catalog["workflow_families"]
+            if family["id"] == "research_driven_change"
+        )
+        self.assertIn(
+            "mathematical_correctness_reviewer",
+            research_family["roles"]["specialists"],
+        )
         for task_id in ("T4", "T5"):
             with self.subTest(task_id=task_id):
-                task = next(item for item in catalog.tasks if item["id"] == task_id)
-                route = task["math_intent_route"]
-                self.assertEqual(route, "mathematical_correction")
-                self.assertEqual(
-                    catalog.raw["math_intent_routes"][route],
-                    {
-                        "id": "mathematical_correction",
-                        "requires_math_intent": True,
-                        "activation": "mathematical_or_numerical_correction_evidence",
-                        "owner_skill": "computational-optimization",
-                        "reviewer": "mathematical_correctness_reviewer",
-                        "required_packet": "mathematical_intent_packet",
-                    },
-                )
-                self.assertIn(
-                    "mathematical_correctness_reviewer",
-                    next(
-                        family
-                        for family in catalog.workflow_families
-                        if family["id"] == "research_driven_change"
-                    )["roles"]["specialists"],
-                )
+                task = next(item for item in catalog["tasks"] if item["id"] == task_id)
+                self.assertEqual(task["math_intent_route"], "mathematical_correction")
                 self.assertNotIn(
-                    "mathematical_correctness_reviewer",
-                    default_specialists_for_task(config, catalog, task_id),
+                    "mathematical_correctness_reviewer", task["specialists"]
                 )
 
     def test_math_scope_contract_is_owned_and_routed(self) -> None:
@@ -1540,11 +1549,25 @@ class RouteToolTest(unittest.TestCase):
 
     def test_comprehensive_tasks_project_cross_module_handoff_guidance(self) -> None:
         """T11/T12 inherit the conditional dependency-resolution prompt."""
-        config = load_team_config()
-        catalog = load_task_catalog(config)
+        alignment = subprocess.run(
+            [
+                str(AGENT_CANON_CLI),
+                "check-agent-runtime-alignment",
+                "--root",
+                str(PROJECT_ROOT),
+            ],
+            cwd=PROJECT_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(alignment.returncode, 0, alignment.stdout + alignment.stderr)
+        catalog = yaml.safe_load(
+            (PROJECT_ROOT / "agents/task_catalog.yaml").read_text(encoding="utf-8")
+        )
         family = next(
             family
-            for family in catalog.workflow_families
+            for family in catalog["workflow_families"]
             if family["id"] == "comprehensive_development"
         )
         rendered = json.dumps(family["subagent_prompt"], ensure_ascii=False)
@@ -1564,7 +1587,11 @@ class RouteToolTest(unittest.TestCase):
         ):
             self.assertIn(marker, rendered)
         self.assertEqual(
-            [task["family"] for task in catalog.tasks if task["id"] in ("T11", "T12")],
+            [
+                task["family"]
+                for task in catalog["tasks"]
+                if task["id"] in ("T11", "T12")
+            ],
             ["comprehensive_development", "comprehensive_development"],
         )
 
