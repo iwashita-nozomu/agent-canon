@@ -1002,6 +1002,42 @@ fn test_atomic_publish_and_readback_keep_exact_bytes_and_private_mode() {
 }
 
 #[test]
+fn test_parent_owned_removal_uses_lexical_entry_snapshot() {
+    use std::os::unix::fs::symlink;
+
+    let temp = TempDir::new();
+    git_repo(temp.path(), "https://example.invalid/parent.git");
+    let attested = native_attested_root(temp.path(), "remove-test");
+    let target = temp.path().join("target.txt");
+    fs::write(&target, b"keep target").expect("write in-root target");
+    let link = temp.path().join("receipt.json");
+    symlink(&target, &link).expect("create in-root receipt alias");
+    let receipt = attested
+        .resolve_parent_owned_path(Path::new("receipt.json"), nonempty("remove-test"))
+        .expect("capture receipt and lexical alias identities");
+
+    attested
+        .remove_parent_owned_file(&receipt)
+        .expect("remove the receipt through its opened lexical parent");
+    assert!(!link.exists(), "the lexical receipt alias is removed");
+    assert_eq!(
+        fs::read(&target).expect("physical target remains"),
+        b"keep target"
+    );
+    assert_reject(
+        attested.remove_parent_owned_file(&receipt),
+        ParentRootReject::RootRaceDetected,
+    );
+
+    let absent = attested
+        .resolve_parent_owned_path(Path::new("absent.json"), nonempty("remove-test"))
+        .expect("capture absent path");
+    attested
+        .remove_parent_owned_file(&absent)
+        .expect("removing an already absent receipt is idempotent");
+}
+
+#[test]
 fn test_noreplace_publish_classifies_identical_and_conflicting_bytes() {
     let temp = TempDir::new();
     git_repo(temp.path(), "https://example.invalid/parent.git");

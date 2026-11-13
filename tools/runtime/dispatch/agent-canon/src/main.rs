@@ -170,12 +170,19 @@ Commands:
   check-solid-evidence [paths...] [--root ROOT] [--changed] [--base-ref BASE_REF] [--evidence EVIDENCE] [--exclude EXCLUDE] [--verbose] [--format text|json]
   rust-migration-audit --root <repo-root>
   issue-sync [--repo OWNER/REPO] [--issue-url URL] [options]
+  check-proof-trace-alignment --trace-module PATH [options]
+  reference-materializer --url URL [--input PATH|--fetch] [options]
+  repo-structure-contract [--root ROOT] [--contract PATH] [options]
+  check-agent-canon-log-policy [--input PATH|--remote URL] [--commit SHA]
+  wiki-publish --wiki-root PATH --source-root PATH --source-commit SHA [options]
+  orphan-lifecycle <inventory|authorize-cleanup> [options]
   update-latest-result RESULT_ROOT --variant VARIANT [--result-dir PATH]
   parent-repository-audit <list|check> --root ROOT [options]
   html-artifact-access REPORT_PATH [options]
   sync-experiment-registry-context --topic TOPIC [options]
   create-experiment-topic <topic> [options]
   server-readiness [--layout <layout.toml>]
+  environment-dependencies <validate|dry-run|install|boundary|project-install|image-install|image-verify> [options]
   check-skill-frontmatter [--root ROOT] [--format text|json]
   chatgpt-codex-route --input <packet.json|->
   rust-migration-plan --root <repo-root> [--limit N] [--format text|json]
@@ -283,6 +290,9 @@ fn main() {
     }
     if args.len() >= 2 && args[1] == "html-artifact-access" {
         std::process::exit(agent_canon::html_artifact_access::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "environment-dependencies" {
+        std::process::exit(agent_canon::environment_dependencies::run_cli(&args[2..]));
     }
     if args.len() >= 2 && args[1] == "check-skill-tool-invocation-graph" {
         std::process::exit(catalog::skill_dependency_graph::run(&args[2..]));
@@ -398,6 +408,24 @@ fn main() {
     }
     if args.len() >= 2 && args[1] == "issue-sync" {
         std::process::exit(agent_canon::issue_sync::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "check-proof-trace-alignment" {
+        std::process::exit(agent_canon::check_proof_trace_alignment::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "reference-materializer" {
+        std::process::exit(agent_canon::reference_materializer::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "repo-structure-contract" {
+        std::process::exit(agent_canon::repo_structure_contract::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "check-agent-canon-log-policy" {
+        std::process::exit(agent_canon::log_policy::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "wiki-publish" {
+        std::process::exit(agent_canon::wiki_publish::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "orphan-lifecycle" {
+        std::process::exit(agent_canon::orphan_lifecycle::run(&args[2..]));
     }
     if args.len() >= 2 && args[1] == agent_canon::codex_agent_role_eval::SELECTOR {
         std::process::exit(agent_canon::codex_agent_role_eval::run(&args[2..]));

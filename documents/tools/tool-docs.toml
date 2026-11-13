@@ -89,7 +89,7 @@ summary = "SQLite-backed prose structure graph and external-runtime artifact bou
 [[tool]]
 id = "repo-structure-contract"
 classification = "public"
-tool = "tools/validation/semantic/structure/repo_structure_contract.py"
+tool = "tools/runtime/dispatch/agent-canon/src/repo_structure_contract.rs"
 doc = "documents/tools/repo_structure_contract.md"
 language = "python"
 summary = "Repository tree versus AgentCanon structure contract checker documentation."
@@ -137,7 +137,7 @@ summary = "gh-backed GitHub branch and PR publish tool documentation."
 [[tool]]
 id = "wiki-publish"
 classification = "public"
-tool = "tools/repository/github/wiki_publish.py"
+tool = "tools/runtime/dispatch/agent-canon/src/wiki_publish.rs"
 doc = "documents/tools/wiki_publish.md"
 language = "python"
 summary = "Deterministic AgentCanon wiki publication to repo.wiki.git with default-branch-only and source-commit binding."
@@ -289,9 +289,9 @@ summary = "JIT-canonical IR to Lean evidence-catalog documentation."
 [[tool]]
 id = "check-proof-trace-alignment"
 classification = "public"
-tool = "tools/validation/semantic/proof/check_proof_trace_alignment.py"
+tool = "tools/runtime/dispatch/agent-canon/src/check_proof_trace_alignment.rs"
 doc = "documents/tools/check_proof_trace_alignment.md"
-language = "python"
+language = "rust"
 summary = "Proof trace code-path and proposition alignment checker documentation."
 
 [[tool]]

@@ -1,7 +1,7 @@
 # @dependency-start
 # contract implementation
 # responsibility Provides structural refiners for decoded runtime values.
-# downstream implementation ./container/devcontainer_dependencies.py narrows dependency manifest and receipt values
+# downstream implementation dispatch/agent-canon/src/environment_dependencies.rs owns native dependency manifest and receipt values
 # downstream implementation ../agent/orchestration/model_profile_registry.py narrows registry values
 # downstream implementation ../agent/orchestration/team_config.py narrows config values
 # downstream implementation ../agent/orchestration/packets.py narrows packet values

@@ -662,6 +662,14 @@ impl AttestedParent {
         platform::read_parent_owned_file(self, receipt)
     }
 
+    /// Remove one receipt-bound regular file beneath this attested parent.
+    pub fn remove_parent_owned_file(
+        &self,
+        receipt: &ParentOwnedPathReceipt,
+    ) -> Result<(), AuthorityError> {
+        platform::remove_parent_owned_file(self, receipt)
+    }
+
     pub fn atomic_replace_parent_owned_file(
         &self,
         receipt: &ParentOwnedPathReceipt,
@@ -769,8 +777,8 @@ impl ParentRootAttestor {
 mod platform {
     pub(crate) use super::linux::{
         atomic_replace_parent_owned_file, attest, issue_child_handoff,
-        publish_parent_owned_file_noreplace, read_parent_owned_file, resolve_parent_owned_path,
-        verify_live_identity, write_parent_owned_file,
+        publish_parent_owned_file_noreplace, read_parent_owned_file, remove_parent_owned_file,
+        resolve_parent_owned_path, verify_live_identity, write_parent_owned_file,
     };
 }
 
@@ -778,8 +786,8 @@ mod platform {
 mod platform {
     pub(crate) use super::unsupported::{
         atomic_replace_parent_owned_file, attest, issue_child_handoff,
-        publish_parent_owned_file_noreplace, read_parent_owned_file, resolve_parent_owned_path,
-        verify_live_identity, write_parent_owned_file,
+        publish_parent_owned_file_noreplace, read_parent_owned_file, remove_parent_owned_file,
+        resolve_parent_owned_path, verify_live_identity, write_parent_owned_file,
     };
 }
 

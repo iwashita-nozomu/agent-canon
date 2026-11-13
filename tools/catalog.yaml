@@ -53,9 +53,15 @@ runtime_schema:
   # one-file catalog entry below. Keeping this inventory here prevents the
   # dispatcher from silently dropping a first-class Rust route.
   rust_public_commands:
+    - id: rust-check-agent-canon-log-policy
+      selector: check-agent-canon-log-policy
+      path: tools/runtime/dispatch/agent-canon/src/log_policy.rs
     - id: rust-parent-repository-audit
       selector: parent-repository-audit
       path: tools/runtime/dispatch/agent-canon/src/parent_repository_audit.rs
+    - id: rust-environment-dependencies
+      selector: environment-dependencies
+      path: tools/runtime/dispatch/agent-canon/src/environment_dependencies.rs
     - id: rust-workflow-selection-manifest
       selector: workflow-selection-manifest
       path: tools/runtime/dispatch/agent-canon/src/workflow_selection_eval.rs
@@ -796,14 +802,14 @@ entries:
   - id: check-proof-trace-alignment
     public: true
     summary: Checks package-retained proof trace contracts against implementation source paths, AST anchors, and retained checked theorem names.
-    path: tools/validation/semantic/proof/check_proof_trace_alignment.py
+    path: tools/runtime/dispatch/agent-canon/src/check_proof_trace_alignment.rs
     family: agent_tools
     role: checker
     status: canonical
     audience: skill
     placement: skill_helper
-    command: python3 tools/validation/semantic/proof/check_proof_trace_alignment.py
-    dispatch: {argv: ["python3", "tools/validation/semantic/proof/check_proof_trace_alignment.py"]}
+    command: tools/bin/agent-canon check-proof-trace-alignment
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "check-proof-trace-alignment"]}
     writes: false
     default_wiring:
       ci: false
@@ -819,12 +825,12 @@ entries:
   - id: repo-structure-contract
     public: true
     summary: Compares an observed repository tree with the AgentCanon structure contract.
-    path: tools/validation/semantic/structure/repo_structure_contract.py
+    path: tools/runtime/dispatch/agent-canon/src/repo_structure_contract.rs
     family: agent_tools
     role: checker
     status: canonical
-    command: python3 tools/validation/semantic/structure/repo_structure_contract.py
-    dispatch: {argv: ["python3", "tools/validation/semantic/structure/repo_structure_contract.py"]}
+    command: tools/bin/agent-canon repo-structure-contract
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "repo-structure-contract"]}
     writes: false
     default_wiring:
       ci: false
@@ -862,12 +868,12 @@ entries:
   - id: wiki-publish
     public: true
     summary: Publishes one markdown wiki page to the dedicated repo.wiki.git sidecar using default-branch-only clone, format gates, source commit binding, and exact readback identity.
-    path: tools/repository/github/wiki_publish.py
+    path: tools/runtime/dispatch/agent-canon/src/wiki_publish.rs
     family: agent_tools
     role: sync
     status: canonical
-    command: python3 tools/repository/github/wiki_publish.py --help
-    dispatch: {argv: ["python3", "tools/repository/github/wiki_publish.py", "--help"]}
+    command: tools/bin/agent-canon wiki-publish --help
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "wiki-publish", "--help"]}
     writes: true
     default_wiring:
       ci: false
@@ -1631,14 +1637,14 @@ entries:
 
   - id: orphan-lifecycle
     summary: Inventories semantic branch, PR-head, and worktree lifecycle state and authorizes exact cleanup candidates without performing mutation.
-    path: tools/repository/git/orphan_lifecycle.py
+    path: tools/runtime/dispatch/agent-canon/src/orphan_lifecycle.rs
     family: agent_tools
     role: inventory
     status: canonical
     audience: agent
     placement: workflow_helper
-    command: python3 tools/repository/git/orphan_lifecycle.py
-    dispatch: {argv: ["python3", "tools/repository/git/orphan_lifecycle.py"]}
+    command: tools/bin/agent-canon orphan-lifecycle
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "orphan-lifecycle"]}
     writes: true
     default_wiring:
       ci: false
@@ -1931,12 +1937,12 @@ entries:
 
   - id: reference-materializer
     summary: Converts consulted PDF or HTML references into Markdown files under references/.
-    path: tools/analysis/documents/reference_materializer.py
+    path: tools/runtime/dispatch/agent-canon/src/reference_materializer.rs
     family: agent_tools
     role: sync
     status: canonical
-    command: python3 tools/analysis/documents/reference_materializer.py
-    dispatch: {argv: ["python3", "tools/analysis/documents/reference_materializer.py"]}
+    command: tools/bin/agent-canon reference-materializer
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "reference-materializer"]}
     writes: true
     default_wiring:
       ci: false

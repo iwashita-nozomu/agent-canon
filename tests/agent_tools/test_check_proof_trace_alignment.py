@@ -3,33 +3,37 @@
 # @dependency-start
 # contract test
 # responsibility Tests proof trace code path and proposition alignment checker.
-# upstream implementation ../../tools/validation/semantic/proof/check_proof_trace_alignment.py checks anchors.
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/check_proof_trace_alignment.rs checks anchors.
 # upstream design ../../agents/skills/formal-proof-workflow.md defines trace policy.
 # @dependency-end
 
 from __future__ import annotations
 
 import json
+import os
 import subprocess
-import sys
 import tempfile
 import textwrap
 import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "validation" / "semantic" / "proof" / "check_proof_trace_alignment.py"
+NATIVE_CLI = Path(
+    os.environ.get("AGENT_CANON_CLI", PROJECT_ROOT / "tools/bin/agent-canon")
+)
 
 
 class CheckProofTraceAlignmentTest(unittest.TestCase):
     """Validate proof trace alignment findings."""
 
-    def run_checker(self, root: Path, trace: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    def run_checker(
+        self, root: Path, trace: Path, *args: str
+    ) -> subprocess.CompletedProcess[str]:
         """Run the checker for one fixture trace."""
         return subprocess.run(
             [
-                sys.executable,
-                str(SCRIPT),
+                str(NATIVE_CLI),
+                "check-proof-trace-alignment",
                 "--root",
                 str(root),
                 "--trace-module",
@@ -133,7 +137,9 @@ class CheckProofTraceAlignmentTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("PROOF_TRACE_ALIGNMENT=fail", result.stdout)
-            self.assertIn("missing-required-source-token:return value - 1", result.stdout)
+            self.assertIn(
+                "missing-required-source-token:return value - 1", result.stdout
+            )
 
     def test_missing_checked_fragment_fails(self) -> None:
         """A contract must refer to a retained checked fragment."""
@@ -166,6 +172,77 @@ class CheckProofTraceAlignmentTest(unittest.TestCase):
             self.assertIn(
                 "checked-fragment-not-retained:missing_theorem",
                 result.stdout,
+            )
+
+    def test_trace_keeps_mapping_inputs_and_ignores_unrelated_objects(self) -> None:
+        """Non-JSON metadata remains valid input to the existing trace contract."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "solver.py"
+            source.write_text(
+                "def solve(value):\n    return value + 1\n", encoding="utf-8"
+            )
+            trace = root / "trace.py"
+            trace.write_text(
+                "from collections import UserDict\n"
+                "FORMAL_PROOF_TRACE = UserDict({\n"
+                " 'unused': object(),\n"
+                " 'step': UserDict({'source_path':'solver.py', 'source_symbol':'solve',\n"
+                " 'claim':'A step increments the value.', 'callback':lambda: None,\n"
+                " 'implementation_anchor':{'required_ast_patterns':['value + 1']}})})\n",
+                encoding="utf-8",
+            )
+            result = self.run_checker(root, trace, "--format", "json")
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(json.loads(result.stdout)["findings"], [])
+
+    def test_ast_pattern_and_shape_limits_keep_independent_failures(self) -> None:
+        """Each failed source property produces its original finding category."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "solver.py"
+            source.write_text(
+                "def solve(value):\n    if value:\n        return 1\n    return 0\n",
+                encoding="utf-8",
+            )
+            trace = root / "trace.py"
+            trace.write_text(
+                "FORMAL_PROOF_TRACE = {'step': {'source_path':'solver.py',\n"
+                " 'source_symbol':'solve', 'claim':'The function has a conditional.',\n"
+                " 'implementation_anchor': {'required_ast_patterns':['abs(value)'],\n"
+                " 'min_return_count':3, 'max_branch_count':0}}}\n",
+                encoding="utf-8",
+            )
+            result = self.run_checker(root, trace, "--format", "json")
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertEqual(
+                {item["kind"] for item in json.loads(result.stdout)["findings"]},
+                {
+                    "missing-required-ast-pattern",
+                    "return-count-below-minimum",
+                    "branch-count-above-maximum",
+                },
+            )
+
+    def test_large_python_integer_limit_is_preserved(self) -> None:
+        """The external Python integer contract keeps arbitrary precision."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "solver.py").write_text(
+                "def solve():\n    return 1\n", encoding="utf-8"
+            )
+            trace = root / "trace.py"
+            trace.write_text(
+                "FORMAL_PROOF_TRACE = {'step': {'source_path':'solver.py',\n"
+                " 'source_symbol':'solve', 'claim':'Returns one.',\n"
+                " 'implementation_anchor': {'min_return_count':2**300}}}\n",
+                encoding="utf-8",
+            )
+            result = self.run_checker(root, trace, "--format", "json")
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn(
+                f"1<{2**300}",
+                [item["detail"] for item in json.loads(result.stdout)["findings"]],
             )
 
 
