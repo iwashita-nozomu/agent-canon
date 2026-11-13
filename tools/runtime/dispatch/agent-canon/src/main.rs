@@ -89,6 +89,7 @@ mod responsibility_scope;
 mod result_logs;
 mod rule_inventory;
 mod run_log_contract;
+mod runtime_log_archive;
 mod rust_migration_plan;
 mod semantic_index;
 mod semantic_responsibility;
@@ -116,6 +117,7 @@ use std::env;
 const HELP: &str = "AgentCanon's native command line interface.
 
 Usage: agent-canon <command> [arguments]
+  github-publish [--root ROOT] <push|pr|publish-pr|checks> --user-task TASK [options]
   run-gpu-command [options] -- COMMAND ...
   experiment-registry [--repo-root ROOT] [--registry PATH]
 
@@ -223,6 +225,7 @@ Commands:
   compose-consumer-entrypoint --base <path> --specific <path> --output <path> [--source-root <path>]
   template-bundle <export|committed-tree|verify|native-package|native-verify|native-version> [options]
   native-release <prepare|select-artifacts|publish|compare-reproducible> [options]
+  runtime-log-archive-git <archive command> [options]
 
 Options:
   -h, --help     Print help
@@ -263,6 +266,10 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "run-evaluation" {
         std::process::exit(run_evaluation::run_cli(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "runtime-log-archive-git" {
+        std::process::exit(runtime_log_archive::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == agent_canon::eval_accumulation_check::SELECTOR {
@@ -313,6 +320,9 @@ fn main() {
         std::process::exit(theorem_graph_circularity_check::run(&args[2..]));
     }
 
+    if args.len() >= 2 && args[1] == "github-publish" {
+        std::process::exit(agent_canon::github_publish::run(&args[2..]));
+    }
     if args.len() >= 2 && args[1] == "bootstrap-runtime" {
         std::process::exit(agent_canon::bootstrap_runtime::run(&args[2..]));
     }

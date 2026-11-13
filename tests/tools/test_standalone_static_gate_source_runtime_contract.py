@@ -6,7 +6,7 @@
 # upstream implementation ../../tools/validation/ci/runners/run_standalone_static_gate_unit.sh owns contract and eval unit commands
 # upstream implementation ../../tools/runtime/dispatch/agent-canon/src/eval_accumulation_check.rs owns the native eval checker command
 # upstream implementation ../../tools/runtime/dispatch/agent-canon/src/eval_accumulation.rs runs the selected eval producer collection
-# upstream implementation ../../tools/runtime/archive/runtime_log_paths.py defines canonical eval result paths
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/eval_archive_paths.rs defines canonical eval result paths
 # upstream design ../../documents/design/source-owned-dependency-validation.md source and persisted graph authority split
 # downstream implementation ../../.github/workflows/agent-canon-static-gates.yml runs selected unit owners
 # @dependency-end
@@ -20,9 +20,8 @@ from pathlib import Path
 
 import pytest
 
-from tools.runtime.archive.runtime_log_paths import LOG_ARCHIVE_PARENT
-
 ROOT = Path(__file__).resolve().parents[2]
+LOG_ARCHIVE_PARENT = Path("archive/agent-canon-log")
 RUNNER = (
     ROOT
     / "tools"
@@ -166,9 +165,6 @@ def test_eval_preserves_failed_producer_logs_until_ci_capture(
         "import json, os, sys\n"
         "import runpy\n"
         "from pathlib import Path\n"
-        "if sys.argv[1] == 'runtime-paths':\n"
-        "    import subprocess\n"
-        "    raise SystemExit(subprocess.run([os.environ['REAL_BOUNDARY_NATIVE'], *sys.argv[1:]], check=False).returncode)\n"
         "if sys.argv[1] == 'run-accumulated-agent-evals':\n"
         "    sys.argv = [str(Path(__file__).parents[2] / 'producer_fixture.py'), *sys.argv[2:]]\n"
         "    runpy.run_path(sys.argv[0], run_name='__main__')\n"
@@ -208,7 +204,6 @@ def test_eval_preserves_failed_producer_logs_until_ci_capture(
             "AGENT_CANON_RUNTIME_ROOT": str(runtime),
             "AGENT_CANON_CLI": str(native_cli),
             "AGENT_CANON_NATIVE_BIN": "",
-            "REAL_BOUNDARY_NATIVE": os.environ["AGENT_CANON_NATIVE_BIN"],
             "AGENT_CANON_HOOK_ARCHIVE_DIR": "/var/lib/agent-canon/private-log",
             "AGENT_CANON_LOG_ROOT": "/var/lib/agent-canon/private-log",
             "CALLS": str(calls),

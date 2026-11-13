@@ -66,7 +66,7 @@ Role settings remain in `agents/agents_config.json`; the agreed task scope contr
 parallel reports.
 
 Archive a selected durable agent report through the existing
-`tools/runtime/archive/runtime_log_archive_git.py archive-agent-report --report-dir
+`tools/runtime/dispatch/agent-canon/src/runtime_log_archive.rs archive-agent-report --report-dir
 reports/agents/<run-id>` operation, using the owned execution route. It owns the
 immutable snapshot, append-only index, push and remote readback. Broad `sync` is for
 explicitly selected cumulative runtime families, not a replacement report publisher.

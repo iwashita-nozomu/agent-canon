@@ -99,7 +99,7 @@ git status --short
 make ci-quick
 git add <files>
 git commit -m "<type>: <summary>"
-python3 tools/repository/github/github_publish.py push \
+agent-canon github-publish push \
   --user-task "<current user task>" \
   --repo <owner/name>
 ```
@@ -107,6 +107,6 @@ python3 tools/repository/github/github_publish.py push \
 確認:
 
 - push 前に dirty worktree を残していない
-- push は `github_publish.py` の verified remote route で実行している
+- push は `agent-canon github-publish` の verified remote route で実行している
 - commit / push 済みの状態で完了報告する
 - carry-over note や action log が current state に追随している

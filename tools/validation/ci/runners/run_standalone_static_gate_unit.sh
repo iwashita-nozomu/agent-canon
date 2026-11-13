@@ -196,12 +196,7 @@ run_eval() (
   # Create the canonical archive's eval-results directory for CI readback,
   # using the archive owner's path resolver rather than a caller override.
   local eval_log_dir="${temp_root}/agent-eval-runs/agent-canon-pr-gate"
-  eval_results_parent="$(
-    env -u AGENT_CANON_HOOK_ARCHIVE_DIR -u AGENT_CANON_LOG_ROOT \
-      "${AGENT_CANON_NATIVE_BIN:-${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}}" \
-      runtime-paths eval-results --source-root "${ROOT}" --runtime-root "${AGENT_CANON_STATIC_RUNTIME_ROOT}" \
-      --family codex-agent-role --parent true
-  )"
+  eval_results_parent="${AGENT_CANON_STATIC_RUNTIME_ROOT}/archive/agent-canon-log/eval-results"
   mkdir -p "${eval_log_dir}" "${eval_results_parent}"
   env -u AGENT_CANON_HOOK_ARCHIVE_DIR -u AGENT_CANON_LOG_ROOT \
     AGENT_CANON_CLI="${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" \

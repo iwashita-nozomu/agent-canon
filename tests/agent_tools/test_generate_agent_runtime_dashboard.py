@@ -23,12 +23,37 @@ from unittest.mock import patch
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = "generate-agent-runtime-dashboard"
-sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-from tools.runtime.archive.runtime_log_paths import (
-    HOOK_ARCHIVE_DIR_ENV,
-    mounted_log_archive_root,
-    repo_log_key,
+NATIVE_CLI = os.environ.get("AGENT_CANON_NATIVE_BIN") or os.environ.get(
+    "AGENT_CANON_CLI", str(PROJECT_ROOT / "tools" / "bin" / "agent-canon")
 )
+HOOK_ARCHIVE_DIR_ENV = "AGENT_CANON_HOOK_ARCHIVE_DIR"
+
+
+def mounted_log_archive_root(_root: Path) -> Path:
+    return Path(os.environ["AGENT_CANON_RUNTIME_ROOT"]) / "archive" / "agent-canon-log"
+
+
+def repo_log_key(source_root: Path) -> str:
+    runtime = Path(os.environ["AGENT_CANON_RUNTIME_ROOT"])
+    result = subprocess.run(
+        [
+            NATIVE_CLI,
+            "runtime-log-archive-git",
+            "--source-root",
+            str(source_root),
+            "--canon-root",
+            str(PROJECT_ROOT),
+            "--runtime-root",
+            str(runtime),
+            "repo-key",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    prefix = "RUNTIME_LOG_ARCHIVE_REPO_KEY="
+    return next(line[len(prefix):] for line in result.stdout.splitlines() if line.startswith(prefix))
 
 DASHBOARD_PROMPT_CHAR_COUNT = 27
 

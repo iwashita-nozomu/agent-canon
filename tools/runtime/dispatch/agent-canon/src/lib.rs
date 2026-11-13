@@ -86,6 +86,7 @@ pub mod extract_docx;
 pub mod formal_proof;
 pub mod generated_completeness;
 pub mod git_read;
+pub mod github_publish;
 pub mod github_status_lifecycle;
 pub mod gpu_command_admission;
 pub mod historical_skill_usage;

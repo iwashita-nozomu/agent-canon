@@ -24,7 +24,7 @@ fn run_inner(args: &[String]) -> Result<i32, String> {
         .iter()
         .any(|value| matches!(value.as_str(), "--help" | "-h"))
     {
-        println!("usage: agent-canon runtime-paths <root|path|eval-results|check-control|check-read-only|gate-g1|temp-dir|remove-tree|copy-read-only|capture-subprocess|detect-secrets-report> [options]");
+        println!("usage: agent-canon runtime-paths <root|path|ensure-dir|check-control|check-read-only|gate-g1|temp-dir|remove-tree|copy-read-only|capture-subprocess|detect-secrets-report|write-file|receipt-identity> [options]");
         return Ok(0);
     }
     let action = args.first().ok_or("runtime-paths action is required")?;
@@ -32,7 +32,6 @@ fn run_inner(args: &[String]) -> Result<i32, String> {
         "root",
         "path",
         "ensure-dir",
-        "eval-results",
         "check-control",
         "check-read-only",
         "gate-g1",
@@ -187,23 +186,6 @@ fn run_inner(args: &[String]) -> Result<i32, String> {
         _ => {
             let source = Path::new(required(&values, "source-root")?);
             let runtime = values.get("runtime-root").map(PathBuf::from);
-            if action == "eval-results" {
-                let path = crate::eval_archive_paths::eval_results_dir(
-                    source,
-                    required(&values, "family")?,
-                    runtime.as_deref(),
-                )?;
-                println!(
-                    "{}",
-                    if values.get("parent").is_some_and(|value| value == "true") {
-                        path.parent().ok_or("archive path has no parent")?
-                    } else {
-                        &path
-                    }
-                    .display()
-                );
-                return Ok(0);
-            }
             let read_root = RuntimeArtifactBoundary::resolve_read_path(
                 source,
                 runtime.as_deref(),

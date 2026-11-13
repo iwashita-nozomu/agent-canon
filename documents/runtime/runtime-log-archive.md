@@ -3,8 +3,8 @@
 contract agent-runtime
 responsibility Defines external AgentCanon hook, eval, runtime-summary, and report archive publication.
 upstream design bootstrap-runtime.md shared runtime boundary
-upstream implementation ../../tools/runtime/archive/runtime_log_paths.py external path resolver
-upstream implementation ../../tools/runtime/archive/runtime_log_archive_git.py canonical archive publisher
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/eval_archive_paths.rs external path resolver
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/runtime_log_archive.rs canonical native archive publisher
 upstream implementation ../../tools/runtime/dispatch/agent-canon/src/eval_accumulation_check.rs eval completeness gate
 upstream implementation ../../tools/runtime/dispatch/agent-canon/src/codex_runtime_summary.rs exports bounded Codex runtime summaries
 downstream design runtime-log-archive-migration.md archive migration route
@@ -40,8 +40,8 @@ document does not duplicate policy owned by the log repository.
 
 Start with [Standalone Bootstrap And Shared Tool Runtime](bootstrap-runtime.md)
 for the command family and lifecycle. Use
-`runtime_log_paths.py` for path resolution and
-`runtime_log_archive_git.py` for archive state, clone, commit, push, and
+`eval_archive_paths.rs` for path resolution and
+`tools/bin/agent-canon runtime-log-archive-git <command>` for archive state, clone, commit, push, and
 readback. Use `tools/bin/agent-canon eval-accumulation-check` to validate the external archive.
 Use `tools/bin/agent-canon export-codex-runtime-summary` to append a bounded,
 prompt-free Codex runtime summary and cross-chat index through the native
@@ -77,8 +77,8 @@ responsibility and occurrence locators, source finding kind, and timestamp.
 Issue/private bodies, digests, fingerprints, credentials, and generated IDs do
 not enter the receipt. A publisher reads the GitHub result back first, writes
 and reads back this receipt, and only then removes a pending packet. Failed or
-uncertain publication retains the pending packet. `runtime_log_archive_git.py
-sync` stages this published namespace with the existing private archive
+uncertain publication retains the pending packet. The native
+`runtime-log-archive-git sync` command stages this published namespace with the existing private archive
 families so the host shell remains the Git publisher. The publisher injects a
 resident writer and invokes `bootstrap.sh ... tool run/exec issue-sync --
 --stage-publication-receipt`; its runtime/spool route is a precondition for
@@ -275,7 +275,7 @@ Existing tracked or ignored report files are classified before removal:
 Prepared sanitized historical bundles use the existing
 `agent-canon-log-report-provenance.v1` index contract. The task-local
 sanitizer supplies a prepared tree and one provenance object per run to
-`runtime_log_archive_git.py archive-agent-report --provenance <file> --publish`.
+`tools/bin/agent-canon runtime-log-archive-git archive-agent-report --provenance <file> --publish`.
 The archive owner verifies the source commit/tree listing, every source blob
 hash, every prepared archive hash, redaction rule IDs/counts, and the absence
 of forbidden path or credential-shaped bytes before copying. Each provenance
@@ -309,7 +309,7 @@ Docker/Git cleanup command.
 
 ## Status and recovery
 
-`runtime_log_archive_git.py status` and the bootstrap `status` operation show
+`tools/bin/agent-canon runtime-log-archive-git status` and the bootstrap `status` operation show
 the resolved runtime root, archive branch/lease, pending spool, and latest
 publication receipt without generating a new report. A held lease or an
 archive branch mismatch fails closed. Resolve the owning lease or branch

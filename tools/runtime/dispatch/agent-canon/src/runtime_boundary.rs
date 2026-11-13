@@ -135,7 +135,7 @@ fn canonicalize_with_missing_suffix(path: &Path) -> Result<PathBuf, String> {
                 return Err(format!(
                     "cannot resolve runtime path {}: {error}",
                     path.display()
-                ))
+                ));
             }
         }
     }
@@ -145,10 +145,7 @@ fn canonicalize_with_missing_suffix(path: &Path) -> Result<PathBuf, String> {
 ///
 /// This preserves the additive explicit-path route while refusing source-local
 /// artifacts and symlink components.
-pub(crate) fn resolve_external_artifact_path(
-    source_root: &Path,
-    path: &Path,
-) -> Result<PathBuf, String> {
+pub fn resolve_external_artifact_path(source_root: &Path, path: &Path) -> Result<PathBuf, String> {
     let candidate = expand_user_path(path)?;
     if !candidate.is_absolute() {
         return Err(format!(
@@ -396,7 +393,7 @@ impl RuntimeDirectory {
                     return Err(std::io::Error::new(
                         std::io::ErrorKind::InvalidInput,
                         "absolute runtime directory requires a volume prefix",
-                    ))
+                    ));
                 }
             };
             if !matches!(components.next(), Some(Component::RootDir)) {
@@ -593,7 +590,7 @@ impl RuntimeDirectory {
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::InvalidData,
                     "runtime target is not a regular file",
-                ))
+                ));
             }
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
             Err(error) => return Err(error),
@@ -732,7 +729,7 @@ impl RuntimeDirectory {
                         std::io::ErrorKind::InvalidData,
                         "runtime target is not a regular file",
                     ),
-                ))
+                ));
             }
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
             Err(error) => return Err(atomic_write_stage("target_inspect", error)),
@@ -815,6 +812,42 @@ impl RuntimeDirectory {
 
     pub(crate) fn lock(&self, relative: &Path) -> std::io::Result<RuntimeFileLock> {
         self.lock_with_marker(relative, true)
+    }
+
+    pub(crate) fn try_lock_with_empty_marker(
+        &self,
+        relative: &Path,
+    ) -> std::io::Result<RuntimeFileLock> {
+        use cap_fs_ext::{FollowSymlinks, OpenOptionsFollowExt};
+        let (parent, name) = self.parent(relative, true)?;
+        let mut options = cap_std::fs::OpenOptions::new();
+        options
+            .read(true)
+            .write(true)
+            .create(true)
+            .follow(FollowSymlinks::No);
+        #[cfg(unix)]
+        {
+            use cap_std::fs::OpenOptionsExt;
+            options.mode(0o600);
+        }
+        let file = parent.directory.open_with(&name, &options)?.into_std();
+        if !file.metadata()?.is_file() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "runtime lock is not a regular file",
+            ));
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            file.set_permissions(fs::Permissions::from_mode(0o600))?;
+            rustix::fs::flock(&file, rustix::fs::FlockOperation::NonBlockingLockExclusive)
+                .map_err(std::io::Error::from)?;
+        }
+        #[cfg(not(unix))]
+        file.lock()?;
+        Ok(RuntimeFileLock { file })
     }
 
     fn lock_with_marker(
@@ -963,12 +996,12 @@ fn private_directory_mode(directory: &cap_std::fs::Dir) -> std::io::Result<()> {
     Ok(())
 }
 
-pub(crate) struct RuntimeFileLock {
+pub struct RuntimeFileLock {
     file: fs::File,
 }
 
 impl RuntimeFileLock {
-    pub(crate) fn finish(self) -> std::io::Result<()> {
+    pub fn finish(self) -> std::io::Result<()> {
         self.file.unlock()
     }
 }
@@ -1143,7 +1176,7 @@ impl RuntimeArtifactBoundary {
         match self.directory.parent(relative, false) {
             Ok((parent, name)) => match parent.directory.symlink_metadata(&name) {
                 Ok(metadata) if metadata.is_symlink() => {
-                    return Err(format!("runtime target is a symlink: {}", joined.display()))
+                    return Err(format!("runtime target is a symlink: {}", joined.display()));
                 }
                 Ok(_) => {}
                 Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
@@ -1151,7 +1184,7 @@ impl RuntimeArtifactBoundary {
                     return Err(format!(
                         "cannot inspect runtime path {}: {error}",
                         joined.display()
-                    ))
+                    ));
                 }
             },
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
@@ -1159,7 +1192,7 @@ impl RuntimeArtifactBoundary {
                 return Err(format!(
                     "cannot inspect runtime path {}: {error}",
                     joined.display()
-                ))
+                ));
             }
         }
         Ok(joined)
@@ -1255,6 +1288,70 @@ impl RuntimeArtifactBoundary {
             .map_err(|error| error.to_string())?
             .ok_or("copy source is missing")?;
         self.atomic_write_bytes(target, &bytes, 0o600)
+    }
+
+    /// Acquire a no-follow runtime lock without seeding the empty marker byte.
+    ///
+    /// Archive transactions historically use an empty lock file; other spool
+    /// protocols retain their existing seeded-marker behavior.
+    pub fn lock_with_empty_marker(&self, path: &Path) -> Result<RuntimeFileLock, String> {
+        let target = self.resolve(path)?;
+        let relative = target
+            .strip_prefix(&self.root)
+            .map_err(|_| format!("path escapes runtime root: {}", target.display()))?;
+        self.directory
+            .lock_with_marker(relative, false)
+            .map_err(|error| format!("runtime lock failed: {}: {error}", target.display()))
+    }
+
+    /// Acquire a nonblocking no-follow runtime lock without seeding its marker.
+    pub fn try_lock_with_empty_marker(&self, path: &Path) -> Result<RuntimeFileLock, String> {
+        let target = self.resolve(path)?;
+        let relative = target
+            .strip_prefix(&self.root)
+            .map_err(|_| format!("path escapes runtime root: {}", target.display()))?;
+        self.directory
+            .try_lock_with_empty_marker(relative)
+            .map_err(|error| format!("runtime lock failed: {}: {error}", target.display()))
+    }
+
+    /// Publish immutable bytes once beneath the runtime without following path
+    /// components. Existing identical bytes are idempotent; conflicting bytes
+    /// remain untouched.
+    pub fn write_once_bytes(&self, path: &Path, bytes: &[u8]) -> Result<PathBuf, String> {
+        let target = self.resolve(path)?;
+        let relative = target
+            .strip_prefix(&self.root)
+            .map_err(|_| format!("path escapes runtime root: {}", target.display()))?;
+        self.directory
+            .write_once(relative, bytes)
+            .map_err(|error| {
+                format!(
+                    "immutable runtime publication failed: {}: {error}",
+                    target.display()
+                )
+            })?;
+        Ok(target)
+    }
+
+    /// Remove one regular artifact through the existing no-follow boundary.
+    pub fn remove_file(&self, path: &Path) -> Result<bool, String> {
+        let target = self.resolve(path)?;
+        let relative = target
+            .strip_prefix(&self.root)
+            .map_err(|_| format!("path escapes runtime root: {}", target.display()))?;
+        if self
+            .directory
+            .read(relative)
+            .map_err(|error| format!("runtime file check failed: {}: {error}", target.display()))?
+            .is_none()
+        {
+            return Ok(false);
+        }
+        self.directory.remove_file(relative).map_err(|error| {
+            format!("runtime file removal failed: {}: {error}", target.display())
+        })?;
+        Ok(true)
     }
 
     pub fn atomic_write_bytes(
@@ -1442,6 +1539,23 @@ impl RuntimeSpoolBoundary {
     pub fn boundary(&self) -> &RuntimeArtifactBoundary {
         &self.0
     }
+
+    pub fn root(&self) -> &Path {
+        self.0.root()
+    }
+
+    pub fn resolve(&self, path: &Path) -> Result<PathBuf, String> {
+        self.0.resolve(path)
+    }
+
+    pub fn read_bytes(&self, path: &Path) -> Result<Option<Vec<u8>>, String> {
+        self.0.read_bytes(path)
+    }
+
+    /// Remove one spool file after its owning protocol has verified durable readback.
+    pub fn remove_file(&self, path: &Path) -> Result<bool, String> {
+        self.0.remove_file(path)
+    }
 }
 
 fn resolve_readonly_runtime_path(
@@ -1595,7 +1709,7 @@ fn reject_symlink_components(path: &Path, stop: &Path) -> Result<(), String> {
                 }
                 Component::CurDir => {}
                 Component::RootDir | Component::Prefix(_) => {
-                    return Err(format!("path is outside boundary: {}", path.display()))
+                    return Err(format!("path is outside boundary: {}", path.display()));
                 }
             }
         }

@@ -22,7 +22,7 @@ branch registry、cleanup database、Issue state machine を作りません。
 同じ tool の `authorize-cleanup` が explicit selection を inventory digest に束縛して認可します。
 どちらも ref、PR、worktree、ファイルを削除しません。
 
-- PR の publication と GitHub mutation は `tools/repository/github/github_publish.py` および
+- PR の publication と GitHub mutation は `tools/runtime/dispatch/agent-canon/src/github_publish.rs` および
   [agents/skills/pr-processing.md](../../agents/skills/pr-processing.md) に残ります。
 - worktree の停止・除去・prune は runtime provisioning owner または user owner に残ります。
 - local/remote branch の削除は、現在その resource を所有する既存 cleanup route に残ります。
