@@ -412,28 +412,15 @@ entries:
 
   - id: checkout-identity
     summary: Reads the current cwd, Git root, branch state, HEAD, and normalized remote owner/repository for bounded workflow transitions.
-    path: tools/runtime/authority/checkout_identity.py
+    path: tools/runtime/dispatch/agent-canon/src/checkout_identity.rs
     family: agent_tools
     role: helper
     status: canonical
     audience: agent
     placement: workflow_helper
-    command: python3 tools/runtime/authority/checkout_identity.py --format lines
+    command: tools/bin/agent-canon checkout-identity --format lines
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "checkout-identity"]}
     writes: false
-    dispatch:
-      runtime: python
-      argv: [python3, tools/runtime/authority/checkout_identity.py]
-      execution_plane: tool-container
-      cwd: source-root
-      env: clean
-      stdin: inherited
-      stdout: captured
-      stderr: captured
-      exit: propagate
-      signal: propagate
-      side_effect: read-only
-      output_root: none
-      written_paths: []
     default_wiring:
       ci: false
       pr_check: false
@@ -1776,14 +1763,14 @@ entries:
   - id: repository-topic-clone
     public: true
     summary: Owns the generic workspace topic clone, branch reuse, origin/main merge, publication readback, and reconstructibility cleanup lifecycle.
-    path: tools/repository/workspace/repository_topic_clone.py
+    path: tools/runtime/dispatch/agent-canon/src/repository_topic_clone.rs
     family: agent_tools
     role: workflow
     status: canonical
     audience: skill
     placement: skill_helper
-    command: python3 tools/repository/workspace/repository_topic_clone.py
-    dispatch: {argv: ["python3", "tools/repository/workspace/repository_topic_clone.py"]}
+    command: tools/bin/agent-canon repository-topic-clone
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "repository-topic-clone"]}
     writes: true
     default_wiring:
       ci: false
@@ -1799,14 +1786,14 @@ entries:
   - id: dependency-module-change
     public: true
     summary: Decorates generic repository topic clones with .gitmodules, gitlink, pin, and projection policy.
-    path: tools/repository/workspace/dependency_module_change.py
+    path: tools/runtime/dispatch/agent-canon/src/dependency_module_change.rs
     family: agent_tools
     role: workflow
     status: canonical
     audience: skill
     placement: skill_helper
-    command: python3 tools/repository/workspace/dependency_module_change.py
-    dispatch: {argv: ["python3", "tools/repository/workspace/dependency_module_change.py"]}
+    command: tools/bin/agent-canon dependency-module-change
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "dependency-module-change"]}
     writes: true
     default_wiring:
       ci: false
