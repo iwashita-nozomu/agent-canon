@@ -1,16 +1,16 @@
 <!--
 @dependency-start
 contract reference
-responsibility Documents lean_recursive_proof_search.py operator usage.
-upstream implementation ../../tools/analysis/proof/lean_recursive_proof_search.py runs target-driven Lean proof attempts.
+responsibility Documents lean-recursive-proof-search CLI operator usage.
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/lean_recursive_proof_search.rs runs target-driven Lean proof attempts.
 upstream design lean_capability_matrix.md routes Lean tactics and theorem search features.
 upstream design ../../agents/skills/formal-proof-workflow.md defines recursive target-driven proof search.
 @dependency-end
 -->
 
-# lean_recursive_proof_search.py
+# lean-recursive-proof-search CLI
 
-`lean_recursive_proof_search.py` runs a JSON list of Lean proof targets and
+`lean-recursive-proof-search CLI` runs a JSON list of Lean proof targets and
 records whether each tactic attempt verifies, leaves structured unresolved
 goals, or fails without a parseable next-goal frontier. It is a proof-search
 evidence tool, not theorem authority: only a checked Lean file without proof
@@ -19,7 +19,7 @@ escapes closes a proof obligation.
 Use it with a topic-local Lake package or a generated Lean proof environment:
 
 ```bash
-python3 tools/analysis/proof/lean_recursive_proof_search.py \
+tools/bin/agent-canon lean-recursive-proof-search \
   --config lean/<topic>/proof_search_targets.json \
   --format markdown \
   --out lean/<topic>/recursive_proof_search.md

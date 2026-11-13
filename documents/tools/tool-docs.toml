@@ -225,9 +225,9 @@ summary = "Path/risk check matrix classifier documentation."
 [[tool]]
 id = "formal-proof"
 classification = "public"
-tool = "tools/analysis/proof/formal_proof.py"
+tool = "tools/runtime/dispatch/agent-canon/src/formal_proof.rs"
 doc = "documents/tools/formal_proof.md"
-language = "python"
+language = "rust"
 summary = "Formal proof scaffold planner documentation, including natural-language, Python AST, and package-retained trace routes."
 
 [[tool]]
@@ -237,6 +237,14 @@ tool = "tools/runtime/dispatch/agent-canon/src/lean_proof_env.rs"
 doc = "documents/tools/lean_proof_env.md"
 language = "rust"
 summary = "Lean Mathlib/Aesop proof environment setup and checker routing documentation."
+
+[[tool]]
+id = "lean-recursive-proof-search"
+classification = "public"
+tool = "tools/runtime/dispatch/agent-canon/src/lean_recursive_proof_search.rs"
+doc = "documents/tools/lean_recursive_proof_search.md"
+language = "rust"
+summary = "Configured Lean proof attempts and unresolved-goal frontier reporting."
 
 [[tool]]
 id = "tool-proof-coverage"
