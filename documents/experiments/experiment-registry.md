@@ -142,7 +142,7 @@ tools/bin/agent-canon create-experiment-topic <topic>
 ```bash
 python3 -m tools.experiments.execution.run_managed_experiment --topic <topic> --variant <variant> -- python3 experiments/<topic>/run.py
 python3 -m tools.experiments.artifacts.save_experiment_result_annex --result-dir experiments/<topic>/result/<run-id> --annex-repo "$EXPERIMENT_RESULT_ANNEX_REPO"
-python3 -m tools.experiments.artifacts.update_latest_result experiments/<topic>/result --variant <variant>
+agent-canon update-latest-result experiments/<topic>/result --variant <variant>
 ```
 
 ## server 実行ルール
