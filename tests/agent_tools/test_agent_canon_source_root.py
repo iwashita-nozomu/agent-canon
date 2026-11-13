@@ -121,7 +121,9 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
     def test_exec_parser_accepts_command(self) -> None:
         """Accept an exact source-relative command and its arguments."""
         parser = build_parser()
-        parsed = parser.parse_args(["exec", "tools/agent/orchestration/route.py", "--list"])
+        parsed = parser.parse_args(
+            ["exec", "tools/agent/orchestration/route.py", "--list"]
+        )
         self.assertEqual(parsed.mode, "exec")
         self.assertEqual(parsed.command, "tools/agent/orchestration/route.py")
         self.assertEqual(parsed.args, ["--list"])
@@ -137,6 +139,7 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
         """Run a source-owned route from an isolated development clone."""
         with tempfile.TemporaryDirectory() as workspace:
             clone = Path(workspace) / "agent-canon"
+
             def copy_ignore(directory: str, names: list[str]) -> set[str]:
                 """Ignore clone-local state while retaining canonical packages."""
                 ignored = set(
@@ -150,9 +153,10 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
                         ".ruff_cache",
                     )(directory, names)
                 )
-                if Path(directory).resolve() == (
-                    PROJECT_ROOT / "tools" / "repository"
-                ).resolve():
+                if (
+                    Path(directory).resolve()
+                    == (PROJECT_ROOT / "tools" / "repository").resolve()
+                ):
                     ignored.discard("workspace")
                 return ignored
 
@@ -182,8 +186,8 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("surface", result.stdout)
 
-    def test_exec_command_supports_python_source_contract_readback(self) -> None:
-        """The source wrapper can run a Python checker with source-relative paths."""
+    def test_exec_command_supports_native_source_contract_readback(self) -> None:
+        """The source wrapper runs its local checker with source-relative paths."""
         with tempfile.TemporaryDirectory() as workspace:
             clone = Path(workspace) / "agent-canon"
 
@@ -194,9 +198,10 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
                         ".git", ".agent-canon", "reports", "workspace"
                     )(directory, names)
                 )
-                if Path(directory).resolve() == (
-                    PROJECT_ROOT / "tools" / "repository"
-                ).resolve():
+                if (
+                    Path(directory).resolve()
+                    == (PROJECT_ROOT / "tools" / "repository").resolve()
+                ):
                     ignored.discard("workspace")
                 return ignored
 
@@ -207,13 +212,15 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
                 ignore=ignore_clone_links,
             )
             subprocess.run(["git", "init", "-q"], cwd=clone, check=True)
+            native_checker = clone / "native-structure-checker"
+            shutil.copy2(os.environ["AGENT_CANON_CLI"], native_checker)
             result = subprocess.run(
                 [
                     sys.executable,
                     PUBLIC_RESOLVER,
                     "exec",
-                    "python3",
-                    "tools/validation/semantic/structure/repo_structure_contract.py",
+                    str(native_checker),
+                    "repo-structure-contract",
                     "--root",
                     ".",
                     "--contract",
@@ -236,11 +243,7 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
             script = root / "tools" / "agent_tool.sh"
             script.parent.mkdir(parents=True, exist_ok=True)
             script.write_text(
-                "#!/usr/bin/env sh\n"
-                "if [ \"$1\" = \"pass\" ]; then\n"
-                "  exit 0\n"
-                "fi\n"
-                "exit 1\n"
+                '#!/usr/bin/env sh\nif [ "$1" = "pass" ]; then\n  exit 0\nfi\nexit 1\n'
             )
             script.chmod(stat.S_IXUSR | stat.S_IRUSR)
 
