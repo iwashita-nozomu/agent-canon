@@ -418,6 +418,7 @@ fn check_team_task_catalog(root: &Path, findings: &mut Vec<AlignmentFinding>) {
         .iter()
         .filter_map(|task| yaml_string(yaml_get(task, "id")))
         .collect::<BTreeSet<_>>();
+    check_math_intent_route(&task_yaml, findings);
     for field in [
         "model",
         "model_reasoning_effort",
@@ -660,6 +661,90 @@ fn check_team_task_catalog(root: &Path, findings: &mut Vec<AlignmentFinding>) {
                 "team-config",
                 "agents/agents_config.json#activation_rules",
                 format!("unknown-role:{role}"),
+            ));
+        }
+    }
+}
+
+fn check_math_intent_route(task_catalog: &Yaml, findings: &mut Vec<AlignmentFinding>) {
+    let route_id = "mathematical_correction";
+    let route =
+        yaml_get(task_catalog, "math_intent_routes").and_then(|routes| yaml_get(routes, route_id));
+    let expected = [
+        ("id", "mathematical_correction"),
+        (
+            "activation",
+            "mathematical_or_numerical_correction_evidence",
+        ),
+        ("owner_skill", "computational-optimization"),
+        ("reviewer", "mathematical_correctness_reviewer"),
+        ("required_packet", "mathematical_intent_packet"),
+    ];
+    if route.is_none()
+        || expected.iter().any(|(field, value)| {
+            yaml_string(route.and_then(|route| yaml_get(route, field))) != Some(*value)
+        })
+        || route
+            .and_then(|route| yaml_get(route, "requires_math_intent"))
+            .and_then(Yaml::as_bool)
+            != Some(true)
+    {
+        findings.push(AlignmentFinding::new(
+            "math-intent-route",
+            "agents/task_catalog.yaml#math_intent_routes.mathematical_correction",
+            "canonical-route-record-divergence",
+        ));
+    }
+    let family = yaml_values(yaml_get(task_catalog, "workflow_families"))
+        .iter()
+        .find(|family| yaml_string(yaml_get(family, "id")) == Some("research_driven_change"));
+    let family_specialists = family
+        .and_then(|family| yaml_get(family, "roles"))
+        .and_then(|roles| yaml_get(roles, "specialists"));
+    if !yaml_strings(family_specialists)
+        .iter()
+        .any(|role| role == "mathematical_correctness_reviewer")
+    {
+        findings.push(AlignmentFinding::new(
+            "math-intent-route",
+            "research_driven_change",
+            "math-reviewer-must-remain-a-route-candidate",
+        ));
+    }
+    for task_id in ["T4", "T5"] {
+        let task = yaml_values(yaml_get(task_catalog, "tasks"))
+            .iter()
+            .find(|task| yaml_string(yaml_get(task, "id")) == Some(task_id));
+        if yaml_string(task.and_then(|task| yaml_get(task, "math_intent_route"))) != Some(route_id)
+        {
+            findings.push(AlignmentFinding::new(
+                "math-intent-route",
+                task_id,
+                "canonical-route-not-selected",
+            ));
+            continue;
+        }
+        let task_specialists = yaml_strings(task.and_then(|task| yaml_get(task, "specialists")));
+        let default_pack_specialists = yaml_values(yaml_get(task_catalog, "review_packs"))
+            .iter()
+            .filter(|pack| {
+                yaml_strings(yaml_get(pack, "default_for_tasks"))
+                    .iter()
+                    .any(|id| id == task_id)
+            })
+            .flat_map(|pack| yaml_strings(yaml_get(pack, "specialists")))
+            .collect::<Vec<_>>();
+        if task_specialists
+            .iter()
+            .any(|role| role == "mathematical_correctness_reviewer")
+            || default_pack_specialists
+                .iter()
+                .any(|role| role == "mathematical_correctness_reviewer")
+        {
+            findings.push(AlignmentFinding::new(
+                "math-intent-route",
+                task_id,
+                "math-reviewer-must-remain-conditional",
             ));
         }
     }

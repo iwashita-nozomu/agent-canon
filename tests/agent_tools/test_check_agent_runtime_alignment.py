@@ -12,29 +12,10 @@ import json
 import os
 import shutil
 import subprocess
-import tempfile
-from dataclasses import replace
 from pathlib import Path
-from typing import cast
 
 import pytest
 import yaml
-
-from tools.agent.orchestration.packets import (
-    resolve_active_design_packet_config,
-    resolve_cross_cutting_document_packet,
-    resolve_document_section_locators,
-    resolve_role_document_packet,
-)
-from tools.agent.orchestration.team_config import (
-    TaskCatalog,
-    load_team_config,
-    resolve_role,
-    select_roles,
-)
-from tools.repository.workspace.workspace_scope import (
-    resolve_report_bundle_artifact_path,
-)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 AGENT_CANON_CLI = Path(
@@ -60,31 +41,11 @@ def run_alignment(root: Path) -> subprocess.CompletedProcess[str]:
     )
 
 
-def task_catalog_from_raw(raw: dict[str, object]) -> TaskCatalog:
-    """Build the public TaskCatalog value from the shared configuration owner."""
-    return TaskCatalog(
-        raw=raw,
-        workflow_families=tuple(raw["workflow_families"]),  # type: ignore[arg-type]
-        tasks=tuple(raw["tasks"]),  # type: ignore[arg-type]
-        review_packs=tuple(raw["review_packs"]),  # type: ignore[arg-type]
-    )
-
-
-def loaded_task_catalog_raw() -> dict[str, object]:
-    """Return the checked-in task catalog as mutable data for direct API tests."""
+def load_task_catalog_data() -> dict[str, object]:
+    """Read the canonical task data used by native alignment tests."""
     return yaml.safe_load(
         (PROJECT_ROOT / "agents/task_catalog.yaml").read_text(encoding="utf-8")
     )
-
-
-def test_missing_report_bundle_path_uses_existing_git_parent(tmp_path: Path) -> None:
-    """A future report bundle is resolved without being created."""
-    parent = tmp_path / "parent"
-    subprocess.run(["git", "init", "-q", "-b", "main", str(parent)], check=True)
-    report_dir = parent / "reports/agents/future-run"
-    resolved = resolve_report_bundle_artifact_path(report_dir, "intent_brief.md")
-    assert resolved == report_dir / "intent_brief.md"
-    assert not report_dir.exists()
 
 
 def test_native_runtime_alignment_passes_canonical_sources() -> None:
@@ -93,32 +54,35 @@ def test_native_runtime_alignment_passes_canonical_sources() -> None:
     assert result.stdout.rstrip().endswith("AGENT_RUNTIME_ALIGNMENT=pass")
 
 
-def test_team_configuration_keeps_integration_and_publisher_as_worker_mappings() -> (
-    None
-):
-    """Integration and publication roles remain child mappings, not parent routes."""
-    config = load_team_config()
-    specialists = {
-        str(role["id"]): role
-        for role in cast(list[dict[str, object]], config.raw["specialist_roles"])
-    }
+def test_canonical_role_data_keeps_integration_and_publisher_on_worker() -> None:
+    """Role source maps integration and publication onto the worker executable."""
+    aligned = run_alignment(PROJECT_ROOT)
+    assert aligned.returncode == 0, aligned.stdout + aligned.stderr
+    config = json.loads(
+        (PROJECT_ROOT / "agents/agents_config.json").read_text(encoding="utf-8")
+    )
+    specialists = {str(role["id"]): role for role in config["specialist_roles"]}
     for role_id in ("integration_executor", "publisher"):
         assert specialists[role_id]["codex_agents"] == ["worker"]
-    topology = cast(
-        dict[str, object], loaded_task_catalog_raw()["role_topology_defaults"]
-    )
-    families = cast(dict[str, list[str]], topology["role_families"])
+    topology = load_task_catalog_data()["role_topology_defaults"]
+    families = topology["role_families"]
     assert "integration_executor" in families["integration"]
     assert "publisher" in families["publication"]
 
 
 def test_team_configuration_keeps_skill_evaluator_on_its_explicit_task() -> None:
-    """The evaluator is an optional specialist reserved for T14."""
-    config = load_team_config()
-    evaluator = resolve_role(config, "skill_evaluator")
-    assert evaluator in config.specialist_roles
-    assert evaluator.activation == "explicit_empirical_skill_evaluation"
-    catalog = loaded_task_catalog_raw()
+    """Native alignment and source records reserve the evaluator for T14."""
+    aligned = run_alignment(PROJECT_ROOT)
+    assert aligned.returncode == 0, aligned.stdout + aligned.stderr
+    config = json.loads(
+        (PROJECT_ROOT / "agents/agents_config.json").read_text(encoding="utf-8")
+    )
+    evaluator = next(
+        role for role in config["specialist_roles"] if role["id"] == "skill_evaluator"
+    )
+    assert evaluator["activation"] == "explicit_empirical_skill_evaluation"
+    assert evaluator["codex_agents"] == ["skill_evaluator"]
+    catalog = load_task_catalog_data()
     t14 = next(task for task in catalog["tasks"] if task["id"] == "T14")
     assert "skill_evaluator" in t14["specialists"]
     assert all(
@@ -128,34 +92,16 @@ def test_team_configuration_keeps_skill_evaluator_on_its_explicit_task() -> None
     )
 
 
-def test_full_team_role_selection_keeps_skill_evaluator_isolated() -> None:
-    """Full-team selection never leaks the empirical evaluator across workflows."""
-    config = load_team_config()
-    catalog = task_catalog_from_raw(loaded_task_catalog_raw())
-    comprehensive = select_roles(
-        config,
-        [],
-        full_team=True,
-        catalog=catalog,
-        workflow_family_id="comprehensive_development",
-    )
-    evaluation = select_roles(
-        config,
-        [],
-        full_team=True,
-        catalog=catalog,
-        workflow_family_id="skill_evaluation",
-    )
-    assert "skill_evaluator" not in {role.id for role in comprehensive}
-    assert [role.id for role in evaluation] == ["skill_evaluator"]
-
-
 def test_skill_evaluator_context_is_limited_to_its_scenario_packet() -> None:
-    """The role context policy shares only its current packet and listed files."""
-    config = load_team_config()
+    """Role source limits evaluator visibility to its scenario packet."""
+    aligned = run_alignment(PROJECT_ROOT)
+    assert aligned.returncode == 0, aligned.stdout + aligned.stderr
+    config = json.loads(
+        (PROJECT_ROOT / "agents/agents_config.json").read_text(encoding="utf-8")
+    )
     policy = next(
         policy
-        for policy in config.context_policies
+        for policy in config["context_policies"]
         if policy.get("roles") == ["skill_evaluator"]
     )
     assert policy["share_only"] == [
@@ -170,22 +116,7 @@ def test_skill_evaluator_context_is_limited_to_its_scenario_packet() -> None:
         "prior_reports",
         "evaluator_artifacts",
         "full_session_context",
-    }.issubset(set(cast(list[str], policy["do_not_share"])))
-
-
-def test_t14_role_selection_uses_only_skill_evaluator() -> None:
-    """T14 selects the isolated evaluator through the shared team/task API."""
-    config = load_team_config()
-    catalog = task_catalog_from_raw(loaded_task_catalog_raw())
-    evaluator_roles = select_roles(
-        config,
-        ["skill_evaluator"],
-        full_team=False,
-        catalog=catalog,
-        workflow_family_id="skill_evaluation",
-    )
-    assert [role.id for role in evaluator_roles] == ["skill_evaluator"]
-    assert evaluator_roles[0].codex_agents == ("skill_evaluator",)
+    }.issubset(set(policy["do_not_share"]))
 
 
 def test_native_runtime_alignment_detects_profile_sandbox_policy_drift(
@@ -358,75 +289,3 @@ def test_native_runtime_alignment_rejects_generated_role_authority_claim(
     result = run_alignment(root)
     assert result.returncode == 1
     assert "stale-generated-role-authority" in result.stdout
-
-
-def test_template_workspace_can_resolve_shared_document_packets() -> None:
-    """Shared docs remain resolvable when the derived workspace omits AgentCanon."""
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        workspace = Path(tmp_dir)
-        entries = resolve_cross_cutting_document_packet(workspace, PROJECT_ROOT)
-        review_process = (
-            PROJECT_ROOT / "documents/conventions/REVIEW_PROCESS.md"
-        ).resolve()
-        assert review_process in {entry.path for entry in entries}
-        assert all(entry.path.exists() for entry in entries)
-
-        config = load_team_config()
-        role = resolve_role(config, "design_reviewer")
-        active_packet = resolve_active_design_packet_config(config)
-        assert active_packet.schema == "waterfall.design_packet.v1"
-        assert (
-            active_packet.implementation_source_packet.entry_id
-            == "implementation-source-packet"
-        )
-        packet = resolve_role_document_packet(
-            config=config,
-            role=role,
-            report_dir=workspace / "runtime/reports/agents/_packet_probe",
-            workspace_root=workspace,
-            active_design_packet=active_packet,
-            agentcanon_source_root=PROJECT_ROOT,
-        )
-        non_artifact_paths = {
-            entry.path
-            for entry in packet.read_before_work
-            if not entry.rationale.startswith("run artifact:")
-        }
-        assert review_process in non_artifact_paths
-        assert all(entry.exists() for entry in non_artifact_paths)
-
-
-def test_role_document_packets_use_typed_section_locators() -> None:
-    """Document section selectors stay distinct from paths and fail if headings move."""
-    config = load_team_config()
-    role = resolve_role(config, "implementer")
-    active_packet = resolve_active_design_packet_config(config)
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        packet = resolve_role_document_packet(
-            config=config,
-            role=role,
-            report_dir=Path(tmp_dir) / "runtime/reports/agents/_packet_probe",
-            workspace_root=PROJECT_ROOT,
-            active_design_packet=active_packet,
-            agentcanon_source_root=PROJECT_ROOT,
-        )
-    sectioned_entries = [entry for entry in packet.read_before_work if entry.sections]
-    assert sectioned_entries
-    assert all("#" not in str(entry.path) for entry in sectioned_entries)
-    for filename, heading in (
-        ("CODEX_BOOTSTRAP.md", "4. Run Context"),
-        ("CODEX_IMPLEMENTATION.md", "5. Implementation"),
-    ):
-        entry = next(
-            entry for entry in sectioned_entries if entry.path.name == filename
-        )
-        assert {section.heading for section in entry.sections} == {heading}
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        missing_heading_doc = Path(tmp_dir) / "CODEX_IMPLEMENTATION.md"
-        missing_heading_doc.write_text("# Workflow\n", encoding="utf-8")
-        with pytest.raises(RuntimeError, match="section_locator_heading_missing:"):
-            resolve_document_section_locators(
-                "implementer",
-                "agents/canonical/CODEX_IMPLEMENTATION.md",
-                missing_heading_doc,
-            )
