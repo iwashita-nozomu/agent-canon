@@ -158,7 +158,7 @@ fn main() {
     let args: Vec<_> = std::env::args().skip(1).collect();
     let Some(command) = args.first().map(String::as_str) else {
         eprintln!(
-            "usage: agent-canon-python-provider <html-extract|pdf-extract|trace-json|runtime> [arguments]"
+            "usage: agent-canon-python-provider <html-extract|pdf-extract|trace-json|proof-source|runtime> [arguments]"
         );
         std::process::exit(2);
     };
@@ -172,6 +172,24 @@ fn main() {
             &args[3],
             &args[4],
         ));
+    }
+    if command == "proof-source" && args.len() == 4 {
+        match proof_trace_alignment::proof_source(&args[1], &args[2], &args[3]) {
+            Ok(value) => {
+                println!("{value}");
+                std::process::exit(0);
+            }
+            Err(error) => {
+                let unavailable = Python::attach(|py| {
+                    error.is_instance_of::<pyo3::exceptions::PyModuleNotFoundError>(py)
+                });
+                println!(
+                    "{}",
+                    serde_json::json!({"status":"fail","available":!unavailable,"error":error.to_string()})
+                );
+                std::process::exit(1);
+            }
+        }
     }
     let result = match command {
         "runtime" if args.len() == 1 => Python::attach(runtime),
@@ -239,6 +257,40 @@ mod tests {
             json!({"claim":"保持","steps":[1,2],"checked":true})
         );
         assert!(Python::attach(|py| trace(py, &module, "MISSING")).is_err());
+    }
+
+    #[test]
+    fn proof_source_extracts_ast_without_importing_module() {
+        let temporary = tempfile::tempdir().unwrap();
+        let source = temporary.path().join("sample.py");
+        let sentinel = temporary.path().join("executed.txt");
+        std::fs::write(
+            &source,
+            format!(
+                "open({:?}, 'w').write('executed')\n\ndef lemma(x: int) -> int:\n    \"\"\"Claim: lemma returns x + 1.\"\"\"\n    if x > 0:\n        return x + 1\n    return 1\n",
+                sentinel.to_string_lossy()
+            ),
+        )
+        .unwrap();
+        let result = proof_trace_alignment::proof_source(
+            source.to_str().unwrap(),
+            "lemma",
+            temporary.path().to_str().unwrap(),
+        )
+        .unwrap();
+        assert_eq!(result["node_kind"], "FunctionDef");
+        assert_eq!(result["signature"], "def lemma(x: int) -> int");
+        assert_eq!(result["branch_count"], 1);
+        assert_eq!(result["return_expressions"][0], "1");
+        assert_eq!(result["return_expressions"][1], "x + 1");
+        assert_eq!(result["path"], "sample.py");
+        assert!(!sentinel.exists());
+        assert!(proof_trace_alignment::proof_source(
+            source.to_str().unwrap(),
+            "missing",
+            temporary.path().to_str().unwrap()
+        )
+        .is_err());
     }
 
     #[test]

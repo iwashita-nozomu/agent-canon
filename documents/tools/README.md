@@ -44,7 +44,7 @@ global Python executable, or Host Cargo fallback.
 | --- | --- |
 | typed dispatch and route selection | `tools/runtime/dispatch/agent-canon/src/tool_dispatch.rs`, `tools/catalog.yaml` |
 | search and source/dependency analysis | Rust `agent_search.rs`, source graph, GraphClient, LSP API, and semantic index; Python LSP and graph adapters remain for other callers |
-| runtime artifact boundary | `runtime_artifacts.py`, `bootstrap_runtime.py` |
+| runtime artifact boundary | `runtime_artifacts.py`, `bootstrap_runtime.rs` |
 | eval and archive | `run_accumulated_agent_evals.py`, `runtime_log_archive_git.py`, Rust `codex_runtime_summary.rs` |
 | docs and structure | Rust `agent-canon docs`, `repo-structure-contract` |
 | Skill loading | `bootstrap.sh ... tool run --root <registered-project> skill-document-reader -- ...` via the persistent AgentCanon tool container (bounded UTF-8 chunks and EOF admission) |
