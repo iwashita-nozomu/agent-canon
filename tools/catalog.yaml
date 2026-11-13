@@ -1299,12 +1299,12 @@ entries:
   - id: semantic-provider-html-report
     public: true
     summary: Renders semantic-index compare-providers JSON through Quarto as a static HTML projection report with the provider-delta-to-shared-candidate-logic SVG; local resources stay beside the HTML unless --embed-resources is requested.
-    path: tools/analysis/search/reporting/semantic_provider_html_report.py
+    path: tools/runtime/dispatch/agent-canon/src/semantic_index/semantic_provider_html_report.rs
     family: agent_tools
     role: docs
     status: canonical
-    command: python3 tools/analysis/search/reporting/semantic_provider_html_report.py --compare-json reports/agents/<run-id>/semantic_provider_compare.json --output reports/agents/<run-id>/semantic_provider_compare.html
-    dispatch: {argv: ["python3", "tools/analysis/search/reporting/semantic_provider_html_report.py", "--compare-json", "reports/agents/<run-id>/semantic_provider_compare.json", "--output", "reports/agents/<run-id>/semantic_provider_compare.html"]}
+    command: tools/bin/agent-canon semantic-provider-html-report --compare-json reports/agents/<run-id>/semantic_provider_compare.json --output reports/agents/<run-id>/semantic_provider_compare.html
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "semantic-provider-html-report", "--compare-json", "reports/agents/<run-id>/semantic_provider_compare.json", "--output", "reports/agents/<run-id>/semantic_provider_compare.html"]}
     writes: true
     default_wiring:
       ci: false
