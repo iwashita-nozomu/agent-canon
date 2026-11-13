@@ -8,7 +8,7 @@ upstream design ../../agents/skills/skill-dependencies.yaml prerequisite, succes
 upstream design ../../agents/canonical/skills.md reader-facing catalog projection
 upstream design ../../agents/internal-routines/design-implementation-correspondence.md universal design-to-implementation correspondence
 downstream implementation ../../tools/agent/skills/skill_route_catalog.py catalog resolver
-downstream implementation ../../tools/agent/orchestration/route.py capability and phase route materialization
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs capability and phase route materialization
 downstream implementation ../../tools/agent/skills/skill_dependency_map.py dependency graph validation
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs native read-only graph and Mermaid readback
 downstream implementation ../../tools/validation/semantic/runtime/check_agent_runtime_alignment.py runtime alignment readback
@@ -26,8 +26,8 @@ downstream implementation ../../tools/validation/semantic/convention/check_conve
 
 | 責務 | source owner | projection / materializer | 境界 |
 | --- | --- | --- | --- |
-| skill identity / capability metadata | `agents/skills/catalog.yaml` | `skill_dependency_map.py`, `route.py` | catalog fields supply current skill and capability records |
-| dependency / order / routing / parallel relation | `agents/skills/skill-dependencies.yaml` | `skill_dependency_map.py`, `route.py` | graph relations come from the declared map |
+| skill identity / capability metadata | `agents/skills/catalog.yaml` | `skill_dependency_map.py`, `agent-canon route` | catalog fields supply current skill and capability records |
+| dependency / order / routing / parallel relation | `agents/skills/skill-dependencies.yaml` | `skill_dependency_map.py`, `agent-canon route` | graph relations come from the declared map |
 | graph identity and projections | source snapshot and `_IdentityStore` | `skill_dependency_map.py`, `catalog/skill_dependency_graph.rs` | projections contain Ref values and display fields |
 | equality / stale readback | `catalog/skill_dependency_graph.rs` | native checker output | source, generated JSON, and actual Mermaid syntax are compared |
 | design/implementation correspondence | [agents/internal-routines/design-implementation-correspondence.md](../../agents/internal-routines/design-implementation-correspondence.md) | `design_correspondence` in the graph | clause and target paths remain traceable |
@@ -145,7 +145,7 @@ Source reads, normalization, digesting, JSON/Mermaid projection, and readback ar
 | Mermaid nodes, edges, or source metadata differ from graph | `projection_mismatch` / `failed` | expected and observed readback values |
 | projection contains canonical payload instead of a Ref | `payload_duplicate` / `failed` | offending projection field |
 
-Routing selection remains owned by `agents/skills/catalog.yaml`, `agents/skills/skill-dependencies.yaml`, and `tools/agent/orchestration/route.py`; graph rendering does not choose the route.
+Routing selection remains owned by `agents/skills/catalog.yaml`, `agents/skills/skill-dependencies.yaml`, and `tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs`; graph rendering does not choose the route.
 
 ## Checker Contract: Inputs / Outputs / Equality
 
@@ -193,12 +193,12 @@ flowchart LR
 
 この実装は AgentCanon final main `eeb451bd4b829e5417b810804a9d67dfb4ba570d` を設計入力として、設計文書の trace を変更する前の SHA-256 `a28cf776915d006aaffe868185816601c8feb11c7c4375b00b6caf18805c1506` に対応付けて記録します。生成 schema は `agent_canon.skill_tool_invocation_graph.v2` です。実装時点の design SHA-256 は generated graph の `design_correspondence.design_sha256` に保存し、DIC-001..DIC-009 のtarget pathsとclause fingerprintをこの表で追跡します。
 
-The correspondence checker covers `DIC-001`, `DIC-002`, `DIC-003`, `DIC-004`, `DIC-005`, `DIC-006`, `DIC-007`, `DIC-008`, and `DIC-009`, plus these changed paths in both forward and reverse mappings: `agents/skills/catalog.yaml`; `documents/design/skill-tool-invocation-graph.md`; `documents/runtime/skill-dependency-graph.json`; `documents/runtime/skill-dependency-graph.md`; `tests/agent_tools/test_route.py`; `tests/agent_tools/test_skill_dependency_map.py`; `tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs`; `tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs`; `tools/agent/orchestration/route.py`; `tools/agent/skills/skill_dependency_map.py`; and `tools/agent/skills/skill_route_catalog.py`. Missing clause, DIC, or path references are reported as `design_correspondence_missing`.
+The correspondence checker covers `DIC-001`, `DIC-002`, `DIC-003`, `DIC-004`, `DIC-005`, `DIC-006`, `DIC-007`, `DIC-008`, and `DIC-009`, plus these changed paths in both forward and reverse mappings: `agents/skills/catalog.yaml`; `documents/design/skill-tool-invocation-graph.md`; `documents/runtime/skill-dependency-graph.json`; `documents/runtime/skill-dependency-graph.md`; `tests/agent_tools/test_route.py`; `tests/agent_tools/test_skill_dependency_map.py`; `tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs`; `tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs`; `tools/agent/skills/skill_dependency_map.py`; and `tools/agent/skills/skill_route_catalog.py`. Missing clause, DIC, or path references are reported as `design_correspondence_missing`.
 
 | forward clause | implementation target (logical locator / symbol) | focused evidence / validation route | reverse trigger |
 | --- | --- | --- | --- |
 | `SG-004..SG-006` | `tools/agent/skills/skill_dependency_map.py:_IdentityStore`, `_canonical_bytes`, `_canonicalize`, `_identity_preimage` | `test_identity_payloads_are_unique_and_all_projections_are_refs`; typed collision/reference, insertion-order, and Unicode-alias tests | any payload duplication, Ref, Unicode/field-order, or digest-preimage change |
-| `SG-007..SG-008` | `tools/agent/orchestration/route.py:decide_skills`; `tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs:decide_capabilities`; `skill_dependency_map.py:_add_edge` | capability route, phase/order relations, and dependency edge checks | any route, phase, or edge change |
+| `SG-007..SG-008` | `tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs:decide_capabilities`; `skill_dependency_map.py:_add_edge` | capability route, phase/order relations, and dependency edge checks | any route, phase, or edge change |
 | `SG-009..SG-011` | `skill_dependency_map.py:render_graph_mermaid`, `:_parse_mermaid_syntax`, `:readback_mermaid`, `check_artifacts` | actual one-block Mermaid syntax readback; JSON/Mermaid equality and stale/omission failure | any node/edge/order/readback or generated-artifact change |
 | `SG-013..SG-014` | [documents/design/skill-tool-invocation-graph.md](skill-tool-invocation-graph.md) trace; `tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs` | `CHECK_SCHEMA=agent_canon.skill_tool_invocation_check.v1`; DIC trace and generated readback | any manifest/readback/design fingerprint or correspondence target change |
 | `SG-015` | `skill_dependency_map.py:_identity_preimage`, `:_json_digest_from_graph`, `:_parse_mermaid_syntax`, `:readback_mermaid` | graph/json/Mermaid digest equality, JSON preimage excludes self/readback/Mermaid digest, no absolute locator/base64 marker | any preimage, DAG layer, self-digest, Mermaid syntax, or readback change |

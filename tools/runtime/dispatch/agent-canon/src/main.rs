@@ -152,6 +152,7 @@ Commands:
   tool-catalog [--root <repo-root>] [--format text|json|markdown]
   tool <run|inventory|rust-cli> [options]
   capability-route [--capability ID] [--mode routing-only|repo-changing] [--format text|json|markdown] [--root PATH]
+  route [--area AREA] [--prompt TEXT|--prompt-file PATH] [options]
   tool-drift [--root <repo-root>] [--contract NAME]... [--format text|json]
   tool-proof-coverage [--root <repo-root>] [--format text|json|markdown] [--tool-id ID]... [--require-lean-verified]
   theorem-graph-board --graph <path> [--out <path>] [--format json|markdown] [--fail-on-open] [--fail-on-unknown]
@@ -169,6 +170,10 @@ Commands:
   check-semantic-responsibility-contract [paths...] [--root ROOT] [--template TEMPLATE] [--instance INSTANCE] [--artifact-root ARTIFACT_ROOT] [--format text|json]
   check-solid-evidence [paths...] [--root ROOT] [--changed] [--base-ref BASE_REF] [--evidence EVIDENCE] [--exclude EXCLUDE] [--verbose] [--format text|json]
   rust-migration-audit --root <repo-root>
+  render-code-template [--root SOURCE_ROOT] TEMPLATE
+  skill-shim-materializer <check|materialize|readback> [options]
+  skill-shim-evaluation [options]
+  run-accumulated-agent-evals [options]
   parent-repository-audit <list|check> --root ROOT [options]
   html-artifact-access REPORT_PATH [options]
   sync-experiment-registry-context --topic TOPIC [options]
@@ -273,6 +278,18 @@ fn main() {
     if args.len() >= 2 && args[1] == "tool-catalog" {
         std::process::exit(catalog::tool_catalog::run(&args[2..]));
     }
+    if args.len() >= 2 && args[1] == "render-code-template" {
+        std::process::exit(agent_canon::code_template_rendering::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "skill-shim-materializer" {
+        std::process::exit(catalog::skill_materialization::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "skill-shim-evaluation" {
+        std::process::exit(agent_canon::skill_shim_evaluation::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "run-accumulated-agent-evals" {
+        std::process::exit(agent_canon::eval_accumulation::run(&args[2..]));
+    }
     if args.len() >= 2 && args[1] == "parent-repository-audit" {
         std::process::exit(agent_canon::parent_repository_audit::run(&args[2..]));
     }
@@ -289,6 +306,9 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "capability-route" {
         std::process::exit(catalog::skill_routes::run_capability_route(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "route" {
+        std::process::exit(catalog::skill_routes::run_task_route(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "check-github-workflows" {

@@ -7,7 +7,7 @@ upstream design ../../documents/design/request-intent-and-update-relation.md own
 upstream design ./agent-orchestration.md owns fact discovery and the existing post-interview handoff route
 upstream implementation ./catalog.yaml owns public skill identity and explicit trigger metadata
 upstream implementation ./skill-dependencies.yaml owns the public-skill dependency relation
-downstream implementation ../../tools/agent/skills/skill_shim_materializer.py generates the runtime discovery shim
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_materialization.rs generates the runtime discovery shim
 downstream implementation ../../tools/validation/semantic/runtime/check_agent_runtime_alignment.py validates source/catalog/shim alignment
 @dependency-end
 -->

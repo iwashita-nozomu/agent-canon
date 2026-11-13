@@ -212,7 +212,7 @@ path: tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs
         "| native coordination and actual route evidence | "
         "`agents/COMMUNICATION_PROTOCOL.md` |\n"
         "| skill selection | `agents/skills/catalog.yaml`; "
-        "`python3 tools/agent/orchestration/route.py --prompt` |\n"
+        "`tools/bin/agent-canon route --prompt` |\n"
         "| implementation guidance and closeout | "
         "`agents/skills/codex-task-workflow.md` |\n"
         "| active design packet schema | `agents/COMMUNICATION_PROTOCOL.md`; "
@@ -319,7 +319,7 @@ path: tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs
         "`check_agent_runtime_alignment.py` |\n"
         "| skill routing and public skill surface | "
         "`vendor/agent-canon/agents/skills/catalog.yaml` | "
-        "`python3 tools/agent-canon/agent_tools/route.py --prompt` |\n"
+        "`tools/bin/agent-canon route --prompt` |\n"
         "| report and closeout structure | `agents/canonical/CODEX_COMPLETION.md` | Completion Review |\n"
     ),
     "AGENTS.md": (

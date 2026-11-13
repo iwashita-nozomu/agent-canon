@@ -85,7 +85,7 @@ source checkout の `documents/runtime/` を暗黙に更新しません。tracke
 | 目的 | 入口 |
 | --- | --- |
 | public skill / shim / doc / config の整合 | `python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py` |
-| prompt に対する skill 選択 | `python3 tools/agent/orchestration/route.py --prompt "<user request>" --mode routing-only --format json` |
+| prompt に対する skill 選択 | `tools/bin/agent-canon route --prompt "<user request>" --mode routing-only --format json` |
 | 選択した tool の実行 | 既存 CLI / API / script を native argv で呼び、実行と検証は各 owner に委譲します。 |
 | 依存辞書の静的検査 | `python3 tools/agent/skills/skill_dependency_map.py check --root .` |
 | 外部 graph 生成 | `python3 tools/agent/skills/skill_dependency_map.py graph --root . --runtime-root <external-runtime-root>` |

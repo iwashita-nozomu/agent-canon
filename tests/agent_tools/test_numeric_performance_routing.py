@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests post-run numerical performance routing and the non-numerical C++ boundary.
-# upstream implementation ../../tools/agent/orchestration/route.py owns prompt-derived skill routing
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs owns native prompt-derived skill routing
 # upstream design ../../agents/skills/computational-optimization.md owns convergence-first numerical performance diagnosis
 # upstream design ../../agents/skills/cpp-review.md owns the native performance handoff boundary
 # upstream design ../../documents/experiments/experiment-critical-review.md owns post-run experiment review
@@ -12,17 +12,19 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
-import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-ROUTE = PROJECT_ROOT / "tools" / "agent" / "orchestration" / "route.py"
+AGENT_CANON_CLI = Path(
+    os.environ.get("AGENT_CANON_CLI", str(PROJECT_ROOT / "tools/bin/agent-canon"))
+)
 
 
 def _route(prompt: str) -> dict[str, object]:
     result = subprocess.run(
-        [sys.executable, str(ROUTE), "--prompt", prompt, "--format", "json"],
+        [str(AGENT_CANON_CLI), "route", "--prompt", prompt, "--format", "json"],
         cwd=PROJECT_ROOT,
         capture_output=True,
         check=False,

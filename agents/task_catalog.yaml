@@ -5,7 +5,7 @@
 # downstream design canonical/CODEX_WORKFLOW.md workflow consumes task routing catalog
 # downstream design canonical/CODEX_SUBAGENTS.md Codex subagent inventory consumes task routing
 # downstream implementation ../.codex/config.toml Codex runtime config consumes task routing
-# downstream implementation ../tools/agent/orchestration/route.py consumes exclusive execution routes
+# downstream implementation ../tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs consumes exclusive execution routes
 # @dependency-end
 version: 2
 

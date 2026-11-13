@@ -1,7 +1,6 @@
 // @dependency-start
 // contract implementation
 // responsibility Owns pure subagent invocation observation and honest collaboration receipts.
-// upstream implementation ../../../../../tools/agent/orchestration/subagent_selection.py owns the current Python API contract.
 // upstream implementation ./python_json.rs owns Python-compatible strings and JSON values.
 // upstream implementation ./agent_search.rs reuses ICU CaseMapper::fold_string for Unicode 15 case folding.
 // downstream implementation ../tests/subagent_selection_native.rs checks the frozen CPython 3.12.3 API corpus.

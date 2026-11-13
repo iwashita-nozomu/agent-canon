@@ -205,7 +205,7 @@ pub fn classify(paths: &[String]) -> Vec<PathRisk> {
         active.push(PathRisk {
             profile: "agent-eval",
             reason: "eval_surface_changed",
-            checks: &["python3 eval/producers/run_accumulated_agent_evals.py"],
+            checks: &["tools/bin/agent-canon run-accumulated-agent-evals"],
         });
     }
     if paths.iter().any(|path| has_prefix(path, RUST_PREFIXES)) {

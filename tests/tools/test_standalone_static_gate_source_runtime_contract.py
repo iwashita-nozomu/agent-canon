@@ -5,7 +5,7 @@
 # responsibility Verifies standalone static unit source/runtime routing and eval failure evidence retention.
 # upstream implementation ../../tools/validation/ci/runners/run_standalone_static_gate_unit.sh owns contract and eval unit commands
 # upstream implementation ../../tools/runtime/dispatch/agent-canon/src/eval_accumulation_check.rs owns the native eval checker command
-# upstream implementation ../../eval/producers/run_accumulated_agent_evals.py runs the selected eval producer collection
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/eval_accumulation.rs runs the selected eval producer collection
 # upstream implementation ../../tools/runtime/archive/runtime_log_paths.py defines canonical eval result paths
 # upstream design ../../documents/design/source-owned-dependency-validation.md source and persisted graph authority split
 # downstream implementation ../../.github/workflows/agent-canon-static-gates.yml runs selected unit owners
@@ -129,7 +129,7 @@ def test_eval_preserves_failed_producer_logs_until_ci_capture(
         encoding="utf-8",
     )
     paths = (
-        ("eval/producers/run_accumulated_agent_evals.py", "producer", producer_status),
+        ("producer_fixture.py", "producer", producer_status),
     )
     archive_relative = LOG_ARCHIVE_PARENT.as_posix()
     for relative, name, status in paths:
@@ -166,7 +166,12 @@ def test_eval_preserves_failed_producer_logs_until_ci_capture(
     native_cli.write_text(
         "#!/usr/bin/env python3\n"
         "import json, os, sys\n"
+        "import runpy\n"
         "from pathlib import Path\n"
+        "if sys.argv[1] == 'run-accumulated-agent-evals':\n"
+        "    sys.argv = [str(Path(__file__).parents[2] / 'producer_fixture.py'), *sys.argv[2:]]\n"
+        "    runpy.run_path(sys.argv[0], run_name='__main__')\n"
+        "    raise SystemExit(0)\n"
         "if sys.argv[1] != 'eval-accumulation-check':\n"
         "    raise SystemExit(86)\n"
         "with Path(os.environ['CALLS']).open('a') as stream:\n"

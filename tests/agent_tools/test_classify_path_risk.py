@@ -54,7 +54,7 @@ class ClassifyPathRiskTest(unittest.TestCase):
             "ROOT_AGENTS.md": ("docs", "eval"),
             ".codex/agents/worker.toml": ("contracts", "eval"),
             "agents/agents_config.json": ("contracts", "eval"),
-            "tools/agent/orchestration/route.py": ("contracts", "eval"),
+            "tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs": ("contracts", "eval"),
             "documents/conventions/example.md": ("docs", "eval"),
             "bootstrap/host/manifest.toml": ("eval", "workflow-container"),
             "tools/runtime/archive/github_eval_delivery.py": ("contracts", "eval"),
@@ -118,7 +118,7 @@ class ClassifyPathRiskTest(unittest.TestCase):
                 {
                     "profile": "agent-eval",
                     "reason": "eval_surface_changed",
-                    "checks": ["python3 eval/producers/run_accumulated_agent_evals.py"],
+                    "checks": ["tools/bin/agent-canon run-accumulated-agent-evals"],
                 },
                 {
                     "profile": "rust",

@@ -87,7 +87,7 @@ IMPLEMENTATION_TRACE_PATHS = (
     "tests/agent_tools/test_skill_dependency_map.py",
     "tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs",
     "tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs",
-    "tools/agent/orchestration/route.py",
+    "tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs",
     "tools/agent/skills/skill_dependency_map.py",
     "tools/agent/skills/skill_route_catalog.py",
 )

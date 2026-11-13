@@ -17,9 +17,9 @@ classification_values = ["public", "internal", "compat", "retired", "example"]
 [[tool]]
 id = "route"
 classification = "public"
-tool = "tools/agent/orchestration/route.py"
+tool = "tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs"
 doc = "documents/tools/route.md"
-language = "python"
+language = "rust"
 summary = "Short task-routing tool documentation."
 
 [[tool]]
