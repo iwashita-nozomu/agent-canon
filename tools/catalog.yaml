@@ -1192,12 +1192,12 @@ entries:
 
   - id: runtime-log-archive-git
     summary: Produces immutable native context certificates, materializes prepared runtime artifacts with confirmed outcome receipts, and checkpoints atomic hook-event spool files through one prepared archive transaction.
-    path: tools/runtime/archive/runtime_log_archive_git.py
+    path: tools/runtime/dispatch/agent-canon/src/runtime_log_archive.rs
     family: agent_tools
     role: sync
     status: canonical
-    command: python3 tools/runtime/archive/runtime_log_archive_git.py <append-context-discovery|materialize-runtime-event|sync>
-    dispatch: {argv: ["python3", "tools/runtime/archive/runtime_log_archive_git.py", "<append-context-discovery|materialize-runtime-event|sync>"]}
+    command: tools/bin/agent-canon runtime-log-archive-git <archive-command>
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "runtime-log-archive-git"]}
     writes: true
     default_wiring:
       ci: false

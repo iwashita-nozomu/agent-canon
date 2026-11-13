@@ -307,7 +307,7 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                 ),
                 (
                     "eval archive",
-                    "tools/runtime/archive/runtime_log_archive_git.py",
+                    "tools/runtime/dispatch/agent-canon/src/runtime_log_archive.rs",
                     "archive readback",
                 ),
                 (

@@ -167,7 +167,7 @@ relay preserves these semantics and reports the transport limitation honestly.
 
 Before the generic runtime-event artifact exists, the sole context handoff is
 the immutable `agent_canon.context_discovery_certificate.v1` produced by
-`runtime_log_archive_git.py append-context-discovery`. The producer reads the
+`runtime-log-archive-git append-context-discovery`. The producer reads the
 native `session_meta` and selected `event_msg` / `task_complete` records from
 the finite Codex rollout source, binds repository and byte-range identities,
 and publishes one no-replace certificate at
