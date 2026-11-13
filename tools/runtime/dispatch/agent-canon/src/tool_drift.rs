@@ -229,7 +229,7 @@ const CONTRACTS: &[ToolContract] = &[
         name: "generated_artifact_guard",
         tool: "tools/runtime/dispatch/agent-canon/src/report_artifact_checks.rs",
         links: &[
-            direct_link("tools/runtime/artifacts/report_artifact_checks.py"),
+            direct_link("tools/runtime/dispatch/agent-canon/src/report_artifact_checks.rs"),
             direct_link("documents/design/request-intent-and-update-relation.md"),
             direct_link("agents/canonical/ARTIFACT_PLACEMENT.md"),
             direct_link("templates/agents/closeout_gate.md"),

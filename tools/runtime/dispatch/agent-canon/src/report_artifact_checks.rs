@@ -2,7 +2,7 @@
 // contract implementation
 // responsibility Owns native report checks, status parsing, token fields, run-bundle placement, and generated report rejection.
 // upstream design ../../../../../documents/design/request-intent-and-update-relation.md selected report evidence contract
-// upstream implementation ../../../../../tools/runtime/artifacts/report_artifact_checks.py retains selected report placement checks
+// upstream design ../../../../../documents/runtime/runtime-log-archive.md retains selected report placement checks
 // upstream design ../../../../../agents/canonical/ARTIFACT_PLACEMENT.md generated artifact placement policy
 // upstream design ../../../../../templates/agents/closeout_gate.md closeout evidence template
 // upstream design ../../../../../tools/README.md native tool index
@@ -25,6 +25,14 @@ use std::process::Command;
 use std::sync::OnceLock;
 
 pub const GENERATED_ARTIFACT_GUARD_SELECTOR: &str = "generated-artifact-guard";
+
+/// Authoritative path, target digest and decision projection for one review.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReviewIdentityResult {
+    pub design_artifact_path: Option<String>,
+    pub review_target_sha256: Option<String>,
+    pub decision_approved: bool,
+}
 
 const GENERATED_ARTIFACT_GUARD_DESCRIPTION: &str =
     "Fail when mechanically regenerated report artifacts remain in the tree.";
@@ -115,7 +123,7 @@ fn pure_posix_path(path: &[u8]) -> Vec<u8> {
     normalized
 }
 
-fn is_mechanically_regenerated_report_path(path: &[u8]) -> bool {
+fn is_mechanically_regenerated_report_path_bytes(path: &[u8]) -> bool {
     let normalized = normalized_git_path(path);
     let candidate = pure_posix_path(&normalized);
     if GENERATED_ARTIFACT_ROOTS.iter().any(|root| {
@@ -178,19 +186,19 @@ fn python_surrogateescape_sort_key(path: &[u8]) -> Vec<u32> {
 fn generated_artifact_blockers(root: &Path) -> io::Result<Vec<GeneratedArtifactBlocker>> {
     let mut states = HashMap::<Vec<u8>, GeneratedArtifactState>::new();
     for path in git_report_paths(root, &[])? {
-        if is_mechanically_regenerated_report_path(&path) {
+        if is_mechanically_regenerated_report_path_bytes(&path) {
             states.insert(path, GeneratedArtifactState::Tracked);
         }
     }
     for path in git_report_paths(root, &["--others", "--exclude-standard"])? {
-        if is_mechanically_regenerated_report_path(&path) {
+        if is_mechanically_regenerated_report_path_bytes(&path) {
             states
                 .entry(path)
                 .or_insert(GeneratedArtifactState::Untracked);
         }
     }
     for path in git_report_paths(root, &["--others", "--ignored", "--exclude-standard"])? {
-        if is_mechanically_regenerated_report_path(&path) {
+        if is_mechanically_regenerated_report_path_bytes(&path) {
             states
                 .entry(path)
                 .or_insert(GeneratedArtifactState::Ignored);
@@ -359,8 +367,80 @@ fn approve_pattern() -> &'static Regex {
     })
 }
 
+fn review_target_sha_pattern() -> &'static Regex {
+    static PATTERN: OnceLock<Regex> = OnceLock::new();
+    PATTERN.get_or_init(|| {
+        Regex::new(r"(?i)\breview_target_sha256\s*=\s*`?([0-9a-f]{64})`?")
+            .expect("fixed review target digest regex")
+    })
+}
+
+fn design_artifact_path_pattern() -> &'static Regex {
+    static PATTERN: OnceLock<Regex> = OnceLock::new();
+    PATTERN.get_or_init(|| {
+        Regex::new(r"(?im)^\s*-\s*Design artifact path:\s*`?([^`\r\n]+?)`?\s*$")
+            .expect("fixed design artifact path regex")
+    })
+}
+
 pub fn markdown_without_comments(text: &str) -> String {
     placeholder_pattern().replace_all(text, "").into_owned()
+}
+
+/// Return whether one report path names a mechanically regenerated artifact.
+pub fn is_mechanically_regenerated_report_path(path: &str) -> bool {
+    is_mechanically_regenerated_report_path_bytes(path.as_bytes())
+}
+
+/// Return exact tracked, untracked, and ignored eval capture leftovers in path order.
+pub fn generated_eval_transient_blockers(workspace: &Path) -> Vec<String> {
+    let mut states = HashMap::<Vec<u8>, &'static str>::new();
+    for path in git_report_paths(workspace, &[]).unwrap_or_default() {
+        if eval_transient_capture_path(&path) {
+            states.insert(path, "tracked");
+        }
+    }
+    for path in git_report_paths(workspace, &["--others", "--exclude-standard"]).unwrap_or_default()
+    {
+        if eval_transient_capture_path(&path) {
+            states.entry(path).or_insert("untracked");
+        }
+    }
+    for path in git_report_paths(workspace, &["--others", "--ignored", "--exclude-standard"])
+        .unwrap_or_default()
+    {
+        if eval_transient_capture_path(&path) {
+            states.entry(path).or_insert("ignored");
+        }
+    }
+    let mut paths = states.into_iter().collect::<Vec<_>>();
+    paths.sort_by_cached_key(|(path, _)| python_surrogateescape_sort_key(path));
+    paths
+        .into_iter()
+        .map(|(path, state)| {
+            format!(
+                "generated_report_artifact_{state}_left_in_tree:{}",
+                String::from_utf8_lossy(&path)
+            )
+        })
+        .collect()
+}
+
+fn eval_transient_capture_path(path: &[u8]) -> bool {
+    let normalized = normalized_git_path(path);
+    let Some(relative) = normalized.strip_prefix(b"reports/agent-eval-runs/") else {
+        return false;
+    };
+    let mut parts = relative.split(|byte| *byte == b'/');
+    let (Some(run), Some(filename), None) = (parts.next(), parts.next(), parts.next()) else {
+        return false;
+    };
+    if run.is_empty() {
+        return false;
+    }
+    [b".stdout.txt".as_slice(), b".stderr.txt".as_slice()]
+        .iter()
+        .any(|suffix| filename.len() > suffix.len() && filename.ends_with(suffix))
 }
 
 pub fn markdown_without_adjudicated_rejected_hypotheses(text: &str) -> String {
@@ -622,6 +702,25 @@ pub fn check_final_review_artifact(text: &str) -> Vec<String> {
     blockers
 }
 
+/// Parse the last declared review target/path together with the approved decision.
+pub fn parse_review_identity(text: &str) -> ReviewIdentityResult {
+    let design_artifact_path = design_artifact_path_pattern()
+        .captures_iter(text)
+        .last()
+        .and_then(|capture| capture.get(1))
+        .map(|value| value.as_str().trim().trim_matches(['\'', '"']).to_owned());
+    let review_target_sha256 = review_target_sha_pattern()
+        .captures_iter(text)
+        .last()
+        .and_then(|capture| capture.get(1))
+        .map(|value| value.as_str().to_ascii_lowercase());
+    ReviewIdentityResult {
+        design_artifact_path,
+        review_target_sha256,
+        decision_approved: has_approve_decision(text),
+    }
+}
+
 /// Parse status bullets from a complete Markdown artifact, keeping the last value per key.
 pub fn parse_markdown_status_lines(text: &str) -> BTreeMap<String, String> {
     let mut data = BTreeMap::new();
@@ -729,7 +828,7 @@ pub fn report_artifact_placement_blockers(
     for raw_path in git_report_paths(&workspace, &["--others", "--ignored", "--exclude-standard"])
         .unwrap_or_default()
     {
-        if !is_mechanically_regenerated_report_path(&raw_path) {
+        if !is_mechanically_regenerated_report_path_bytes(&raw_path) {
             continue;
         }
         let path = String::from_utf8_lossy(&raw_path).into_owned();
@@ -756,6 +855,8 @@ pub fn report_artifact_placement_blockers(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+    use std::process::Command;
 
     #[test]
     fn empty_planned_work_units_keep_the_waterfall_diagnostic() {
@@ -783,5 +884,69 @@ mod tests {
             check_final_review_artifact("## Decision\nnot approved\n"),
             vec!["final_review.md:decision_not_approve"]
         );
+    }
+
+    #[test]
+    fn eval_transient_classifier_orders_tracked_untracked_and_ignored_paths() {
+        let workspace = tempfile::tempdir().unwrap();
+        let root = workspace.path();
+        Command::new("git")
+            .args(["init", "-q"])
+            .current_dir(root)
+            .status()
+            .unwrap();
+        fs::write(
+            root.join(".gitignore"),
+            "reports/agent-eval-runs/ignored-run/\n",
+        )
+        .unwrap();
+        let tracked = root.join("reports/agent-eval-runs/tracked-run/01-role.stdout.txt");
+        fs::create_dir_all(tracked.parent().unwrap()).unwrap();
+        fs::write(&tracked, "tracked\n").unwrap();
+        Command::new("git")
+            .args([
+                "add",
+                ".gitignore",
+                "reports/agent-eval-runs/tracked-run/01-role.stdout.txt",
+            ])
+            .current_dir(root)
+            .status()
+            .unwrap();
+        let untracked = root.join("reports/agent-eval-runs/untracked-run/02-role.stderr.txt");
+        fs::create_dir_all(untracked.parent().unwrap()).unwrap();
+        fs::write(&untracked, "untracked\n").unwrap();
+        let ignored = root.join("reports/agent-eval-runs/ignored-run/03-role.stderr.txt");
+        fs::create_dir_all(ignored.parent().unwrap()).unwrap();
+        fs::write(&ignored, "ignored\n").unwrap();
+
+        assert_eq!(
+            generated_eval_transient_blockers(root),
+            vec![
+                "generated_report_artifact_ignored_left_in_tree:reports/agent-eval-runs/ignored-run/03-role.stderr.txt",
+                "generated_report_artifact_tracked_left_in_tree:reports/agent-eval-runs/tracked-run/01-role.stdout.txt",
+                "generated_report_artifact_untracked_left_in_tree:reports/agent-eval-runs/untracked-run/02-role.stderr.txt",
+            ]
+        );
+    }
+
+    #[test]
+    fn eval_transient_classifier_excludes_non_capture_outputs() {
+        let workspace = tempfile::tempdir().unwrap();
+        let root = workspace.path();
+        Command::new("git")
+            .args(["init", "-q"])
+            .current_dir(root)
+            .status()
+            .unwrap();
+        for relative in [
+            "reports/agent-eval-runs/run/summary.json",
+            "reports/agent-eval-runs/run/nested/role.stdout.txt",
+            "reports/agent-runtime-dashboard/role.stdout.txt",
+        ] {
+            let path = root.join(relative);
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(path, "generated\n").unwrap();
+        }
+        assert!(generated_eval_transient_blockers(root).is_empty());
     }
 }

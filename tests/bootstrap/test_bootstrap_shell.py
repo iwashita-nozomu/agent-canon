@@ -3767,9 +3767,10 @@ fi
         encoding="utf-8",
     )
     fake_docker.chmod(0o755)
-    archive_owner = repository / "tools/runtime/archive/runtime_log_archive_git.py"
-    archive_owner.parent.mkdir(parents=True)
-    archive_owner.write_text("# fixture archive provider\n", encoding="utf-8")
+    archive_cli = repository / "tools/bin/agent-canon"
+    archive_cli.parent.mkdir(parents=True)
+    archive_cli.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+    archive_cli.chmod(0o755)
     shell_args = " ".join(repr(argument) for argument in compatibility_args)
     script = f"""
 source {str(ADAPTER)!r}
@@ -6662,9 +6663,15 @@ def test_scheduled_sync_attempts_pending_archives_after_source_failure(
 ) -> None:
     """A failed source refresh does not strand already-pending archive inputs."""
     install = tmp_path / "agent-canon"
-    archive_owner = install / "tools/runtime/archive/runtime_log_archive_git.py"
-    archive_owner.parent.mkdir(parents=True)
-    archive_owner.write_text("# test-owned source fixture\n", encoding="utf-8")
+    archive_cli = install / "tools/bin/agent-canon"
+    archive_cli.parent.mkdir(parents=True)
+    archive_cli.write_text(
+        "#!/usr/bin/env bash\n"
+        "if [[ ${1:-} == --version ]]; then exit 0; fi\n"
+        f"printf 'hook\\n' >> {str(tmp_path / 'phases.txt')!r}\n",
+        encoding="utf-8",
+    )
+    archive_cli.chmod(0o755)
     runtime = tmp_path / ".runtime"
     runtime.mkdir()
     phases = tmp_path / "phases.txt"
@@ -6672,7 +6679,6 @@ def test_scheduled_sync_attempts_pending_archives_after_source_failure(
 source {str(ADAPTER)!r}
 _agent_canon_advance_source() {{ printf 'source\\n' >> {str(phases)!r}; return 2; }}
 _agent_canon_json_error() {{ return 2; }}
-python3() {{ printf 'hook\\n' >> {str(phases)!r}; return 0; }}
 _agent_canon_container_name() {{ printf 'resident\\n'; }}
 _agent_canon_use_active_image() {{ printf 'active-image\\n' >> {str(phases)!r}; return 0; }}
 _agent_canon_ensure_container() {{ printf 'resident\\n'; }}
@@ -6792,7 +6798,7 @@ def test_archive_and_codex_crossings_are_host_owned() -> None:
         'identity_args+=(--repository-id "$AGENT_CANON_SOURCE_REPOSITORY_ID")' in text
     )
     assert 'git -C "$log_root" merge --ff-only "origin/$branch"' in text
-    assert "runtime_log_archive_git.py" in text
+    assert "runtime-log-archive-git" in text
     assert '--archive-root "$AGENT_CANON_PRIVATE_LOG_ROOT"' in eval_archive
     assert eval_archive.index(
         '--archive-root "$AGENT_CANON_PRIVATE_LOG_ROOT"'

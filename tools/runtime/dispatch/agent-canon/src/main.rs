@@ -90,6 +90,7 @@ mod responsibility_scope;
 mod result_logs;
 mod rule_inventory;
 mod run_log_contract;
+mod runtime_log_archive;
 mod rust_migration_plan;
 mod semantic_index;
 mod semantic_responsibility;
@@ -106,8 +107,9 @@ mod tool_rejection_preflight;
 #[cfg(not(test))]
 use agent_canon::runtime_boundary;
 use agent_canon::{
-    catalog, codex_runtime_summary, compare_agent_run_paths, entrypoint_composer, extract_docx,
-    formal_proof, generated_completeness, lean_recursive_proof_search, native_release,
+    catalog, codex_runtime_summary, compare_agent_run_paths, cpp_source_canonical_ir,
+    cpp_template_to_lean, entrypoint_composer, extract_docx, formal_proof, generated_completeness,
+    jit_canonical_ir, lean_recursive_proof_search, native_release, operational_ir_to_lean,
     report_artifact_checks, run_evaluation, stablehlo_value_closure, template_bundle,
     theorem_graph_board, theorem_graph_circularity_check, tool_dispatch, tool_proof_coverage,
 };
@@ -116,7 +118,9 @@ use std::env;
 const HELP: &str = "AgentCanon's native command line interface.
 
 Usage: agent-canon <command> [arguments]
+  github-publish [--root ROOT] <push|pr|publish-pr|checks> --user-task TASK [options]
   run-gpu-command [options] -- COMMAND ...
+  run-managed-experiment [options] -- COMMAND ...
   experiment-registry [--repo-root ROOT] [--registry PATH]
 
 Commands:
@@ -146,6 +150,10 @@ Commands:
   tool-rejection-preflight [paths...] [--root <repo-root>] [--changed] [--format text|json]
   check-merge-structure --source <ref> [--target <ref>] [--compare-commit <ref>] [--repo-root <path>]
   jit-ir-to-lean --jit-ir <path> --namespace <Lean.Namespace> --out <path>
+  operational-ir-to-lean --ir <path> --namespace <Lean.Namespace> [options]
+  jit-canonical-ir --python-symbol PATH::QUALNAME --input-factory PATH::QUALNAME --out PATH [options]
+  cpp-source-canonical-ir --root ROOT --cpp-symbol PATH::QUALNAME [--format json|markdown|text] [--out PATH]
+  cpp-template-to-lean --root ROOT --cpp-symbol PATH::QUALNAME --namespace NAMESPACE [options]
   log-surface-inventory [--root <repo-root>] [--format text|json] [--output <path>] [--check --baseline <path>]
   stablehlo-value-closure --ir <path> --function NAME --value SSA [--region-id ID] [--max-nodes N] [--format text|json]
   theorem-graph-circularity-check --graph <path> [--out <path>] [--format text|json|markdown] [--fail-on-finding]
@@ -222,6 +230,7 @@ Commands:
   compose-consumer-entrypoint --base <path> --specific <path> --output <path> [--source-root <path>]
   template-bundle <export|committed-tree|verify|native-package|native-verify|native-version> [options]
   native-release <prepare|select-artifacts|publish|compare-reproducible> [options]
+  runtime-log-archive-git <archive command> [options]
 
 Options:
   -h, --help     Print help
@@ -264,6 +273,10 @@ fn main() {
         std::process::exit(run_evaluation::run_cli(&args[2..]));
     }
 
+    if args.len() >= 2 && args[1] == "runtime-log-archive-git" {
+        std::process::exit(runtime_log_archive::run(&args[2..]));
+    }
+
     if args.len() >= 2 && args[1] == agent_canon::eval_accumulation_check::SELECTOR {
         std::process::exit(agent_canon::eval_accumulation_check::run_cli(&args[2..]));
     }
@@ -296,10 +309,25 @@ fn main() {
         std::process::exit(stablehlo_value_closure::run(&args[2..]));
     }
 
+    if args.len() >= 2 && args[1] == jit_canonical_ir::SELECTOR {
+        std::process::exit(jit_canonical_ir::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == cpp_source_canonical_ir::SELECTOR {
+        std::process::exit(cpp_source_canonical_ir::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == cpp_template_to_lean::SELECTOR {
+        std::process::exit(cpp_template_to_lean::run(&args[2..]));
+    }
+
     if args.len() >= 2 && args[1] == theorem_graph_circularity_check::SELECTOR {
         std::process::exit(theorem_graph_circularity_check::run(&args[2..]));
     }
 
+    if args.len() >= 2 && args[1] == "github-publish" {
+        std::process::exit(agent_canon::github_publish::run(&args[2..]));
+    }
     if args.len() >= 2 && args[1] == "bootstrap-runtime" {
         std::process::exit(agent_canon::bootstrap_runtime::run(&args[2..]));
     }
@@ -483,6 +511,9 @@ fn main() {
     if args.len() >= 2 && args[1] == "run-gpu-command" {
         std::process::exit(agent_canon::gpu_command_admission::run(&args[2..]));
     }
+    if args.len() >= 2 && args[1] == agent_canon::managed_experiment::SELECTOR {
+        std::process::exit(agent_canon::managed_experiment::run(&args[2..]));
+    }
     if args.len() >= 2 && args[1] == "sync-experiment-registry-context" {
         std::process::exit(agent_canon::experiment_registry::context::run(&args[2..]));
     }
@@ -598,6 +629,10 @@ fn main() {
         std::process::exit(jit_ir_to_lean::run(&args[2..]));
     }
 
+    if args.len() >= 2 && args[1] == operational_ir_to_lean::SELECTOR {
+        std::process::exit(operational_ir_to_lean::run(&args[2..]));
+    }
+
     if args.len() >= 2 && args[1] == "jsonl-to-md" {
         std::process::exit(result_logs::run_jsonl_to_md(&args[2..]));
     }
@@ -620,6 +655,18 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "test-design" {
         std::process::exit(test_design::run(&args[2..]));
+    }
+
+    if args.len() >= 2
+        && matches!(
+            args[1].as_str(),
+            "run-container-pack"
+                | "run-in-repo-container"
+                | "run-python-in-dockerfile"
+                | "run-repo-program"
+        )
+    {
+        std::process::exit(agent_canon::container_runtime::run(&args[1], &args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "notebook-quality" {

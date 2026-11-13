@@ -786,6 +786,14 @@ impl AttestedParent {
         platform::read_parent_owned_file(self, receipt)
     }
 
+    /// Flush the receipt-bound target directory after publication recovery.
+    pub fn sync_parent_owned_directory(
+        &self,
+        receipt: &ParentOwnedPathReceipt,
+    ) -> Result<(), AuthorityError> {
+        platform::sync_parent_owned_directory(self, receipt)
+    }
+
     /// Remove one receipt-bound regular file beneath this attested parent.
     pub fn remove_parent_owned_file(
         &self,
@@ -904,7 +912,7 @@ mod platform {
         ensure_parent_owned_directory, issue_child_handoff, publish_parent_owned_file_noreplace,
         read_parent_owned_file, remove_empty_parent_owned_directory, remove_parent_owned_file,
         remove_parent_owned_tree, reserve_parent_owned_directory_target, resolve_parent_owned_path,
-        set_parent_owned_directory_mode, verify_live_identity,
+        set_parent_owned_directory_mode, sync_parent_owned_directory, verify_live_identity,
         verify_parent_owned_directory_target, write_parent_owned_file,
     };
 }
@@ -916,7 +924,7 @@ mod platform {
         ensure_parent_owned_directory, issue_child_handoff, publish_parent_owned_file_noreplace,
         read_parent_owned_file, remove_empty_parent_owned_directory, remove_parent_owned_file,
         remove_parent_owned_tree, reserve_parent_owned_directory_target, resolve_parent_owned_path,
-        set_parent_owned_directory_mode, verify_live_identity,
+        set_parent_owned_directory_mode, sync_parent_owned_directory, verify_live_identity,
         verify_parent_owned_directory_target, write_parent_owned_file,
     };
 }

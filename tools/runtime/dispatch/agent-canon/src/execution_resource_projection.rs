@@ -216,6 +216,109 @@ pub fn projection_context_payload(stdout: &str) -> JsonValue {
     ]))
 }
 
+pub fn project_terminal_outcome(
+    outcome: &serde_json::Value,
+    admission: Option<&serde_json::Value>,
+) -> Result<Vec<u8>, ProjectionError> {
+    use serde_json::{json, Value};
+    use sha2::{Digest, Sha256};
+    let run_id = outcome
+        .get("run_id")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "terminal outcome run_id is missing".to_owned())?;
+    let outcome_fingerprint = outcome
+        .get("outcome_fingerprint")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "terminal outcome fingerprint is missing".to_owned())?;
+    let plan_fingerprint = outcome
+        .get("plan_fingerprint")
+        .and_then(Value::as_str)
+        .filter(|value| !value.is_empty())
+        .map(str::to_owned)
+        .unwrap_or_else(|| format!("{:x}", Sha256::digest(outcome_fingerprint.as_bytes())));
+    let exit_code = outcome
+        .get("exit_code")
+        .and_then(Value::as_i64)
+        .ok_or_else(|| "terminal outcome exit code is missing".to_owned())?;
+    let projected_admission = if let Some(fingerprint) =
+        outcome.get("admission_fingerprint").and_then(Value::as_str)
+    {
+        let admission = admission.ok_or_else(|| {
+            "GPU projection requires UUID visibility and runtime identity evidence".to_owned()
+        })?;
+        let visibility = admission
+            .get("container_visible_uuid_mapping")
+            .filter(|value| value.is_object())
+            .ok_or_else(|| {
+                "GPU projection requires typed UUID visibility and runtime identity evidence"
+                    .to_owned()
+            })?;
+        let namespace = visibility
+            .get("namespace_id")
+            .and_then(Value::as_str)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| {
+                "GPU projection requires non-empty runtime namespace and identity fingerprints"
+                    .to_owned()
+            })?;
+        let runtime = visibility
+            .get("runtime_identity_fingerprint")
+            .and_then(Value::as_str)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| {
+                "GPU projection requires non-empty runtime namespace and identity fingerprints"
+                    .to_owned()
+            })?;
+        json!({"admission_fingerprint":fingerprint,"guarantee":"run-level-opaque-uuid-admission","namespace_id":namespace,"runtime_identity_fingerprint":runtime,"selected_uuids":admission.get("selected_uuids").unwrap_or(&Value::Null)})
+    } else {
+        Value::Null
+    };
+    let failure = outcome
+        .get("primary_failure")
+        .filter(|value| !value.is_null());
+    let kind = if let Some(failure) = failure {
+        let kind = failure
+            .get("kind")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_lowercase();
+        let operation = failure
+            .get("operation")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_lowercase();
+        if [
+            "gpu_",
+            "nvidia_",
+            "runtime_",
+            "reservation_",
+            "lock_",
+            "source_",
+        ]
+        .iter()
+        .any(|prefix| kind.starts_with(prefix))
+        {
+            Some("managed_gpu_failure")
+        } else if ["execute", "runner", "launch", "run"]
+            .iter()
+            .any(|part| operation.contains(part))
+        {
+            Some("managed_gpu_execution")
+        } else {
+            Some("see_execution_resource_plan")
+        }
+    } else if exit_code != 0 {
+        Some("managed_gpu_execution")
+    } else {
+        None
+    };
+    let value = json!({"admission":projected_admission,"completion_coverage_path":format!("reports/agents/{run_id}/runtime/completion_coverage.json"),"error":kind.map(|kind|json!({"kind":kind})),"exit_code":exit_code,"plan_fingerprint":plan_fingerprint,"plan_path":format!("reports/agents/{run_id}/runtime/execution_resource_plan.json"),"projection":"post_tool_use","run_id":run_id,"schema_version":PROJECTION_SCHEMA_VERSION});
+    let value = crate::python_json::parse_json(&value.to_string())?;
+    let mut bytes = canonical_json_ascii_bytes_reject_nonfinite(&value)?;
+    bytes.push(b'\n');
+    Ok(bytes)
+}
+
 fn validate_admission(value: &JsonValue) -> Result<(), ProjectionError> {
     if matches!(value, JsonValue::Null) {
         return Ok(());

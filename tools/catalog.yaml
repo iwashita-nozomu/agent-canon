@@ -695,14 +695,27 @@ entries:
   - id: jit-canonical-ir
     public: true
     summary: Extracts StableHLO-derived JIT-canonical IR records and backend traces from a JIT root.
-    path: tools/analysis/proof/jit_canonical_ir.py
+    path: tools/runtime/dispatch/agent-canon/src/jit_canonical_ir.rs
     family: agent_tools
     role: helper
     status: canonical
     audience: skill
     placement: skill_helper
-    command: python3 tools/analysis/proof/jit_canonical_ir.py
-    dispatch: {argv: ["python3", "tools/analysis/proof/jit_canonical_ir.py"]}
+    command: tools/bin/agent-canon jit-canonical-ir
+    dispatch:
+      runtime: rust
+      argv: [tools/bin/agent-canon, jit-canonical-ir]
+      execution_plane: tool-container
+      cwd: target-root
+      env: allowlisted
+      stdin: inherited
+      stdout: captured
+      stderr: captured
+      exit: propagate
+      signal: propagate
+      side_effect: explicit-target-write
+      output_root: explicit-target
+      written_paths: []
     writes: true
     default_wiring:
       ci: false
@@ -762,14 +775,27 @@ entries:
 
   - id: cpp-source-canonical-ir
     summary: Extracts source-only C++ records into the shared thin operational IR.
-    path: tools/analysis/code/cpp_source_canonical_ir.py
+    path: tools/runtime/dispatch/agent-canon/src/cpp_source_canonical_ir.rs
     family: agent_tools
     role: helper
     status: canonical
     audience: internal
     placement: support_library
-    command: python3 tools/analysis/code/cpp_source_canonical_ir.py
-    dispatch: {argv: ["python3", "tools/analysis/code/cpp_source_canonical_ir.py"]}
+    command: tools/bin/agent-canon cpp-source-canonical-ir
+    dispatch:
+      runtime: rust
+      argv: [tools/bin/agent-canon, cpp-source-canonical-ir]
+      execution_plane: tool-container
+      cwd: target-root
+      env: allowlisted
+      stdin: inherited
+      stdout: captured
+      stderr: captured
+      exit: propagate
+      signal: propagate
+      side_effect: explicit-target-write
+      output_root: explicit-target
+      written_paths: []
     writes: true
     default_wiring:
       ci: false
@@ -785,14 +811,27 @@ entries:
   - id: cpp-template-to-lean
     public: true
     summary: Fully expands C++ template source roots into complete Lean evidence definitions.
-    path: tools/analysis/proof/cpp_template_to_lean.py
+    path: tools/runtime/dispatch/agent-canon/src/cpp_template_to_lean.rs
     family: agent_tools
     role: helper
     status: canonical
     audience: skill
     placement: skill_helper
-    command: python3 tools/analysis/proof/cpp_template_to_lean.py
-    dispatch: {argv: ["python3", "tools/analysis/proof/cpp_template_to_lean.py"]}
+    command: tools/bin/agent-canon cpp-template-to-lean
+    dispatch:
+      runtime: rust
+      argv: [tools/bin/agent-canon, cpp-template-to-lean]
+      execution_plane: tool-container
+      cwd: target-root
+      env: allowlisted
+      stdin: inherited
+      stdout: captured
+      stderr: captured
+      exit: propagate
+      signal: propagate
+      side_effect: explicit-target-write
+      output_root: explicit-target
+      written_paths: []
     writes: true
     default_wiring:
       ci: false
@@ -809,14 +848,27 @@ entries:
 
   - id: operational-ir-to-lean
     summary: Renders shared thin operational IR records into Lean evidence definitions.
-    path: tools/analysis/proof/operational_ir_to_lean.py
+    path: tools/runtime/dispatch/agent-canon/src/operational_ir_to_lean.rs
     family: agent_tools
     role: helper
     status: canonical
     audience: internal
     placement: support_library
-    command: python3 tools/analysis/proof/operational_ir_to_lean.py
-    dispatch: {argv: ["python3", "tools/analysis/proof/operational_ir_to_lean.py"]}
+    command: tools/bin/agent-canon operational-ir-to-lean
+    dispatch:
+      runtime: rust
+      argv: [tools/bin/agent-canon, operational-ir-to-lean]
+      execution_plane: tool-container
+      cwd: target-root
+      env: allowlisted
+      stdin: inherited
+      stdout: captured
+      stderr: captured
+      exit: propagate
+      signal: propagate
+      side_effect: explicit-target-write
+      output_root: explicit-target
+      written_paths: []
     writes: true
     default_wiring:
       ci: false
@@ -899,12 +951,12 @@ entries:
   - id: github-publish
     public: true
     summary: Publishes verified GitHub branches, pull requests, and PR checks through gh with explicit user-task evidence and verified remote policy.
-    path: tools/repository/github/github_publish.py
+    path: tools/runtime/dispatch/agent-canon/src/github_publish.rs
     family: agent_tools
     role: sync
     status: canonical
-    command: python3 tools/repository/github/github_publish.py --help
-    dispatch: {argv: ["python3", "tools/repository/github/github_publish.py", "--help"]}
+    command: tools/bin/agent-canon github-publish --help
+    dispatch: {runtime: rust, argv: ["{rust-cli}", "github-publish"]}
     writes: true
     default_wiring:
       ci: false
@@ -916,7 +968,7 @@ entries:
       - agents/skills/pr-processing.md
       - documents/agent-canon/agent-canon-github-remote.md
     tests:
-      - tests/agent_tools/test_github_publish.py
+      - tools/runtime/dispatch/agent-canon/tests/github_publish_native.rs
 
   - id: wiki-publish
     public: true
@@ -1102,7 +1154,7 @@ entries:
     tests:
       - tests/agent_tools/test_tool_catalog.py
       - tests/agent_tools/test_tool_dispatch.py
-      - tests/tools/test_run_managed_experiment.py
+      - tools/runtime/dispatch/agent-canon/tests/managed_experiment_native.rs
 
   - id: run-accumulated-agent-evals
     summary: Runs registered AgentCanon eval producers with append-only accumulation before archive validation.
@@ -1127,12 +1179,12 @@ entries:
 
   - id: runtime-log-archive-git
     summary: Produces immutable native context certificates, materializes prepared runtime artifacts with confirmed outcome receipts, and checkpoints atomic hook-event spool files through one prepared archive transaction.
-    path: tools/runtime/archive/runtime_log_archive_git.py
+    path: tools/runtime/dispatch/agent-canon/src/runtime_log_archive.rs
     family: agent_tools
     role: sync
     status: canonical
-    command: python3 tools/runtime/archive/runtime_log_archive_git.py <append-context-discovery|materialize-runtime-event|sync>
-    dispatch: {argv: ["python3", "tools/runtime/archive/runtime_log_archive_git.py", "<append-context-discovery|materialize-runtime-event|sync>"]}
+    command: tools/bin/agent-canon runtime-log-archive-git <archive-command>
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "runtime-log-archive-git"]}
     writes: true
     default_wiring:
       ci: false
@@ -1806,7 +1858,7 @@ entries:
       - agents/skills/agent-canon-update.md
     tests:
       - tools/runtime/dispatch/agent-canon/tests/generated_completeness_native.rs
-      - tests/agent_tools/test_github_publish.py
+      - tools/runtime/dispatch/agent-canon/tests/github_publish_native.rs
 
   - id: check-agent-canon-pr
     summary: Runs the standalone AgentCanon PR readiness checklist.
@@ -2498,12 +2550,12 @@ entries:
 
   - id: run-managed-experiment
     summary: Creates and tracks shared managed experiment runs.
-    path: tools/experiments/execution/run_managed_experiment.py
+    path: tools/runtime/dispatch/agent-canon/src/managed_experiment.rs
     family: experiments
     role: experiment
     status: canonical
-    command: python3 -m tools.experiments.execution.run_managed_experiment
-    dispatch: {argv: ["python3", "-m", "tools.experiments.execution.run_managed_experiment"]}
+    command: tools/bin/agent-canon run-managed-experiment
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "run-managed-experiment"]}
     writes: true
     default_wiring:
       ci: false
@@ -2513,7 +2565,7 @@ entries:
       - documents/tools/README.md
       - documents/experiments/experiment-registry.md
     tests:
-      - tests/tools/test_run_managed_experiment.py
+      - tools/runtime/dispatch/agent-canon/tests/managed_experiment_native.rs
 
   - id: html-artifact-access
     public: true

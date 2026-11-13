@@ -1198,6 +1198,44 @@ pub(crate) fn read_parent_owned_file(
     Ok(bytes)
 }
 
+pub(crate) fn sync_parent_owned_directory(
+    attested: &AttestedParent,
+    receipt: &ParentOwnedPathReceipt,
+) -> Result<(), AuthorityError> {
+    attested.verify_live_identity()?;
+    let root = validate_receipt(attested, receipt)?;
+    let target = receipt.target.ok_or_else(|| {
+        error(
+            ParentRootReject::RootRaceDetected,
+            "parent-owned sync receipt has no target identity",
+        )
+    })?;
+    if target.kind != EntryKind::File {
+        return Err(error(
+            ParentRootReject::RootRaceDetected,
+            "parent-owned sync target is not a regular file",
+        ));
+    }
+    let parts = relative_components(root.path(), &receipt.physical_path)?;
+    let (parent_parts, leaf) = split_leaf(&parts)?;
+    let (parent, opened_components) =
+        open_component_chain(root, parent_parts, &receipt.parent_components, false)?;
+    if opened_components != receipt.parent_components {
+        return Err(error(
+            ParentRootReject::RootRaceDetected,
+            "parent directory identity changed before sync",
+        ));
+    }
+    verify_target_identity(&parent, leaf, Some(target), false)?;
+    verify_lexical_snapshot(root, receipt, true, false)?;
+    sync_directory(&parent)?;
+    verify_component_identities(root, parent_parts, &receipt.parent_components)?;
+    verify_target_identity(&parent, leaf, Some(target), false)?;
+    verify_lexical_snapshot(root, receipt, true, false)?;
+    attested.verify_live_identity()?;
+    Ok(())
+}
+
 pub(crate) fn remove_parent_owned_file(
     attested: &AttestedParent,
     receipt: &ParentOwnedPathReceipt,
@@ -3017,7 +3055,7 @@ fn verify_handoff(
             return Err(error(
                 ParentRootReject::HandoffInvalid,
                 "invalid handoff storage",
-            ))
+            ));
         }
     };
     let mode = match required_string(payload, "mode")? {
@@ -3027,7 +3065,7 @@ fn verify_handoff(
             return Err(error(
                 ParentRootReject::HandoffInvalid,
                 "invalid handoff mode",
-            ))
+            ));
         }
     };
     let expected_storage = if transport == HandoffTransport::ParentLocalFile {

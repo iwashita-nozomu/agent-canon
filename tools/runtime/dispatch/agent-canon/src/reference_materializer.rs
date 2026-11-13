@@ -36,7 +36,7 @@ fn normalize(value: &str) -> String {
     python_strip(&result.join("\n")).to_owned()
 }
 
-fn provider(kind: &str, bytes: &[u8]) -> Result<Value, String> {
+pub(crate) fn provider(kind: &str, bytes: &[u8]) -> Result<Value, String> {
     let executable = std::env::var_os("AGENT_CANON_PYTHON_PROVIDER")
         .unwrap_or_else(|| "agent-canon-python-provider".into());
     let mut child = Command::new(executable)
