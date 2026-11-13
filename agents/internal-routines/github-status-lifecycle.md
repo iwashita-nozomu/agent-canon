@@ -8,7 +8,7 @@ upstream design ../../documents/conventions/software-engineering-principles.md c
 upstream design ../../documents/operations/issue-label-taxonomy.toml repository label mapping
 downstream design ../skills/pr-processing.md invokes this routine inside the publication boundary
 downstream implementation ../../.codex/personal/skills/_github-status-lifecycle/SKILL.md private runtime adapter
-downstream implementation ../../tools/repository/github/github_status_lifecycle.py transport and reconciliation
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/github_status_lifecycle.rs transport and reconciliation
 @dependency-end
 -->
 
@@ -32,7 +32,7 @@ Issue や label の推測・新規作成、PR merge、Issue close はこの操�
 | 対象 Issue/PR、現在の実装・検証事実、公開権限 | `pr-processing` と変更・検証の各 owner |
 | ラベル名と明示された旧ラベル | `documents/operations/issue-label-taxonomy.toml` |
 | 作業状態の分類、変更順、結果判定 | この routine |
-| native comment/Issue ID、単一 API 操作と読戻し | `GhStatusAdapter` と既存 `github_publish.py` transport |
+| native comment/Issue ID、単一 API 操作と読戻し | 既存 `gh api` transport とRust adapter |
 | 説明の十分性、根拠・検証・残件、最終公開報告 | 呼出元の既存 writing/publication owner |
 
 コメントの文面・リンク・モデルから書込権限を推論しません。呼出元は routine の結果を
@@ -42,7 +42,7 @@ Issue や label の推測・新規作成、PR merge、Issue close はこの操�
 
 既存 TOML の `[status_lifecycle]` が `active`、`ready_for_review`、
 `needs_verification` の名前を所有します。`legacy_aliases` に宣言された旧ラベルだけを
-管理対象へ加えます。標準 `tomllib`（既存 Python 3.10 経路では `tomli`）を使います。
+管理対象へ加えます。既存Rust TOML parserを使います。
 空・重複・衝突・未知キーは拒否し、canonical labels の remote catalog での存在を確認します。
 不足するラベルを勝手に作成・rename しません。旧ラベルの不存在は問題にせず、他のラベルは保存します。
 
@@ -66,7 +66,7 @@ Issue や label の推測・新規作成、PR merge、Issue close はこの操�
 PR がない段階では PR identity を作らず、存在する source・Issue・作業結果だけを記録します。
 書式を満たすための marker、hash、canonical serialization、全履歴の同一 payload 件数は不要です。
 
-`reconcile_status` へは、投稿する `comment_body` または再利用する `comment_id` の
+`agent-canon github-status-lifecycle` へは、投稿する `--comment-body-file` または再利用する `--comment-id` の
 どちらか一つを渡します。既存コメントを使う際は、呼出元が内容と対象の適合を確認して
 その native ID を明示します。同文の別コメントが存在してもそれだけでは拒否せず、
 逆に同文検索から操作の完了・排他・再投稿権限を推論しません。
