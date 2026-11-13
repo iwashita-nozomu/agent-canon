@@ -401,7 +401,10 @@ mod tests {
     #[test]
     fn child_environment_keeps_parent_target_and_runtime_roots_distinct() {
         let temporary = tempfile::tempdir().expect("root capability fixture creates");
-        let temporary_root = temporary.path().canonicalize().expect("physical fixture root");
+        let temporary_root = temporary
+            .path()
+            .canonicalize()
+            .expect("physical fixture root");
         let source = temporary_root.join("source");
         let target = temporary_root.join("target");
         let runtime = temporary_root.join("runtime");
