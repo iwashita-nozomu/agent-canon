@@ -55,6 +55,7 @@ class ClassifyPathRiskTest(unittest.TestCase):
             ".codex/agents/worker.toml": ("contracts", "eval"),
             "agents/agents_config.json": ("contracts", "eval"),
             "tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs": (
+                "rust",
                 "contracts",
                 "eval",
             ),
