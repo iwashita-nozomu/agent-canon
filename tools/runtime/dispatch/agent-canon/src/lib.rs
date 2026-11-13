@@ -79,6 +79,7 @@ pub mod experiment_registry;
 pub mod extract_docx;
 pub mod generated_completeness;
 pub mod git_read;
+pub mod github_status_lifecycle;
 pub mod historical_skill_usage;
 pub mod server_readiness;
 pub mod skill_frontmatter;

@@ -172,6 +172,7 @@ Commands:
   check-semantic-responsibility-contract [paths...] [--root ROOT] [--template TEMPLATE] [--instance INSTANCE] [--artifact-root ARTIFACT_ROOT] [--format text|json]
   check-solid-evidence [paths...] [--root ROOT] [--changed] [--base-ref BASE_REF] [--evidence EVIDENCE] [--exclude EXCLUDE] [--verbose] [--format text|json]
   rust-migration-audit --root <repo-root>
+  github-status-lifecycle --repo OWNER/REPO --issue NUMBER --facts-json PATH [options]
   semantic-provider-html-report --compare-json PATH --output PATH [options]
   check-proof-trace-alignment --trace-module PATH [options]
   reference-materializer --url URL [--input PATH|--fetch] [options]
@@ -430,6 +431,9 @@ fn main() {
     }
     if args.len() >= 2 && args[1] == "rust-migration-audit" {
         std::process::exit(migration_audit::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "github-status-lifecycle" {
+        std::process::exit(agent_canon::github_status_lifecycle::run(&args[2..]));
     }
     if args.len() >= 2 && args[1] == "semantic-provider-html-report" {
         std::process::exit(semantic_index::semantic_provider_html_report::run(
