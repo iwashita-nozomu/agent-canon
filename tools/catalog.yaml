@@ -65,6 +65,9 @@ runtime_schema:
     - id: rust-skill-dependency-map
       selector: skill-dependency-map
       path: tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs
+    - id: rust-check-agent-canon-log-policy
+      selector: check-agent-canon-log-policy
+      path: tools/runtime/dispatch/agent-canon/src/log_policy.rs
     - id: rust-parent-repository-audit
       selector: parent-repository-audit
       path: tools/runtime/dispatch/agent-canon/src/parent_repository_audit.rs

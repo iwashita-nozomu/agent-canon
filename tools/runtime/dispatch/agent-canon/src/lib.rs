@@ -98,6 +98,7 @@ pub mod hook_safety;
 pub mod html_artifact_access;
 pub mod latest_result;
 pub mod lean_proof_env;
+pub mod log_policy;
 pub mod log_repository_identity;
 pub mod lsp_code_analysis;
 pub mod native_release;
