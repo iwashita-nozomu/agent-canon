@@ -814,14 +814,14 @@ entries:
   - id: check-proof-trace-alignment
     public: true
     summary: Checks package-retained proof trace contracts against implementation source paths, AST anchors, and retained checked theorem names.
-    path: tools/validation/semantic/proof/check_proof_trace_alignment.py
+    path: tools/runtime/dispatch/agent-canon/src/check_proof_trace_alignment.rs
     family: agent_tools
     role: checker
     status: canonical
     audience: skill
     placement: skill_helper
-    command: python3 tools/validation/semantic/proof/check_proof_trace_alignment.py
-    dispatch: {argv: ["python3", "tools/validation/semantic/proof/check_proof_trace_alignment.py"]}
+    command: tools/bin/agent-canon check-proof-trace-alignment
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "check-proof-trace-alignment"]}
     writes: false
     default_wiring:
       ci: false
@@ -1949,12 +1949,12 @@ entries:
 
   - id: reference-materializer
     summary: Converts consulted PDF or HTML references into Markdown files under references/.
-    path: tools/analysis/documents/reference_materializer.py
+    path: tools/runtime/dispatch/agent-canon/src/reference_materializer.rs
     family: agent_tools
     role: sync
     status: canonical
-    command: python3 tools/analysis/documents/reference_materializer.py
-    dispatch: {argv: ["python3", "tools/analysis/documents/reference_materializer.py"]}
+    command: tools/bin/agent-canon reference-materializer
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "reference-materializer"]}
     writes: true
     default_wiring:
       ci: false
