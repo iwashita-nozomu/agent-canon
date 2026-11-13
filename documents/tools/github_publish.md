@@ -5,14 +5,14 @@ responsibility Documents the gh-backed GitHub publish and PR tool.
 upstream design ../agent-canon/agent-canon-github-remote.md defines canonical GitHub remote policy.
 upstream design ../../agents/skills/agent-canon-update.md defines PR workflow usage.
 upstream design ../../ROOT_AGENTS.md defines PR mutation authority.
-downstream implementation ../../tools/repository/github/github_publish.py implements the tool.
-downstream implementation ../../tests/agent_tools/test_github_publish.py validates the tool contract.
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/github_publish.rs implements the tool.
+downstream implementation ../../tools/runtime/dispatch/agent-canon/tests/github_publish_native.rs validates the tool contract.
 @dependency-end
 -->
 
 # GitHub Publish Tool
 
-`tools/repository/github/github_publish.py` is the canonical AgentCanon entrypoint for
+`agent-canon github-publish` is the AgentCanon command for
 GitHub branch publication, pull request creation/update, and PR check evidence.
 It is `gh`-based for repository identity and PR operations, and uses `git push`
 only after `gh repo view` and `git remote get-url origin` agree on the same
@@ -22,13 +22,12 @@ The standalone `push` action is reversible branch transport, not correctness,
 review, or PR publication. It requires the verified remote identity/permission
 and a named current branch, captures local `HEAD`/tree, sends that commit with
 the normal non-forced
-`git push -u <remote> <commit-sha>:refs/heads/<branch>` (using a process-local
-`gh auth git-credential` helper for HTTPS remotes), reads exactly one
+`git push -u <remote> <commit-sha>:refs/heads/<branch>` through the configured Git
+transport, reads exactly one
 `git ls-remote <remote> refs/heads/<branch>` result, and verifies the remote SHA
 and unchanged local branch/HEAD/tree. It does not generate or claim G1/G2/G3 or
 PR lifecycle evidence; summaries use `publication_boundary=branch_transport_only`.
-Any identity mismatch is a typed `UserVisibleFailure`; there is no push API,
-alternate remote, or checkout fallback.
+Identity mismatches return a failure summary with the next action.
 
 The tool requires `--user-task` on every action. The compact stdout and optional
 `--summary-out` JSON include the task, repository, branch, remote verification,
@@ -47,7 +46,7 @@ actual merge commit.
 Push the current topic branch:
 
 ```bash
-python3 tools/repository/github/github_publish.py push \
+agent-canon github-publish push \
   --user-task "<current user task>" \
   --repo iwashita-nozomu/agent-canon
 ```
@@ -55,7 +54,7 @@ python3 tools/repository/github/github_publish.py push \
 Push and create or update a pull request:
 
 ```bash
-python3 tools/repository/github/github_publish.py publish-pr \
+agent-canon github-publish publish-pr \
   --user-task "<current user task>" \
   --repo iwashita-nozomu/agent-canon \
   --title "<PR title>" \
@@ -66,7 +65,7 @@ python3 tools/repository/github/github_publish.py publish-pr \
 Read PR checks:
 
 ```bash
-python3 tools/repository/github/github_publish.py checks \
+agent-canon github-publish checks \
   --user-task "<current user task>" \
   --repo iwashita-nozomu/agent-canon \
   --pr <number-or-branch>
@@ -97,9 +96,3 @@ verification and the PR workflow gates.
 Non-critical hook, style, OOP, log-surface, planning, or closeout findings are
 recorded as warning or closeout evidence. They do not stop branch publication or
 PR body/check updates.
-
-## Retired Shell Route
-
-`tools/repository/publish/push_origin.sh` no longer performs push work. It prints the replacement
-command and exits so old shell snippets cannot become a second publish
-implementation or bypass the required user-task evidence.

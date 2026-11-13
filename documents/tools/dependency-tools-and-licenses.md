@@ -136,7 +136,7 @@ license の `LICENSE` と、Rust crate については `tools/runtime/dispatch/a
 | Chrome for Testing runtime libraries | Shared amd64/arm64 system libraries required by Puppeteer's image-owned browser. | `bootstrap/container/image/dependencies.toml` (`puppeteer-*` Ubuntu 24.04 package records) | Ubuntu archive package notices |
 | `npm` CLI | `@openai/codex` の install に使う JavaScript package manager。 | `.devcontainer/dependencies.toml` | upstream: Artistic-2.0 |
 | Codex CLI: `@openai/codex` | local Codex runtime entrypoint。 | `.devcontainer/dependencies.toml` | upstream: Apache-2.0 |
-| GitHub CLI: `gh` | GitHub repo 確認、branch publish、PR evidence 作成。 | `.devcontainer/dependencies.toml`, `tools/repository/github/github_publish.py` | upstream: MIT |
+| GitHub CLI: `gh` | GitHub repo 確認、branch publish、PR evidence 作成。 | `.devcontainer/dependencies.toml`, `tools/runtime/dispatch/agent-canon/src/github_publish.rs` | upstream: MIT |
 | `gitleaks` | secret scanning。 | `.devcontainer/dependencies.toml`, `tools/validation/ci/checks/scan_secrets.sh` | upstream: MIT |
 | `trufflehog` | secret discovery / verification。 | `.devcontainer/dependencies.toml`, `tools/validation/ci/checks/scan_secrets.sh` | upstream: AGPL-3.0 |
 | `detect-secrets` | current tree / baseline 型の secret scanning。 | `.devcontainer/dependencies.toml`, `tools/validation/ci/checks/scan_secrets.sh` | upstream: Apache-2.0 |
