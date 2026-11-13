@@ -912,12 +912,12 @@ entries:
   - id: github-publish
     public: true
     summary: Publishes verified GitHub branches, pull requests, and PR checks through gh with explicit user-task evidence and verified remote policy.
-    path: tools/repository/github/github_publish.py
+    path: tools/runtime/dispatch/agent-canon/src/github_publish.rs
     family: agent_tools
     role: sync
     status: canonical
-    command: python3 tools/repository/github/github_publish.py --help
-    dispatch: {argv: ["python3", "tools/repository/github/github_publish.py", "--help"]}
+    command: tools/bin/agent-canon github-publish --help
+    dispatch: {runtime: rust, argv: ["{rust-cli}", "github-publish"]}
     writes: true
     default_wiring:
       ci: false
@@ -929,7 +929,7 @@ entries:
       - agents/skills/pr-processing.md
       - documents/agent-canon/agent-canon-github-remote.md
     tests:
-      - tests/agent_tools/test_github_publish.py
+      - tools/runtime/dispatch/agent-canon/tests/github_publish_native.rs
 
   - id: wiki-publish
     public: true
@@ -1819,7 +1819,7 @@ entries:
       - agents/skills/agent-canon-update.md
     tests:
       - tools/runtime/dispatch/agent-canon/tests/generated_completeness_native.rs
-      - tests/agent_tools/test_github_publish.py
+      - tools/runtime/dispatch/agent-canon/tests/github_publish_native.rs
 
   - id: check-agent-canon-pr
     summary: Runs the standalone AgentCanon PR readiness checklist.

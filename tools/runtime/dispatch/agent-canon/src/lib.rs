@@ -84,6 +84,7 @@ pub mod formal_proof;
 pub mod generated_completeness;
 pub mod git_read;
 pub mod github_status_lifecycle;
+pub mod github_publish;
 pub mod historical_skill_usage;
 pub mod server_readiness;
 pub mod skill_frontmatter;

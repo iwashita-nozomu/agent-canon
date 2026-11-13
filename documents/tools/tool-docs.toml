@@ -129,7 +129,7 @@ summary = "Rust-native algorithm InitializeConfig/SolveConfig ownership and runt
 [[tool]]
 id = "github-publish"
 classification = "public"
-tool = "tools/repository/github/github_publish.py"
+tool = "tools/runtime/dispatch/agent-canon/src/github_publish.rs"
 doc = "documents/tools/github_publish.md"
 language = "python"
 summary = "gh-backed GitHub branch and PR publish tool documentation."
