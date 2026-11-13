@@ -987,6 +987,7 @@ impl RuntimeFs {
 }
 
 struct LifecycleLock {
+    #[cfg(unix)]
     file: cap_std::fs::File,
 }
 
