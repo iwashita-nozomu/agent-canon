@@ -190,6 +190,7 @@ const SKILL_KEYWORDS: &[SkillKeywordRule] = &[
             &["結果を書き出"],
             &["result writeout"],
             &["runtime_log_archive_git.py"],
+            &["runtime-log-archive-git"],
             &["artifact", "evidence"],
             &["artifact", "report"],
             &["run bundle", "evidence"],
@@ -547,6 +548,7 @@ const WORKFLOW_KEYWORDS: &[SimpleKeywordRule] = &[
             "generate-agent-runtime-dashboard",
             "run_repo_dependency_review.sh",
             "runtime_log_archive_git.py",
+            "runtime-log-archive-git",
             "oop-readability-check",
             "mechanical verdict",
             "failed validation",
@@ -731,6 +733,7 @@ const TOOL_KEYWORDS: &[SimpleKeywordRule] = &[
             "dependency graph",
         ],
     ),
+    ("runtime-log-archive-git", &["runtime-log-archive-git"]),
     (
         "runtime_log_archive_git.py",
         &[

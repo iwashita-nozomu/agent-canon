@@ -2,7 +2,7 @@
 # contract tool
 # responsibility Declares canonical-source marker contracts consumed by convention compliance checks.
 # upstream design ../../../../documents/design/entrypoint-owner-map.md root entrypoint responsibility boundary
-# downstream implementation ./check_convention_compliance.py loads marker contracts
+# downstream implementation ../../../runtime/dispatch/agent-canon/src/convention_compliance.rs loads marker contracts
 # downstream implementation ../../../runtime/dispatch/agent-canon/src/entrypoint_owner_map.rs rejects operational marker ownership in root entrypoints
 # downstream implementation ../../../../tests/agent_tools/test_check_convention_compliance.py verifies marker contracts
 # @dependency-end
@@ -31,7 +31,7 @@ description = "Python source files keep readable definition order visible in con
 
 [[contracts.surfaces]]
 path = "documents/conventions/python/09_file_roles.md"
-markers = ["読者順序", "依存順序", "公開契約", "公開入口", "内部補助関数", "check_convention_compliance.py"]
+markers = ["読者順序", "依存順序", "公開契約", "公開入口", "内部補助関数", "check-convention-compliance"]
 
 [[contracts.surfaces]]
 path = "documents/conventions/coding-conventions-house-style.md"
@@ -40,3 +40,127 @@ markers = ["読者順序", "公開契約", "公開入口", "内部補助関数",
 [[contracts.surfaces]]
 path = "agents/skills/catalog.yaml"
 markers = ["コードファイル", "順序", "定義順", "関数", "class"]
+
+[checker]
+convention_sources = [
+    "documents/conventions/README.md",
+    "documents/conventions/common/01_principles.md",
+    "documents/rule/naming.md",
+    "documents/conventions/common/03_comments.md",
+    "documents/conventions/common/04_operators.md",
+    "documents/conventions/common/05_docs.md",
+    "documents/conventions/python/01_scope.md",
+    "documents/conventions/python/04_type_annotations.md",
+    "documents/conventions/python/06_comments.md",
+    "documents/conventions/python/07_type_checker.md",
+    "documents/conventions/python/09_file_roles.md",
+    "documents/conventions/python/11_naming.md",
+    "documents/conventions/python/15_jax_rules.md",
+    "documents/conventions/python/20_benchmark_policy.md",
+    "documents/conventions/python/30_experiment_directory_structure.md",
+    "documents/conventions/coding-conventions-python.md",
+    "documents/conventions/coding-conventions-cpp.md",
+    "documents/conventions/coding-conventions-project.md",
+    "documents/conventions/coding-conventions-house-style.md",
+    "documents/conventions/coding-conventions-testing.md",
+    "documents/conventions/coding-conventions-reviews.md",
+    "documents/conventions/coding-conventions-experiments.md",
+    "documents/conventions/coding-conventions-logging.md",
+    "documents/design/algorithm-implementation-boundary.md",
+    "documents/conventions/object-oriented-design.md",
+    "documents/conventions/REVIEW_PROCESS.md",
+    "agents/canonical/CODEX_WORKFLOW.md",
+    "agents/canonical/CODEX_IMPLEMENTATION.md",
+    "agents/canonical/CODEX_BOOTSTRAP.md",
+    "agents/canonical/CODEX_COMPLETION.md",
+    "agents/canonical/CODEX_INTAKE.md",
+    "agents/canonical/CODEX_ROUTING.md",
+]
+workflow_consumers = ["tools/validation/ci/checks/check_agent_canon_pr.sh"]
+stale_owner_phrases = ["runtime-profiles-and-check-matrix.md`、`agents/canonical/CODEX_WORKFLOW.md", "agents/canonical/CODEX_SUBAGENTS.md`、`documents/conventions/REVIEW_PROCESS.md"]
+forwarder_markers = ["FORWARDER_CALLER", "FORWARDER_ACTION", "FORWARDER_SEVERITY=fix-now", "FORWARDER_PROMPT", "caller_process_chain"]
+forwarder_policy_markers = ["*_FORWARDER=deprecated", "*_FORWARDER_SEVERITY=fix-now", "caller chain", "canonical command"]
+
+[[checker.gates]]
+id = "dependency_review"
+path = "tools/analysis/dependencies/run_repo_dependency_review.sh"
+owners = ["tools/catalog.yaml"]
+[[checker.gates]]
+id = "notebook_quality"
+path = "tools/runtime/dispatch/agent-canon/src/notebook_quality.rs"
+owners = ["tools/catalog.yaml"]
+[[checker.gates]]
+id = "oop_readability"
+path = "tools/runtime/dispatch/agent-canon/src/oop/python/readability.rs"
+owners = ["tools/catalog.yaml"]
+[[checker.gates]]
+id = "oop_cpp_readability"
+path = "tools/runtime/dispatch/agent-canon/src/oop/cpp/readability.rs"
+owners = ["tools/catalog.yaml"]
+[[checker.gates]]
+id = "behavior_eval"
+path = "tools/runtime/dispatch/agent-canon/src/run_evaluation.rs"
+owners = ["tools/catalog.yaml"]
+[[checker.gates]]
+id = "skill_frontmatter"
+path = "tools/runtime/dispatch/agent-canon/src/skill_frontmatter.rs"
+owners = ["tools/catalog.yaml"]
+[[checker.gates]]
+id = "convention_compliance"
+path = "tools/runtime/dispatch/agent-canon/src/convention_compliance.rs"
+owners = ["tools/catalog.yaml"]
+[[checker.gates]]
+id = "tool_catalog"
+path = "tools/runtime/dispatch/agent-canon/src/catalog/tool_catalog.rs"
+owners = ["tools/catalog.yaml"]
+[[checker.gates]]
+id = "tool_convention_drift"
+path = "tools/runtime/dispatch/agent-canon/src/tool_drift.rs"
+owners = ["tools/catalog.yaml"]
+[[checker.gates]]
+id = "github_workflow_pr_flow"
+path = "tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs"
+owners = ["tools/catalog.yaml"]
+[[checker.gates]]
+id = "bootstrap_container_runtime"
+path = "bootstrap.sh"
+owners = ["documents/runtime/bootstrap-runtime.md"]
+
+[[contracts]]
+id = "validation_failure_response"
+[[contracts.surfaces]]
+path = "documents/operations/TROUBLESHOOTING.md"
+markers = ["validation test/check failure", "failing_contract", "cause_classification", "intent_preservation", "documents/runtime/runtime-profiles-and-check-matrix.json", "documents/runtime/runtime-profiles-and-check-matrix.md"]
+[[contracts.surfaces]]
+path = "documents/conventions/coding-conventions-testing.md"
+markers = ["Validation test/check", "failing_contract", "cause_classification", "intent_preservation", "documents/runtime/runtime-profiles-and-check-matrix.json", "documents/runtime/runtime-profiles-and-check-matrix.md"]
+
+[[contracts]]
+id = "mathematical_necessity_gate"
+[[contracts.surfaces]]
+path = "documents/conventions/common/05_docs.md"
+markers = ["mathematical necessity gate", "Judgment / Mathematical Role / Necessity Evidence / Owner / Validation Route", "necessary-and-sufficient condition", "non-contractual mathematical judgment"]
+[[contracts.surfaces]]
+path = "documents/conventions/coding-conventions-testing.md"
+markers = ["mathematical necessity gate", "Numerical Trigger", "Non-Numerical Alternative", "checker-owned property"]
+
+[[contracts]]
+id = "review_issue_routing"
+[[contracts.surfaces]]
+path = "documents/conventions/REVIEW_PROCESS.md"
+markers = ["Review Finding Issue Routing", "agent-canon issue-sync", "private packet"]
+
+[[contracts]]
+id = "hook_guardrail_policy"
+[[contracts.surfaces]]
+path = "tools/runtime/dispatch/agent-canon/src/hook_dispatcher.rs"
+markers = ["HOOK_EVENT_CONTRACTS", "HookEventContract", "ACTIVE_HOOK_HANDLERS", "UserPromptSubmit", "PreToolUse", "PostToolUse", "Stop", "hook_safety", "validate_projection_bytes", "record_hook_invocation", "HookLogContext"]
+[[contracts.surfaces]]
+path = "tools/runtime/dispatch/agent-canon/src/hook_safety.rs"
+markers = ["AGENT_CANON_BRANCH_WORKTREE_AUTHORITY", "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY", "branch_block_payload", "command_sha256", "operation", "same-segment", "DESTRUCTIVE_GIT_GUARD=block", "BRANCH_WORKTREE_CREATION_GUARD=block"]
+[[contracts.surfaces]]
+path = ".codex/README.md"
+markers = ["active events", "active/inactive", "legacy `Stop`", "fail-open", "bounded", "redacted"]
+[[contracts.surfaces]]
+path = "documents/codex/codex-configuration-reference.md"
+markers = ["Hook Severity Policy", "fail-open", "warning/evidence", "secret", "Active dispatcher failures"]

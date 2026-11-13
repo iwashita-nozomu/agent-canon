@@ -38,79 +38,21 @@ RUNTIME_ROOT="$(cd "${SCRIPT_DIR}/../../../.." && pwd -P)"
 TOOLS_ROOT="${RUNTIME_ROOT}/tools"
 
 assert_read_only_target() {
-  python3 - "${ROOT}" <<'PY'
-import json
-from pathlib import Path
-import subprocess
-import sys
-
-
-# libmount owns path decoding, nested mounts and visible overmount selection.
-# Query this process's namespace; only VFS flags authorize the read-only body.
-try:
-    target = Path(sys.argv[1]).resolve(strict=True)
-    result = subprocess.run(
-        [
-            "findmnt", "--kernel", "--first-only", "--direction", "backward",
-            "--list", "--target", str(target), "--json",
-            "--output", "TARGET,VFS-OPTIONS",
-        ],
-        check=True, capture_output=True, text=True,
-    )
-    payload = json.loads(result.stdout)
-except (OSError, subprocess.CalledProcessError, ValueError) as error:
-    raise SystemExit(
-        f"AGENT_CANON_STATIC_GATE=fail reason=target_mount_query_failed error={type(error).__name__}"
-    ) from error
-
-mounts = payload.get("filesystems") if isinstance(payload, dict) else None
-if not isinstance(mounts, list) or len(mounts) != 1 or not isinstance(mounts[0], dict):
-    raise SystemExit("AGENT_CANON_STATIC_GATE=fail reason=target_mount_missing")
-mount_point = mounts[0].get("target")
-vfs_options = mounts[0].get("vfs-options")
-if not isinstance(mount_point, str) or not mount_point or not isinstance(vfs_options, str):
-    raise SystemExit("AGENT_CANON_STATIC_GATE=fail reason=target_mount_columns_missing")
-options = set(vfs_options.split(","))
-if "ro" not in options or "rw" in options:
-    raise SystemExit(
-        f"AGENT_CANON_STATIC_GATE=fail reason=target_mount_not_read_only mount={mount_point}"
-    )
-print(f"AGENT_CANON_STATIC_GATE_TARGET_MOUNT=read-only mount={mount_point}")
-PY
+  "${AGENT_CANON_NATIVE_BIN:-${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}}" \
+    runtime-paths check-read-only --source-root "${ROOT}"
 }
 
 assert_read_only_target
 cd "${ROOT}"
 
 # Runtime artifacts belong to the caller-selected external runtime root.  Keep
-# the path resolver in runtime_artifacts.py as the single source of truth.
+# the path resolver in runtime_boundary.rs as the single source of truth.
 runtime_boundary_root() {
-  local candidate="$1"
-  PYTHONPATH="${RUNTIME_ROOT}${PYTHONPATH:+:${PYTHONPATH}}" \
-    python3 - "${ROOT}" "${candidate}" <<'PY'
-from pathlib import Path
-import sys
-
-from tools.runtime.artifacts.runtime_artifacts import runtime_artifact_boundary
-
-source_root = Path(sys.argv[1])
-runtime_root = Path(sys.argv[2])
-print(runtime_artifact_boundary(source_root, runtime_root, create=True).root)
-PY
+  "${AGENT_CANON_NATIVE_BIN:-${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}}" runtime-paths root --source-root "${ROOT}" --runtime-root "$1"
 }
 
 runtime_boundary_path() {
-  local candidate="$1"
-  PYTHONPATH="${RUNTIME_ROOT}${PYTHONPATH:+:${PYTHONPATH}}" \
-    python3 - "${ROOT}" "${AGENT_CANON_STATIC_RUNTIME_ROOT}" "${candidate}" <<'PY'
-from pathlib import Path
-import sys
-
-from tools.runtime.artifacts.runtime_artifacts import runtime_artifact_boundary
-
-boundary = runtime_artifact_boundary(Path(sys.argv[1]), Path(sys.argv[2]), create=True)
-print(boundary.resolve(Path(sys.argv[3])))
-PY
+  "${AGENT_CANON_NATIVE_BIN:-${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}}" runtime-paths path --source-root "${ROOT}" --runtime-root "${AGENT_CANON_STATIC_RUNTIME_ROOT}" --candidate "$1"
 }
 
 AGENT_CANON_STATIC_RUNTIME_ROOT="${AGENT_CANON_RUNTIME_ROOT}"
@@ -223,7 +165,7 @@ run_contracts() {
   "${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" tool-proof-coverage
   "${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" responsibility-scope --root "${ROOT}"
   "${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" check-agent-runtime-alignment --root "${ROOT}"
-  python3 "${TOOLS_ROOT}/validation/semantic/convention/check_convention_compliance.py" \
+  "${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" check-convention-compliance \
     --root "${ROOT}" --format json
 }
 

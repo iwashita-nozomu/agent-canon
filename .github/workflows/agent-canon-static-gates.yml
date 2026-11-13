@@ -148,13 +148,7 @@ jobs:
           mkdir -p "${evidence}"
           git -C "${GITHUB_WORKSPACE}" show --no-patch --format='%H%n%P' HEAD > "${evidence}/source-identity.txt"
           printf 'base=%s\nunits=%s\n' "${BASE_SHA:-origin/main}" "${SELECTED_UNITS}" >> "${evidence}/source-identity.txt"
-          python3 - <<'PY' > "${RUNNER_TEMP}/agent-canon-docs-paths"
-          import json
-          import os
-          import sys
-          for path in json.loads(os.environ["DOCS_PATHS"]):
-              sys.stdout.buffer.write(path.encode("utf-8") + b"\0")
-          PY
+          jq -j '.[] | . + "\u0000"' <<< "${DOCS_PATHS}" > "${RUNNER_TEMP}/agent-canon-docs-paths"
           mapfile -d '' -t docs_paths < "${RUNNER_TEMP}/agent-canon-docs-paths"
           IFS=',' read -r -a units <<< "${SELECTED_UNITS}"
           status=0

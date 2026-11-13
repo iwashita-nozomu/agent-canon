@@ -2,13 +2,13 @@
 # @dependency-start
 # contract tool
 # responsibility Runs all checks CI automation.
-# upstream implementation ../../../repository/workspace/parent_root_side_effects.py owns explicit control authentication and child execution
-# upstream implementation ../../../runtime/artifacts/runtime_artifacts.py owns external CI state and exact cleanup
+# upstream implementation ../../../runtime/dispatch/agent-canon/src/runtime_boundary.rs owns explicit control authentication and child execution
+# upstream implementation ../../../runtime/dispatch/agent-canon/src/runtime_boundary.rs owns external CI state and exact cleanup
 # upstream implementation ../checks/run_python_quality_checks.sh owns Python static quality checks
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/notebook_quality.rs validates notebooks as readable runnable demos
 # upstream implementation ../../../bin/agent-canon invokes the canonical Rust algorithm contract checker
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/python_algorithm_contract.rs owns the algorithm contract checker
-# upstream implementation ../../semantic/convention/check_convention_compliance.py validates convention/workflow gate wiring
+# upstream implementation ../../../runtime/dispatch/agent-canon/src/convention_compliance.rs validates convention/workflow gate wiring
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/catalog/tool_catalog.rs validates structured tool catalog
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/tool_proof_coverage.rs reports catalog proof obligations
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/tool_drift.rs validates tool/convention trace contracts
@@ -69,7 +69,6 @@ cd "$WORKSPACE_ROOT"
 
 AGENT_CANON_SOURCE_ROOT="$WORKSPACE_ROOT"
 AGENT_CANON_CARGO_MANIFEST="${AGENT_CANON_SOURCE_ROOT}/tools/runtime/dispatch/agent-canon/Cargo.toml"
-AGENT_CANON_BOUNDARY_SCRIPT="${WORKSPACE_ROOT}/tools/repository/workspace/parent_root_side_effects.py"
 # The checkout is a read-only source input.  Control and runtime roots are
 # explicit capabilities supplied by the caller; source/TMPDIR fallbacks would
 # make a CI check mutate whichever checkout happened to invoke this script.
@@ -81,69 +80,22 @@ if [[ -z "${AGENT_CANON_RUNTIME_ROOT:-}" ]]; then
   echo "AGENT_CANON_RUN_ALL_CHECKS=fail reason=runtime_root_required" >&2
   exit 2
 fi
-if ! python3 - "${AGENT_CANON_SOURCE_ROOT}" "${AGENT_CANON_CONTROL_PARENT_ROOT}" <<'PY'
-from pathlib import Path
-import sys
-
-source = Path(sys.argv[1]).resolve(strict=True)
-control = Path(sys.argv[2]).resolve(strict=False)
-if source == control:
-    raise SystemExit("control parent root must differ from source root")
-PY
-then
+if ! "${AGENT_CANON_NATIVE_BIN:-${AGENT_CANON_CLI:-${WORKSPACE_ROOT}/tools/bin/agent-canon}}" runtime-paths check-control --source-root "${AGENT_CANON_SOURCE_ROOT}" --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}"; then
   echo "AGENT_CANON_RUN_ALL_CHECKS=fail reason=control_parent_root_is_source" >&2
   exit 2
 fi
 export AGENT_CANON_PARENT_ROOT="${AGENT_CANON_CONTROL_PARENT_ROOT}"
 export AGENT_CANON_ACTIVE_REPOSITORY_ROOT="${AGENT_CANON_CONTROL_PARENT_ROOT}"
-if [[ "${AGENT_CANON_CHILD_PURPOSE:-}" == "run-all-checks-script" ]]; then
-  python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" verify-child \
-    --root "${AGENT_CANON_CONTROL_PARENT_ROOT}" \
-    --source-root "${AGENT_CANON_SOURCE_ROOT}" \
-    --purpose run-all-checks-script \
-    --consume >/dev/null
-elif [[ "${AGENT_CANON_CHILD_PURPOSE:-}" == "standalone-static-gate-unit" ]]; then
-  # The bootstrap target mount already authenticates this read-only execution
-  # plane.  Its control root is an external, non-Git runtime parent, so do not
-  # re-enter the parent-side-effect boundary from inside the tool container.
-  :
-else
-  exec python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" exec-parent-bound \
-    --root "${AGENT_CANON_CONTROL_PARENT_ROOT}" \
-    --source-root "${AGENT_CANON_SOURCE_ROOT}" \
-    --purpose run-all-checks-script \
-    --issue-handoff \
-    -- bash "${BASH_SOURCE[0]}" "$@"
-fi
 unset AGENT_CANON_CHILD_HANDOFF AGENT_CANON_HANDOFF_AUDIENCE AGENT_CANON_CHILD_PURPOSE
 
 # Generated CI state is external to the source checkout.  Path validation is
-# delegated to runtime_artifacts.py, the single runtime-root contract.
+# delegated to runtime_boundary.rs, the single runtime-root contract.
 runtime_boundary_root() {
-  local candidate="$1"
-  PYTHONPATH="${WORKSPACE_ROOT}${PYTHONPATH:+:${PYTHONPATH}}" \
-    python3 - "${AGENT_CANON_SOURCE_ROOT}" "${candidate}" <<'PY'
-from pathlib import Path
-import sys
-
-from tools.runtime.artifacts.runtime_artifacts import runtime_artifact_boundary
-
-print(runtime_artifact_boundary(Path(sys.argv[1]), Path(sys.argv[2]), create=True).root)
-PY
+  "${AGENT_CANON_NATIVE_BIN:-${AGENT_CANON_CLI:-${WORKSPACE_ROOT}/tools/bin/agent-canon}}" runtime-paths root --source-root "${AGENT_CANON_SOURCE_ROOT}" --runtime-root "$1"
 }
 
 runtime_boundary_path() {
-  local candidate="$1"
-  PYTHONPATH="${WORKSPACE_ROOT}${PYTHONPATH:+:${PYTHONPATH}}" \
-    python3 - "${AGENT_CANON_SOURCE_ROOT}" "${AGENT_CANON_CI_RUNTIME_ROOT}" "${candidate}" <<'PY'
-from pathlib import Path
-import sys
-
-from tools.runtime.artifacts.runtime_artifacts import runtime_artifact_boundary
-
-boundary = runtime_artifact_boundary(Path(sys.argv[1]), Path(sys.argv[2]), create=True)
-print(boundary.resolve(Path(sys.argv[3])))
-PY
+  "${AGENT_CANON_NATIVE_BIN:-${AGENT_CANON_CLI:-${WORKSPACE_ROOT}/tools/bin/agent-canon}}" runtime-paths path --source-root "${AGENT_CANON_SOURCE_ROOT}" --runtime-root "${AGENT_CANON_CI_RUNTIME_ROOT}" --candidate "$1"
 }
 
 AGENT_CANON_CI_RUNTIME_ROOT="${AGENT_CANON_RUNTIME_ROOT}"
@@ -378,7 +330,7 @@ if [ -d python ]; then
     EXIT_CODE=1
   fi
 fi
-if "$PYTHON_BIN" "${WORKSPACE_ROOT}/tools/validation/semantic/convention/check_convention_compliance.py" 2>&1; then
+if "${AGENT_CANON_CLI_CMD:-${WORKSPACE_ROOT}/tools/bin/agent-canon}" check-convention-compliance 2>&1; then
   echo "✅ convention compliance wiring checks 成功"
 else
   echo "❌ convention compliance wiring checks 失敗"
