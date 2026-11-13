@@ -735,9 +735,12 @@ const TOOL_KEYWORDS: &[SimpleKeywordRule] = &[
     ),
     (
         "runtime-log-archive-git",
+        &["runtime-log-archive-git"],
+    ),
+    (
+        "runtime_log_archive_git.py",
         &[
             "runtime_log_archive_git.py",
-            "runtime-log-archive-git",
             "agent report archive",
             "runbundle archive",
             "archive path",
