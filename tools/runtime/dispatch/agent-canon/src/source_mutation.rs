@@ -168,13 +168,40 @@ impl SourceMutationCapability {
         self.atomic_write_text_with_parents(path, text, mode, false)
     }
 
-    /// Atomically replace one approved UTF-8 source file, creating only missing parent directories beneath the same exact capability.
+    /// Create missing parents beneath the same exact source capability.
     pub fn atomic_write_text_with_parents(
         &self,
         path: &Path,
         text: &str,
         mode: u32,
         create_parents: bool,
+    ) -> Result<()> {
+        self.write_with(path, mode, true, create_parents, |file| {
+            file.write_all(text.as_bytes())
+        })
+    }
+
+    pub fn atomic_write_bytes(&self, path: &Path, bytes: &[u8], mode: u32) -> Result<()> {
+        self.write_with(path, mode, true, false, |file| file.write_all(bytes))
+    }
+
+    /// Stream a new file without replacing a pre-existing directory entry.
+    pub fn publish_noreplace_with(
+        &self,
+        path: &Path,
+        mode: u32,
+        writer: impl FnOnce(&mut cap_std::fs::File) -> io::Result<()>,
+    ) -> Result<()> {
+        self.write_with(path, mode, false, false, writer)
+    }
+
+    fn write_with(
+        &self,
+        path: &Path,
+        mode: u32,
+        replace: bool,
+        create_parents: bool,
+        writer: impl FnOnce(&mut cap_std::fs::File) -> io::Result<()>,
     ) -> Result<()> {
         use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -204,7 +231,13 @@ impl SourceMutationCapability {
                 },
             )?;
         match directory.symlink_metadata(name) {
-            Ok(metadata) if metadata.is_file() => {}
+            Ok(metadata) if metadata.is_file() && replace => {}
+            Ok(metadata) if metadata.is_file() => {
+                return Err(SourceMutationError::new(format!(
+                    "mutation target already exists: {}",
+                    path.display()
+                )))
+            }
             Ok(metadata) if metadata.is_symlink() => {
                 return Err(SourceMutationError::new(format!(
                     "mutation target contains symlink component: {}",
@@ -233,7 +266,7 @@ impl SourceMutationCapability {
                 std::process::id()
             ));
             let mut options = cap_std::fs::OpenOptions::new();
-            options.write(true).create_new(true);
+            options.read(!replace).write(true).create_new(true);
             options.follow(FollowSymlinks::No);
             #[cfg(unix)]
             {
@@ -251,7 +284,7 @@ impl SourceMutationCapability {
                 }
             };
             let result = (|| {
-                file.write_all(text.as_bytes()).map_err(|error| {
+                writer(&mut file).map_err(|error| {
                     SourceMutationError::new(format!(
                         "cannot write mutation target {}: {error}",
                         path.display()
@@ -282,20 +315,57 @@ impl SourceMutationCapability {
                 }
                 #[cfg(not(unix))]
                 let _ = mode;
+                #[cfg(unix)]
+                let published_identity = file
+                    .metadata()
+                    .map_err(|error| SourceMutationError::new(error.to_string()))?;
                 drop(file);
-                directory
-                    .rename(&temporary_name, &directory, &target_name)
-                    .map_err(|error| {
-                        SourceMutationError::new(format!(
-                            "cannot publish mutation target {}: {error}",
-                            path.display()
-                        ))
-                    })
+                if replace {
+                    directory
+                        .rename(&temporary_name, &directory, &target_name)
+                        .map_err(|error| {
+                            SourceMutationError::new(format!(
+                                "cannot publish mutation target {}: {error}",
+                                path.display()
+                            ))
+                        })
+                } else {
+                    directory
+                        .hard_link(&temporary_name, &directory, &target_name)
+                        .map_err(|error| {
+                            SourceMutationError::new(format!(
+                                "cannot publish mutation target {}: {error}",
+                                path.display()
+                            ))
+                        })?;
+                    #[cfg(unix)]
+                    if let Err(error) = directory.open(".").and_then(|file| file.sync_all()) {
+                        use cap_fs_ext::MetadataExt;
+                        if let Ok(actual) = directory.symlink_metadata(&target_name) {
+                            if actual.is_file()
+                                && actual.dev() == published_identity.dev()
+                                && actual.ino() == published_identity.ino()
+                            {
+                                let _ = directory.remove_file(&target_name);
+                            }
+                        }
+                        return Err(SourceMutationError::new(format!(
+                            "cannot sync mutation parent: {error}"
+                        )));
+                    }
+                    Ok(())
+                }
             })();
-            if result.is_err() {
-                let _ = directory.remove_file(&temporary_name);
-            }
-            return result;
+            let cleanup = directory.remove_file(&temporary_name);
+            return match (result, cleanup) {
+                (Err(error), _) => Err(error),
+                (Ok(()), Err(error)) if error.kind() != io::ErrorKind::NotFound => {
+                    Err(SourceMutationError::new(format!(
+                        "cannot remove mutation temporary file: {error}"
+                    )))
+                }
+                _ => Ok(()),
+            };
         }
         Err(SourceMutationError::new(
             "could not allocate a unique mutation temporary file",
@@ -305,6 +375,16 @@ impl SourceMutationCapability {
     /// Copy one approved regular file or source symlink with copy2-style
     /// content, permission, timestamp, and available extended-attribute data.
     pub fn copy_file_with_metadata(&self, source: &Path, target: &Path) -> Result<()> {
+        self.copy_file_from_root_with_metadata(&self.source_root, source, target)
+    }
+
+    /// Copy from an explicitly selected read root into an approved target.
+    pub fn copy_file_from_root_with_metadata(
+        &self,
+        read_root: &Path,
+        source: &Path,
+        target: &Path,
+    ) -> Result<()> {
         let resolved_target = self.assert_allowed(target)?;
         let target_relative = resolved_target
             .strip_prefix(&self.source_root)
@@ -344,25 +424,21 @@ impl SourceMutationCapability {
         let source_candidate = if source.is_absolute() {
             source.to_path_buf()
         } else {
-            self.source_root.join(source)
+            read_root.join(source)
         };
-        let source_relative = source_candidate
-            .strip_prefix(&self.source_root)
-            .map_err(|_| {
+        let source_relative = source_candidate.strip_prefix(read_root).map_err(|_| {
+            SourceMutationError::new(format!(
+                "copy source is outside source root: {}",
+                source.display()
+            ))
+        })?;
+        let (source_directory, source_name) =
+            open_file_parent_nofollow(read_root, source_relative, false).map_err(|error| {
                 SourceMutationError::new(format!(
-                    "copy source is outside source root: {}",
+                    "cannot open copy source parent for {}: {error}",
                     source.display()
                 ))
             })?;
-        let (source_directory, source_name) =
-            open_file_parent_nofollow(&self.source_root, source_relative, false).map_err(
-                |error| {
-                    SourceMutationError::new(format!(
-                        "cannot open copy source parent for {}: {error}",
-                        source.display()
-                    ))
-                },
-            )?;
         let source_entry = source_directory
             .symlink_metadata(&source_name)
             .map_err(|error| {
@@ -1072,6 +1148,35 @@ fn ignored_xattr_attribute_error(error: rustix::io::Errno) -> bool {
     use rustix::io::Errno;
 
     ignored_xattr_list_error(error) || error == Errno::PERM || error == Errno::ACCESS
+}
+
+/// Create the parent of an explicit absolute file path through no-follow handles.
+pub fn ensure_file_parent_nofollow(path: &Path) -> io::Result<PathBuf> {
+    if !path.is_absolute() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "absolute output path required",
+        ));
+    }
+    let mut root = PathBuf::new();
+    let mut relative = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::Prefix(prefix) => root.push(prefix.as_os_str()),
+            Component::RootDir => root.push(std::path::MAIN_SEPARATOR.to_string()),
+            Component::Normal(name) => relative.push(name),
+            _ => {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "canonical output path required",
+                ))
+            }
+        }
+    }
+    let (_directory, _name) = open_file_parent_nofollow(&root, &relative, true)?;
+    path.parent()
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "output parent is missing"))?
+        .canonicalize()
 }
 
 fn open_file_parent_nofollow(

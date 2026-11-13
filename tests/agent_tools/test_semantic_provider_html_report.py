@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests semantic provider HTML report rendering.
-# upstream implementation ../../tools/analysis/search/reporting/semantic_provider_html_report.py renders semantic provider comparison HTML
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/semantic_index/semantic_provider_html_report.rs renders semantic provider comparison HTML
 # upstream design ../../agents/skills/html-output.md owns HTML artifact generation and validation
 # upstream design ../../documents/tools/semantic_index.md defines semantic provider comparison authority boundaries
 # @dependency-end
@@ -20,7 +20,6 @@ from pathlib import Path
 from typing import cast
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "analysis" / "search" / "reporting" / "semantic_provider_html_report.py"
 
 
 def event_string(event: dict[str, object], name: str) -> str:
@@ -165,8 +164,12 @@ def sample_compare_report() -> dict[str, object]:
             "shared_count": 2,
             "overlap_ratio": 0.4,
             "shared": ["documents/a.md:document:1-20|documents/b.md:document:1-20"],
-            "left_only": ["documents/left.md:document:1-8|documents/<script>.md:document:1-8"],
-            "right_only": ["documents/right.md:document:2-9|documents/peer.md:document:1-7"],
+            "left_only": [
+                "documents/left.md:document:1-8|documents/<script>.md:document:1-8"
+            ],
+            "right_only": [
+                "documents/right.md:document:2-9|documents/peer.md:document:1-7"
+            ],
         },
         "search": {
             "query_chars": 42,
@@ -240,8 +243,8 @@ class SemanticProviderHtmlReportTest(unittest.TestCase):
         if project_marker is not None:
             env["FAKE_PROJECT_MARKER"] = str(project_marker)
         argv = [
-            sys.executable,
-            str(SCRIPT),
+            os.environ["AGENT_CANON_CLI"],
+            "semantic-provider-html-report",
             "--compare-json",
             str(compare_json),
             "--output",
@@ -281,9 +284,7 @@ class SemanticProviderHtmlReportTest(unittest.TestCase):
             )
             receipt = json.loads(result_line.split("=", 1)[1])
             self.assertEqual(receipt["status"], "rendered")
-            self.assertEqual(
-                receipt["configuration"]["project"], {"type": "default"}
-            )
+            self.assertEqual(receipt["configuration"]["project"], {"type": "default"})
             self.assertEqual(receipt["validation"]["lychee"], "pass")
             self.assertEqual(receipt["quarto_version"], "1.10.19")
             self.assertEqual(receipt["pandoc_version"], "pandoc 3.4.0.1")
@@ -309,7 +310,9 @@ class SemanticProviderHtmlReportTest(unittest.TestCase):
             self.assertIn("--to", render_argv)
             self.assertEqual(events[-1]["kind"], "lychee")
             self.assertIn("--config", event_argv(events[-1]))
-            self.assertIn('src="provider-delta.svg"', output.read_text(encoding="utf-8"))
+            self.assertIn(
+                'src="provider-delta.svg"', output.read_text(encoding="utf-8")
+            )
             self.assertTrue((root / "provider-delta.svg").is_file())
 
     def test_missing_search_section_is_allowed(self) -> None:
@@ -360,9 +363,7 @@ class SemanticProviderHtmlReportTest(unittest.TestCase):
                 root, sample_compare_report(), output, embed_resources=True
             )
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn(
-                "embed-resources: true", event_string(events[0], "source")
-            )
+            self.assertIn("embed-resources: true", event_string(events[0], "source"))
             result_line = next(
                 line
                 for line in result.stdout.splitlines()
@@ -379,9 +380,7 @@ class SemanticProviderHtmlReportTest(unittest.TestCase):
             project.mkdir()
             marker = project / "pre-render-ran.txt"
             project_config = (
-                "project:\n"
-                "  type: default\n"
-                "  pre-render: touch pre-render-ran.txt\n"
+                "project:\n  type: default\n  pre-render: touch pre-render-ran.txt\n"
             )
             (project / "_quarto.yml").write_text(project_config, encoding="utf-8")
             nested_tmp = project / "tmp"
@@ -398,7 +397,9 @@ class SemanticProviderHtmlReportTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertTrue(output.is_file())
             self.assertFalse(marker.exists())
-            inspect_event = next(event for event in events if event["kind"] == "inspect")
+            inspect_event = next(
+                event for event in events if event["kind"] == "inspect"
+            )
             render_event = next(event for event in events if event["kind"] == "render")
             generated_source = Path(event_string(inspect_event, "source_path"))
             generated_project = generated_source.parent
@@ -410,7 +411,9 @@ class SemanticProviderHtmlReportTest(unittest.TestCase):
                 "project:\n  type: default\n",
             )
 
-    def test_failure_states_distinguish_source_renderer_render_and_validation(self) -> None:
+    def test_failure_states_distinguish_source_renderer_render_and_validation(
+        self,
+    ) -> None:
         """The CLI keeps owning failure states distinct at its native boundaries."""
         cases = (
             ("missing_asset", 1, True, None, True, 0, 0),
@@ -428,7 +431,10 @@ class SemanticProviderHtmlReportTest(unittest.TestCase):
             render_status,
             lychee_status,
         ) in cases:
-            with self.subTest(status=expected_status), tempfile.TemporaryDirectory() as tmp_dir:
+            with (
+                self.subTest(status=expected_status),
+                tempfile.TemporaryDirectory() as tmp_dir,
+            ):
                 root = Path(tmp_dir)
                 result, _ = self.run_report(
                     root,

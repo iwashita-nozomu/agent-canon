@@ -168,12 +168,16 @@ Commands:
   historical-skill-usage-read --path <skill_usage.jsonl>
   generate-agent-improvement-guide [--root ROOT] [--runtime-root ROOT] [--out PATH] [--output-mode 600|644]
   generate-agent-runtime-dashboard [--root ROOT] [--runtime-root ROOT] [--out PATH] [--compact-out PATH] [--api-out PATH] [--recent-days DAYS]
+  issue-sync [--repo OWNER/REPO] [--issue-url URL] [options]
   eval-accumulation-check [--root ROOT] [--runtime-root ROOT] [--family-registry PATH] [--format text|json] [--compact-out PATH]
   oop-python-rule-inventory|oop-cpp-rule-inventory [--root <repo-root>] [--format text|json|markdown]
   lean-proof-env <init|smoke|agent-smoke|counterexample-smoke|all-smoke|check-file> [options]
   check-semantic-responsibility-contract [paths...] [--root ROOT] [--template TEMPLATE] [--instance INSTANCE] [--artifact-root ARTIFACT_ROOT] [--format text|json]
   check-solid-evidence [paths...] [--root ROOT] [--changed] [--base-ref BASE_REF] [--evidence EVIDENCE] [--exclude EXCLUDE] [--verbose] [--format text|json]
   rust-migration-audit --root <repo-root>
+  save-experiment-result-annex --raw-dir PATH [--annex-repo PATH] [options]
+  github-status-lifecycle --repo OWNER/REPO --issue NUMBER --facts-json PATH [options]
+  semantic-provider-html-report --compare-json PATH --output PATH [options]
   check-proof-trace-alignment --trace-module PATH [options]
   reference-materializer --url URL [--input PATH|--fetch] [options]
   repo-structure-contract [--root ROOT] [--contract PATH] [options]
@@ -184,7 +188,6 @@ Commands:
   skill-shim-materializer <check|materialize|readback> [options]
   skill-shim-evaluation [options]
   run-accumulated-agent-evals [options]
-  issue-sync [--repo OWNER/REPO] [--issue-url URL] [options]
   update-latest-result RESULT_ROOT --variant VARIANT [--result-dir PATH]
   parent-repository-audit <list|check> --root ROOT [options]
   html-artifact-access REPORT_PATH [options]
@@ -288,8 +291,20 @@ fn main() {
         std::process::exit(theorem_graph_circularity_check::run(&args[2..]));
     }
 
+    if args.len() >= 2 && args[1] == agent_canon::agent_runtime_dashboard::GUIDE_SELECTOR {
+        std::process::exit(agent_canon::agent_runtime_dashboard::run_guide_cli(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == agent_canon::agent_runtime_dashboard::DASHBOARD_SELECTOR {
+        std::process::exit(agent_canon::agent_runtime_dashboard::run_dashboard_cli(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "issue-sync" {
+        std::process::exit(agent_canon::issue_sync::run(&args[2..]));
+    }
     if args.len() >= 2 && args[1] == "tool-catalog" {
         std::process::exit(catalog::tool_catalog::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "save-experiment-result-annex" {
+        std::process::exit(agent_canon::annex_retention::run(&args[2..]));
     }
     if args.len() >= 2 && args[1] == "render-code-template" {
         std::process::exit(agent_canon::code_template_rendering::run(&args[2..]));
@@ -305,16 +320,6 @@ fn main() {
     }
     if args.len() >= 2 && args[1] == "update-latest-result" {
         std::process::exit(agent_canon::latest_result::run(&args[2..]));
-    }
-    if args.len() >= 2 && args[1] == agent_canon::agent_runtime_dashboard::GUIDE_SELECTOR {
-        std::process::exit(agent_canon::agent_runtime_dashboard::run_guide_cli(
-            &args[2..],
-        ));
-    }
-    if args.len() >= 2 && args[1] == agent_canon::agent_runtime_dashboard::DASHBOARD_SELECTOR {
-        std::process::exit(agent_canon::agent_runtime_dashboard::run_dashboard_cli(
-            &args[2..],
-        ));
     }
     if args.len() >= 2 && args[1] == "parent-repository-audit" {
         std::process::exit(agent_canon::parent_repository_audit::run(&args[2..]));
@@ -443,6 +448,14 @@ fn main() {
     if args.len() >= 2 && args[1] == "rust-migration-audit" {
         std::process::exit(migration_audit::run(&args[2..]));
     }
+    if args.len() >= 2 && args[1] == "github-status-lifecycle" {
+        std::process::exit(agent_canon::github_status_lifecycle::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "semantic-provider-html-report" {
+        std::process::exit(semantic_index::semantic_provider_html_report::run(
+            &args[2..],
+        ));
+    }
     if args.len() >= 2 && args[1] == "check-proof-trace-alignment" {
         std::process::exit(agent_canon::check_proof_trace_alignment::run(&args[2..]));
     }
@@ -460,9 +473,6 @@ fn main() {
     }
     if args.len() >= 2 && args[1] == "orphan-lifecycle" {
         std::process::exit(agent_canon::orphan_lifecycle::run(&args[2..]));
-    }
-    if args.len() >= 2 && args[1] == "issue-sync" {
-        std::process::exit(agent_canon::issue_sync::run(&args[2..]));
     }
     if args.len() >= 2 && args[1] == agent_canon::codex_agent_role_eval::SELECTOR {
         std::process::exit(agent_canon::codex_agent_role_eval::run(&args[2..]));
