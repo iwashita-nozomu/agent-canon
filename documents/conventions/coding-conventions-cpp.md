@@ -113,7 +113,7 @@ AgentCanon 自体には C++ CMake project や compile database がないため�
 - bounded かつ決定的な入力で検証します。
 - 期待結果が分かるケース（対角行列、既知解など）を優先します。
 - `jax.export` と C++ をつなぐ変更では、project-local smoke target を追加し、少なくとも
-  `python3 tools/validation/ci/checks/check_jax_export_stack.py` と
+  `python3 tests/bootstrap/jax_export_stack_smoke.py` と
   `cmake --build <selected-build-dir> --target <project-cpp-smoke-target>` を通します。
 
 ## 6. 再利用
