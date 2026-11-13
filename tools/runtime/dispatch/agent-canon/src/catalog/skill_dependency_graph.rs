@@ -2426,7 +2426,12 @@ mod tests {
             command: "graph".to_owned(),
             root: temp.path().to_path_buf(),
             output: None,
-            runtime_root: Some(runtime.path().to_path_buf()),
+            runtime_root: Some(
+                runtime
+                    .path()
+                    .canonicalize()
+                    .expect("canonical runtime root"),
+            ),
             mutation_capability: None,
             source_mutation: false,
             source_mutation_evidence: None,
@@ -2490,7 +2495,12 @@ mod tests {
             command: "graph".to_owned(),
             root: temp.path().to_path_buf(),
             output: Some(PathBuf::from(GRAPH_MARKDOWN_PATH)),
-            runtime_root: Some(runtime.path().to_path_buf()),
+            runtime_root: Some(
+                runtime
+                    .path()
+                    .canonicalize()
+                    .expect("canonical runtime root"),
+            ),
             mutation_capability: Some(capability),
             source_mutation: true,
             source_mutation_evidence: None,
@@ -2561,7 +2571,12 @@ mod tests {
             command: "graph".to_owned(),
             root: temp.path().to_path_buf(),
             output: Some(PathBuf::from(GRAPH_MARKDOWN_PATH)),
-            runtime_root: Some(runtime.path().to_path_buf()),
+            runtime_root: Some(
+                runtime
+                    .path()
+                    .canonicalize()
+                    .expect("canonical runtime root"),
+            ),
             mutation_capability: Some(capability),
             source_mutation: true,
             source_mutation_evidence: None,
