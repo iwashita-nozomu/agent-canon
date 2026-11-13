@@ -1032,6 +1032,12 @@ fn read_target_nofollow(
             relative.display()
         ))
     })?;
+    if !file_metadata.is_file() {
+        return Err(SkillMaterializationError::new(format!(
+            "target is not a regular file: {}",
+            path.display()
+        )));
+    }
     let mut bytes = Vec::new();
     file.read_to_end(&mut bytes).map_err(|error| {
         SkillMaterializationError::new(format!(
