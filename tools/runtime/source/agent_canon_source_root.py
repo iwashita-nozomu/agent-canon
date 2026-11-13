@@ -128,10 +128,7 @@ def _default_pythonpath(*, root: Path) -> str:
                 ) from exc
             if canonical == source_tools:
                 continue
-            if (
-                canonical == source_tools / "agent_tools"
-                and "agent-canon" in candidate.parts
-            ):
+            if canonical == source_tools / "agent_tools" and candidate.is_symlink():
                 # The standalone public self-view aliases the selected source
                 # tools tree; retain only the canonical source tools entry.
                 continue

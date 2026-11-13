@@ -2,11 +2,8 @@
 # contract environment
 # responsibility Defines AgentCanon's disposable live, proof, and full-check test image.
 # upstream implementation ./docker.sh selects and runs each test capability profile
-# upstream implementation ../../tools/analysis/dependencies/dependency_plan.py invokes the typed image installer
-# upstream implementation ../../tools/runtime/container/devcontainer_dependencies.py installs the image dependency plan
-# upstream implementation ../../tools/runtime/values.py refines decoded dependency records
-# upstream implementation ../../tools/repository/workspace/parent_root_side_effects.py owns installer side-effect boundaries
-# upstream implementation ../../tools/runtime/artifacts/runtime_artifacts.py owns external runtime boundaries
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/environment_dependencies.rs owns the native typed installer
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/authority/mod.rs owns parent-root receipt boundaries
 # upstream environment ../../bootstrap/container/image/dependencies.toml pins image providers
 # upstream implementation ../../tools/runtime/dispatch/agent-canon/Cargo.toml defines the CLI crate
 # upstream environment ../../tools/runtime/dispatch/agent-canon/Cargo.lock locks CLI build dependencies
@@ -23,6 +20,7 @@
 FROM ubuntu:24.04@sha256:33ceb71981b602c1a7443a53469e4dba065f7503eab3078a2d7a57a2ab987517
 
 ARG TARGETARCH
+ARG AGENT_CANON_BOOTSTRAP_RUST_VERSION=1.99.1
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -49,20 +47,16 @@ WORKDIR /opt/agent-canon/source
 
 # Keep the image installer cache key limited to its manifest and actual import
 # closure; ordinary source revisions do not reinstall the full-check providers.
-COPY tools/__init__.py /opt/agent-canon/source/tools/
-COPY tools/analysis/__init__.py /opt/agent-canon/source/tools/analysis/
-COPY tools/analysis/dependencies/__init__.py \
-     tools/analysis/dependencies/dependency_plan.py \
-     /opt/agent-canon/source/tools/analysis/dependencies/
-COPY tools/runtime/__init__.py tools/runtime/values.py /opt/agent-canon/source/tools/runtime/
-COPY tools/runtime/container/__init__.py \
-     tools/runtime/container/devcontainer_dependencies.py \
-     /opt/agent-canon/source/tools/runtime/container/
-COPY tools/runtime/artifacts/__init__.py \
-     tools/runtime/artifacts/runtime_artifacts.py \
-     /opt/agent-canon/source/tools/runtime/artifacts/
-COPY tools/repository/__init__.py /opt/agent-canon/source/tools/repository/
-COPY tools/repository/workspace/parent_root_side_effects.py /opt/agent-canon/source/tools/repository/workspace/
+COPY .markdownlint-cli2.jsonc /opt/agent-canon/source/.markdownlint-cli2.jsonc
+COPY tools/validation/documentation/config/lychee.toml \
+     /opt/agent-canon/source/tools/validation/documentation/config/lychee.toml
+COPY tools/validation/ci/config/actionlint.yaml \
+     /opt/agent-canon/source/tools/validation/ci/config/actionlint.yaml
+COPY tools/runtime/dispatch/agent-canon/Cargo.toml \
+     tools/runtime/dispatch/agent-canon/Cargo.lock \
+     /opt/agent-canon/source/tools/runtime/dispatch/agent-canon/
+COPY tools/runtime/dispatch/agent-canon/src/ \
+     /opt/agent-canon/source/tools/runtime/dispatch/agent-canon/src/
 COPY bootstrap/container/image/dependencies.toml /opt/agent-canon/source/bootstrap/container/image/
 
 # The profile first affects the provider/build layers below, not common setup.
@@ -84,26 +78,20 @@ RUN if [ "${TEST_PROFILE}" = "full-checks" ]; then \
       curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 --output /usr/local/bin/rustup-init "https://static.rust-lang.org/rustup/archive/1.28.2/${rustup_target}/rustup-init"; \
       echo "${rustup_sha}  /usr/local/bin/rustup-init" | sha256sum --check --strict; \
       chmod 0555 /usr/local/bin/rustup-init; \
-      rustup-init -y --no-modify-path --default-toolchain none; \
+      rustup-init -y --no-modify-path --default-toolchain "${AGENT_CANON_BOOTSTRAP_RUST_VERSION}" --profile minimal; \
+      CARGO_TARGET_DIR=/tmp/agent-canon-bootstrap-target cargo build --locked --release \
+        --manifest-path /opt/agent-canon/source/tools/runtime/dispatch/agent-canon/Cargo.toml; \
+      install -m 0555 /tmp/agent-canon-bootstrap-target/release/agent-canon /usr/local/bin/agent-canon-dependency-bootstrap; \
       install -d -m 0755 "${PUPPETEER_CACHE_DIR}"; \
-      python3 -m tools.analysis.dependencies.dependency_plan image-install \
+      /usr/local/bin/agent-canon-dependency-bootstrap environment-dependencies image-install \
         --workspace /opt/agent-canon/source \
         --manifest /opt/agent-canon/source/bootstrap/container/image/dependencies.toml \
         --records ruff basedpyright check-jsonschema yamllint shellcheck actionlint zizmor rust-toolchain python3-pytest \
         markdownlint-cli2 node quarto lychee mermaid-cli \
         --format text; \
-      rm -f /usr/local/bin/rustup-init; \
+      rm -f /usr/local/bin/rustup-init /usr/local/bin/agent-canon-dependency-bootstrap; \
       rm -rf /tmp/* /var/lib/apt/lists/*; \
     fi
-
-# Cargo's cache key follows only the crate, lockfile, and exact files read by
-# compile-time include_bytes! expressions.
-COPY tools/runtime/dispatch/agent-canon/Cargo.toml \
-     tools/runtime/dispatch/agent-canon/Cargo.lock \
-     /opt/agent-canon/source/tools/runtime/dispatch/agent-canon/
-COPY tools/runtime/dispatch/agent-canon/src/ /opt/agent-canon/source/tools/runtime/dispatch/agent-canon/src/
-COPY documents/runtime/shared-runtime-surfaces.toml \
-     /opt/agent-canon/source/documents/runtime/shared-runtime-surfaces.toml
 
 RUN if [ "${TEST_PROFILE}" = "full-checks" ]; then \
       CARGO_TARGET_DIR=/tmp/agent-canon-test-cargo-target cargo build \

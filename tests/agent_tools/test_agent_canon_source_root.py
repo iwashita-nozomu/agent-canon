@@ -125,7 +125,6 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
         self.assertEqual(parsed.mode, "exec")
         self.assertEqual(parsed.command, "tools/bin/agent-canon")
         self.assertEqual(parsed.args, ["route", "--list"])
-        self.assertEqual(parsed.args, ["--list"])
 
     def test_public_entrypoints_are_executable_for_source_root_dispatch(self) -> None:
         """Source-root dispatch targets keep their shebang entrypoint mode."""
@@ -185,8 +184,8 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("surface", result.stdout)
 
-    def test_exec_command_supports_python_source_contract_readback(self) -> None:
-        """The source wrapper can run a Python checker with source-relative paths."""
+    def test_exec_command_supports_native_source_contract_readback(self) -> None:
+        """The source wrapper runs its local checker with source-relative paths."""
         with tempfile.TemporaryDirectory() as workspace:
             clone = Path(workspace) / "agent-canon"
 
@@ -211,13 +210,15 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
                 ignore=ignore_clone_links,
             )
             subprocess.run(["git", "init", "-q"], cwd=clone, check=True)
+            native_checker = clone / "native-structure-checker"
+            shutil.copy2(os.environ["AGENT_CANON_CLI"], native_checker)
             result = subprocess.run(
                 [
                     sys.executable,
                     PUBLIC_RESOLVER,
                     "exec",
-                    "python3",
-                    "tools/validation/semantic/structure/repo_structure_contract.py",
+                    str(native_checker),
+                    "repo-structure-contract",
                     "--root",
                     ".",
                     "--contract",

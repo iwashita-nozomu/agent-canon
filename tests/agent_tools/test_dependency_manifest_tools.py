@@ -340,23 +340,10 @@ class DependencyManifestToolTest(unittest.TestCase):
             root = Path(tmp_dir)
             (root / "python").mkdir()
             (root / "docker").mkdir()
-            container_tools = root / "tools" / "runtime" / "container"
-            container_tools.mkdir(parents=True)
-            (container_tools / "devcontainer_dependencies.py").symlink_to(
-                PROJECT_ROOT
-                / "tools"
-                / "runtime"
-                / "container"
-                / "devcontainer_dependencies.py"
-            )
-            dependency_tools = root / "tools" / "analysis" / "dependencies"
-            dependency_tools.mkdir(parents=True)
-            (dependency_tools / "dependency_plan.py").symlink_to(
-                PROJECT_ROOT
-                / "tools"
-                / "analysis"
-                / "dependencies"
-                / "dependency_plan.py"
+            native_tools = root / "tools" / "bin"
+            native_tools.mkdir(parents=True)
+            (native_tools / "agent-canon").symlink_to(
+                PROJECT_ROOT / "tools" / "bin" / "agent-canon"
             )
             manifest = root / "bootstrap" / "container" / "image" / "dependencies.toml"
             manifest.parent.mkdir(parents=True)

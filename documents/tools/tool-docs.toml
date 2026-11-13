@@ -89,7 +89,7 @@ summary = "SQLite-backed prose structure graph and external-runtime artifact bou
 [[tool]]
 id = "repo-structure-contract"
 classification = "public"
-tool = "tools/validation/semantic/structure/repo_structure_contract.py"
+tool = "tools/runtime/dispatch/agent-canon/src/repo_structure_contract.rs"
 doc = "documents/tools/repo_structure_contract.md"
 language = "python"
 summary = "Repository tree versus AgentCanon structure contract checker documentation."
