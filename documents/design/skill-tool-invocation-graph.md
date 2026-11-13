@@ -7,7 +7,6 @@ upstream design ../../agents/skills/agent-orchestration.md route and Decision Su
 upstream design ../../agents/skills/skill-dependencies.yaml prerequisite, successor, order, and parallel relation owner
 upstream design ../../agents/canonical/skills.md reader-facing catalog projection
 upstream design ../../agents/internal-routines/design-implementation-correspondence.md universal design-to-implementation correspondence
-downstream implementation ../../tools/agent/skills/skill_route_catalog.py catalog resolver
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs capability and phase route materialization
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs native graph construction, writing, and readback
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/runtime_alignment.rs runtime alignment readback
@@ -192,7 +191,7 @@ flowchart LR
 
 この実装は AgentCanon final main `eeb451bd4b829e5417b810804a9d67dfb4ba570d` を設計入力として、設計文書の trace を変更する前の SHA-256 `a28cf776915d006aaffe868185816601c8feb11c7c4375b00b6caf18805c1506` に対応付けて記録します。生成 schema は `agent_canon.skill_tool_invocation_graph.v2` です。実装時点の design SHA-256 は generated graph の `design_correspondence.design_sha256` に保存し、DIC-001..DIC-009 のtarget pathsとclause fingerprintをこの表で追跡します。
 
-The correspondence checker covers `DIC-001`, `DIC-002`, `DIC-003`, `DIC-004`, `DIC-005`, `DIC-006`, `DIC-007`, `DIC-008`, and `DIC-009`, plus these changed paths in both forward and reverse mappings: `agents/skills/catalog.yaml`; `documents/design/skill-tool-invocation-graph.md`; `documents/runtime/skill-dependency-graph.json`; `documents/runtime/skill-dependency-graph.md`; `tests/agent_tools/test_route.py`; `tests/agent_tools/test_skill_dependency_map.py`; `tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs`; `tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs`; `tools/runtime/dispatch/agent-canon/src/source_mutation.rs`; `tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs`; and `tools/agent/skills/skill_route_catalog.py`. Missing clause, DIC, or path references are reported as `design_correspondence_missing`.
+The correspondence checker covers `DIC-001`, `DIC-002`, `DIC-003`, `DIC-004`, `DIC-005`, `DIC-006`, `DIC-007`, `DIC-008`, and `DIC-009`, plus these changed paths in both forward and reverse mappings: `agents/skills/catalog.yaml`; `documents/design/skill-tool-invocation-graph.md`; `documents/runtime/skill-dependency-graph.json`; `documents/runtime/skill-dependency-graph.md`; `tests/agent_tools/test_route.py`; `tests/agent_tools/test_skill_dependency_map.py`; `tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs`; `tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs`; and `tools/runtime/dispatch/agent-canon/src/source_mutation.rs`. Missing clause, DIC, or path references are reported as `design_correspondence_missing`.
 
 | forward clause | implementation target (logical locator / symbol) | focused evidence / validation route | reverse trigger |
 | --- | --- | --- | --- |

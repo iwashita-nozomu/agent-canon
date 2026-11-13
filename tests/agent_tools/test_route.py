@@ -4,7 +4,6 @@
 # contract test
 # responsibility Tests short task routing helper behavior and explicit capability owner partitions.
 # upstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs owns the native route selector
-# upstream implementation ../../tools/agent/skills/skill_route_catalog.py owns catalog/rule/index behavior
 # upstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs owns native capability preflight/decision behavior
 # upstream design ../../documents/design/tool-skill-routing-refactor.md defines naming policy
 # upstream design ../../.codex/personal/skills/code-visualization/SKILL.md owns the runtime direct-route text
@@ -36,7 +35,6 @@ CAPABILITY_ROUTE_GOLDEN = (
     PROJECT_ROOT / "tests" / "fixtures" / "capability_route" / "python_golden.json"
 )
 sys.path.insert(0, str(PROJECT_ROOT))
-import tools.agent.skills.skill_route_catalog as catalog_module  # noqa: E402
 
 
 def _route_environment(
@@ -2082,10 +2080,9 @@ class CapabilityRouteTest(unittest.TestCase):
                     ]
                 ),
             )
-            with self.assertRaisesRegex(
-                ValueError, "skill-dependency-map-unknown-reference"
-            ):
-                catalog_module.load_skill_route_rules(root)
+            result = self.run_route("--root", str(root), "--prompt", "$task-routing", "--format", "json")
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("skill-dependency-map-unknown-reference", result.stdout + result.stderr)
 
     def test_skill_dependency_schema_rejects_self_reference(self) -> None:
         """Dependency owner rejects self-referential relations."""
@@ -2120,10 +2117,9 @@ class CapabilityRouteTest(unittest.TestCase):
                     ]
                 ),
             )
-            with self.assertRaisesRegex(
-                ValueError, "skill-dependency-map-self-reference"
-            ):
-                catalog_module.load_skill_route_rules(root)
+            result = self.run_route("--root", str(root), "--prompt", "$task-routing", "--format", "json")
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("skill-dependency-map-self-reference", result.stdout + result.stderr)
 
     def test_capability_route_selects_oop_type_design(self) -> None:
         """The explicit capability selects exactly the approved owner route."""
@@ -2374,29 +2370,6 @@ class CapabilityRouteTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         payload = json.loads(result.stdout)
         self.assertNotIn("oop-type-design", payload["skills"])
-
-    def test_capability_route_freezes_related_skill_mapping(self) -> None:
-        """Related skill mappings are copied into read-only views."""
-        source = {"oop-type-design": ("python-review",)}
-        frozen = catalog_module.freeze_related_skill_mapping(source, "related_skills")
-        source["oop-type-design"] = ()
-        self.assertEqual(frozen["oop-type-design"], ("python-review",))
-        with self.assertRaises(TypeError):
-            frozen["new"] = ()  # type: ignore[index]
-
-    def test_capability_route_freezes_index_route_mapping(self) -> None:
-        """Capability index routes cannot be mutated by callers."""
-        rules = catalog_module.load_skill_route_rules(PROJECT_ROOT)
-        index = catalog_module.build_capability_index(rules)
-        with self.assertRaises(TypeError):
-            index.routes["other"] = index.routes["oop_type_design"]  # type: ignore[index]
-
-    def test_capability_route_freezes_index_rule_mapping(self) -> None:
-        """Capability index skill rules cannot be mutated by callers."""
-        rules = catalog_module.load_skill_route_rules(PROJECT_ROOT)
-        index = catalog_module.build_capability_index(rules)
-        with self.assertRaises(TypeError):
-            index.rules_by_skill["other"] = index.rules_by_skill["oop-type-design"]  # type: ignore[index]
 
     def test_native_capability_json_preserves_related_skill_order(self) -> None:
         """The native envelope preserves related candidates and deferred order."""
