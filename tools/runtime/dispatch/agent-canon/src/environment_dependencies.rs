@@ -10654,7 +10654,8 @@ failure_policy = "fail"
         assert_fake_responses_consumed(&installer.probe);
     }
 
-    #[cfg(unix)]
+    // The Ubuntu image contract freezes the tree before its atomic publication.
+    #[cfg(target_os = "linux")]
     #[test]
     fn image_install_and_verify_use_frozen_plan_receipts_and_live_executable_output() {
         let root = TempRoot::new();
