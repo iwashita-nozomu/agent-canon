@@ -292,10 +292,14 @@ fn main() {
     }
 
     if args.len() >= 2 && args[1] == agent_canon::agent_runtime_dashboard::GUIDE_SELECTOR {
-        std::process::exit(agent_canon::agent_runtime_dashboard::run_guide_cli(&args[2..]));
+        std::process::exit(agent_canon::agent_runtime_dashboard::run_guide_cli(
+            &args[2..],
+        ));
     }
     if args.len() >= 2 && args[1] == agent_canon::agent_runtime_dashboard::DASHBOARD_SELECTOR {
-        std::process::exit(agent_canon::agent_runtime_dashboard::run_dashboard_cli(&args[2..]));
+        std::process::exit(agent_canon::agent_runtime_dashboard::run_dashboard_cli(
+            &args[2..],
+        ));
     }
     if args.len() >= 2 && args[1] == "issue-sync" {
         std::process::exit(agent_canon::issue_sync::run(&args[2..]));
