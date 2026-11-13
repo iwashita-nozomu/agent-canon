@@ -217,9 +217,7 @@ fn verify_handoff_independently(token: &str, root: &Path) -> Value {
     derive.update(boot_id.trim().as_bytes());
     let session_key = derive.finalize().into_bytes();
     let mut verify = HmacSha256::new_from_slice(&session_key).expect("initialize HMAC oracle");
-    verify.update(&independent_json_bytes(&Value::Object(
-        payload.clone(),
-    )));
+    verify.update(&independent_json_bytes(&Value::Object(payload.clone())));
     verify
         .verify_slice(&decode_hex(signature))
         .expect("standard HMAC-SHA256 verifies the issued token");
