@@ -339,6 +339,27 @@ pub(crate) struct RuntimeDirectory {
 }
 
 impl RuntimeDirectory {
+    pub(crate) fn create_file_once(
+        &self,
+        relative: &Path,
+        mode: u32,
+    ) -> std::io::Result<std::fs::File> {
+        use cap_fs_ext::{FollowSymlinks, OpenOptionsFollowExt};
+        let (parent, name) = self.parent(relative, false)?;
+        let mut options = cap_std::fs::OpenOptions::new();
+        options
+            .write(true)
+            .create_new(true)
+            .follow(FollowSymlinks::No);
+        #[cfg(unix)]
+        {
+            use cap_std::fs::OpenOptionsExt;
+            options.mode(mode);
+        }
+        #[cfg(not(unix))]
+        let _ = mode;
+        Ok(parent.directory.open_with(name, &options)?.into_std())
+    }
     pub(crate) fn open(path: &Path, create: bool) -> std::io::Result<Self> {
         if !path.is_absolute() {
             return Err(std::io::Error::new(
@@ -458,7 +479,7 @@ impl RuntimeDirectory {
         private_directory_mode(&self.directory)
     }
 
-    fn sync_directory(&self) -> std::io::Result<()> {
+    pub(crate) fn sync_directory(&self) -> std::io::Result<()> {
         use cap_fs_ext::{FollowSymlinks, OpenOptionsFollowExt};
 
         // Dir handles are opened for capability-relative traversal and may be O_PATH.
@@ -521,6 +542,21 @@ impl RuntimeDirectory {
     pub(crate) fn read(&self, relative: &Path) -> std::io::Result<Option<Vec<u8>>> {
         self.read_stable(relative)
             .map(|result| result.map(|(bytes, _)| bytes))
+    }
+
+    /// Observe an existing entry through its parent handle without reading user bytes.
+    #[cfg(target_os = "linux")]
+    pub(crate) fn entry_exists(&self, relative: &Path) -> std::io::Result<bool> {
+        let (parent, name) = match self.parent(relative, false) {
+            Ok(value) => value,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+            Err(error) => return Err(error),
+        };
+        match parent.directory.symlink_metadata(name) {
+            Ok(_) => Ok(true),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
+            Err(error) => Err(error),
+        }
     }
 
     pub(crate) fn remove_file(&self, relative: &Path) -> std::io::Result<()> {
