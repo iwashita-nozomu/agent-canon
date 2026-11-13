@@ -62,13 +62,15 @@ fn commit_all(root: &Path, message: &str) {
 }
 
 fn publication_receipts(
-    candidate_sha: &str,
-    candidate_tree: &str,
-    base_sha: &str,
-    base_tree: &str,
+    candidate: (&str, &str),
+    base: (&str, &str),
+    merge_sha: &str,
+    merge_tree: &str,
     branch: &str,
     repository: &str,
 ) -> (Value, Value, Value) {
+    let (candidate_sha, candidate_tree) = candidate;
+    let (base_sha, base_tree) = base;
     let binding = json!({
         "transaction_id": format!("tx:{}", "1".repeat(64)),
         "snapshot_id": format!("snapshot:{}", "2".repeat(64)),
@@ -162,17 +164,18 @@ fn publication_receipts(
         "number": 7,
         "state": "MERGED",
         "baseRefName": "main",
-        "baseRefOid": "1".repeat(40),
+        "baseRefOid": merge_sha,
         "mergeCasBaseOid": base_sha,
         "mergeCasBaseTreeOid": base_tree,
         "headRefName": branch,
         "headRefOid": candidate_sha,
         "headRepository": {"nameWithOwner": format!("owner/{repository}")},
-        "mergeCommit": {"oid": "1".repeat(40)},
-        "mergeTreeOid": "2".repeat(40),
+        "mergeCommit": {"oid": merge_sha},
+        "mergeTreeOid": merge_tree,
     });
-    let readback = materialize_publication_readback_receipt(&cas, &lifecycle, &authoritative_readback)
-        .expect("native lifecycle owner materializes valid publication readback");
+    let readback =
+        materialize_publication_readback_receipt(&cas, &lifecycle, &authoritative_readback)
+            .expect("native lifecycle owner materializes valid publication readback");
     (cas, lifecycle, readback)
 }
 
@@ -195,7 +198,10 @@ fn native_cleanup_cli_accepts_merged_receipts_and_preserves_sibling_content() {
     init_repository(&source, "main");
     fs::write(source.join("base.txt"), "base\n").unwrap();
     commit_all(&source, "initial");
-    git_ok(&source, &["remote", "add", "origin", remote.to_str().unwrap()]);
+    git_ok(
+        &source,
+        &["remote", "add", "origin", remote.to_str().unwrap()],
+    );
     git_ok(&source, &["push", "origin", "main"]);
     git_ok(&remote, &["symbolic-ref", "HEAD", "refs/heads/main"]);
 
@@ -213,7 +219,10 @@ fn native_cleanup_cli_accepts_merged_receipts_and_preserves_sibling_content() {
     };
     let prepared = prepare(&request).expect("prepare independent clone fixture");
     git_ok(&prepared.clone, &["config", "user.name", "AgentCanon test"]);
-    git_ok(&prepared.clone, &["config", "user.email", "test@example.invalid"]);
+    git_ok(
+        &prepared.clone,
+        &["config", "user.email", "test@example.invalid"],
+    );
     fs::write(prepared.clone.join("topic.txt"), "topic\n").unwrap();
     git_ok(&prepared.clone, &["add", "topic.txt"]);
     git_ok(&prepared.clone, &["commit", "-m", "topic change"]);
@@ -222,6 +231,12 @@ fn native_cleanup_cli_accepts_merged_receipts_and_preserves_sibling_content() {
     let candidate_tree = git_stdout(&prepared.clone, &["rev-parse", "HEAD^{tree}"]);
     let base_sha = git_stdout(&prepared.clone, &["rev-parse", "origin/main"]);
     let base_tree = git_stdout(&prepared.clone, &["rev-parse", "origin/main^{tree}"]);
+    git_ok(&source, &["fetch", "origin", branch]);
+    git_ok(&source, &["merge", "--no-ff", "--no-edit", "FETCH_HEAD"]);
+    git_ok(&source, &["push", "origin", "main"]);
+    let merge_sha = git_stdout(&source, &["rev-parse", "HEAD"]);
+    let merge_tree = git_stdout(&source, &["rev-parse", "HEAD^{tree}"]);
+    git_ok(&prepared.clone, &["fetch", "origin", "main"]);
 
     let topic_root = parent.join("workspace").join(topic);
     let sibling = topic_root.join("keep.txt");
@@ -230,10 +245,10 @@ fn native_cleanup_cli_accepts_merged_receipts_and_preserves_sibling_content() {
     let ignore_after_drift = fs::read(parent.join(".gitignore")).unwrap();
 
     let (cas, lifecycle, readback) = publication_receipts(
-        &candidate_sha,
-        &candidate_tree,
-        &base_sha,
-        &base_tree,
+        (&candidate_sha, &candidate_tree),
+        (&base_sha, &base_tree),
+        &merge_sha,
+        &merge_tree,
         branch,
         repository,
     );
@@ -279,5 +294,8 @@ fn native_cleanup_cli_accepts_merged_receipts_and_preserves_sibling_content() {
     assert!(String::from_utf8_lossy(&output.stdout).contains("CLEANUP="));
     assert!(!prepared.clone.exists());
     assert_eq!(fs::read(&sibling).unwrap(), b"keep\n");
-    assert_eq!(fs::read(parent.join(".gitignore")).unwrap(), ignore_after_drift);
+    assert_eq!(
+        fs::read(parent.join(".gitignore")).unwrap(),
+        ignore_after_drift
+    );
 }
