@@ -656,6 +656,28 @@ mod source_root_tests {
 
     #[test]
     fn migrated_path_owner_preserves_repository_and_runtime_layouts() {
+        if std::env::var_os("AGENT_CANON_TEST_ARCHIVE_LAYOUT_ISOLATED").is_none() {
+            let mut command = std::process::Command::new(std::env::current_exe().unwrap());
+            command.args(["--exact","eval_archive_paths::source_root_tests::migrated_path_owner_preserves_repository_and_runtime_layouts","--nocapture"])
+                .env("AGENT_CANON_TEST_ARCHIVE_LAYOUT_ISOLATED","1");
+            for name in [
+                HOOK_ARCHIVE_DIR_ENV,
+                PRIVATE_LOG_ROOT_ENV,
+                SOURCE_REMOTE_ENV,
+                SOURCE_REMOTE_NAME_ENV,
+                STABLE_ID_ENV,
+            ] {
+                command.env_remove(name);
+            }
+            let output = command.output().expect("isolated archive input process");
+            assert!(
+                output.status.success(),
+                "{}\n{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+            return;
+        }
         let temporary = tempfile::tempdir().unwrap();
         let source = temporary.path().join("consumer");
         let canon = temporary.path().join("agent-canon");
