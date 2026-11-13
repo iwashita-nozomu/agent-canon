@@ -375,6 +375,16 @@ impl SourceMutationCapability {
     /// Copy one approved regular file or source symlink with copy2-style
     /// content, permission, timestamp, and available extended-attribute data.
     pub fn copy_file_with_metadata(&self, source: &Path, target: &Path) -> Result<()> {
+        self.copy_file_from_root_with_metadata(&self.source_root, source, target)
+    }
+
+    /// Copy from an explicitly selected read root into an approved target.
+    pub fn copy_file_from_root_with_metadata(
+        &self,
+        read_root: &Path,
+        source: &Path,
+        target: &Path,
+    ) -> Result<()> {
         let resolved_target = self.assert_allowed(target)?;
         let target_relative = resolved_target
             .strip_prefix(&self.source_root)
@@ -414,25 +424,21 @@ impl SourceMutationCapability {
         let source_candidate = if source.is_absolute() {
             source.to_path_buf()
         } else {
-            self.source_root.join(source)
+            read_root.join(source)
         };
-        let source_relative = source_candidate
-            .strip_prefix(&self.source_root)
-            .map_err(|_| {
+        let source_relative = source_candidate.strip_prefix(read_root).map_err(|_| {
+            SourceMutationError::new(format!(
+                "copy source is outside source root: {}",
+                source.display()
+            ))
+        })?;
+        let (source_directory, source_name) =
+            open_file_parent_nofollow(read_root, source_relative, false).map_err(|error| {
                 SourceMutationError::new(format!(
-                    "copy source is outside source root: {}",
+                    "cannot open copy source parent for {}: {error}",
                     source.display()
                 ))
             })?;
-        let (source_directory, source_name) =
-            open_file_parent_nofollow(&self.source_root, source_relative, false).map_err(
-                |error| {
-                    SourceMutationError::new(format!(
-                        "cannot open copy source parent for {}: {error}",
-                        source.display()
-                    ))
-                },
-            )?;
         let source_entry = source_directory
             .symlink_metadata(&source_name)
             .map_err(|error| {
@@ -1142,6 +1148,35 @@ fn ignored_xattr_attribute_error(error: rustix::io::Errno) -> bool {
     use rustix::io::Errno;
 
     ignored_xattr_list_error(error) || error == Errno::PERM || error == Errno::ACCESS
+}
+
+/// Create the parent of an explicit absolute file path through no-follow handles.
+pub fn ensure_file_parent_nofollow(path: &Path) -> io::Result<PathBuf> {
+    if !path.is_absolute() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "absolute output path required",
+        ));
+    }
+    let mut root = PathBuf::new();
+    let mut relative = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::Prefix(prefix) => root.push(prefix.as_os_str()),
+            Component::RootDir => root.push(std::path::MAIN_SEPARATOR.to_string()),
+            Component::Normal(name) => relative.push(name),
+            _ => {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "canonical output path required",
+                ))
+            }
+        }
+    }
+    let (_directory, _name) = open_file_parent_nofollow(&root, &relative, true)?;
+    path.parent()
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "output parent is missing"))?
+        .canonicalize()
 }
 
 fn open_file_parent_nofollow(
