@@ -65,7 +65,7 @@ These artifacts retain their own inputs, expected results, and validation.
 Codex hooks keep their behavior in [`hook_dispatcher.rs`](../../tools/runtime/dispatch/agent-canon/src/hook_dispatcher.rs)
 and append-only event records in [`hook_event_log.rs`](../../tools/runtime/dispatch/agent-canon/src/hook_event_log.rs).
 Their archive lifecycle remains with
-[`runtime_log_archive_git.py`](../../tools/runtime/archive/runtime_log_archive_git.py).
+[`runtime-log-archive-git`](../../tools/runtime/dispatch/agent-canon/src/runtime_log_archive.rs).
 Eval execution and manifest resolution remain with
 [`run_evaluation.rs`](../../tools/runtime/dispatch/agent-canon/src/run_evaluation.rs)
 and [`eval_manifest_paths.rs`](../../tools/runtime/dispatch/agent-canon/src/eval_manifest_paths.rs).

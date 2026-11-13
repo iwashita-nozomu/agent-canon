@@ -20,11 +20,11 @@ from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = "generate-agent-improvement-guide"
-sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-from tools.runtime.archive.runtime_log_paths import (
-    HOOK_ARCHIVE_DIR_ENV,
-    mounted_log_archive_root,
-)
+HOOK_ARCHIVE_DIR_ENV = "AGENT_CANON_HOOK_ARCHIVE_DIR"
+
+
+def mounted_log_archive_root(_root: Path) -> Path:
+    return Path(os.environ["AGENT_CANON_RUNTIME_ROOT"]) / "archive" / "agent-canon-log"
 
 
 class GenerateAgentImprovementGuideTest(unittest.TestCase):

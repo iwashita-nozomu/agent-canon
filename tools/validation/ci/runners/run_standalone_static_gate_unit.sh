@@ -4,7 +4,7 @@
 # responsibility Runs one standalone AgentCanon static-gate execution unit without selecting whether that unit is required.
 # upstream design ../../../../documents/runtime/runtime-profiles-and-check-matrix.md risk-based validation routing
 # upstream implementation ./run_all_checks.sh owns the full-confidence check body executed from a read-only target
-# upstream implementation ../../../../tools/runtime/archive/runtime_log_paths.py resolves the canonical eval archive destination
+# upstream implementation ../../../../tools/runtime/dispatch/agent-canon/src/eval_archive_paths.rs resolves the canonical eval archive destination
 # upstream implementation ../../../../tools/runtime/dispatch/agent-canon/src/eval_accumulation_check.rs validates accumulated hook and eval results
 # downstream implementation ../checks/check_agent_canon_pr.sh aggregates all units for the manual full-confidence route
 # downstream implementation ../../../../.github/workflows/agent-canon-static-gates.yml remote execution boundary
@@ -254,22 +254,7 @@ run_eval() (
   # Create the canonical archive's eval-results directory for CI readback,
   # using the archive owner's path resolver rather than a caller override.
   local eval_log_dir="${temp_root}/agent-eval-runs/agent-canon-pr-gate"
-  eval_results_parent="$(
-    env -u AGENT_CANON_HOOK_ARCHIVE_DIR -u AGENT_CANON_LOG_ROOT \
-      PYTHONPATH="${RUNTIME_ROOT}${PYTHONPATH:+:${PYTHONPATH}}" \
-      python3 - "${ROOT}" "${AGENT_CANON_STATIC_RUNTIME_ROOT}" <<'PY'
-from pathlib import Path
-import sys
-
-from tools.runtime.archive.runtime_log_paths import eval_results_dir
-
-print(
-    eval_results_dir(
-        Path(sys.argv[1]), "codex-agent-role", Path(sys.argv[2])
-    ).parent
-)
-PY
-  )"
+  eval_results_parent="${AGENT_CANON_STATIC_RUNTIME_ROOT}/archive/agent-canon-log/eval-results"
   mkdir -p "${eval_log_dir}" "${eval_results_parent}"
   env -u AGENT_CANON_HOOK_ARCHIVE_DIR -u AGENT_CANON_LOG_ROOT \
     AGENT_CANON_CLI="${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" \

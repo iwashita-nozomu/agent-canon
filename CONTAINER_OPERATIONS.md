@@ -234,8 +234,8 @@ external runtime-root spool. `eval collect` records run/task/source identity,
 source HEAD and unchanged result, AgentCanon/tool digest, family status, and
 metrics. It does not write source-local reports.
 
-`eval sync` uses the typed host Git adapter and the existing
-`runtime_log_archive_git.py` owner to publish to
+`eval sync` uses the host entrypoint's native
+`runtime-log-archive-git` command to publish to
 `iwashita-nozomu/agent-canon-log`. The log repository owns branch and retention
 policy. Network/archive failure keeps the spool and failure receipt for retry.
 Publication is complete only after non-force push and remote ref/tree/blob

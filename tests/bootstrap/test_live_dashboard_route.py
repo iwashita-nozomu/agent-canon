@@ -3,19 +3,21 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 import subprocess
-import sys
 from pathlib import Path
 
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "tools" / "agent_tools"))
-from tools.agent.orchestration.tool_calls import (
-    build_issue_receipt_stage_command,  # noqa: E402
-)
-from tools.runtime.archive.runtime_log_paths import repo_log_key  # noqa: E402
+
+
+def repo_log_key(_root: Path) -> str:
+    """Return the frozen key for this test's canonical source remote."""
+    identity = "github.com/example/live-target"
+    readable = identity.replace("/", "-")
+    return f"{readable}-{hashlib.sha256(identity.encode()).hexdigest()[:24]}"
 
 LIVE_DOCKER = os.environ.get("AGENT_CANON_LIVE_DOCKER") == "1"
 
@@ -195,28 +197,45 @@ def test_resident_dashboard_route_uses_target_and_private_archive(
             "head": target_head,
             "remote": "example/live-target",
         }
-        command_common = {
-            "repository": "example/live-target",
-            "runtime_root": str(control / "runtime"),
-            "agentcanon_source_root": str(source),
-            "target_root": str(target),
-            "control_parent_root": str(control),
-            "checkout_identity": checkout_identity,
-            "bootstrap": str(source / "bootstrap.sh"),
-        }
-        materialized_preflight = build_issue_receipt_stage_command(
-            **command_common,
-            execution="run",
-            preflight=True,
-        )
-        materialized_stage = build_issue_receipt_stage_command(
-            **command_common,
-            number="<issue-number>",
-            url="<issue-url>",
-            state="<issue-state>",
-            action="<issue-action>",
-            execution="run",
-        )
+        command_prefix = [
+            str(source / "bootstrap.sh"),
+            "--control-parent-root",
+            str(control),
+            "--runtime-root",
+            str(control / "runtime"),
+            "tool",
+            "run",
+            "--root",
+            str(target),
+            "issue-sync",
+            "--",
+        ]
+        materialized_preflight = [
+            *command_prefix,
+            "--receipt-preflight",
+            "--checkout-head",
+            checkout_identity["head"],
+            "--checkout-repository",
+            checkout_identity["remote"],
+        ]
+        materialized_stage = [
+            *command_prefix,
+            "--stage-publication-receipt",
+            "--repo",
+            "example/live-target",
+            "--receipt-number",
+            "<issue-number>",
+            "--receipt-url",
+            "<issue-url>",
+            "--receipt-state",
+            "<issue-state>",
+            "--receipt-action",
+            "<issue-action>",
+            "--checkout-head",
+            checkout_identity["head"],
+            "--checkout-repository",
+            checkout_identity["remote"],
+        ]
         assert materialized_preflight[
             materialized_preflight.index("--root") + 1
         ] == str(target)
