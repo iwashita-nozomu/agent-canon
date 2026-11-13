@@ -170,6 +170,7 @@ Commands:
   check-solid-evidence [paths...] [--root ROOT] [--changed] [--base-ref BASE_REF] [--evidence EVIDENCE] [--exclude EXCLUDE] [--verbose] [--format text|json]
   rust-migration-audit --root <repo-root>
   github-status-lifecycle --repo OWNER/REPO --issue NUMBER --facts-json PATH [options]
+  reference-materializer --url URL [--input PATH|--fetch] [options]
   repo-structure-contract [--root ROOT] [--contract PATH] [options]
   check-agent-canon-log-policy [--input PATH|--remote URL] [--commit SHA]
   wiki-publish --wiki-root PATH --source-root PATH --source-commit SHA [options]
@@ -406,6 +407,9 @@ fn main() {
     }
     if args.len() >= 2 && args[1] == "github-status-lifecycle" {
         std::process::exit(agent_canon::github_status_lifecycle::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "reference-materializer" {
+        std::process::exit(agent_canon::reference_materializer::run(&args[2..]));
     }
     if args.len() >= 2 && args[1] == "repo-structure-contract" {
         std::process::exit(agent_canon::repo_structure_contract::run(&args[2..]));
