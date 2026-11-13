@@ -119,6 +119,7 @@ Usage: agent-canon <command> [arguments]
 
 Commands:
   evaluate-codex-agent-roles [--root ROOT] [--runtime-root PATH] [--accumulate] [--format text|json]
+  check-agent-runtime-alignment [--root ROOT] [--format text|json]
   evaluate-workflow-selection [--root ROOT] [--manifest PATH] [--accumulate] [--runtime-root PATH]
   check-skill-tool-invocation-graph [--root ROOT]
   skill-dependency-map <check|graph> [options]
@@ -433,6 +434,9 @@ fn main() {
     }
     if args.len() >= 2 && args[1] == agent_canon::codex_agent_role_eval::SELECTOR {
         std::process::exit(agent_canon::codex_agent_role_eval::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "check-agent-runtime-alignment" {
+        std::process::exit(agent_canon::runtime_alignment::run(&args[2..]));
     }
     if args.len() >= 2 && args[1] == agent_canon::server_readiness::SELECTOR {
         std::process::exit(agent_canon::server_readiness::run(&args[2..]));

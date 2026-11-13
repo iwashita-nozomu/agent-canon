@@ -255,7 +255,7 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                 (
                     "workflow family and role candidates",
                     "agents/task_catalog.yaml",
-                    "check_agent_runtime_alignment.py",
+                    "tools/bin/agent-canon check-agent-runtime-alignment",
                 ),
                 (
                     "task bootstrap and CLI entrypoints",
@@ -268,7 +268,7 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                 (
                     "role behavior and stage conditions",
                     ".codex/agents/*.toml",
-                    "check_agent_runtime_alignment.py",
+                    "tools/bin/agent-canon check-agent-runtime-alignment",
                 ),
                 (
                     "skill routing and public skill surface",
@@ -330,12 +330,12 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                 (
                     "workflow family and role candidates",
                     "agents/task_catalog.yaml",
-                    "check_agent_runtime_alignment.py",
+                    "tools/bin/agent-canon check-agent-runtime-alignment",
                 ),
                 (
                     "public skill registry",
                     "agents/skills/catalog.yaml",
-                    "check_agent_runtime_alignment.py",
+                    "tools/bin/agent-canon check-agent-runtime-alignment",
                 ),
                 (
                     "AgentCanon update transaction",

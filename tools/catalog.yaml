@@ -1841,12 +1841,12 @@ entries:
 
   - id: check-agent-runtime-alignment
     summary: Verifies runtime entrypoints and agent config mirrors stay aligned.
-    path: tools/validation/semantic/runtime/check_agent_runtime_alignment.py
+    path: tools/runtime/dispatch/agent-canon/src/runtime_alignment.rs
     family: agent_tools
     role: checker
     status: canonical
-    command: python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py
-    dispatch: {argv: ["python3", "tools/validation/semantic/runtime/check_agent_runtime_alignment.py"]}
+    command: tools/bin/agent-canon check-agent-runtime-alignment
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "check-agent-runtime-alignment"]}
     writes: false
     default_wiring:
       ci: false

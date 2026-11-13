@@ -49,7 +49,7 @@ paths = [
   "templates/**",
 ]
 protecting_tools = [
-  "tools/validation/semantic/runtime/check_agent_runtime_alignment.py",
+  "tools/runtime/dispatch/agent-canon/src/runtime_alignment.rs",
 ]
 issues = []
 

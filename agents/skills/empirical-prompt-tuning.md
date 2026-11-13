@@ -9,7 +9,7 @@ upstream implementation ./skill-dependencies.yaml prerequisites and routing rela
 upstream design ../../documents/design/responsibility-rationale.md evidence-based instruction revision
 upstream design ./research-workflow.md selection and final evaluation boundary
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_materialization.rs generated runtime discovery shim
-downstream implementation ../../tools/validation/semantic/runtime/check_agent_runtime_alignment.py skill readback
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/runtime_alignment.rs skill readback
 @dependency-end
 -->
 

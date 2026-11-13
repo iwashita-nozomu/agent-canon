@@ -723,6 +723,7 @@ def test_workflow_unit_passes_selected_native_cli_to_source_wrapper(
 ) -> None:
     fixture_root = executable_fixture_root(tmp_path)
     root = fixture_root / "target with spaces"
+    root.mkdir()
     cache = fixture_root / "cache with spaces"
     wrapper = root / "tools/bin/agent-canon"
     wrapper.parent.mkdir(parents=True)
@@ -787,16 +788,8 @@ def test_contract_unit_passes_selected_native_cli_to_alignment(
 ) -> None:
     fixture_root = executable_fixture_root(tmp_path)
     root = fixture_root / "target with spaces"
+    root.mkdir()
     cache = fixture_root / "cache with spaces"
-    alignment = (
-        root / "tools/validation/semantic/runtime/check_agent_runtime_alignment.py"
-    )
-    alignment.parent.mkdir(parents=True)
-    alignment.write_text(
-        "import os, subprocess, sys\n"
-        "result = subprocess.run([os.environ['AGENT_CANON_CLI'], 'codex-hook', '--contract'])\n"
-        "sys.exit(result.returncode)\n"
-    )
     (cache / "bin").mkdir(parents=True)
     for label, path in (
         ("default", cache / "bin/agent-canon"),
@@ -804,7 +797,7 @@ def test_contract_unit_passes_selected_native_cli_to_alignment(
     ):
         path.write_text(
             "#!/usr/bin/env bash\n"
-            'if [[ "$1" == codex-hook ]]; then\n'
+            'if [[ "$1" == check-agent-runtime-alignment ]]; then\n'
             '  printf "' + label + '\\n" > "$SELECTED"\n'
             '  printf "%s\\n" "$@" > "$CALLS"\n'
             '  exit "$CHECKER_EXIT"\n'
@@ -817,12 +810,7 @@ def test_contract_unit_passes_selected_native_cli_to_alignment(
         + text.split("run_contracts() {", 1)[1].split("\n}\n\nrun_eval()", 1)[0]
         + "\n}\n"
     )
-    setup = (
-        "unset AGENT_CANON_NATIVE_BIN\n"
-        "node() { :; }\n"
-        'python3() { if [[ "$1" == *check_agent_runtime_alignment.py ]]; then '
-        'command python3 "$@"; fi; }\n'
-    )
+    setup = "unset AGENT_CANON_NATIVE_BIN\nnode() { :; }\npython3() { :; }\n"
     if explicit_cli:
         setup += (
             "export AGENT_CANON_CLI="
@@ -844,7 +832,11 @@ def test_contract_unit_passes_selected_native_cli_to_alignment(
     )
     assert result.returncode == checker_exit, result.stderr
     assert selected.read_text().strip() == ("explicit" if explicit_cli else "default")
-    assert calls.read_text().splitlines() == ["codex-hook", "--contract"]
+    assert calls.read_text().splitlines() == [
+        "check-agent-runtime-alignment",
+        "--root",
+        str(root),
+    ]
 
 
 def test_runner_places_xdg_cache_under_the_task_runtime() -> None:

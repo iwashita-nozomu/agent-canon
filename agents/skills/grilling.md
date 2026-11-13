@@ -8,7 +8,7 @@ upstream design ./agent-orchestration.md owns fact discovery and the existing po
 upstream implementation ./catalog.yaml owns public skill identity and explicit trigger metadata
 upstream implementation ./skill-dependencies.yaml owns the public-skill dependency relation
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_materialization.rs generates the runtime discovery shim
-downstream implementation ../../tools/validation/semantic/runtime/check_agent_runtime_alignment.py validates source/catalog/shim alignment
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/runtime_alignment.rs validates source/catalog/shim alignment
 @dependency-end
 -->
 

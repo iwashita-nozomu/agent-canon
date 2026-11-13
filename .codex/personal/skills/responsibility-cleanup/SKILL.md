@@ -2,7 +2,7 @@
 name: responsibility-cleanup
 description: "Use when cleanup requires tree observation, source/view/generated/project/personal boundary classification, dependency closure, responsibility-unit dispatch, integration, or re-review."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"aa99927838b2ff784aa0761281e75e1680d0791078889479d966a8a42b473af0"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"6a7f4d15556a2d8302978edb6a065d063901bd54f470c394d9f636b29f7ff8e5"} -->
 
 <!--
 @dependency-start

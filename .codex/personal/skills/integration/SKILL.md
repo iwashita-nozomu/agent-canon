@@ -2,7 +2,7 @@
 name: integration
 description: "Use when a completed local branch must be integrated into its base or a conflict must be resolved."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"8c60f5a5b3b4b23fcf331c96b71a93a2faf25c3cc2a12274d1f0768403592a35"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"1b8cda0862b08bb1498b0d903a4fadae0394465936f96e46e2eb1929c9df52bb"} -->
 
 <!--
 @dependency-start
