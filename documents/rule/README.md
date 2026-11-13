@@ -10,7 +10,7 @@ downstream design directory-structure.md document placement and authority owner
 downstream design dependency-module-changes.md dependency identity and pin owner
 downstream design repository-topic-clone.md generic checkout lifecycle owner
 downstream implementation ../../tools/validation/semantic/convention/check_convention_compliance.py convention validation
-downstream implementation ../../tools/validation/semantic/structure/repo_structure_contract.py structure validation
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/repo_structure_contract.rs structure validation
 @dependency-end
 -->
 

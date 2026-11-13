@@ -170,6 +170,8 @@ Commands:
   check-solid-evidence [paths...] [--root ROOT] [--changed] [--base-ref BASE_REF] [--evidence EVIDENCE] [--exclude EXCLUDE] [--verbose] [--format text|json]
   rust-migration-audit --root <repo-root>
   github-status-lifecycle --repo OWNER/REPO --issue NUMBER --facts-json PATH [options]
+  repo-structure-contract [--root ROOT] [--contract PATH] [options]
+  check-agent-canon-log-policy [--input PATH|--remote URL] [--commit SHA]
   wiki-publish --wiki-root PATH --source-root PATH --source-commit SHA [options]
   orphan-lifecycle <inventory|authorize-cleanup> [options]
   update-latest-result RESULT_ROOT --variant VARIANT [--result-dir PATH]
@@ -178,6 +180,7 @@ Commands:
   sync-experiment-registry-context --topic TOPIC [options]
   create-experiment-topic <topic> [options]
   server-readiness [--layout <layout.toml>]
+  environment-dependencies <validate|dry-run|install|boundary|project-install|image-install|image-verify> [options]
   check-skill-frontmatter [--root ROOT] [--format text|json]
   chatgpt-codex-route --input <packet.json|->
   rust-migration-plan --root <repo-root> [--limit N] [--format text|json]
@@ -285,6 +288,9 @@ fn main() {
     }
     if args.len() >= 2 && args[1] == "html-artifact-access" {
         std::process::exit(agent_canon::html_artifact_access::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "environment-dependencies" {
+        std::process::exit(agent_canon::environment_dependencies::run_cli(&args[2..]));
     }
     if args.len() >= 2 && args[1] == "check-skill-tool-invocation-graph" {
         std::process::exit(catalog::skill_dependency_graph::run(&args[2..]));
@@ -400,6 +406,12 @@ fn main() {
     }
     if args.len() >= 2 && args[1] == "github-status-lifecycle" {
         std::process::exit(agent_canon::github_status_lifecycle::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "repo-structure-contract" {
+        std::process::exit(agent_canon::repo_structure_contract::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "check-agent-canon-log-policy" {
+        std::process::exit(agent_canon::log_policy::run(&args[2..]));
     }
     if args.len() >= 2 && args[1] == "wiki-publish" {
         std::process::exit(agent_canon::wiki_publish::run(&args[2..]));
