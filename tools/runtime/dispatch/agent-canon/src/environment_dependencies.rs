@@ -8584,7 +8584,7 @@ mod tests {
                 std::process::id()
             ));
             fs::create_dir_all(&path).expect("temporary root is created");
-            Self(path)
+            Self(path.canonicalize().expect("temporary root is canonical"))
         }
 
         fn write_manifest(&self, relative: &str, text: &str) -> PathBuf {
@@ -9980,7 +9980,7 @@ output_contains = "1.0.0"
         .contains("duplicate Python extra"));
     }
 
-    #[cfg(unix)]
+    #[cfg(target_os = "linux")]
     #[test]
     fn parent_owned_install_receipt_round_trips_and_is_removed_through_authority() {
         let root = TempRoot::new();
