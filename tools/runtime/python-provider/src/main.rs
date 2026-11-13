@@ -12,6 +12,8 @@ use std::io::{self, Read};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
+mod proof_trace_alignment;
+
 #[derive(Default)]
 struct HtmlText {
     title: Vec<String>,
@@ -139,6 +141,17 @@ fn main() {
         );
         std::process::exit(2);
     };
+    if command == "proof-trace-alignment"
+        && args.len() == 5
+        && ["text", "json"].contains(&args[4].as_str())
+    {
+        std::process::exit(proof_trace_alignment::run(
+            args[1].clone().into(),
+            &args[2],
+            &args[3],
+            &args[4],
+        ));
+    }
     let result = match command {
         "runtime" if args.len() == 1 => Python::attach(runtime),
         "pdf-extract" | "html-extract" if args.len() == 1 => {
