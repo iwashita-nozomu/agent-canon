@@ -835,7 +835,7 @@ entries:
       - documents/tools/repo_structure_contract.md
       - documents/structure/repo-structure-contract.toml
     tests:
-      - tests/agent_tools/test_repo-structure-contract
+      - tests/agent_tools/test_repo_structure_contract.py
 
   - id: github-publish
     public: true
