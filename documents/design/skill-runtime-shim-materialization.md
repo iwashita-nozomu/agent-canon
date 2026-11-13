@@ -10,7 +10,7 @@ upstream design ../../agents/canonical/skills.md public skill reader/index bound
 upstream design ./skill-tool-invocation-graph.md skill/tool identity, graph projection, and readback contract
 upstream design ../../documents/codex/prompt-skill-evaluation-checklist.md fresh evaluator and report contract
 downstream implementation ../../tools/agent/orchestration/route.py deterministic catalog-backed route consumer
-downstream implementation ../../tools/agent/skills/skill_dependency_map.py graph materializer and semantic golden producer
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs native graph materializer and semantic golden producer
 downstream implementation ../../tools/validation/semantic/runtime/check_agent_runtime_alignment.py host-discovery and catalog/shim parity checker
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_materialization.rs native v3 readback renderer and byte comparison
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/skill_frontmatter.rs native frontmatter compatibility command
@@ -120,7 +120,7 @@ materializer はその target だけを生成し、`.codex/config.toml` に skil
 | canonical prose | agents/skills/<skill>.md | 相対 link と digest | canonical rules のコピー |
 | trigger / route identity | catalog.yaml#skill:<id>.routing と route.py | route locator と route digest | trigger 配列、keyword matcher、route decision |
 | dependencies | skill-dependencies.yaml | invocation locator と digest | prerequisite/successor の再掲 |
-| graph identity / edge | skill_dependency_map.py の source universe | 参照用 graph locator | graph edge の再 materialize |
+| graph identity / edge | `skill_dependency_graph.rs` の source universe | 参照用 graph locator | graph edge の再 materialize |
 
 [agents/canonical/skills.md](../../agents/canonical/skills.md) は index/read parity の projection であり（正本: `agents/skills/catalog.yaml`）、catalog-derived な
 identity source ではありません。[documents/design/skill-tool-invocation-graph.md](skill-tool-invocation-graph.md)
@@ -480,9 +480,9 @@ projection equality とします。raw digest の変化は別の `source_digest_
   deferred/matched skill IDs、invocation order、reason/evidence refs、responsibility
   groups、ToolCall refs を exact canonical JSON として比較する。表示用 absolute path、
   run ID、timestamp は projection から除外する。
-- graph JSON/Mermaid は `skill_dependency_map.py graph --root . --runtime-root
+- graph JSON/Mermaid は `tools/bin/agent-canon skill-dependency-map graph --root . --runtime-root
   <external-runtime-root>` で外部 runtime artifact として再生成し、
-  skill_dependency_graph.rs の source/materialized/readback equality を
+  native graph owner の source/materialized/readback equality を
   通す。tracked reader pair を更新する保守操作だけは、固定2ファイルの
   source-mutation capability と外部 before/after evidence を明示する。generated graph を
   手編集しない。
@@ -849,8 +849,8 @@ Wave 4 design の validation evidence は次です。
 ~~~bash
 python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py
 tools/bin/agent-canon check-skill-frontmatter --root .
-python3 tools/agent/skills/skill_dependency_map.py check --root .
-python3 tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs --root .
+tools/bin/agent-canon skill-dependency-map check --root .
+tools/bin/agent-canon check-skill-tool-invocation-graph --root .
 tools/bin/agent-canon evaluate-workflow-selection \
   --root . --manifest eval/definitions/workflow_selection_eval.toml \
   --report-out <run-dir>/workflow-selection.md
@@ -903,7 +903,7 @@ python3 eval/producers/skill_shim_evaluation.py tokens \
 | SHIM-005b native owner preservation | graph/native-route owner | native CLI/API/script owner and [skill-tool-invocation-graph.md](skill-tool-invocation-graph.md) | native route and process guarantees remain owner-owned; no private command schema in shim |
 | SHIM-006 host discovery preservation | runtime alignment | `.codex/personal/skills/*/SKILL.md`, check_agent_runtime_alignment.py | catalog-sized shim paths、frontmatter pass、project config skill registry absent |
 | SHIM-008 all-catalog migration/readback | migration route | `tools/agent/skills/skill_shim_materializer.py` migrate/readback and tests | catalog-sized row receipt, unresolved=0 |
-| SHIM-009 graph/route golden | graph and route checkers | skill_dependency_map.py, skill_dependency_graph.rs, frozen route cases | typed identity/edge/order/route equality |
+| SHIM-009 graph/route golden | graph and route checkers | native skill-dependency-graph command, native graph checker, frozen route cases | typed identity/edge/order/route equality |
 | SHIM-010 token reduction | prompt eval owner | existing prompt/workflow CLIs plus planned skill_shim_evaluation.py tokens | observed host usage, UTF-8 bytes/Unicode scalars, envelope/cache observation, percentile/paired rows; metric status uses aggregate >=70% |
 | SHIM-011 fresh mini usability | evaluator route | planned skill_shim_evaluation.py packets; checklist full/changed packet classes | three scenario variants in two packet classes, no prior context, fixed report grammar |
 | SHIM-012 no keyword/duplicate policy | route and checker tests | route tests plus shim materializer negative tests | keyword-only route and canonical-prose-in-adapter both fail |

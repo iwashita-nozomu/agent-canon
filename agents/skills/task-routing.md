@@ -11,7 +11,7 @@ downstream implementation ../../tools/agent/orchestration/route.py selects short
 downstream implementation ../../tests/agent_tools/test_task_routing_fast_path.py validates packet-free ordinary routing
 upstream design ./skill-dependencies.yaml owns typed skill prerequisites, successors, order, and parallel relations
 downstream implementation ../../tools/agent/skills/skill_route_catalog.py derives invocation order
-downstream implementation ../../tools/agent/skills/skill_dependency_map.py validates and generates dependency graph
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs validates and generates the dependency graph
 @dependency-end
 -->
 

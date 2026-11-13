@@ -6,7 +6,7 @@ responsibility Audits CI, hooks, public skills, catalog routing, adapters, and r
 upstream design ../README.md owns unit closure and semantic routing boundary
 upstream design ../../design/parent-repository-audit.md owns capability and dependency edge design
 upstream implementation ../../../agents/skills/agent-orchestration.md owns orchestrator and delegation contract
-downstream implementation ../../../tools/agent/skills/skill_shim_materializer.py and ../../../tools/agent/skills/skill_dependency_map.py own projections
+downstream implementation ../../../tools/agent/skills/skill_shim_materializer.py and ../../../tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs own projections
 @dependency-end
 -->
 
@@ -34,7 +34,7 @@ semantic route と typed tool command を持つ。shim は薄い adapter で、c
 - `agents/skills/skill-dependencies.yaml`
 - `.codex/personal/skills/*/SKILL.md`
 - `tools/agent/skills/skill_shim_materializer.py`
-- `tools/agent/skills/skill_dependency_map.py`
+- `tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs`
 - `.github/`、hooks、`check_agent_runtime_alignment.py`
 
 ## Repair Route

@@ -121,6 +121,7 @@ Commands:
   evaluate-codex-agent-roles [--root ROOT] [--runtime-root PATH] [--accumulate] [--format text|json]
   evaluate-workflow-selection [--root ROOT] [--manifest PATH] [--accumulate] [--runtime-root PATH]
   check-skill-tool-invocation-graph [--root ROOT]
+  skill-dependency-map <check|graph> [options]
   knowledge|k <search|read|add|status|sync|capture>
   feedback|f <add|status|sync|capture>
   graph <build|status|query|context> [options]
@@ -273,6 +274,9 @@ fn main() {
     }
     if args.len() >= 2 && args[1] == "check-skill-tool-invocation-graph" {
         std::process::exit(catalog::skill_dependency_graph::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "skill-dependency-map" {
+        std::process::exit(catalog::skill_dependency_graph::run_graph_cli(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "tool" {

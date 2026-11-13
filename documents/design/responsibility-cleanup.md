@@ -15,7 +15,7 @@ downstream implementation ../../agents/skills/README.md AgentCanon-specific skil
 downstream implementation ../../agents/skills/catalog.yaml public skill registry
 downstream implementation ../../agents/skills/skill-dependencies.yaml public skill dependency DAG
 downstream implementation ../../tools/agent/skills/skill_shim_materializer.py generated shim materializer
-downstream implementation ../../tools/agent/skills/skill_dependency_map.py generated graph materializer
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs native graph materializer
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs graph readback checker
 @dependency-end
 -->
@@ -212,7 +212,7 @@ Git に未収録の変更・untracked の作業とユーザー/runtime データ
 | RC-02 dependency closure and responsibility boundary | `responsibility-cleanup` / `dependency-analysis` | [documents/design/responsibility-cleanup.md](responsibility-cleanup.md) 責務境界と依存 | 依存と利用側を含む完成状態 |
 | RC-03 environment route | `environment-cleanup` | [agents/skills/dependency-design.md](../../agents/skills/dependency-design.md), [agents/skills/environment-maintenance.md](../../agents/skills/environment-maintenance.md) | dependency design と maintenance validation |
 | RC-04 code route | `code-cleanup` | [agents/skills/dependency-analysis.md](../../agents/skills/dependency-analysis.md), [agents/skills/refactor-loop.md](../../agents/skills/refactor-loop.md), [agents/skills/change-review.md](../../agents/skills/change-review.md) | impact、refactor、review の連続 evidence |
-| RC-05 skill route | `$skill-creator` / [Updating Skills](../../agents/skills/README.md#updating-skills) | `agents/skills/catalog.yaml`, `.codex/config.toml`, `agents/skills/skill-dependencies.yaml`, `tools/agent/skills/skill_shim_materializer.py`, `tools/agent/skills/skill_dependency_map.py` | 標準委譲、必要なsource保守とcaller移行、shim/graph・host inputのreadback、該当する独立評価 |
+| RC-05 skill route | `$skill-creator` / [Updating Skills](../../agents/skills/README.md#updating-skills) | `agents/skills/catalog.yaml`, `.codex/config.toml`, `agents/skills/skill-dependencies.yaml`, `tools/agent/skills/skill_shim_materializer.py`, `tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs` | 標準委譲、必要なsource保守とcaller移行、shim/graph・host inputのreadback、該当する独立評価 |
 | RC-06 existing-owner reuse | `responsibility-cleanup` | [agents/skills/document-canon-cleanup.md](../../agents/skills/document-canon-cleanup.md), [agents/skills/worktree-health.md](../../agents/skills/worktree-health.md), [agents/skills/agent-log-analysis.md](../../agents/skills/agent-log-analysis.md), [agents/skills/runtime-log-repair.md](../../agents/skills/runtime-log-repair.md), [agents/skills/result-artifact-writeout.md](../../agents/skills/result-artifact-writeout.md) | reuse route と既存 receipt |
 | RC-07 external evidence and rollback | owner-selected specialist | unit `external_tools`, `rollback`、`handoff` | primary source/version/license/security と rollback readback |
 | RC-08 integration and re-review | `agent-orchestration` / `change-review` | generated projections、tree/commit readback、review packet | final owner/review/validation readback |
