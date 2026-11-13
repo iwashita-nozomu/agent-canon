@@ -73,9 +73,9 @@ summary = "Semantic vector index and Eval harness documentation."
 [[tool]]
 id = "semantic-provider-html-report"
 classification = "public"
-tool = "tools/runtime/dispatch/agent-canon/src/semantic_index/provider_html_report.rs"
+tool = "tools/runtime/dispatch/agent-canon/src/semantic_index/semantic_provider_html_report.rs"
 doc = "documents/tools/semantic_provider_html_report.md"
-language = "python"
+language = "rust"
 summary = "HTML renderer for semantic-index provider comparison evidence."
 
 [[tool]]

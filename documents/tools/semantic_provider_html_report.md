@@ -7,7 +7,7 @@ upstream design ./semantic_index.md defines semantic provider comparison and can
 upstream design ../../agents/skills/html-output.md owns HTML artifact generation and validation
 upstream environment ../../bootstrap/container/image/dependencies.toml supplies Quarto, embedded Pandoc, and the offline link checker
 upstream design ../prose-reasoning-graph/dsl-spec.md defines shared graph visualization projection and adapter contract
-upstream implementation ../../tools/runtime/dispatch/agent-canon/src/semantic_index/provider_html_report.rs renders provider comparison HTML
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/semantic_index/semantic_provider_html_report.rs renders provider comparison HTML
 downstream implementation ../../tests/agent_tools/test_semantic_provider_html_report.py tests renderer behavior
 @dependency-end
 -->

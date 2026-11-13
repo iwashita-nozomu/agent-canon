@@ -397,7 +397,7 @@ fn main() {
         std::process::exit(migration_audit::run(&args[2..]));
     }
     if args.len() >= 2 && args[1] == "semantic-provider-html-report" {
-        std::process::exit(semantic_index::provider_html_report::run(&args[2..]));
+        std::process::exit(semantic_index::semantic_provider_html_report::run(&args[2..]));
     }
     if args.len() >= 2 && args[1] == agent_canon::codex_agent_role_eval::SELECTOR {
         std::process::exit(agent_canon::codex_agent_role_eval::run(&args[2..]));

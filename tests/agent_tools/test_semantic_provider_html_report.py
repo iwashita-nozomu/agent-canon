@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests semantic provider HTML report rendering.
-# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/semantic_index/provider_html_report.rs renders semantic provider comparison HTML
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/semantic_index/semantic_provider_html_report.rs renders semantic provider comparison HTML
 # upstream design ../../agents/skills/html-output.md owns HTML artifact generation and validation
 # upstream design ../../documents/tools/semantic_index.md defines semantic provider comparison authority boundaries
 # @dependency-end

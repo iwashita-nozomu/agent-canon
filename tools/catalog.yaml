@@ -1278,7 +1278,7 @@ entries:
   - id: semantic-provider-html-report
     public: true
     summary: Renders semantic-index compare-providers JSON through Quarto as a static HTML projection report with the provider-delta-to-shared-candidate-logic SVG; local resources stay beside the HTML unless --embed-resources is requested.
-    path: tools/runtime/dispatch/agent-canon/src/semantic_index/provider_html_report.rs
+    path: tools/runtime/dispatch/agent-canon/src/semantic_index/semantic_provider_html_report.rs
     family: agent_tools
     role: docs
     status: canonical
