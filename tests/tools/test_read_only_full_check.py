@@ -311,6 +311,7 @@ def test_full_unit_preserves_body_status_without_target_mutation(
             "AGENT_CANON_TARGET_ROOT": str(target),
             "AGENT_CANON_CONTROL_PARENT_ROOT": str(control),
             "AGENT_CANON_RUNTIME_ROOT": str(runtime),
+            "TMPDIR": str(runtime / "tmp"),
             "AGENT_CANON_CACHE_ROOT": str(control / "cache"),
             "CARGO_HOME": str(control / "cache" / "cargo"),
             "RUSTUP_HOME": str(control / "image" / "rustup"),

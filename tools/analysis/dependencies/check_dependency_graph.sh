@@ -38,9 +38,14 @@ fail_runtime_boundary() {
 
 runtime_path() {
   local candidate="$1"
-  "${AGENT_CANON_NATIVE_BIN:-${AGENT_CANON_CLI:-${CANON_SOURCE_ROOT}/tools/bin/agent-canon}}" \
+  local resolved
+  if ! resolved="$("${AGENT_CANON_NATIVE_BIN:-${AGENT_CANON_CLI:-${CANON_SOURCE_ROOT}/tools/bin/agent-canon}}" \
     runtime-paths path --source-root "$CANON_SOURCE_ROOT" --target-root "$ROOT_DIR" \
-    --control-parent-root "$CONTROL_ROOT" --runtime-root "$RUNTIME_ROOT" --candidate "$candidate"
+    --control-parent-root "$CONTROL_ROOT" --runtime-root "$RUNTIME_ROOT" --candidate "$candidate" 2>&1)"; then
+    printf 'runtime boundary invalid: %s\n' "$resolved" >&2
+    return 2
+  fi
+  printf '%s\n' "$resolved"
 }
 
 write_runtime_file() {
