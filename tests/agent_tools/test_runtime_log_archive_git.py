@@ -100,7 +100,7 @@ LIFECYCLE_REVERSE_COVERAGE = {
         "RL-015",
     },
     "tests/tools/test_bootstrap_container_contract.py": {"RL-002", "RL-004"},
-    "tests/bootstrap/test_bootstrap_runtime.py": {"RL-002", "RL-004"},
+    "tools/runtime/dispatch/agent-canon/tests/bootstrap_runtime_native.rs": {"RL-002", "RL-004"},
     "tools/runtime/archive/runtime_log_archive_git.py": {
         "RL-004",
         "RL-005",
@@ -111,7 +111,7 @@ LIFECYCLE_REVERSE_COVERAGE = {
         "RL-013",
         "RL-015",
     },
-    "tools/runtime/container/bootstrap_runtime.py": {"RL-002", "RL-004"},
+    "tools/runtime/dispatch/agent-canon/src/bootstrap_runtime.rs": {"RL-002", "RL-004"},
 }
 from tools.runtime.archive import runtime_log_archive_git  # noqa: E402
 

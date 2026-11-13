@@ -41,7 +41,8 @@ const PYTHON_SUFFIXES: &[&str] = &[".py", ".pyi"];
 const CONTAINER_PREFIXES: &[&str] = &["docker/", "bootstrap/", "tests/bootstrap/"];
 const CONTAINER_PATHS: &[&str] = &[
     "bootstrap.sh",
-    "tools/runtime/container/bootstrap_runtime.py",
+    "tools/runtime/dispatch/agent-canon/src/bootstrap_runtime.rs",
+    "tools/runtime/dispatch/agent-canon/tests/bootstrap_runtime_native.rs",
     "tools/runtime/container/compile.sh",
     "tests/tools/test_bootstrap_container_contract.py",
     "tests/tools/test_compile_cache.py",
@@ -65,7 +66,7 @@ const EVAL_PATHS: &[&str] = &[
     "bootstrap.sh",
     "bootstrap/host/manifest.toml",
     "bootstrap/host/lifecycle/entrypoint.sh",
-    "tools/runtime/container/bootstrap_runtime.py",
+    "tools/runtime/dispatch/agent-canon/src/bootstrap_runtime.rs",
     "tools/runtime/archive/runtime_log_archive_git.py",
     "tools/runtime/archive/github_eval_delivery.py",
 ];
@@ -185,7 +186,7 @@ pub fn classify(paths: &[String]) -> Vec<PathRisk> {
             reason: "container_runtime_surface_changed",
             checks: &[
                 "python3 -m pytest -q tests/tools/test_bootstrap_container_contract.py",
-                "python3 -m pytest -q tests/bootstrap/test_bootstrap_runtime.py",
+                "cargo test --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --test bootstrap_runtime_native",
             ],
         });
     }

@@ -85,6 +85,7 @@ pub mod skill_frontmatter;
 // API uses only the newline and source-offset helpers from this owner.
 pub mod agent_canon_source_root;
 pub mod behavior_event_assembly;
+pub mod bootstrap_runtime;
 pub mod environment_dependencies;
 pub mod eval_accumulation_check;
 pub mod eval_archive_paths;

@@ -105,7 +105,7 @@ class ClassifyPathRiskTest(unittest.TestCase):
                     "reason": "container_runtime_surface_changed",
                     "checks": [
                         "python3 -m pytest -q tests/tools/test_bootstrap_container_contract.py",
-                        "python3 -m pytest -q tests/bootstrap/test_bootstrap_runtime.py",
+                        "cargo test --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --test bootstrap_runtime_native",
                     ],
                 },
                 {

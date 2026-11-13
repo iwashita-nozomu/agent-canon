@@ -173,6 +173,7 @@ Commands:
   create-experiment-topic <topic> [options]
   server-readiness [--layout <layout.toml>]
   environment-dependencies <validate|dry-run|install|boundary|project-install|image-install|image-verify> [options]
+  bootstrap-runtime --repository-root ROOT --control-parent-root ROOT --runtime-root ROOT <command> [options]
   check-skill-frontmatter [--root ROOT] [--format text|json]
   chatgpt-codex-route --input <packet.json|->
   rust-migration-plan --root <repo-root> [--limit N] [--format text|json]
@@ -274,6 +275,9 @@ fn main() {
     }
     if args.len() >= 2 && args[1] == "environment-dependencies" {
         std::process::exit(agent_canon::environment_dependencies::run_cli(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "bootstrap-runtime" {
+        std::process::exit(agent_canon::bootstrap_runtime::run(&args[2..]));
     }
     if args.len() >= 2 && args[1] == "check-skill-tool-invocation-graph" {
         std::process::exit(catalog::skill_dependency_graph::run(&args[2..]));

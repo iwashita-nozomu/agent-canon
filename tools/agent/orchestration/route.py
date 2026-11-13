@@ -156,7 +156,7 @@ AREA_DATA: tuple[AreaData, ...] = (
             "./bootstrap.sh --control-parent-root <parent> status",
             "docker build -f docker/Dockerfile -t <project-image> . && docker run --rm <project-image> test/testrunner.sh",
             "python3 -m pytest -q tests/tools/test_bootstrap_container_contract.py",
-            "python3 -m pytest -q tests/bootstrap/test_bootstrap_runtime.py",
+            "cargo test --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --test bootstrap_runtime_native",
         ),
         (
             "agent-canon-bootstrap",

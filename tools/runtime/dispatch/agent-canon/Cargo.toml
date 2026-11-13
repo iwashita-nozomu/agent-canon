@@ -15,9 +15,20 @@
 
 [package]
 name = "agent-canon"
+default-run = "agent-canon"
 version = "0.1.0"
 edition = "2021"
 license = "Apache-2.0"
+
+[features]
+controller-test-driver = []
+
+[[bin]]
+name = "agent-canon-controller-test-driver"
+path = "tests/support/bootstrap_runtime_driver.rs"
+required-features = ["controller-test-driver"]
+test = false
+bench = false
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }

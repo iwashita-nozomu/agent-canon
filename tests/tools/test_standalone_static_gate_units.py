@@ -108,11 +108,11 @@ def selected_units(*paths: str) -> tuple[str, ...]:
         ),
         (("bootstrap.sh",), ("eval", "workflow-container")),
         (
-            ("tools/runtime/container/bootstrap_runtime.py",),
+            ("tools/runtime/dispatch/agent-canon/src/bootstrap_runtime.rs",),
             ("contracts", "eval", "workflow-container"),
         ),
         (
-            ("tests/bootstrap/test_bootstrap_runtime.py",),
+            ("tools/runtime/dispatch/agent-canon/tests/bootstrap_runtime_native.rs",),
             ("contracts", "workflow-container"),
         ),
         (

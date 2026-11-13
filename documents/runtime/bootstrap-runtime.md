@@ -4,7 +4,7 @@ contract agent-runtime
 responsibility Describes the standalone AgentCanon bootstrap and shared tool-runtime user contract.
 upstream design ../../documents/design/agent-canon-bootstrap-tool-runtime.md shared runtime design
 upstream implementation ../../bootstrap.sh Host entrypoint
-upstream implementation ../../tools/runtime/container/bootstrap_runtime.py lifecycle owner
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/bootstrap_runtime.rs lifecycle owner
 downstream design runtime-profiles-and-check-matrix.md validation profiles
 downstream design runtime-log-archive.md archive publication
 @dependency-end

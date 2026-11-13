@@ -261,6 +261,11 @@ def _formatted_container(record: dict, fmt: str) -> str | None:
     return None
 
 
+def _valid_image_id(number: int) -> str:
+    """Return a deterministic SHA256-shaped ID with a distinct short prefix."""
+    return f"sha256:{number:012x}{'0' * 52}"
+
+
 def _read_root_owned_bind_as_user(mount: dict, user: str) -> str | None:
     """Read the source-sync bind with Docker's root-owned mount metadata."""
     uid_text, separator, gid_text = user.partition(":")
@@ -307,85 +312,6 @@ def _memory_bytes(value: str) -> int:
     return int(value)
 
 
-def _run_source_free_resident_python(
-    command: list[str],
-    exec_environment: dict[str, str],
-    container: dict,
-    runtime_root: Path,
-) -> int:
-    """Execute the packaged canonical verifier or hook in the fake resident."""
-    if runtime_root is None:
-        return 1
-    source_mount = next(
-        (
-            mount
-            for mount in container.get("Mounts", [])
-            if mount.get("Destination") == "/opt/agent-canon/source"
-        ),
-        None,
-    )
-    if source_mount is None:
-        return 1
-    source_root = Path(source_mount["Source"]).resolve()
-    script_container_path = Path(command[1])
-    try:
-        script_relative = script_container_path.relative_to("/opt/agent-canon/source")
-    except ValueError:
-        return 1
-    script = source_root / script_relative
-    if not script.is_file() or script.is_symlink():
-        return 1
-
-    mapped_args: list[str] = []
-    for value in command[2:]:
-        if value == "/opt/agent-canon/source":
-            mapped_args.append(str(source_root))
-        else:
-            mapped_args.append(value)
-
-    environment = {
-        "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
-        "HOME": str(runtime_root.parent / "fake-home"),
-        "PYTHONPATH": str(source_root),
-        "PYTHONDONTWRITEBYTECODE": "1",
-        "AGENT_CANON_RUNTIME_ROOT": str(runtime_root),
-        "AGENT_CANON_PRIVATE_LOG_ROOT": str(runtime_root.parent / "private-log"),
-    }
-    Path(environment["HOME"]).mkdir(parents=True, exist_ok=True)
-    Path(environment["AGENT_CANON_PRIVATE_LOG_ROOT"]).mkdir(parents=True, exist_ok=True)
-
-    target_digest = exec_environment.get("AGENT_CANON_TARGET_DIGEST", "")
-    if target_digest:
-        state_path = runtime_root / "state.json"
-        if not state_path.is_file():
-            return 1
-        state = json.loads(state_path.read_text(encoding="utf-8"))
-        target = state.get("targets", {}).get(target_digest)
-        if not isinstance(target, dict) or target.get("mode") != "read-only":
-            return 1
-        target_root = target.get("host_root")
-        if (
-            not isinstance(target_root, str)
-            or target_root != exec_environment.get("AGENT_CANON_TARGET_HOST_ROOT")
-            or not Path(target_root).is_dir()
-        ):
-            return 1
-        environment["AGENT_CANON_TARGET_CONTAINER_ROOT"] = target_root
-        environment["AGENT_CANON_TARGET_DIGEST"] = target_digest
-
-    result = subprocess.run(
-        [sys.executable, str(script), *mapped_args],
-        input=sys.stdin.buffer.read(),
-        capture_output=True,
-        cwd=runtime_root,
-        env=environment,
-        check=False,
-    )
-    sys.stdout.buffer.write(result.stdout)
-    sys.stderr.buffer.write(result.stderr)
-    return result.returncode
-
-
 def _run_source_free_resident_native(
     command: list[str],
     exec_environment: dict[str, str],
@@ -393,13 +319,9 @@ def _run_source_free_resident_native(
     runtime_root: Path,
     workdir_container: str,
 ) -> int:
-    """Execute the selected native CLI in the fake resident container."""
+    """Run the native CLI with Docker's readonly bind namespace supplied to the test driver."""
     if runtime_root is None:
         return 1
-    native = os.environ.get("FAKE_DOCKER_NATIVE_BIN", "")
-    binary = Path(native)
-    if not binary.is_file() or binary.is_symlink() or not os.access(binary, os.X_OK):
-        return 127
     source_mount = next(
         (
             mount
@@ -408,10 +330,26 @@ def _run_source_free_resident_native(
         ),
         None,
     )
-    if source_mount is None:
+    state_mount = next(
+        (
+            mount
+            for mount in container.get("Mounts", [])
+            if mount.get("Destination") == "/var/lib/agent-canon"
+        ),
+        None,
+    )
+    if source_mount is None or state_mount is None:
         return 1
     source_root = Path(source_mount["Source"]).resolve()
     source_container = Path("/opt/agent-canon/source")
+    volume_root = Path(state_mount["Source"])
+    controller_command = len(command) > 1 and command[1] == "bootstrap-runtime"
+    native = os.environ.get("FAKE_DOCKER_NATIVE_BIN") or os.environ.get("AGENT_CANON_CLI", "")
+    driver = os.environ.get("FAKE_DOCKER_CONTROLLER_TEST_DRIVER", "")
+    binary = Path(driver if controller_command and driver else native)
+    if not binary.is_file() or binary.is_symlink() or not os.access(binary, os.X_OK):
+        return 127
+
     mapped_args: list[str] = []
     for value in command[1:]:
         argument = Path(value)
@@ -421,46 +359,111 @@ def _run_source_free_resident_native(
             try:
                 relative = argument.relative_to("/var/lib/agent-canon/runtime")
             except ValueError:
-                mapped_args.append(value)
+                try:
+                    relative = argument.relative_to("/var/lib/agent-canon")
+                except ValueError:
+                    mapped_args.append(value)
+                else:
+                    mapped_args.append(str(volume_root / relative))
             else:
                 mapped_args.append(str(runtime_root / relative))
         else:
             mapped_args.append(str(source_root / relative))
+
     if workdir_container == str(source_container):
         workdir = source_root
     elif workdir_container == "/var/lib/agent-canon/runtime":
         workdir = runtime_root
     else:
         workdir = runtime_root
+
+    private_log_mount = next(
+        (
+            mount
+            for mount in container.get("Mounts", [])
+            if mount.get("Destination") == "/var/lib/agent-canon/private-log"
+        ),
+        None,
+    )
     environment = {
         "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
         "HOME": str(runtime_root.parent / "fake-home"),
         "AGENT_CANON_SOURCE_ROOT": str(source_root),
+        "AGENT_CANON_HOST_INSTALL_ROOT": str(source_root),
         "AGENT_CANON_RUNTIME_ROOT": str(runtime_root),
-        "AGENT_CANON_PRIVATE_LOG_ROOT": str(runtime_root.parent / "private-log"),
+        "AGENT_CANON_CONTROL_PARENT_ROOT": str(volume_root),
+        "AGENT_CANON_EXCHANGE_ROOT": str(volume_root / "exchange"),
+        "AGENT_CANON_HOST_SPOOL_ROOT": str(volume_root / "spool"),
+        "AGENT_CANON_HOST_ARCHIVE_ROOT": str(volume_root / "archive"),
+        "AGENT_CANON_HOST_CACHE_ROOT": str(volume_root / "cache"),
+        "AGENT_CANON_HOST_CODEX_HOME_ROOT": str(volume_root / "codex-home"),
+        "AGENT_CANON_PRIVATE_LOG_ROOT": (
+            str(Path(private_log_mount["Source"]))
+            if private_log_mount is not None
+            else str(runtime_root.parent / "private-log")
+        ),
     }
+    for key in (
+        "AGENT_CANON_IMAGE_ROOT",
+        "AGENT_CANON_IMAGE_DEPENDENCIES_ROOT",
+        "AGENT_CANON_IMAGE_MARKER_DIGEST",
+        "AGENT_CANON_RUNTIME_MARKER_DIGEST",
+    ):
+        value = os.environ.get(f"FAKE_DOCKER_{key}")
+        if value:
+            environment[key] = value
+    environment["AGENT_CANON_RUNTIME_TOOLS_ROOT"] = str(source_root)
+    for key, value in exec_environment.items():
+        if key in {
+            "AGENT_CANON_IMAGE_REF", "AGENT_CANON_IMAGE_ID", "AGENT_CANON_CONTAINER_ID",
+            "AGENT_CANON_CONTROL_ROOT_DIGEST", "AGENT_CANON_CONTAINER_NAME", "AGENT_CANON_IMAGE_OWNED",
+            "AGENT_CANON_SOURCE_HEAD", "AGENT_CANON_HOST_INSTALL_ROOT", "AGENT_CANON_TARGET_HOST_ROOT",
+            "AGENT_CANON_TARGET_CONTAINER_ROOT", "AGENT_CANON_TARGET_DIGEST", "AGENT_CANON_PREVIOUS_IMAGE_ID",
+            "AGENT_CANON_PREVIOUS_IMAGE_REF", "AGENT_CANON_RESTORE_IMAGE_ID", "AGENT_CANON_RESTORE_IMAGE_REF",
+            "AGENT_CANON_CURRENT_IMAGE_ID", "AGENT_CANON_CURRENT_IMAGE_REF",
+        }:
+            environment[key] = value
+        elif key in {"AGENT_CANON_ROLLBACK_MOUNTS_FILE", "AGENT_CANON_RESTORE_TARGETS_FILE"}:
+            environment[key] = str(volume_root / "host-mounts.tsv")
     Path(environment["HOME"]).mkdir(parents=True, exist_ok=True)
     Path(environment["AGENT_CANON_PRIVATE_LOG_ROOT"]).mkdir(parents=True, exist_ok=True)
-    target_digest = exec_environment.get("AGENT_CANON_TARGET_DIGEST", "")
-    if target_digest:
-        state_path = runtime_root / "state.json"
-        if not state_path.is_file():
+
+    process_arguments = [str(binary)]
+    if controller_command and driver:
+        test_bin = Path(os.environ["FAKE_DOCKER_STATE"]).parent / ".fake-docker-bin"
+        test_bin.mkdir(mode=0o700, parents=True, exist_ok=True)
+        tool_wrapper = test_bin / "agent-canon-tool"
+        if tool_wrapper.is_symlink():
+            if tool_wrapper.resolve() != binary.resolve():
+                return 1
+        elif tool_wrapper.exists():
             return 1
-        state = json.loads(state_path.read_text(encoding="utf-8"))
-        target = state.get("targets", {}).get(target_digest)
-        if not isinstance(target, dict) or target.get("mode") != "read-only":
-            return 1
-        target_root = target.get("host_root")
-        if (
-            not isinstance(target_root, str)
-            or target_root != exec_environment.get("AGENT_CANON_TARGET_HOST_ROOT")
-            or not Path(target_root).is_dir()
-        ):
-            return 1
-        environment["AGENT_CANON_TARGET_CONTAINER_ROOT"] = target_root
-        environment["AGENT_CANON_TARGET_DIGEST"] = target_digest
+        else:
+            tool_wrapper.symlink_to(binary)
+        environment["PATH"] = f"{test_bin}{os.pathsep}{environment['PATH']}"
+        process_arguments.extend(
+            [
+                "--test-control-root",
+                str(volume_root),
+                "--test-runtime-root",
+                str(runtime_root),
+                "--test-source-root",
+                str(source_root),
+            ]
+        )
+        for mount in container.get("Mounts", []):
+            destination = mount.get("Destination", "")
+            if (
+                mount.get("Type") == "bind"
+                and mount.get("RW") is False
+                and destination.startswith("/targets/")
+            ):
+                process_arguments.extend(
+                    ["--test-target-mount", destination, mount["Source"]]
+                )
+    process_arguments.extend(mapped_args)
     result = subprocess.run(
-        [str(binary), *mapped_args],
+        process_arguments,
         input=sys.stdin.buffer.read(),
         capture_output=True,
         cwd=workdir,
@@ -592,7 +595,7 @@ def main(argv: list[str]) -> int:
         image_number = int(state.get("next_image", 1))
         state["next_image"] = image_number + 1
         image_id = (
-            f"sha256:{image_number:064x}"
+            _valid_image_id(image_number)
             if os.environ.get("FAKE_DOCKER_VALID_IMAGE_IDS") == "1"
             else f"sha256:fake-image-{image_number}"
         )
@@ -615,7 +618,7 @@ def main(argv: list[str]) -> int:
             _preserve_image_object(state, previous, original_ref=ref)
         image_number = int(state.get("next_image", 1))
         state["next_image"] = image_number + 1
-        image_id = f"sha256:{image_number:064x}"
+        image_id = _valid_image_id(image_number)
         revision = ref.rsplit(":sha-", 1)[-1] if ":sha-" in ref else ""
         state["images"][ref] = {
             "Id": image_id,
@@ -1407,6 +1410,9 @@ def main(argv: list[str]) -> int:
             sys.stdout.write(content)
             return 0
         if command and (command[0] == "/var/lib/agent-canon/cache/bin/agent-canon"):
+            failed_operation = os.environ.get("FAKE_DOCKER_FAIL_CONTROLLER_OPERATION", "")
+            if failed_operation and failed_operation in command:
+                return int(os.environ.get("FAKE_DOCKER_FAIL_CONTROLLER_RC", "41"))
             return _run_source_free_resident_native(
                 command,
                 exec_environment,
@@ -1414,365 +1420,6 @@ def main(argv: list[str]) -> int:
                 runtime_root,
                 workdir_container,
             )
-        if (
-            len(command) >= 2
-            and command[0] == "python3"
-            and command[1].endswith("tools/runtime/container/bootstrap_runtime.py")
-        ):
-            if "codex" in command[2:] and (
-                "hook" in command[2:] or "hook-admission" in command[2:]
-            ):
-                return _run_source_free_resident_python(
-                    command, exec_environment, found[1], runtime_root
-                )
-            failed_operation = os.environ.get(
-                "FAKE_DOCKER_FAIL_CONTROLLER_OPERATION", ""
-            )
-            if failed_operation and failed_operation in command[2:]:
-                return int(os.environ.get("FAKE_DOCKER_FAIL_CONTROLLER_RC", "41"))
-            if command[-1:] == ["gc"] or command[-2:] == ["gc", "--dry-run"]:
-                print(
-                    json.dumps(
-                        {
-                            "schema": "agent-canon.bootstrap-receipt.v2",
-                            "status": "ok",
-                            "operation": "gc",
-                            "code": "state_gc_complete",
-                            "details": {"docker_resources": "host-owned"},
-                        },
-                        separators=(",", ":"),
-                    )
-                )
-                return 0
-            if "target" in command[2:] and "add" in command[2:]:
-                runtime_mount = next(
-                    (
-                        mount
-                        for mount in found[1]["Mounts"]
-                        if mount["Destination"]
-                        in {
-                            "/var/lib/agent-canon",
-                            "/var/lib/agent-canon/runtime",
-                        }
-                    ),
-                    None,
-                )
-                exchange_mount = next(
-                    (
-                        mount
-                        for mount in found[1]["Mounts"]
-                        if mount["Destination"]
-                        in {
-                            "/var/lib/agent-canon",
-                            "/var/lib/agent-canon/runtime",
-                        }
-                    ),
-                    None,
-                )
-                digest = exec_environment.get("AGENT_CANON_TARGET_DIGEST", "")
-                host_root = exec_environment.get("AGENT_CANON_TARGET_HOST_ROOT", "")
-                container_root = exec_environment.get(
-                    "AGENT_CANON_TARGET_CONTAINER_ROOT", f"/targets/{digest}"
-                )
-                if (
-                    runtime_mount is None
-                    or exchange_mount is None
-                    or not digest
-                    or not host_root
-                ):
-                    return 1
-                exchange_root = Path(exchange_mount["Source"]) / "exchange"
-                state_path = runtime_root / "state.json"
-                if state_path.is_file():
-                    lifecycle = json.loads(state_path.read_text(encoding="utf-8"))
-                else:
-                    lifecycle = {"targets": {}, "state": "ready"}
-                target = {
-                    "root": container_root,
-                    "host_root": host_root,
-                    "mode": "read-only",
-                    "digest": digest,
-                }
-                targets = lifecycle.setdefault("targets", {})
-                if not isinstance(targets, dict):
-                    return 1
-                targets[digest] = target
-                # Match the controller's full projection, including prior targets.
-                mount_rows = []
-                mounts_toml = ['schema = "agent-canon.mount-registry.v2"', ""]
-                for target_digest, target_record in sorted(targets.items()):
-                    if not isinstance(target_record, dict):
-                        return 1
-                    target_root = target_record.get("root")
-                    target_host_root = target_record.get("host_root")
-                    target_mode = target_record.get("mode")
-                    if (
-                        not isinstance(target_root, str)
-                        or not isinstance(target_host_root, str)
-                        or target_mode != "read-only"
-                    ):
-                        return 1
-                    mount_rows.append(
-                        f"target\t{target_digest}\t{target_host_root}\t"
-                        f"/targets/{target_digest}\tread-only"
-                    )
-                    mounts_toml.extend(
-                        [
-                            f"[targets.{target_digest}]",
-                            f"root = {json.dumps(target_root)}",
-                            'mode = "read-only"',
-                            f"digest = {json.dumps(target_digest)}",
-                            "",
-                        ]
-                    )
-                state_path.write_text(json.dumps(lifecycle), encoding="utf-8")
-                (exchange_root / "mounts.tsv").write_text(
-                    "\n".join(mount_rows) + ("\n" if mount_rows else ""),
-                    encoding="utf-8",
-                )
-                (exchange_root / "mounts.toml").write_text(
-                    "\n".join(mounts_toml),
-                    encoding="utf-8",
-                )
-                print(
-                    json.dumps(
-                        {
-                            "schema": "agent-canon.bootstrap-receipt.v2",
-                            "status": "ok",
-                            "operation": "target_add",
-                            "code": "target_registered",
-                        }
-                    )
-                )
-                return 0
-            if "target" in command[2:] and "remove" in command[2:]:
-                runtime_mount = next(
-                    (
-                        mount
-                        for mount in found[1]["Mounts"]
-                        if mount["Destination"]
-                        in {
-                            "/var/lib/agent-canon",
-                            "/var/lib/agent-canon/runtime",
-                        }
-                    ),
-                    None,
-                )
-                if runtime_mount is None:
-                    return 1
-                digest = exec_environment.get("AGENT_CANON_TARGET_DIGEST", "")
-                host_root = exec_environment.get("AGENT_CANON_TARGET_HOST_ROOT", "")
-                container_root = exec_environment.get(
-                    "AGENT_CANON_TARGET_CONTAINER_ROOT", f"/targets/{digest}"
-                )
-                state_path = runtime_root / "state.json"
-                if not digest or not state_path.is_file():
-                    return 1
-                lifecycle = json.loads(state_path.read_text(encoding="utf-8"))
-                targets = lifecycle.setdefault("targets", {})
-                target = targets.get(digest)
-                if (
-                    not isinstance(target, dict)
-                    or target.get("host_root") != host_root
-                    or target.get("root") != container_root
-                    or target.get("mode") != "read-only"
-                ):
-                    return 1
-                del targets[digest]
-                mount_rows = []
-                mounts_toml = ['schema = "agent-canon.mount-registry.v2"', ""]
-                for target_digest, target_record in sorted(targets.items()):
-                    if not isinstance(target_record, dict):
-                        return 1
-                    target_root = target_record.get("root")
-                    target_host_root = target_record.get("host_root")
-                    if (
-                        not isinstance(target_root, str)
-                        or not isinstance(target_host_root, str)
-                        or target_record.get("mode") != "read-only"
-                    ):
-                        return 1
-                    mount_rows.append(
-                        f"target\t{target_digest}\t{target_host_root}\t"
-                        f"/targets/{target_digest}\tread-only"
-                    )
-                    mounts_toml.extend(
-                        [
-                            f"[targets.{target_digest}]",
-                            f"root = {json.dumps(target_root)}",
-                            'mode = "read-only"',
-                            f"digest = {json.dumps(target_digest)}",
-                            "",
-                        ]
-                    )
-                state_path.write_text(json.dumps(lifecycle), encoding="utf-8")
-                # The lifecycle adapter maps AGENT_CANON_EXCHANGE_ROOT to
-                # /var/lib/agent-canon/exchange, independent of the controller
-                # state path at /var/lib/agent-canon/runtime. Keep the removal
-                # projection on the same volume path used by target-add and
-                # the host projection exporter.
-                exchange_root = Path(runtime_mount["Source"]) / "exchange"
-                exchange_root.mkdir(parents=True, exist_ok=True)
-                (exchange_root / "mounts.tsv").write_text(
-                    "\n".join(mount_rows) + ("\n" if mount_rows else ""),
-                    encoding="utf-8",
-                )
-                (exchange_root / "mounts.toml").write_text(
-                    "\n".join(mounts_toml), encoding="utf-8"
-                )
-                print(
-                    json.dumps(
-                        {
-                            "schema": "agent-canon.bootstrap-receipt.v2",
-                            "status": "ok",
-                            "operation": "target_remove",
-                            "code": "target_removed",
-                        }
-                    )
-                )
-                return 0
-            if "agent-canon" in command and "--version" in command:
-                print("agent-canon 0.1.0")
-                return 0
-            if "rollback" in command[2:]:
-                runtime_mount = next(
-                    (
-                        mount
-                        for mount in found[1]["Mounts"]
-                        if mount["Destination"]
-                        in {
-                            "/var/lib/agent-canon",
-                            "/var/lib/agent-canon/runtime",
-                        }
-                    ),
-                    None,
-                )
-                current_id = exec_environment.get("AGENT_CANON_CURRENT_IMAGE_ID", "")
-                current_ref = exec_environment.get("AGENT_CANON_CURRENT_IMAGE_REF", "")
-                if runtime_mount is None or not current_id or not current_ref:
-                    return 1
-                volume_root = Path(runtime_mount["Source"])
-                runtime_root = (
-                    volume_root
-                    if runtime_mount["Destination"] == "/var/lib/agent-canon/runtime"
-                    else volume_root / "runtime"
-                )
-                host_install = Path(
-                    exec_environment.get("AGENT_CANON_HOST_INSTALL_ROOT", "")
-                )
-                private_log = host_install.parent / "agent-canon-log"
-                source_sync_source = host_install / ".runtime" / "source-sync"
-                registry_source = (
-                    host_install / ".runtime" / "container-state" / "mounts.toml"
-                )
-                plan = volume_root / "exchange" / "rollback-plan.tsv"
-                plan_lines = [
-                    "schema\tagent-canon.rollback-plan.v1",
-                    f"image-id\t{current_id}",
-                    f"image-ref\t{current_ref}",
-                    f"mount\tmount\t{runtime_root}\t/var/lib/agent-canon/runtime\tfalse",
-                    f"mount\tmount\t{source_sync_source}\t/var/lib/agent-canon/source-sync\ttrue",
-                    f"mount\tmount\t{host_install}\t/opt/agent-canon/source\tfalse",
-                    f"mount\tmount\t{private_log}\t/var/lib/agent-canon/private-log\ttrue",
-                    f"mount\tmount\t{registry_source}\t/var/lib/agent-canon/mount-registry.toml\ttrue",
-                ]
-                mounts_path = volume_root / "exchange" / "mounts.tsv"
-                if mounts_path.is_file():
-                    for line in mounts_path.read_text(encoding="utf-8").splitlines():
-                        fields = line.split("\t")
-                        if len(fields) == 5 and fields[0] == "target":
-                            plan_lines.append(
-                                f"mount\tmount\t{fields[2]}\t{fields[3]}\ttrue"
-                            )
-                plan.write_text("\n".join(plan_lines) + "\n", encoding="utf-8")
-                print(
-                    json.dumps(
-                        {
-                            "schema": "agent-canon.bootstrap-receipt.v2",
-                            "status": "ok",
-                            "operation": "rollback",
-                            "code": "previous_generation_restored",
-                        }
-                    )
-                )
-                return 0
-            operations = {"install", "update", "start", "stop", "uninstall"}
-            operation = next((item for item in command[2:] if item in operations), "")
-            if operation == "start":
-                for container in state["containers"].values():
-                    container.setdefault("State", {})["Running"] = True
-                save(state)
-            if operation == "install" and runtime_mount is not None:
-                volume_root = Path(runtime_mount["Source"])
-                runtime_root = (
-                    volume_root
-                    if runtime_mount["Destination"] == "/var/lib/agent-canon/runtime"
-                    else volume_root / "runtime"
-                )
-                for name in ("generations", "tasks"):
-                    directory = runtime_root / name
-                    if directory.is_dir():
-                        for child in directory.iterdir():
-                            if child.is_dir() and not child.is_symlink():
-                                shutil.rmtree(child)
-                            else:
-                                child.unlink()
-                state_path = runtime_root / "state.json"
-                if state_path.is_file():
-                    lifecycle = json.loads(state_path.read_text(encoding="utf-8"))
-                    lifecycle.update(
-                        {
-                            "targets": {},
-                            "generations": {},
-                            "current_generation": None,
-                            "rollback_generation": None,
-                            "generation_counter": 0,
-                            "active_task_count": 0,
-                            "tasks": {},
-                        }
-                    )
-                    state_path.write_text(json.dumps(lifecycle), encoding="utf-8")
-                exchange_root = volume_root / "exchange"
-                exchange_root.mkdir(parents=True, exist_ok=True)
-                (exchange_root / "mounts.tsv").write_text("", encoding="utf-8")
-                (exchange_root / "mounts.toml").write_text(
-                    'schema = "agent-canon.mount-registry.v2"\n',
-                    encoding="utf-8",
-                )
-            if operation == "update" and runtime_mount is not None:
-                volume_root = Path(runtime_mount["Source"])
-                exchange_root = volume_root / "exchange"
-                exchange_root.mkdir(parents=True, exist_ok=True)
-                registry = (volume_root / "mount-registry.toml").read_text(
-                    encoding="utf-8"
-                )
-                for name in ("mounts.toml", "mounts.tsv"):
-                    (exchange_root / name).unlink(missing_ok=True)
-                (exchange_root / "mounts.toml").write_text(
-                    registry or 'schema = "agent-canon.mount-registry.v2"\n',
-                    encoding="utf-8",
-                )
-                (exchange_root / "mounts.tsv").write_bytes(
-                    (volume_root / "host-mounts.tsv").read_bytes()
-                )
-            if operation:
-                print(
-                    json.dumps(
-                        {
-                            "schema": "agent-canon.bootstrap-receipt.v2",
-                            "status": "ok",
-                            "operation": operation,
-                            "code": {
-                                "install": "installed",
-                                "update": "updated",
-                                "start": "ready",
-                                "stop": "stopped",
-                                "uninstall": "owned_resources_released",
-                            }[operation],
-                        }
-                    )
-                )
-            return 0
         if command == ["agent-canon", "--version"]:
             print("agent-canon 0.1.0")
             return 0

@@ -7,8 +7,8 @@ responsibility Defines the standalone shared AgentCanon tool container and its h
 upstream design documents/design/agent-canon-bootstrap-tool-runtime.md shared runtime design
 upstream design documents/runtime/bootstrap-runtime.md user lifecycle contract
 upstream implementation bootstrap/container/image/Dockerfile shared tool image
-upstream implementation tools/runtime/container/bootstrap_runtime.py container controller
-downstream implementation tests/bootstrap/test_bootstrap_runtime.py lifecycle validation
+upstream implementation tools/runtime/dispatch/agent-canon/src/bootstrap_runtime.rs container controller
+downstream implementation tools/runtime/dispatch/agent-canon/tests/bootstrap_runtime_native.rs lifecycle validation
 @dependency-end
 -->
 
