@@ -154,7 +154,7 @@ jobs:
           rustc -V
           cargo -V
           python -V
-          python -c 'import yaml; print("PyYAML=" + yaml.__version__)'
+          python -m pip show PyYAML
 
       - name: Check and build the native executable
         shell: bash

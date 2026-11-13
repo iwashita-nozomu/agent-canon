@@ -1183,6 +1183,80 @@ impl RuntimeArtifactBoundary {
         Ok(target)
     }
 
+    /// Reserve one private temporary directory through the retained runtime handle.
+    pub fn temporary_directory(&self, path: &Path, prefix: &str) -> Result<PathBuf, String> {
+        if prefix.is_empty() || prefix.contains(['/', '\\']) || prefix.chars().any(char::is_control)
+        {
+            return Err("temporary directory prefix must be one filename component".into());
+        }
+        let parent_path = self.ensure_directory(path)?;
+        let relative = parent_path
+            .strip_prefix(&self.root)
+            .map_err(|error| error.to_string())?;
+        let parent = self
+            .directory
+            .child(relative, false)
+            .map_err(|error| error.to_string())?;
+        let mut nonce = [0u8; 16];
+        getrandom::getrandom(&mut nonce).map_err(|error| error.to_string())?;
+        let suffix = nonce
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>();
+        let name = format!("{prefix}{suffix}");
+        parent
+            .directory
+            .create_dir(&name)
+            .map_err(|error| error.to_string())?;
+        parent
+            .child(Path::new(&name), false)
+            .and_then(|directory| directory.make_private())
+            .map_err(|error| error.to_string())?;
+        Ok(parent_path.join(name))
+    }
+
+    /// Remove one selected directory beneath the runtime through no-follow parents.
+    pub fn remove_directory_tree(&self, path: &Path) -> Result<(), String> {
+        let target = self.resolve(path)?;
+        let relative = target
+            .strip_prefix(&self.root)
+            .map_err(|error| error.to_string())?;
+        let (parent, name) = self
+            .directory
+            .parent(relative, false)
+            .map_err(|error| error.to_string())?;
+        let metadata = parent
+            .directory
+            .symlink_metadata(&name)
+            .map_err(|error| error.to_string())?;
+        if !metadata.is_dir() || metadata.is_symlink() {
+            return Err("runtime cleanup requires a real directory".into());
+        }
+        parent
+            .directory
+            .remove_dir_all(&name)
+            .map_err(|error| error.to_string())
+    }
+
+    /// Copy a regular source file through read-only no-follow source handles.
+    pub fn copy_source_file(&self, source: &Path, target: &Path) -> Result<PathBuf, String> {
+        let source = if source.is_absolute() {
+            source.to_path_buf()
+        } else {
+            self.source_root.join(source)
+        };
+        let relative = source
+            .strip_prefix(&self.source_root)
+            .map_err(|_| "copy source escapes source root")?;
+        let directory = RuntimeDirectory::open_nofollow(&self.source_root, false)
+            .map_err(|error| error.to_string())?;
+        let bytes = directory
+            .read(relative)
+            .map_err(|error| error.to_string())?
+            .ok_or("copy source is missing")?;
+        self.atomic_write_bytes(target, &bytes, 0o600)
+    }
+
     pub fn atomic_write_bytes(
         &self,
         path: &Path,

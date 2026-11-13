@@ -28,32 +28,8 @@ if [ -z "${PYTHON_BIN}" ]; then
 fi
 export PYTHONPATH="${ROOT_DIR}/python${PYTHONPATH:+:${PYTHONPATH}}"
 
-RUNTIME_ROOT="$({
-  ROOT_DIR="${ROOT_DIR}" PYTHON_BIN="${PYTHON_BIN}" "${PYTHON_BIN}" - <<'PY'
-import os
-import sys
-import tempfile
-from pathlib import Path
-
-sys.path.insert(0, os.environ["ROOT_DIR"])
-from tools.runtime.artifacts.runtime_artifacts import (  # noqa: E402
-    RuntimeArtifactError,
-    runtime_artifact_boundary,
-)
-
-try:
-    boundary = runtime_artifact_boundary(
-        Path(os.environ["ROOT_DIR"]),
-        os.environ.get("AGENT_CANON_RUNTIME_ROOT"),
-        create=True,
-    )
-    parent = boundary.ensure_directory(Path("tasks") / "pytest")
-    print(tempfile.mkdtemp(prefix="run-", dir=str(parent)))
-except RuntimeArtifactError as exc:
-    print(f"runtime_root_error: {exc}", file=sys.stderr)
-    raise SystemExit(2)
-PY
-} )"
+RUNTIME_ROOT="$("${AGENT_CANON_NATIVE_BIN:-${AGENT_CANON_CLI:-${ROOT_DIR}/tools/bin/agent-canon}}" \
+  runtime-paths temp-dir --source-root "${ROOT_DIR}" --candidate tasks/pytest --prefix run-)"
 RUN_DIR="${RUNTIME_ROOT}"
 RAW_LOG="${RUN_DIR}/pytest.raw.txt"
 JSON_LOG="${RUN_DIR}/pytest.jsonl"

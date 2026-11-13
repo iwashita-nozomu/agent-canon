@@ -4,7 +4,7 @@
 # responsibility Runs verifier pre-review checks through the shared Python quality runner.
 # upstream design ../../../README.md shared automation index
 # upstream implementation ../checks/run_python_quality_checks.sh shared Python quality gate
-# upstream implementation ../../../runtime/artifacts/runtime_artifacts.py owns external report paths and exact cleanup
+# upstream implementation ../../../runtime/dispatch/agent-canon/src/runtime_boundary.rs owns external report paths and exact cleanup
 # @dependency-end
 set -euo pipefail
 
@@ -13,33 +13,14 @@ WORKSPACE_ROOT="$(cd "${SCRIPT_DIR}/../../../.." && pwd)"
 cd "${WORKSPACE_ROOT}"
 
 # Reports and snapshots are runtime artifacts, not source files.  Resolve all
-# paths through the shared Python runtime boundary and retain only a task
+# paths through the shared Rust runtime boundary and retain only a task
 # namespace under the caller-owned external root.
 runtime_boundary_root() {
-  local candidate="$1"
-  PYTHONPATH="${WORKSPACE_ROOT}${PYTHONPATH:+:${PYTHONPATH}}" \
-    python3 - "${WORKSPACE_ROOT}" "${candidate}" <<'PY'
-from pathlib import Path
-import sys
-
-from tools.runtime.artifacts.runtime_artifacts import runtime_artifact_boundary
-
-print(runtime_artifact_boundary(Path(sys.argv[1]), Path(sys.argv[2]), create=True).root)
-PY
+  "${AGENT_CANON_NATIVE_BIN:-${AGENT_CANON_CLI:-${WORKSPACE_ROOT}/tools/bin/agent-canon}}" runtime-paths root --source-root "${WORKSPACE_ROOT}" --runtime-root "$1"
 }
 
 runtime_boundary_path() {
-  local candidate="$1"
-  PYTHONPATH="${WORKSPACE_ROOT}${PYTHONPATH:+:${PYTHONPATH}}" \
-    python3 - "${WORKSPACE_ROOT}" "${AGENT_CANON_RUNTIME_ROOT}" "${candidate}" <<'PY'
-from pathlib import Path
-import sys
-
-from tools.runtime.artifacts.runtime_artifacts import runtime_artifact_boundary
-
-boundary = runtime_artifact_boundary(Path(sys.argv[1]), Path(sys.argv[2]), create=True)
-print(boundary.resolve(Path(sys.argv[3])))
-PY
+  "${AGENT_CANON_NATIVE_BIN:-${AGENT_CANON_CLI:-${WORKSPACE_ROOT}/tools/bin/agent-canon}}" runtime-paths path --source-root "${WORKSPACE_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" --candidate "$1"
 }
 
 if [ -n "${AGENT_CANON_RUNTIME_ROOT:-}" ]; then

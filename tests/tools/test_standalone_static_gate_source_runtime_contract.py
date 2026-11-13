@@ -166,6 +166,9 @@ def test_eval_preserves_failed_producer_logs_until_ci_capture(
         "import json, os, sys\n"
         "import runpy\n"
         "from pathlib import Path\n"
+        "if sys.argv[1] == 'runtime-paths':\n"
+        "    import subprocess\n"
+        "    raise SystemExit(subprocess.run([os.environ['REAL_BOUNDARY_NATIVE'], *sys.argv[1:]], check=False).returncode)\n"
         "if sys.argv[1] == 'run-accumulated-agent-evals':\n"
         "    sys.argv = [str(Path(__file__).parents[2] / 'producer_fixture.py'), *sys.argv[2:]]\n"
         "    runpy.run_path(sys.argv[0], run_name='__main__')\n"
@@ -205,6 +208,7 @@ def test_eval_preserves_failed_producer_logs_until_ci_capture(
             "AGENT_CANON_RUNTIME_ROOT": str(runtime),
             "AGENT_CANON_CLI": str(native_cli),
             "AGENT_CANON_NATIVE_BIN": "",
+            "REAL_BOUNDARY_NATIVE": os.environ["AGENT_CANON_NATIVE_BIN"],
             "AGENT_CANON_HOOK_ARCHIVE_DIR": "/var/lib/agent-canon/private-log",
             "AGENT_CANON_LOG_ROOT": "/var/lib/agent-canon/private-log",
             "CALLS": str(calls),
