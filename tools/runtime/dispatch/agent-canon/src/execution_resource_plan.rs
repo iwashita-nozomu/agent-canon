@@ -53,7 +53,7 @@ pub struct Failure {
     pub details: BTreeMap<String, Value>,
 }
 impl Failure {
-    fn new(code: &str, message: impl Into<String>) -> Self {
+    pub(crate) fn new(code: &str, message: impl Into<String>) -> Self {
         Self {
             code: code.into(),
             message: message.into(),
@@ -62,7 +62,7 @@ impl Failure {
     }
 }
 type Result<T> = std::result::Result<T, Failure>;
-fn canonical_fingerprint(payload: &Value) -> Result<String> {
+pub(crate) fn canonical_fingerprint(payload: &Value) -> Result<String> {
     let value = crate::python_json::parse_json(&payload.to_string())
         .map_err(|error| Failure::new("gpu_evidence_invalid", error))?;
     let bytes = crate::python_json::canonical_json_ascii_bytes_reject_nonfinite(&value)
@@ -242,6 +242,8 @@ pub struct GpuRunRequest {
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ResourceRequest {
+    pub integration_contract: Value,
+    pub xla_jax_preallocation_values: BTreeMap<String, String>,
     pub owner_id: String,
     pub parent_id: String,
     pub context_id: String,
@@ -526,6 +528,234 @@ pub struct ExecutionResourcePlan {
     gpu_allocation: GpuAllocation,
 }
 impl ExecutionResourcePlan {
+    pub fn plan_id(&self) -> &str {
+        &self.plan_id
+    }
+    pub fn plan_fingerprint(&self) -> &str {
+        &self.plan_fingerprint
+    }
+    pub fn gpu_allocation(&self) -> &GpuAllocation {
+        &self.gpu_allocation
+    }
+    pub fn execution(&self) -> &Value {
+        &self.execution
+    }
+    pub fn resources(&self) -> &Value {
+        &self.resources
+    }
+    pub fn json_spec(&self) -> Value {
+        serde_json::json!({"schema_version":self.schema_version,"plan_id":self.plan_id,"owner":self.owner,"resources":self.resources,"execution":self.execution,"container":self.container,"side_effect_inventory":self.side_effect_inventory})
+    }
+    pub fn freeze(
+        request: &ResourceRequest,
+        observation: &ResourceObservation,
+        mut allocation: GpuAllocation,
+    ) -> Result<Self> {
+        request.validate()?;
+        allocation.validate_order()?;
+        if !["", "pending"].contains(&allocation.plan_fingerprint.as_str()) {
+            return Err(Failure::new(
+                "plan_state_invalid",
+                "GPU allocation is already bound to another plan",
+            ));
+        }
+        if allocation.requested_count != request.gpu_requested_count
+            || allocation.requested_memory_bytes != request.gpu_requested_memory_bytes
+        {
+            return Err(Failure::new(
+                "gpu_request_provenance_mismatch",
+                "GPUAllocation request provenance differs from ResourceRequest",
+            ));
+        }
+        if request
+            .cpu_requested_set
+            .iter()
+            .any(|cpu| !observation.cpu_available_set.contains(cpu))
+        {
+            return Err(Failure::new(
+                "cpu_cardinality_unavailable",
+                "requested CPU set is not contained in discovered allocation",
+            ));
+        }
+        if allocation
+            .lock_readback
+            .get("reservation_owner")
+            .and_then(Value::as_str)
+            != Some("GpuReservationTransaction")
+        {
+            return Err(Failure::new(
+                "gpu_planner_provenance_invalid",
+                "GPUAllocation was not produced by canonical admission owner",
+            ));
+        }
+        if request.gpu_requested_count > 0 {
+            if allocation.allocation_provenance != CALLER_ALLOCATION_PROVENANCE {
+                return Err(Failure::new(
+                    "gpu_caller_allocation_provenance_invalid",
+                    "GPUAllocation is not bound to caller/scheduler UUID set",
+                ));
+            }
+            if allocation.selected_ids.len() != request.gpu_requested_count
+                || allocation.reservation_ids.len() != request.gpu_requested_count
+                || allocation.selected_ids.iter().any(|uuid| {
+                    !allocation.caller_allocated_ids.contains(uuid)
+                        || !allocation.eligible_ids.contains(uuid)
+                        || allocation.occupied_ids.contains(uuid)
+                        || allocation.reserved_ids.contains(uuid)
+                        || allocation.free_memory_bytes.get(uuid).copied().unwrap_or(0)
+                            < request.gpu_requested_memory_bytes
+                        || uuid.chars().all(|character| {
+                            crate::python_cli_integer::decimal_digit_value(character).is_some()
+                        })
+                })
+                || allocation.readback_fingerprint.is_empty()
+            {
+                return Err(Failure::new(
+                    "gpu_allocation_contract_invalid",
+                    "GPUAllocation does not prove cardinality, memory, UUID, or lease invariants",
+                ));
+            }
+        } else if !allocation.selected_ids.is_empty() || !allocation.reservation_ids.is_empty() {
+            return Err(Failure::new(
+                "gpu_allocation_without_request",
+                "GPU-unrequested plan cannot carry allocation or reservation state",
+            ));
+        }
+        let plan_id = if !request.plan_id.is_empty() {
+            request.plan_id.clone()
+        } else if !request.run_id.is_empty() {
+            request.run_id.clone()
+        } else {
+            let mut random = [0u8; 12];
+            getrandom::getrandom(&mut random)
+                .map_err(|error| Failure::new("plan_state_invalid", error.to_string()))?;
+            format!(
+                "plan-{}",
+                random
+                    .iter()
+                    .map(|byte| format!("{byte:02x}"))
+                    .collect::<String>()
+            )
+        };
+        let mut environment = request.environment.clone();
+        let gpu_keys = [
+            "CUDA_VISIBLE_DEVICES",
+            "NVIDIA_VISIBLE_DEVICES",
+            "JAX_PLATFORMS",
+            "XLA_PYTHON_CLIENT_PREALLOCATE",
+            "XLA_PYTHON_CLIENT_ALLOCATOR",
+            "XLA_PYTHON_CLIENT_USE_CUDA_HOST_ALLOCATOR",
+            "XLA_PYTHON_CLIENT_MEM_FRACTION",
+            "XLA_FLAGS",
+        ];
+        if request.gpu_requested_count > 0
+            && ["CUDA_VISIBLE_DEVICES", "NVIDIA_VISIBLE_DEVICES"]
+                .iter()
+                .any(|key| environment.contains_key(*key))
+        {
+            return Err(Failure::new(
+                "gpu_visibility_before_plan_freeze",
+                "selected GPU visibility must be materialized only after plan freeze",
+            ));
+        }
+        if request.gpu_requested_count == 0
+            && (gpu_keys.iter().any(|key| environment.contains_key(*key))
+                || !request.xla_jax_preallocation_values.is_empty())
+        {
+            return Err(Failure::new(
+                "gpu_environment_without_request",
+                "GPU environment cannot be injected for a GPU-unrequested plan",
+            ));
+        }
+        environment.extend(request.xla_jax_preallocation_values.clone());
+        if request.gpu_requested_count > 0 {
+            if environment
+                .get("XLA_PYTHON_CLIENT_PREALLOCATE")
+                .is_some_and(|value| value.to_lowercase() != "false")
+            {
+                return Err(Failure::new(
+                    "xla_preallocation_must_be_disabled",
+                    "GPU execution requires canonical preallocation-disabled XLA environment",
+                ));
+            }
+            environment.insert("XLA_PYTHON_CLIENT_PREALLOCATE".into(), "false".into());
+            environment
+                .entry("XLA_PYTHON_CLIENT_ALLOCATOR".to_owned())
+                .or_insert_with(|| "platform".into());
+            environment
+                .entry("XLA_PYTHON_CLIENT_USE_CUDA_HOST_ALLOCATOR".to_owned())
+                .or_insert_with(|| "false".into());
+        }
+        let run_root = request.runtime_root.join("runs").join(&plan_id);
+        let log_root = run_root.join("logs");
+        let projection = request.source_projection_root.clone().unwrap_or_else(|| {
+            PathBuf::from(format!("/workspace/reports/agents/{plan_id}/runtime"))
+        });
+        let mig_mapping = observation
+            .gpu_devices
+            .iter()
+            .filter(|device| allocation.candidate_ids.contains(&device.uuid))
+            .map(|device| (device.uuid.clone(), device.mig_parent_uuid.clone()))
+            .collect::<BTreeMap<_, _>>();
+        let parents = observation
+            .gpu_devices
+            .iter()
+            .filter_map(|device| {
+                device
+                    .mig_parent_uuid
+                    .as_ref()
+                    .map(|parent| (device.uuid.clone(), parent.clone()))
+            })
+            .collect::<BTreeMap<_, _>>();
+        let resources = serde_json::json!({"cpu":{"requested_set":request.cpu_requested_set,"allocated_set":observation.cpu_available_set,"affinity_id":null},"gpu":{"requested_count":request.gpu_requested_count,"requested_memory_bytes":request.gpu_requested_memory_bytes,"caller_allocated_ids":allocation.caller_allocated_ids,"candidate_ids":allocation.candidate_ids,"occupied_ids":allocation.occupied_ids,"reserved_ids":allocation.reserved_ids,"eligible_ids":allocation.eligible_ids,"selected_ids":allocation.selected_ids,"visible_ids":allocation.selected_ids,"allocation_id":allocation.allocation_id,"reservation_ids":allocation.reservation_ids,"admission_fingerprint":allocation.admission_fingerprint,"free_memory_bytes":allocation.free_memory_bytes,"occupied_process_identities":allocation.occupied_process_identities,"process_identities":allocation.process_identities,"lock_root":allocation.lock_root,"selection_order":allocation.selection_order,"memory_bytes":allocation.memory_bytes,"mig_mapping":mig_mapping,"slot_id":allocation.slot_id,"readback_fingerprint":allocation.readback_fingerprint,"allocation_provenance":request.gpu_allocation_provenance,"lock_readback":allocation.lock_readback,"planner_provenance":"canonical_plan_gpu_allocation","observation_timestamp":observation.observed_at,"observation_fingerprint":observation.fingerprint,"mig_parent_by_uuid":parents},"memory":{"host_bytes":observation.host_memory_bytes,"gpu_bytes":allocation.memory_bytes,"temp_bytes":observation.temp_bytes,"enforcement_mode":"hard_preflight"},"temp":{"runtime_root":request.runtime_root,"run_root":run_root,"log_root":log_root,"quota_bytes":request.temp_bytes,"disposal_policy":"record_every_side_effect"},"ports":request.ports});
+        let owner = serde_json::json!({"owner_id":request.owner_id,"parent_id":request.parent_id,"context_id":request.context_id,"maximum_timeout_seconds":request.maximum_timeout_seconds,"managed_run_integration":request.integration_contract});
+        let execution = serde_json::json!({"cwd":request.cwd,"argv":request.argv,"env":environment,"admission_fingerprint":allocation.admission_fingerprint,"owner_maximum_timeout_seconds":request.maximum_timeout_seconds,"idle_policy":"observe_and_wait","force_stop_policy":"no_idle_force_stop; runner_deadline_owner_only","gpu_force_kill_policy":"never","requested_chunks":request.requested_chunks});
+        let structure_ref = "documents/structure/repo-structure-contract.toml";
+        let mut tree = observation.structure_tool.clone();
+        if tree
+            .get("structure_contract_ref")
+            .is_some_and(|value| value != structure_ref)
+        {
+            return Err(Failure::new(
+                "structure_contract_authority_mismatch",
+                "tree capability cannot override canonical structure contract",
+            ));
+        }
+        tree.insert("structure_contract_ref".into(), structure_ref.into());
+        let container = serde_json::json!({"runtime_root":request.runtime_root,"source_projection_root":projection,"structure_tool":"tree","tree_version":observation.structure_tool.get("version").map(String::as_str).unwrap_or("unknown"),"tree_capability":tree,"structure_contract_ref":structure_ref,"tool_availability":observation.tool_availability,"container_id":observation.container_id,"boot_id":observation.boot_id});
+        let mut effects = vec![
+            serde_json::json!({"id":"workspace-bind","owner":"container-runtime","target":"/workspace","policy":"allowed_source_bound_readback","disposal":"record_only"}),
+            serde_json::json!({"id":"runtime-root","owner":"ExecutionResourcePlan","target":request.runtime_root,"policy":"container-local","disposal":"record_only"}),
+            serde_json::json!({"id":"run-root","owner":"ExecutionResourcePlan","target":run_root,"policy":"container-local","disposal":"record_only"}),
+            serde_json::json!({"id":"log-root","owner":"ExecutionResourcePlan","target":log_root,"policy":"container-local","disposal":"record_only"}),
+            serde_json::json!({"id":"source-projection","owner":"ExecutionResourcePlan","target":projection,"policy":"controlled_source_bound","disposal":"record_only"}),
+            serde_json::json!({"id":"runner-process-tree","owner":"ExperimentRunner","target":plan_id,"policy":"runner_owned_descendant_lifecycle","disposal":"dispose_after_terminal"}),
+            serde_json::json!({"id":"gpu-leases","owner":"GpuReservationTransaction","target":request.lock_root,"policy":"shared_scheduler_visibility","disposal":"owner_callback_after_runner_join"}),
+            serde_json::json!({"id":"cpu-affinity","owner":"ExperimentRunner","target":request.cpu_requested_set,"policy":"runner_owned","disposal":"dispose_if_applied"}),
+            serde_json::json!({"id":"gpu-slot","owner":"ExperimentRunner","target":allocation.slot_id,"policy":"runner_owned","disposal":"dispose_if_allocated"}),
+            serde_json::json!({"id":"temp-handle","owner":"ExperimentRunner","target":run_root,"policy":"retain_evidence_remove_transient","disposal":"owner_callback"}),
+        ];
+        effects.extend(request.ports.iter().enumerate().map(|(index,port)|serde_json::json!({"id":format!("port:{}",port.get("name").map(Value::to_string).unwrap_or_else(||index.to_string())),"owner":"ExperimentRunner","target":port,"policy":"runner_owned","disposal":"release_if_allocated"})));
+        let side_effect_inventory = Value::Array(effects);
+        let spec = serde_json::json!({"schema_version":PLAN_SCHEMA,"plan_id":plan_id,"owner":owner,"resources":resources,"execution":execution,"container":container,"side_effect_inventory":side_effect_inventory});
+        let plan_fingerprint = canonical_fingerprint(&spec)?;
+        allocation.plan_fingerprint = plan_fingerprint.clone();
+        Ok(Self {
+            schema_version: PLAN_SCHEMA.into(),
+            plan_id,
+            state: PlanState::PlanFrozen,
+            state_history: vec![PlanState::ResourceDiscovered, PlanState::PlanFrozen],
+            owner,
+            resources,
+            execution,
+            container,
+            side_effect_inventory,
+            plan_fingerprint,
+            readback: serde_json::json!({"non_secret_equal":false,"secret_witness":[],"observed_cwd":null,"observed_argv":[]}),
+            evidence: serde_json::json!({"terminal":null,"partial":null,"cleanup":null,"closeout":null}),
+            gpu_allocation: allocation,
+        })
+    }
     pub fn state(&self) -> PlanState {
         self.state
     }

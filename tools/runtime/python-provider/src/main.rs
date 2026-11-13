@@ -96,6 +96,55 @@ fn runtime(py: Python<'_>) -> PyResult<Value> {
     }))
 }
 
+fn system_metadata(py: Python<'_>) -> PyResult<Value> {
+    let mut result = runtime(py)?;
+    let platform = py.import("platform")?;
+    result["python_version"] = json!(platform
+        .call_method0("python_version")?
+        .extract::<String>()?);
+    result["platform"] = json!(platform.call_method0("platform")?.extract::<String>()?);
+    result["hostname"] = json!(py
+        .import("socket")?
+        .call_method0("gethostname")?
+        .extract::<String>()?);
+    Ok(result)
+}
+
+fn format_command(py: Python<'_>, input: &Value) -> PyResult<Value> {
+    use pyo3::types::{PyDict, PyString};
+    let invalid =
+        || pyo3::exceptions::PyValueError::new_err("command and placeholder strings are required");
+    let raw = input.get("command").ok_or_else(invalid)?;
+    let tokens = if let Some(text) = raw.as_str() {
+        py.import("shlex")?
+            .call_method1("split", (text,))?
+            .extract::<Vec<String>>()?
+    } else {
+        raw.as_array()
+            .ok_or_else(invalid)?
+            .iter()
+            .map(|value| value.as_str().map(str::to_owned).ok_or_else(invalid))
+            .collect::<PyResult<Vec<_>>>()?
+    };
+    let placeholders = input
+        .get("placeholders")
+        .and_then(Value::as_object)
+        .ok_or_else(invalid)?;
+    let keywords = PyDict::new(py);
+    for (key, value) in placeholders {
+        keywords.set_item(key, value.as_str().ok_or_else(invalid)?)?;
+    }
+    let result = tokens
+        .iter()
+        .map(|token| {
+            PyString::new(py, token)
+                .call_method("format", (), Some(&keywords))?
+                .extract::<String>()
+        })
+        .collect::<PyResult<Vec<_>>>()?;
+    Ok(json!({"command":result}))
+}
+
 fn module_location(py: Python<'_>, name: &str) -> PyResult<Value> {
     let spec = py
         .import("importlib.util")?
@@ -175,6 +224,18 @@ fn main() {
     }
     let result = match command {
         "runtime" if args.len() == 1 => Python::attach(runtime),
+        "system-metadata" if args.len() == 1 => Python::attach(system_metadata),
+        "format-command" if args.len() == 1 => {
+            let mut bytes = Vec::new();
+            if let Err(error) = io::stdin().read_to_end(&mut bytes) {
+                eprintln!("{error}");
+                std::process::exit(2);
+            }
+            match serde_json::from_slice(&bytes) {
+                Ok(input) => Python::attach(|py| format_command(py, &input)),
+                Err(error) => Err(pyo3::exceptions::PyValueError::new_err(error.to_string())),
+            }
+        }
         "module-location" if args.len() == 2 => Python::attach(|py| module_location(py, &args[1])),
         "pdf-extract" | "html-extract" if args.len() == 1 => {
             let mut bytes = Vec::new();

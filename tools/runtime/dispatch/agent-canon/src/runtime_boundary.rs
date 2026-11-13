@@ -342,6 +342,36 @@ pub(crate) struct RuntimeDirectory {
 }
 
 impl RuntimeDirectory {
+    #[cfg(target_os = "linux")]
+    pub(crate) fn publish_anonymous_once(
+        &self,
+        relative: &Path,
+        bytes: &[u8],
+        mode: u32,
+    ) -> std::io::Result<std::fs::File> {
+        use cap_fs_ext::{FollowSymlinks, OpenOptionsFollowExt};
+        let (parent, name) = self.parent(relative, false)?;
+        let descriptor = rustix::fs::openat(
+            &parent.directory,
+            ".",
+            rustix::fs::OFlags::WRONLY | rustix::fs::OFlags::TMPFILE | rustix::fs::OFlags::CLOEXEC,
+            rustix::fs::Mode::from_bits_truncate(mode),
+        )?;
+        let mut file = std::fs::File::from(descriptor);
+        file.write_all(bytes)?;
+        file.sync_all()?;
+        rustix::fs::linkat(
+            &file,
+            "",
+            &parent.directory,
+            &name,
+            rustix::fs::AtFlags::EMPTY_PATH,
+        )?;
+        parent.sync_directory()?;
+        let mut options = cap_std::fs::OpenOptions::new();
+        options.read(true).follow(FollowSymlinks::No);
+        Ok(parent.directory.open_with(name, &options)?.into_std())
+    }
     pub(crate) fn create_file_once(
         &self,
         relative: &Path,

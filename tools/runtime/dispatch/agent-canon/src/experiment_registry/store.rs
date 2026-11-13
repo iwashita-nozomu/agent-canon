@@ -44,6 +44,30 @@ pub(crate) fn load(path: &Path) -> Result<RegistryValue, String> {
     parse_registry(&text)
 }
 
+pub(crate) fn json_value(value: &RegistryValue) -> Result<JsonValue, String> {
+    use crate::python_json::{JsonArray, JsonNumber, JsonObject};
+    Ok(match value {
+        RegistryValue::String(value) => JsonValue::String(JsonString::from_text(value)),
+        RegistryValue::Integer(value) => JsonValue::Number(JsonNumber::Integer(value.to_string())),
+        RegistryValue::Float(value) => JsonValue::Number(JsonNumber::Float(*value)),
+        RegistryValue::Boolean(value) => JsonValue::Bool(*value),
+        RegistryValue::Array(values) => JsonValue::Array(JsonArray(
+            values.iter().map(json_value).collect::<Result<_, _>>()?,
+        )),
+        RegistryValue::Table(values) => JsonValue::Object(JsonObject(
+            values
+                .iter()
+                .map(|(key, value)| Ok((JsonString::from_text(key), json_value(value)?)))
+                .collect::<Result<_, String>>()?,
+        )),
+        RegistryValue::Other(value) => {
+            return Err(format!(
+                "experiment registry contains an unsupported JSON value: {value}"
+            ))
+        }
+    })
+}
+
 pub(crate) fn get<'a>(table: &'a RegistryValue, key: &str) -> Option<&'a RegistryValue> {
     let RegistryValue::Table(items) = table else {
         return None;
