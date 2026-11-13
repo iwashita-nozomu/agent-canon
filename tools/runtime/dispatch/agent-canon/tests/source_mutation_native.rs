@@ -191,6 +191,45 @@ fn source_capability_writes_only_the_approved_file() {
 }
 
 #[test]
+fn external_copy_keeps_explicit_read_and_write_roots() {
+    let source = TempRoot::new();
+    let target = TempRoot::new();
+    let input = source.write("input.md", "copy bytes\n");
+    let output = target.0.join("assets/output.md");
+    let capability = capability(&target.0, &["assets/output.md"]);
+    capability
+        .copy_file_from_root_with_metadata(&source.0, &input, &output)
+        .unwrap();
+    assert_eq!(fs::read(&output).unwrap(), b"copy bytes\n");
+    let outsider = TempRoot::new();
+    let outside_input = outsider.write("private.md", "keep\n");
+    assert!(capability
+        .copy_file_from_root_with_metadata(&source.0, &outside_input, &output)
+        .is_err());
+    assert!(capability
+        .copy_file_from_root_with_metadata(&source.0, &input, &target.0.join("unapproved.md"))
+        .is_err());
+    assert_eq!(fs::read(&output).unwrap(), b"copy bytes\n");
+}
+
+#[cfg(unix)]
+#[test]
+fn explicit_output_parent_creation_rejects_symlink_components() {
+    use agent_canon::source_mutation::ensure_file_parent_nofollow;
+    use std::os::unix::fs::symlink;
+    let root = TempRoot::new();
+    let outside = TempRoot::new();
+    let output = root.0.join("nested/assets/result.html");
+    assert_eq!(
+        ensure_file_parent_nofollow(&output).unwrap(),
+        output.parent().unwrap()
+    );
+    symlink(&outside.0, root.0.join("alias")).unwrap();
+    assert!(ensure_file_parent_nofollow(&root.0.join("alias/created/result.html")).is_err());
+    assert!(!outside.0.join("created").exists());
+}
+
+#[test]
 fn source_capability_removes_only_the_approved_file() {
     let root = TempRoot::new();
     let approved = root.write("docs/approved.md", "remove me\n");

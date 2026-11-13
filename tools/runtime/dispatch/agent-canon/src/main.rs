@@ -169,6 +169,7 @@ Commands:
   check-semantic-responsibility-contract [paths...] [--root ROOT] [--template TEMPLATE] [--instance INSTANCE] [--artifact-root ARTIFACT_ROOT] [--format text|json]
   check-solid-evidence [paths...] [--root ROOT] [--changed] [--base-ref BASE_REF] [--evidence EVIDENCE] [--exclude EXCLUDE] [--verbose] [--format text|json]
   rust-migration-audit --root <repo-root>
+  semantic-provider-html-report --compare-json PATH --output PATH [options]
   update-latest-result RESULT_ROOT --variant VARIANT [--result-dir PATH]
   parent-repository-audit <list|check> --root ROOT [options]
   html-artifact-access REPORT_PATH [options]
@@ -394,6 +395,9 @@ fn main() {
     }
     if args.len() >= 2 && args[1] == "rust-migration-audit" {
         std::process::exit(migration_audit::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "semantic-provider-html-report" {
+        std::process::exit(semantic_index::provider_html_report::run(&args[2..]));
     }
     if args.len() >= 2 && args[1] == agent_canon::codex_agent_role_eval::SELECTOR {
         std::process::exit(agent_canon::codex_agent_role_eval::run(&args[2..]));
