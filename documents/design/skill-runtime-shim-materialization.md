@@ -10,7 +10,7 @@ upstream design ../../agents/canonical/skills.md public skill reader/index bound
 upstream design ./skill-tool-invocation-graph.md skill/tool identity, graph projection, and readback contract
 upstream design ../../documents/codex/prompt-skill-evaluation-checklist.md fresh evaluator and report contract
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs deterministic catalog-backed route consumer
-downstream implementation ../../tools/agent/skills/skill_dependency_map.py graph materializer and semantic golden producer
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs graph materializer and semantic golden producer
 downstream implementation ../../tools/validation/semantic/runtime/check_agent_runtime_alignment.py host-discovery and catalog/shim parity checker
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_materialization.rs native v3 readback renderer and byte comparison
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/skill_frontmatter.rs native frontmatter compatibility command
@@ -846,7 +846,7 @@ Wave 4 design の validation evidence は次です。
 ~~~bash
 python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py
 tools/bin/agent-canon check-skill-frontmatter --root .
-python3 tools/agent/skills/skill_dependency_map.py check --root .
+tools/bin/agent-canon skill-dependency-map check --root .
 tools/bin/agent-canon check-skill-tool-invocation-graph --root .
 tools/bin/agent-canon evaluate-workflow-selection \
   --root . --manifest eval/definitions/workflow_selection_eval.toml \

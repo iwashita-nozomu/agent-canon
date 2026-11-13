@@ -12,7 +12,7 @@ downstream design ../canonical/CODEX_WORKFLOW.md consumes the shared skill canon
 downstream implementation ../../tools/validation/semantic/runtime/check_agent_runtime_alignment.py validates public and official skill boundaries
 upstream design code-visualization.md visualization selection and native renderer delegation
 downstream implementation ../../tools/agent/skills/skill_route_catalog.py validates public skill routing
-downstream implementation ../../tools/agent/skills/skill_dependency_map.py validates the dependency dictionary and generates its Mermaid projection
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs validates the dependency dictionary and generates its graph projections
 @dependency-end
 -->
 
@@ -75,7 +75,7 @@ source / adapter / installed / repository-owned のpathと、選択済みSkill�
 [agent-orchestration](agent-orchestration.md) は task 開始時の routing entry として public surface の先頭に置きます。
 [subagent-bootstrap](subagent-bootstrap.md) も public とし、選択された repo-changing task の stage separation で使います。
 
-`skill_dependency_map.py` が単一の Mermaid/JSON graph を生成します。通常は明示した外部 runtime artifact へ出力し、
+`agent-canon skill-dependency-map graph` が単一の Mermaid/JSON graph を生成します。通常は明示した外部 runtime artifact へ出力し、
 source checkout の `documents/runtime/` を暗黙に更新しません。tracked reader pair の更新だけは、固定 Markdown/JSON
 2 path の `--source-mutation-capability-json` と外部 before/after evidence を伴う明示保守操作です。
 図を手編集せず、辞書の変更から再生成します。
@@ -87,9 +87,9 @@ source checkout の `documents/runtime/` を暗黙に更新しません。tracke
 | public skill / shim / doc / config の整合 | `python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py` |
 | prompt に対する skill 選択 | `tools/bin/agent-canon route --prompt "<user request>" --mode routing-only --format json` |
 | 選択した tool の実行 | 既存 CLI / API / script を native argv で呼び、実行と検証は各 owner に委譲します。 |
-| 依存辞書の静的検査 | `python3 tools/agent/skills/skill_dependency_map.py check --root .` |
-| 外部 graph 生成 | `python3 tools/agent/skills/skill_dependency_map.py graph --root . --runtime-root <external-runtime-root>` |
-| tracked reader pair の明示更新 | `python3 tools/agent/skills/skill_dependency_map.py graph --root . --output documents/runtime/skill-dependency-graph.md --runtime-root <external-runtime-root> --source-mutation-capability-json <exact-two-path-capability.json>` |
+| 依存辞書の静的検査 | `tools/bin/agent-canon skill-dependency-map check --root .` |
+| 外部 graph 生成 | `tools/bin/agent-canon skill-dependency-map graph --root . --runtime-root <external-runtime-root>` |
+| tracked reader pair の明示更新 | `tools/bin/agent-canon skill-dependency-map graph --root . --output documents/runtime/skill-dependency-graph.md --runtime-root <external-runtime-root> --source-mutation-capability-json <exact-two-path-capability.json>` |
 
 ## Internal Review And Runtime Routines
 

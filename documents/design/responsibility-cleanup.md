@@ -15,7 +15,7 @@ downstream implementation ../../agents/skills/README.md AgentCanon-specific skil
 downstream implementation ../../agents/skills/catalog.yaml public skill registry
 downstream implementation ../../agents/skills/skill-dependencies.yaml public skill dependency DAG
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_materialization.rs native generated shim materializer
-downstream implementation ../../tools/agent/skills/skill_dependency_map.py generated graph materializer
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs generated graph materializer
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs graph readback checker
 @dependency-end
 -->
