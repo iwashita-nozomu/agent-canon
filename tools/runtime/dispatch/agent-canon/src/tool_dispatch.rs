@@ -1022,7 +1022,7 @@ fn resolve_container_argv(
     Ok(command)
 }
 
-fn find_executable(name: &str) -> Option<PathBuf> {
+pub(crate) fn find_executable(name: &str) -> Option<PathBuf> {
     let path_value = env::var_os("PATH")?;
     env::split_paths(&path_value)
         .map(|directory| directory.join(name))
