@@ -106,8 +106,8 @@ def test_eval_producers_leave_source_status_and_bytes_unchanged(tmp_path: Path) 
     environment.pop("AGENT_CANON_RUNTIME_ROOT", None)
     commands = (
         (
-            sys.executable,
-            str(ROOT / "eval/producers/evaluate_workflow_selection.py"),
+            str(ROOT / "tools/bin/agent-canon"),
+            "evaluate-workflow-selection",
             "--accumulate",
             "--runtime-root",
             str(runtime),

@@ -12,7 +12,7 @@ id = "workflow-selection"
 check_id = "workflow_selection_eval"
 count_label = "WORKFLOW_SELECTION_REPORTS"
 summary = "Prompt-intake workflow selection routing eval reports."
-producer = "eval/producers/evaluate_workflow_selection.py --accumulate"
+producer = "tools/bin/agent-canon evaluate-workflow-selection --accumulate"
 filename_regex = '^workflow-selection-eval-\d{8}T\d{12}Z-[0-9a-f]{10}-(?:pass|fail)\.md$'
 run_id_regex = '\bWORKFLOW_SELECTION_EVAL_RUN_ID=([A-Za-z0-9_.:-]+)'
 missing_reports_detail = "no-workflow-selection-eval-reports"
