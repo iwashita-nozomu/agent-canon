@@ -23,18 +23,18 @@ use agent_canon::authority::{
 };
 use agent_canon::eval_archive_paths;
 use agent_canon::log_repository_identity::{
-    UNIDENTIFIED_SOURCE, normalize_remote, source_remote, stable_source_id_from_runtime_env,
+    normalize_remote, source_remote, stable_source_id_from_runtime_env, UNIDENTIFIED_SOURCE,
 };
 use agent_canon::runtime_boundary::{
-    RUNTIME_ROOT_ENV, RuntimeArtifactBoundary, RuntimeFileLock, RuntimeSpoolBoundary,
-    resolve_external_artifact_path,
+    resolve_external_artifact_path, RuntimeArtifactBoundary, RuntimeFileLock, RuntimeSpoolBoundary,
+    RUNTIME_ROOT_ENV,
 };
 use agent_canon::source_mutation::SourceMutationCapability;
 use cap_fs_ext::{DirExt, FollowSymlinks, OpenOptionsFollowExt};
 use cap_std::ambient_authority;
 use cap_std::fs::{Dir, OpenOptions};
 use regex::bytes::Regex as BytesRegex;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::ffi::OsStr;
@@ -3944,7 +3944,7 @@ fn copy_agent_reports_prepared(
         ));
     }
     let root = report_root
-        .map(|path| agent_canon::path_resolution::resolve_non_strict(path))
+        .map(agent_canon::path_resolution::resolve_non_strict)
         .transpose()
         .map_err(|error| ArchiveError::new("report_root_invalid", error))?
         .unwrap_or_else(|| context.source_root.join("reports/agents"));
@@ -4240,10 +4240,11 @@ fn dirty_key_for_path(path: &str) -> (String, bool) {
             _ => None,
         })
         .collect::<Vec<_>>();
-    if parts.len() >= 2 && REPO_KEYED_ARCHIVE_FAMILIES.contains(&parts[0].as_str()) {
-        if parts[1] != "legacy-import" {
-            return (parts[1].clone(), false);
-        }
+    if parts.len() >= 2
+        && REPO_KEYED_ARCHIVE_FAMILIES.contains(&parts[0].as_str())
+        && parts[1] != "legacy-import"
+    {
+        return (parts[1].clone(), false);
     }
     if parts.first().is_some_and(|part| {
         matches!(

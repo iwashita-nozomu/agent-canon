@@ -1,12 +1,12 @@
 //! Transactional ingestion of the host hook-event spool into the archive clone.
 
 use super::{
-    ArchiveContext, ArchiveError, ArchivePublicationReceipt, PreparedArchiveTransaction,
-    archive_blob_at, archive_runtime_root, canonical_compact_json, sha256_hex,
+    archive_blob_at, archive_runtime_root, canonical_compact_json, sha256_hex, ArchiveContext,
+    ArchiveError, ArchivePublicationReceipt, PreparedArchiveTransaction,
 };
 use agent_canon::eval_archive_paths;
 use agent_canon::runtime_boundary::{RuntimeArtifactBoundary, RuntimeSpoolBoundary};
-use serde_json::{Map, Value, json};
+use serde_json::{json, Map, Value};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -785,6 +785,6 @@ mod tests {
         let mut row = serde_json::to_vec(&index).unwrap();
         row.push(b'\n');
         assert_eq!(parse_index(&row).unwrap().len(), 1);
-        assert!(parse_index(&[b'{', b'}', b'\n']).is_err());
+        assert!(parse_index(b"{}\n").is_err());
     }
 }

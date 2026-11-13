@@ -1,13 +1,13 @@
 use super::{
-    AttestationRequest, AttestedParent, AuthorityError, ChildHandoffReceipt, ChildHandoffRequest,
-    ComponentIdentity, EntryKind, FileIdentity, FileMode, HANDOFF_SCHEMA, HandoffMode,
-    HandoffStorage, HandoffTransport, LexicalEntrySnapshot, LexicalSnapshot, NonEmptyTrimmedString,
-    Nonce128, OwnerRoot, ParentOwnedNoReplaceOutcome, ParentOwnedPathReceipt, ParentRootReject,
-    PhysicalRoot, RootKind, RootPrecedence, SecretToken, Sha256Digest, TargetIdentity,
-    VerifiedChildHandoff, digest_bytes, digest_hex, encode_hex,
+    digest_bytes, digest_hex, encode_hex, AttestationRequest, AttestedParent, AuthorityError,
+    ChildHandoffReceipt, ChildHandoffRequest, ComponentIdentity, EntryKind, FileIdentity, FileMode,
+    HandoffMode, HandoffStorage, HandoffTransport, LexicalEntrySnapshot, LexicalSnapshot,
+    NonEmptyTrimmedString, Nonce128, OwnerRoot, ParentOwnedNoReplaceOutcome,
+    ParentOwnedPathReceipt, ParentRootReject, PhysicalRoot, RootKind, RootPrecedence, SecretToken,
+    Sha256Digest, TargetIdentity, VerifiedChildHandoff, HANDOFF_SCHEMA,
 };
-use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE;
+use base64::Engine;
 use cap_fs_ext::{DirExt, FollowSymlinks, OpenOptionsFollowExt};
 use cap_std::ambient_authority;
 use cap_std::fs::{
@@ -3406,12 +3406,10 @@ mod strict_json_tests {
 
     #[test]
     fn raw_object_parser_rejects_nested_duplicate_keys() {
-        assert!(
-            strict_json(
-                br#"{"outer":{"value":1,"value":2}}"#,
-                ParentRootReject::HandoffInvalid,
-            )
-            .is_err()
-        );
+        assert!(strict_json(
+            br#"{"outer":{"value":1,"value":2}}"#,
+            ParentRootReject::HandoffInvalid,
+        )
+        .is_err());
     }
 }

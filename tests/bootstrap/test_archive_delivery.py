@@ -21,6 +21,8 @@ def run_adapter(tmp_path: Path, script: str) -> subprocess.CompletedProcess[str]
         ["bash", "-c", f"source {shlex.quote(str(ADAPTER))}\n{script}"],
         env={
             **os.environ,
+            "AGENT_CANON_NATIVE_BIN": "",
+            "AGENT_CANON_CLI": "",
             "AGENT_CANON_STATE_ROOT": str(state),
             "AGENT_CANON_RUNTIME_ROOT": str(tmp_path),
             "AGENT_CANON_REPOSITORY_ROOT": str(tmp_path),

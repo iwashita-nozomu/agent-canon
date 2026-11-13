@@ -173,6 +173,7 @@ class ResponsibilityScopeTest(unittest.TestCase):
             "tools/runtime/dispatch/agent-canon/src/runtime_log_archive/runtime_event.rs": "eval-and-hook-evidence",
             "tools/runtime/dispatch/agent-canon/src/runtime_log_archive/hook_spool.rs": "eval-and-hook-evidence",
             "tools/runtime/dispatch/agent-canon/src/eval_archive_paths.rs": "shared-tooling",
+            "tools/runtime/dispatch/agent-canon/src/log_repository_identity.rs": "shared-tooling",
             "tests/agent_tools/test_eval_accumulation_check.py": "eval-and-hook-evidence",
             "tests/agent_tools/test_runtime_log_archive_git.py": "eval-and-hook-evidence",
             "tools/runtime/dispatch/agent-canon/tests/runtime_log_archive_native.rs": "eval-and-hook-evidence",

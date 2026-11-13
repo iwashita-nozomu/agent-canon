@@ -341,7 +341,11 @@ pub fn run_generated_artifact_guard(args: &[String]) -> i32 {
         eprintln!("agent-canon generated-artifact-guard: failed to write output: {error}");
         return 1;
     }
-    if blockers.is_empty() { 0 } else { 1 }
+    if blockers.is_empty() {
+        0
+    } else {
+        1
+    }
 }
 
 const PLAN_SECTIONS: &[(&str, &str)] = &[
@@ -857,11 +861,9 @@ mod tests {
     #[test]
     fn empty_planned_work_units_keep_the_waterfall_diagnostic() {
         let text = "# Schedule\n## Stage Plan\n| Stage | Owner |\n| --- | --- |\n| plan | manager |\n## Clause Coverage\n| Clause | Stage |\n| --- | --- |\n| C1 | plan |\n## Planned Work Units\n| Unit | Clause |\n| --- | --- |\n";
-        assert!(
-            check_schedule_artifact(text)
-                .iter()
-                .any(|blocker| blocker == "schedule.md:planned_work_units_empty")
-        );
+        assert!(check_schedule_artifact(text)
+            .iter()
+            .any(|blocker| blocker == "schedule.md:planned_work_units_empty"));
     }
 
     #[test]

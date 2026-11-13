@@ -85,6 +85,11 @@ fn fixture() -> (
     init_repo(&source);
     init_repo(&canon);
     fs::create_dir_all(&runtime).unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&runtime, fs::Permissions::from_mode(0o700)).unwrap();
+    }
     fs::create_dir_all(&sessions).unwrap();
     git(
         &source,
@@ -240,8 +245,9 @@ fn append_and_materialize_bind_the_exact_rollout_and_confirmed_receipt() {
     );
     assert!(
         materialize.status.success(),
-        "{}",
-        String::from_utf8_lossy(&materialize.stdout)
+        "{}{}",
+        String::from_utf8_lossy(&materialize.stdout),
+        String::from_utf8_lossy(&materialize.stderr)
     );
     let output = String::from_utf8_lossy(&materialize.stdout);
     assert!(output.contains("RUNTIME_EVENT_OUTCOME=committed"));

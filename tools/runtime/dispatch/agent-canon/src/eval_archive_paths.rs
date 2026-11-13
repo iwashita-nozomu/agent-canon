@@ -14,11 +14,11 @@
 //! Read-only archive paths used by the native eval accumulation checker.
 
 use crate::log_repository_identity::{
-    SOURCE_REMOTE_ENV, SOURCE_REMOTE_NAME_ENV, STABLE_ID_ENV, repo_log_key,
+    repo_log_key, SOURCE_REMOTE_ENV, SOURCE_REMOTE_NAME_ENV, STABLE_ID_ENV,
 };
 use crate::python_text::python_strip;
 use crate::runtime_boundary::RuntimeSpoolBoundary;
-use crate::runtime_boundary::{RuntimeArtifactBoundary, resolve_external_artifact_path};
+use crate::runtime_boundary::{resolve_external_artifact_path, RuntimeArtifactBoundary};
 use std::collections::{BTreeMap, HashSet};
 use std::env;
 use std::path::{Path, PathBuf};
@@ -610,7 +610,7 @@ fn archive_safe_slug(value: &str) -> String {
 }
 #[cfg(test)]
 mod source_root_tests {
-    use super::agent_canon_root;
+    use super::*;
     use std::fs;
 
     #[test]
@@ -697,7 +697,7 @@ mod source_root_tests {
         );
         assert_eq!(
             hook_event_spool_root(&source, Some(&runtime)).unwrap(),
-            runtime.join("spool/hook-events").join(key)
+            runtime.join("spool/hook-events").join(&key)
         );
         assert_eq!(
             runtime_event_publication_outcome_spool_root(&source, Some(&runtime)).unwrap(),

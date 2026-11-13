@@ -1,7 +1,7 @@
 //! Bounded GitHub main-Eval artifact input for the existing host publisher.
 
 use super::archive_runtime_root;
-use super::{ArchiveContext, ArchiveError, CommandOptions, command_archive_eval};
+use super::{command_archive_eval, ArchiveContext, ArchiveError, CommandOptions};
 use agent_canon::log_repository_identity::{normalize_remote, source_remote};
 use agent_canon::runtime_boundary::{RuntimeArtifactBoundary, RuntimeSpoolBoundary};
 use cap_fs_ext::{DirExt, FollowSymlinks, OpenOptionsFollowExt};
@@ -28,6 +28,15 @@ pub(super) struct EvalArtifactLimits {
     entry_bytes: u64,
     runtime_bytes: u64,
     members: u64,
+}
+
+struct MainEvalDelivery<'a> {
+    context: &'a ArchiveContext,
+    repository: &'a str,
+    boundary: &'a RuntimeArtifactBoundary,
+    stage_root: &'a Path,
+    limits: EvalArtifactLimits,
+    no_pull: bool,
 }
 
 impl EvalArtifactLimits {
@@ -810,15 +819,17 @@ pub(super) fn deliver_main_evals(
                 continue;
             }
             match deliver_one_artifact(
-                context,
-                repository,
-                &boundary,
-                &stage_root_absolute,
+                &MainEvalDelivery {
+                    context,
+                    repository,
+                    boundary: &boundary,
+                    stage_root: &stage_root_absolute,
+                    limits,
+                    no_pull,
+                },
                 &run_id,
                 head,
                 object,
-                limits,
-                no_pull,
             ) {
                 Ok(true) => {
                     published_run_ids.insert(run_id);
@@ -897,16 +908,17 @@ fn remove_stage_directory(
 }
 
 fn deliver_one_artifact(
-    context: &ArchiveContext,
-    repository: &str,
-    boundary: &RuntimeArtifactBoundary,
-    stage_root: &Path,
+    delivery: &MainEvalDelivery<'_>,
     run_id: &str,
     head: &str,
     artifact: &serde_json::Map<String, Value>,
-    limits: EvalArtifactLimits,
-    no_pull: bool,
 ) -> Result<bool, ArchiveError> {
+    let context = delivery.context;
+    let repository = delivery.repository;
+    let boundary = delivery.boundary;
+    let stage_root = delivery.stage_root;
+    let limits = delivery.limits;
+    let no_pull = delivery.no_pull;
     let artifact_id = artifact
         .get("id")
         .and_then(Value::as_i64)

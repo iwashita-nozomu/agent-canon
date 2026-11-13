@@ -24,6 +24,7 @@ NATIVE_CLI = os.environ.get("AGENT_CANON_CLI") or os.environ.get(
     "AGENT_CANON_NATIVE_BIN", str(PROJECT_ROOT / "tools" / "bin" / "agent-canon")
 )
 HOOK_SPOOL_INDEX_NAME = ".spool-index.jsonl"
+FIXTURE_SOURCE_REMOTE = "https://github.com/example/eval-accumulation-fixture.git"
 
 
 def mounted_log_archive_root(canon_root: Path, runtime_root: Path | None = None) -> Path:
@@ -35,6 +36,9 @@ def mounted_log_archive_root(canon_root: Path, runtime_root: Path | None = None)
 def repo_log_key(source_root: Path) -> str:
     """Read the source key from the native archive owner's CLI output."""
     runtime = source_root.parent / f".{source_root.name}.agent-canon-runtime"
+    environment = os.environ.copy()
+    environment.pop("AGENT_CANON_SOURCE_REPOSITORY_ID", None)
+    environment["AGENT_CANON_SOURCE_REPOSITORY_REMOTE"] = FIXTURE_SOURCE_REMOTE
     result = subprocess.run(
         [
             NATIVE_CLI,
@@ -50,6 +54,7 @@ def repo_log_key(source_root: Path) -> str:
         check=False,
         capture_output=True,
         text=True,
+        env=environment,
     )
     assert result.returncode == 0, result.stdout + result.stderr
     prefix = "RUNTIME_LOG_ARCHIVE_REPO_KEY="
@@ -124,6 +129,8 @@ class EvalAccumulationCheckTest(unittest.TestCase):
         environment = os.environ.copy()
         environment.pop("AGENT_CANON_HOOK_ARCHIVE_DIR", None)
         environment.pop("AGENT_CANON_LOG_ROOT", None)
+        environment.pop("AGENT_CANON_SOURCE_REPOSITORY_ID", None)
+        environment["AGENT_CANON_SOURCE_REPOSITORY_REMOTE"] = FIXTURE_SOURCE_REMOTE
         if not with_runtime:
             environment.pop("AGENT_CANON_RUNTIME_ROOT", None)
         return subprocess.run(

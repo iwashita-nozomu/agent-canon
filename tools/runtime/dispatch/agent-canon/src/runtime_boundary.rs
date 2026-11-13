@@ -1849,11 +1849,9 @@ mod tests {
             nested_source.join("forbidden.txt"),
             PathBuf::from("source/forbidden.txt"),
         ] {
-            assert!(
-                boundary
-                    .atomic_write_bytes(&path, b"forbidden", 0o600)
-                    .is_err()
-            );
+            assert!(boundary
+                .atomic_write_bytes(&path, b"forbidden", 0o600)
+                .is_err());
         }
         assert!(!nested_source.join("forbidden.txt").exists());
         boundary

@@ -10,17 +10,17 @@
 // @dependency-end
 
 use crate::dependency_manifest::{
-    DependencyDeclaration, ManifestSnapshot, ProducerIdentity, SnapshotRequest, SourceIdentity,
-    SourceSpan, SurfaceRelation, capture_snapshot, current_producer_identity, diagnostic_category,
-    diagnostic_identity_json, probe_snapshot_identity, snapshot_completeness,
-    validate_persisted_producer_identity, validate_producer_identity, write_snapshot_jsonl,
+    capture_snapshot, current_producer_identity, diagnostic_category, diagnostic_identity_json,
+    probe_snapshot_identity, snapshot_completeness, validate_persisted_producer_identity,
+    validate_producer_identity, write_snapshot_jsonl, DependencyDeclaration, ManifestSnapshot,
+    ProducerIdentity, SnapshotRequest, SourceIdentity, SourceSpan, SurfaceRelation,
 };
 use crate::runtime_boundary::{
     resolve_runtime_root, resolve_runtime_root_at, stable_source_key, validate_external_target,
 };
 use crate::structured_analysis::{initialize_graph_schema, validate_graph_connection};
-use rusqlite::{Connection, OpenFlags, OptionalExtension, params};
-use serde_json::{Map, Value, json};
+use rusqlite::{params, Connection, OpenFlags, OptionalExtension};
+use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fs;
@@ -3591,8 +3591,8 @@ pub(crate) fn run(args: &[String]) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::Mutex;
     use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Mutex;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     static FIXTURE_COUNTER: AtomicUsize = AtomicUsize::new(0);
@@ -4272,13 +4272,11 @@ mod tests {
             probe.receipt_sha256.as_deref(),
             fixture.receipt_value["receipt_sha256"].as_str()
         );
-        assert!(
-            probe
-                .live_identity_fingerprint
-                .as_deref()
-                .map(|value| runtime_hex(value, 64))
-                .unwrap_or(false)
-        );
+        assert!(probe
+            .live_identity_fingerprint
+            .as_deref()
+            .map(|value| runtime_hex(value, 64))
+            .unwrap_or(false));
         assert_eq!(probe.profile, "default");
 
         let graph_path = test_graph_db(&fixture.root);
@@ -4392,12 +4390,10 @@ mod tests {
         let query = query_graph(&args).expect("source-only query");
         assert_eq!(status["status"], "fresh");
         assert_eq!(query["status"], "fresh");
-        assert!(
-            !query["nodes"]
-                .as_array()
-                .expect("source-only nodes")
-                .is_empty()
-        );
+        assert!(!query["nodes"]
+            .as_array()
+            .expect("source-only nodes")
+            .is_empty());
 
         fs::write(
             fixture.root.join("reports/agents/.active_run"),
@@ -4525,21 +4521,19 @@ mod tests {
             .iter()
             .filter_map(|node| node.get("id").and_then(Value::as_str))
             .collect::<BTreeSet<_>>();
-        assert!(
-            query["facts"]
-                .as_array()
-                .is_some_and(|facts| facts.iter().all(|fact| {
-                    fact.get("kind").and_then(Value::as_str) == Some("dependency")
-                        && fact
-                            .get("from")
-                            .and_then(Value::as_str)
-                            .is_some_and(|id| selected_ids.contains(id))
-                        && fact
-                            .get("to")
-                            .and_then(Value::as_str)
-                            .is_some_and(|id| selected_ids.contains(id))
-                }))
-        );
+        assert!(query["facts"]
+            .as_array()
+            .is_some_and(|facts| facts.iter().all(|fact| {
+                fact.get("kind").and_then(Value::as_str) == Some("dependency")
+                    && fact
+                        .get("from")
+                        .and_then(Value::as_str)
+                        .is_some_and(|id| selected_ids.contains(id))
+                    && fact
+                        .get("to")
+                        .and_then(Value::as_str)
+                        .is_some_and(|id| selected_ids.contains(id))
+            })));
 
         args.depth = 0;
         let seed_only = query_graph(&args).expect("zero-depth seeded query");
@@ -4613,13 +4607,11 @@ mod tests {
         args.all = true;
         args.depth = 0;
         let full = query_graph(&args).expect("full graph query remains unseeded");
-        assert!(
-            full["nodes"]
-                .as_array()
-                .expect("full graph nodes")
-                .iter()
-                .all(|node| node.get("minimum_depth").is_none())
-        );
+        assert!(full["nodes"]
+            .as_array()
+            .expect("full graph nodes")
+            .iter()
+            .all(|node| node.get("minimum_depth").is_none()));
     }
 
     #[test]
@@ -4654,11 +4646,9 @@ mod tests {
         fs::write(&duplicate_path, &duplicate.artifact_bytes).expect("duplicate runtime event");
         let duplicate_error = build_graph_with_failure(&graph_args(&duplicate.root))
             .expect_err("duplicate runtime events must fail closed");
-        assert!(
-            duplicate_error
-                .to_string()
-                .contains("expected one runtime-event certificate, found 2")
-        );
+        assert!(duplicate_error
+            .to_string()
+            .contains("expected one runtime-event certificate, found 2"));
 
         let mismatch = graph_fixture();
         let event = String::from_utf8(mismatch.artifact_bytes.clone()).expect("event UTF-8");
@@ -4682,11 +4672,9 @@ mod tests {
             .expect("event-shaped symlink");
         let symlink_error = build_graph_with_failure(&graph_args(&symlink_fixture.root))
             .expect_err("event-shaped symlink must fail closed");
-        assert!(
-            symlink_error
-                .to_string()
-                .contains("runtime-event entry is not a regular file")
-        );
+        assert!(symlink_error
+            .to_string()
+            .contains("runtime-event entry is not a regular file"));
 
         let nonregular_fixture = graph_fixture();
         fs::remove_file(&nonregular_fixture.artifact).expect("remove runtime event");
@@ -4697,11 +4685,9 @@ mod tests {
         fs::create_dir(&directory_path).expect("event-shaped directory");
         let directory_error = build_graph_with_failure(&graph_args(&nonregular_fixture.root))
             .expect_err("event-shaped directory must fail closed");
-        assert!(
-            directory_error
-                .to_string()
-                .contains("runtime-event entry is not a regular file")
-        );
+        assert!(directory_error
+            .to_string()
+            .contains("runtime-event entry is not a regular file"));
     }
 
     #[test]

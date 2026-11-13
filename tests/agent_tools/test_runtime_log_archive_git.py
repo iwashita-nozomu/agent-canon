@@ -135,8 +135,12 @@ class RuntimeLogArchiveCliTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("RUNTIME_LOG_ARCHIVE_AGENT_REPORTS=pass", result.stdout)
         source_key = next(line.split("=", 1)[1] for line in result.stdout.splitlines() if line.startswith("RUNTIME_LOG_ARCHIVE_REPO_KEY="))
+        run_snapshots = list(
+            (self.archive / "agent-reports" / source_key / "run-1").iterdir()
+        )
+        self.assertEqual(len(run_snapshots), 1)
         self.assertEqual(
-            (self.archive / "agent-reports" / source_key / "run-1" / "review.md").read_text(encoding="utf-8"),
+            (run_snapshots[0] / "review.md").read_text(encoding="utf-8"),
             "durable report\n",
         )
 

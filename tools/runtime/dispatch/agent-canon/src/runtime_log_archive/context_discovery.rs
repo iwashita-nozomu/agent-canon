@@ -4,8 +4,8 @@ use super::{ArchiveContext, ArchiveError, CommandOptions};
 use agent_canon::authority::{
     AttestationRequest, NonEmptyTrimmedString, Nonce128, ParentRootAttestor,
 };
-use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
+use base64::Engine;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -13,8 +13,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::OnceLock;
-use time::OffsetDateTime;
 use time::format_description::well_known::Rfc3339;
+use time::OffsetDateTime;
 
 const SESSION_ROOT_ENV: &str = "AGENT_CANON_CODEX_SESSION_ROOT";
 const CERTIFICATE_SCHEMA: &str = "agent_canon.context_discovery_certificate.v1";
@@ -973,17 +973,13 @@ mod tests {
                 "11111111-1111-4111-8111-111111111111".to_owned(),
             ))
         );
-        assert!(
-            rollout_identity(Path::new(
-                "rollout-2026-13-45T99-99-99Z-11111111-1111-4111-8111-111111111111.jsonl"
-            ))
-            .is_none()
-        );
-        assert!(
-            rollout_identity(Path::new(
-                "rollout-2026-11-13T09-27-36Z-11111111-1111-4111-8111-111111111111.jsonl.bak"
-            ))
-            .is_none()
-        );
+        assert!(rollout_identity(Path::new(
+            "rollout-2026-13-45T99-99-99Z-11111111-1111-4111-8111-111111111111.jsonl"
+        ))
+        .is_none());
+        assert!(rollout_identity(Path::new(
+            "rollout-2026-11-13T09-27-36Z-11111111-1111-4111-8111-111111111111.jsonl.bak"
+        ))
+        .is_none());
     }
 }

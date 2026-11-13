@@ -99,8 +99,7 @@ exclude_paths = [
   "eval/**",
   "tools/runtime/dispatch/agent-canon/src/runtime_log_archive.rs",
   "tools/runtime/dispatch/agent-canon/src/runtime_log_archive/**",
-  "tools/runtime/dispatch/agent-canon/src/eval_archive_paths.rs",
-  "tools/runtime/dispatch/agent-canon/src/log_repository_identity.rs",
+  "tools/runtime/dispatch/agent-canon/tests/runtime_log_archive_native.rs",
 ]
 protecting_tools = [
   "tools/runtime/dispatch/agent-canon/src/responsibility_scope.rs",

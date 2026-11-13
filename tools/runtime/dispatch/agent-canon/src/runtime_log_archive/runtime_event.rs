@@ -1,7 +1,7 @@
 //! Source-bound runtime-event materialization and durable outcome receipt.
 
 use super::context_discovery::{self, RuntimeEventSource};
-use super::{ArchiveContext, ArchiveError, CommandOptions, archive_runtime_root};
+use super::{archive_runtime_root, ArchiveContext, ArchiveError, CommandOptions};
 use crate::graph;
 use agent_canon::authority::{
     AttestationRequest, NonEmptyTrimmedString, Nonce128, ParentOwnedNoReplaceOutcome,
@@ -216,6 +216,13 @@ struct OutcomeAttempt {
     _lock: RuntimeFileLock,
 }
 
+struct OutcomeIdentity<'a> {
+    target: &'a Path,
+    attempt_id: &'a str,
+    artifact_sha: &'a str,
+    materialization_id: &'a str,
+}
+
 struct ResultInput {
     gate_result: String,
     decision: String,
@@ -360,7 +367,7 @@ fn is_source_snapshot_path(value: &str) -> bool {
 }
 
 fn parse_validation(bytes: &[u8], gate_id: &str) -> Result<ResultInput, ArchiveError> {
-    use agent_canon::python_json::{JsonValue, parse_json_bytes_unique_keys};
+    use agent_canon::python_json::{parse_json_bytes_unique_keys, JsonValue};
     let parsed = parse_json_bytes_unique_keys(bytes).map_err(|_| {
         error(
             "result_authority_mismatch",
@@ -1195,29 +1202,27 @@ fn load_publication_chain(
 fn persist_outcome(
     context: &ArchiveContext,
     attempt: &OutcomeAttempt,
-    target: &Path,
-    attempt_id: &str,
-    artifact_sha: &str,
-    materialization_id: &str,
+    identity: &OutcomeIdentity<'_>,
     sequence: u64,
     prior_observation_sha: Option<String>,
     prior_receipt_sha: Option<String>,
     evidence: ObservationEvidence,
 ) -> Result<DurableReceipt, ArchiveError> {
-    let committed = evidence.causal_gap == false
+    let committed = !evidence.causal_gap
         && evidence.target_directory_fsync_status == "succeeded"
         && evidence.readback_status == "verified"
-        && evidence.readback_sha256.as_deref() == Some(artifact_sha);
+        && evidence.readback_sha256.as_deref() == Some(identity.artifact_sha);
     let mut observation = Observation {
         schema: OBSERVATION_SCHEMA.to_owned(),
-        attempt_id: attempt_id.to_owned(),
-        artifact_path: target
+        attempt_id: identity.attempt_id.to_owned(),
+        artifact_path: identity
+            .target
             .strip_prefix(&context.source_root)
             .map_err(|_| error("schema_invalid", "event target escapes source root"))?
             .to_string_lossy()
             .replace('\\', "/"),
-        artifact_sha256: artifact_sha.to_owned(),
-        materialization_id: materialization_id.to_owned(),
+        artifact_sha256: identity.artifact_sha.to_owned(),
+        materialization_id: identity.materialization_id.to_owned(),
         sequence,
         prior_observation_sha256: prior_observation_sha,
         outcome: if committed { "committed" } else { "uncertain" }.to_owned(),
@@ -1247,21 +1252,20 @@ fn persist_outcome(
     }
     let mut receipt = Receipt {
         schema: RECEIPT_SCHEMA.to_owned(),
-        attempt_id: attempt_id.to_owned(),
+        attempt_id: identity.attempt_id.to_owned(),
         artifact_path: observation.artifact_path.clone(),
-        artifact_sha256: artifact_sha.to_owned(),
-        materialization_id: materialization_id.to_owned(),
+        artifact_sha256: identity.artifact_sha.to_owned(),
+        materialization_id: identity.materialization_id.to_owned(),
         sequence,
         prior_receipt_sha256: prior_receipt_sha,
         observation,
         receipt_sha256: "0".repeat(64),
     };
     let raw_receipt = receipt_bytes(&mut receipt)?;
-    let receipt_path = target.with_file_name(format!(
-        "{}.outcome.{}.{}.json",
-        target.file_stem().unwrap().to_string_lossy(),
-        attempt_id,
-        format!("{sequence:06}")
+    let receipt_path = identity.target.with_file_name(format!(
+        "{}.outcome.{}.{sequence:06}.json",
+        identity.target.file_stem().unwrap().to_string_lossy(),
+        identity.attempt_id,
     ));
     let parent = ParentRootAttestor::new()
         .attest(&AttestationRequest {
@@ -1671,13 +1675,20 @@ pub(super) fn materialize(
         artifact_sha256: "0".repeat(64),
     };
     let event_bytes = self_hashed_event(&mut record)?;
+    let event_sha256 = hash(&event_bytes);
     let attempt = acquire_outcome_attempt(context, &attempt_id)?;
+    let outcome_identity = OutcomeIdentity {
+        target: &target,
+        attempt_id: &attempt_id,
+        artifact_sha: &event_sha256,
+        materialization_id: &record.materialization_id,
+    };
     let chain = load_publication_chain(
         context,
         &attempt,
         &target,
         &attempt_id,
-        &record.artifact_sha256,
+        &event_sha256,
         &record.materialization_id,
     )?;
     if !chain.observations.is_empty() || !chain.receipts.is_empty() {
@@ -1736,10 +1747,7 @@ pub(super) fn materialize(
         persist_outcome(
             context,
             &attempt,
-            &target,
-            &attempt_id,
-            &record.artifact_sha256,
-            &record.materialization_id,
+            &outcome_identity,
             1,
             None,
             None,
@@ -1747,22 +1755,17 @@ pub(super) fn materialize(
         )?
     } else {
         let prior = &chain.observations[0].0;
-        let receipt = chain.receipts.first();
-        if receipt.is_none() {
-            persist_outcome(
+        match chain.receipts.first() {
+            None => persist_outcome(
                 context,
                 &attempt,
-                &target,
-                &attempt_id,
-                &record.artifact_sha256,
-                &record.materialization_id,
+                &outcome_identity,
                 prior.sequence,
                 prior.prior_observation_sha256.clone(),
                 None,
                 prior.evidence.clone(),
-            )?
-        } else {
-            receipt.unwrap().clone()
+            )?,
+            Some(receipt) => receipt.clone(),
         }
     };
     if latest_durable.value.observation.outcome == "committed" {
@@ -1802,10 +1805,7 @@ pub(super) fn materialize(
     let second = persist_outcome(
         context,
         &attempt,
-        &target,
-        &attempt_id,
-        &record.artifact_sha256,
-        &record.materialization_id,
+        &outcome_identity,
         2,
         Some(latest_durable.value.observation.observation_sha256.clone()),
         Some(latest_durable.value.receipt_sha256.clone()),
@@ -1814,7 +1814,15 @@ pub(super) fn materialize(
     if second.value.observation.outcome != "committed" {
         return Err(error(
             "publication_uncertain",
-            "latest confirmed outcome is uncertain",
+            format!(
+                "latest confirmed outcome is uncertain: source={} causal_gap={} fsync={} readback={} readback_sha256={:?} artifact_sha256={}",
+                second.value.observation.evidence.source,
+                second.value.observation.evidence.causal_gap,
+                second.value.observation.evidence.target_directory_fsync_status,
+                second.value.observation.evidence.readback_status,
+                second.value.observation.evidence.readback_sha256,
+                second.value.observation.artifact_sha256,
+            ),
         ));
     }
     print_success(
