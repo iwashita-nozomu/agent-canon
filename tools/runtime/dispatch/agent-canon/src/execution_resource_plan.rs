@@ -4,7 +4,8 @@
 // upstream design ../../../../../documents/experiments/gpu-admission-r5-source-packet.md owns the existing transaction contract
 // upstream implementation runtime_boundary.rs owns external artifact paths and stable files
 // upstream implementation execution_resource_projection.rs owns the coarse Hook projection
-// downstream test ./tests/direct_gpu_native.rs and ./tests/managed_experiment_native.rs preserve admission and managed transaction properties
+// downstream test ../tests/direct_gpu_native.rs preserves direct admission properties
+// downstream test ../tests/managed_experiment_native.rs preserves managed transaction properties
 // @dependency-end
 
 use regex::Regex;
@@ -18,33 +19,6 @@ use std::sync::LazyLock;
 pub const PLAN_SCHEMA: &str = "execution-resource-plan/v1";
 pub const HOST_RUNTIME_ROOT: &str = "/var/lib/agent-canon/runtime";
 pub const CALLER_ALLOCATION_PROVENANCE: &str = "caller_scheduler_allocated_uuid_set";
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum PlanState {
-    #[serde(rename = "resource_discovered")]
-    ResourceDiscovered,
-    #[serde(rename = "plan_frozen")]
-    PlanFrozen,
-    #[serde(rename = "env_materialized")]
-    EnvironmentMaterialized,
-    #[serde(rename = "effective_env_readback_verified")]
-    EffectiveEnvironmentVerified,
-    #[serde(rename = "ExperimentRunner execute")]
-    Execute,
-    #[serde(rename = "terminal")]
-    Terminal,
-    #[serde(rename = "cleanup_disposed")]
-    CleanupDisposed,
-}
-const STATE_SEQUENCE: [PlanState; 7] = [
-    PlanState::ResourceDiscovered,
-    PlanState::PlanFrozen,
-    PlanState::EnvironmentMaterialized,
-    PlanState::EffectiveEnvironmentVerified,
-    PlanState::Execute,
-    PlanState::Terminal,
-    PlanState::CleanupDisposed,
-];
 
 #[derive(Clone, Debug, Serialize)]
 pub struct Failure {
@@ -517,20 +491,16 @@ impl GpuAllocation {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct ExecutionResourcePlan {
     schema_version: String,
     plan_id: String,
-    state: PlanState,
-    state_history: Vec<PlanState>,
     owner: Value,
     resources: Value,
     execution: Value,
     container: Value,
     side_effect_inventory: Value,
     plan_fingerprint: String,
-    readback: Value,
-    evidence: Value,
     gpu_allocation: GpuAllocation,
 }
 impl ExecutionResourcePlan {
@@ -749,48 +719,14 @@ impl ExecutionResourcePlan {
         Ok(Self {
             schema_version: PLAN_SCHEMA.into(),
             plan_id,
-            state: PlanState::PlanFrozen,
-            state_history: vec![PlanState::ResourceDiscovered, PlanState::PlanFrozen],
             owner,
             resources,
             execution,
             container,
             side_effect_inventory,
             plan_fingerprint,
-            readback: serde_json::json!({"non_secret_equal":false,"secret_witness":[],"observed_cwd":null,"observed_argv":[]}),
-            evidence: serde_json::json!({"terminal":null,"partial":null,"cleanup":null,"closeout":null}),
             gpu_allocation: allocation,
         })
-    }
-    pub fn state(&self) -> PlanState {
-        self.state
-    }
-    pub fn transition(&self, next: PlanState) -> Result<Self> {
-        self.gpu_allocation.validate_order()?;
-        if self.gpu_allocation.plan_fingerprint != self.plan_fingerprint {
-            return Err(Failure::new(
-                "plan_state_invalid",
-                "GPU allocation fingerprint must match immutable plan",
-            ));
-        }
-        if !STATE_SEQUENCE.starts_with(&self.state_history)
-            || self.state_history.last() != Some(&self.state)
-        {
-            return Err(Failure::new(
-                "plan_state_invalid",
-                "state history must be an exact ordered prefix",
-            ));
-        }
-        if STATE_SEQUENCE.get(self.state_history.len()) != Some(&next) {
-            return Err(Failure::new(
-                "plan_state_invalid",
-                "unexpected resource-plan transition",
-            ));
-        }
-        let mut plan = self.clone();
-        plan.state = next;
-        plan.state_history.push(next);
-        Ok(plan)
     }
 }
 

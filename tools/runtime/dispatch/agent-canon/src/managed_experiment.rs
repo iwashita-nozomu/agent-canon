@@ -592,6 +592,14 @@ fn artifact_capability(
     .map_err(|error| error.to_string())
 }
 fn write_json(context: &RunContext, path: &Path, value: &JsonValue) -> Result<()> {
+    write_json_with_mode(context, path, value, None)
+}
+fn write_json_with_mode(
+    context: &RunContext,
+    path: &Path,
+    value: &JsonValue,
+    explicit_mode: Option<u32>,
+) -> Result<()> {
     let mut bytes = python_json::python_json_pretty_ascii_bytes(value)?;
     bytes.push(b'\n');
     let text = String::from_utf8(bytes).map_err(|error| error.to_string())?;
@@ -614,6 +622,7 @@ fn write_json(context: &RunContext, path: &Path, value: &JsonValue) -> Result<()
     };
     #[cfg(not(unix))]
     let mode = 0o644;
+    let mode = explicit_mode.unwrap_or(mode);
     artifact_capability(context)?
         .atomic_write_text_with_parents(path, &text, mode, true)
         .map_err(|error| error.to_string())
@@ -2213,8 +2222,14 @@ fn build_provider_request(
         .result
         .join("runtime/managed-run-request.json");
     let result_path = context.paths.result.join("runtime/managed-run-result.json");
-    write_value(context, &request_path, &payload)
-        .map_err(|error| admission_error("admitted_runner_request_write_failed", &error))?;
+    write_json_with_mode(
+        context,
+        &request_path,
+        &as_python(&payload)
+            .map_err(|error| admission_error("admitted_runner_request_write_failed", &error))?,
+        Some(0o600),
+    )
+    .map_err(|error| admission_error("admitted_runner_request_write_failed", &error))?;
     Ok((request_path, result_path, payload))
 }
 

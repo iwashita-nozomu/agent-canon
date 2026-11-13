@@ -134,6 +134,7 @@ fn run_paths(root: &Path, provider: &Path, name: &str, mode: &str) -> Output {
         ])
         .env("AGENT_CANON_EXPERIMENT_RUNNER_ADMITTED", provider)
         .env("MANAGED_FIXTURE_MODE", mode)
+        .env("TOKEN_UNDER_TEST", "private-fixture-token")
         .output()
         .expect("native managed command starts")
 }
@@ -182,6 +183,22 @@ fn managed_cli_freezes_source_once_and_publishes_provider_receipts() {
         serde_json::from_slice(&fs::read(result.join("runtime/managed-run-request.json")).unwrap())
             .unwrap();
     assert_eq!(request["schema"], "agentcanon-managed-run/v1");
+    assert_eq!(
+        request["environment"]["TOKEN_UNDER_TEST"],
+        "private-fixture-token"
+    );
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        assert_eq!(
+            fs::metadata(result.join("runtime/managed-run-request.json"))
+                .unwrap()
+                .permissions()
+                .mode()
+                & 0o777,
+            0o600
+        );
+    }
     assert_eq!(
         request["cases"][0]["entrypoint_relative_path"],
         "experiments/demo_topic/run.py"
