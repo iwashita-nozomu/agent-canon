@@ -8563,7 +8563,7 @@ pub fn run_cli(args: &[String]) -> i32 {
 mod tests {
     use super::*;
     use std::io::Write;
-    #[cfg(unix)]
+    #[cfg(target_os = "linux")]
     use std::os::unix::fs::PermissionsExt;
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -8602,7 +8602,6 @@ mod tests {
         }
     }
 
-    #[cfg(unix)]
     #[cfg(target_os = "linux")]
     fn initialize_git_checkout(path: &Path) {
         fs::create_dir_all(path).expect("Git checkout directory is created");
