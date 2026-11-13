@@ -3,7 +3,7 @@
 // responsibility Compares tree JSON path kinds with existing repository structure profiles.
 // upstream design ../../../../../documents/structure/repo-structure-contract.toml owns profiles and ignore rules
 // upstream implementation ./path_resolution.rs owns Python-compatible glob matching
-// downstream test ../../../../../tests/agent_tools/test_repo-structure-contract preserves public CLI oracles
+// downstream test ../../../../../tests/agent_tools/test_repo_structure_contract.py preserves public CLI oracles
 // @dependency-end
 
 use crate::path_resolution::{python_fnmatch_case, resolve_non_strict};
