@@ -2304,15 +2304,15 @@ entries:
 
   - id: generate-agent-improvement-guide
     summary: Generates PR and push-time guidance from memory, eval, hook, and issue evidence.
-    path: eval/producers/generate_agent_improvement_guide.py
+    path: tools/runtime/dispatch/agent-canon/src/agent_runtime_dashboard.rs
     family: agent_tools
     role: docs
     status: canonical
-    command: python3 eval/producers/generate_agent_improvement_guide.py
+    command: tools/bin/agent-canon generate-agent-improvement-guide
     writes: true
     dispatch:
-      runtime: python
-      argv: [python3, eval/producers/generate_agent_improvement_guide.py]
+      runtime: rust
+      argv: [tools/bin/agent-canon, generate-agent-improvement-guide]
       execution_plane: tool-container
       cwd: target-root
       env: allowlisted
@@ -2337,15 +2337,15 @@ entries:
 
   - id: generate-agent-runtime-dashboard
     summary: Generates read-only dashboards and compact token-light summaries for AgentCanon runtime logs and eval results.
-    path: eval/producers/generate_agent_runtime_dashboard.py
+    path: tools/runtime/dispatch/agent-canon/src/agent_runtime_dashboard.rs
     family: agent_tools
     role: docs
     status: canonical
-    command: python3 eval/producers/generate_agent_runtime_dashboard.py
+    command: tools/bin/agent-canon generate-agent-runtime-dashboard
     writes: true
     dispatch:
-      runtime: python
-      argv: [python3, eval/producers/generate_agent_runtime_dashboard.py]
+      runtime: rust
+      argv: [tools/bin/agent-canon, generate-agent-runtime-dashboard]
       execution_plane: tool-container
       cwd: target-root
       env: allowlisted
