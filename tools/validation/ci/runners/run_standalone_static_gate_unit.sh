@@ -154,6 +154,11 @@ run_rust() {
   export CARGO_PROFILE_TEST_DEBUG=0
   local phase="${1:-all}"
   case "${phase}" in
+    controller-driver)
+      [[ "$#" -eq 1 ]] || return 2
+      cargo build --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --locked --offline --features controller-test-driver \
+        --bin agent-canon-controller-test-driver
+      ;;
     all|prepare)
       [[ "$#" -le 1 ]] || return 2
       cargo build --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --locked --offline
@@ -310,9 +315,7 @@ PY
 run_workflow_container() {
   local cargo_target_dir controller_test_driver
   cargo_target_dir="${CARGO_TARGET_DIR:-${ROOT}/tools/runtime/dispatch/agent-canon/target}"
-  cargo build --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml \
-    --locked --offline --features controller-test-driver \
-    --bin agent-canon-controller-test-driver
+  run_rust controller-driver
   controller_test_driver="${cargo_target_dir}/debug/agent-canon-controller-test-driver"
   [[ -x "${controller_test_driver}" ]] || {
     echo "AGENT_CANON_CONTROLLER_TEST_DRIVER=fail" >&2

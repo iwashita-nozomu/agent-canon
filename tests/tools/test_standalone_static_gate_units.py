@@ -109,11 +109,11 @@ def selected_units(*paths: str) -> tuple[str, ...]:
         (("bootstrap.sh",), ("eval", "workflow-container")),
         (
             ("tools/runtime/dispatch/agent-canon/src/bootstrap_runtime.rs",),
-            ("contracts", "eval", "workflow-container"),
+            ("rust", "contracts", "eval", "workflow-container"),
         ),
         (
             ("tools/runtime/dispatch/agent-canon/tests/bootstrap_runtime_native.rs",),
-            ("contracts", "workflow-container"),
+            ("rust", "workflow-container"),
         ),
         (
             ("tests/agent_tools/test_eval_accumulation_check.py",),
@@ -749,7 +749,12 @@ def test_workflow_unit_passes_selected_native_cli_to_source_wrapper(
     )
     setup = (
         'unset AGENT_CANON_NATIVE_BIN\npython3() { printf "pytest\\n" >> "$TRACE"; }\n'
+        'run_rust() { test "$*" = controller-driver; printf "driver-build\\n" >> "$TRACE"; }\n'
     )
+    driver = cache / "target/debug/agent-canon-controller-test-driver"
+    driver.parent.mkdir(parents=True)
+    driver.write_text("#!/bin/sh\nexit 0\n")
+    driver.chmod(0o755)
     if explicit_cli:
         setup += (
             "export AGENT_CANON_CLI="
@@ -765,6 +770,7 @@ def test_workflow_unit_passes_selected_native_cli_to_source_wrapper(
         ROOT=str(root),
         AGENT_CANON_SOURCE_ROOT=str(root),
         AGENT_CANON_CACHE_ROOT=str(cache),
+        CARGO_TARGET_DIR=str(cache / "target"),
         CHECKER_EXIT=str(checker_exit),
         CALLS=str(calls),
         TRACE=str(trace),
@@ -775,7 +781,11 @@ def test_workflow_unit_passes_selected_native_cli_to_source_wrapper(
         "--root",
         str(root),
     ]
-    expected_trace = ["pytest", "native:" + ("explicit" if explicit_cli else "default")]
+    expected_trace = [
+        "driver-build",
+        "pytest",
+        "native:" + ("explicit" if explicit_cli else "default"),
+    ]
     if checker_exit == 0:
         expected_trace.append("pytest")
     assert trace.read_text().splitlines() == expected_trace
