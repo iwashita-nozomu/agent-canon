@@ -58,44 +58,41 @@ fn build_fixture() -> Fixture {
     let provider = root.join("fake-experiment-runner-admitted");
     fs::write(
         &provider,
-        r##"#!/usr/bin/env python3
-import json, os, sys
-args = sys.argv
-request = json.load(open(args[args.index('--request') + 1], encoding='utf-8'))
-result_path = args[args.index('--result') + 1]
-assert os.getcwd() == request['metadata']['agentcanon_working_directory']
-assert os.environ['EXPERIMENT_RUN_DIR'] == request['metadata']['agentcanon_output_directory']
-open(os.path.join(request['metadata']['agentcanon_output_directory'], 'fixture-provider-called'), 'a').write('called\n')
-pid = os.getpid()
-mode = os.environ.get('MANAGED_FIXTURE_MODE', 'valid')
-lifecycle = {
-    'run_id': request['run_id'], 'terminal_event_id': 'terminal-1',
-    'observed_at_ns': 1, 'terminal_status': 'finished',
-    'total_case_count_at_start': 1, 'completion_count_before': 0,
-    'completion_count_after': 1, 'scheduler_completed': True,
-    'admitted_case_count': 1, 'terminal_notification_count': 1,
-    'child_process_ids': [pid], 'process_group_ids': [pid],
-    'direct_children_quiescent': True, 'descendant_quiescence': 'proved',
-    'cleanup_failures': [], 'terminal_coverage_complete': True,
-    'requested_case_coverage_complete': True, 'quiescence_complete': True,
-    'completion_coverage_complete': True,
+        r##"#!/bin/sh
+set -eu
+request= result=
+while [ "$#" -gt 0 ]; do
+    case "$1" in --request) request=$2; shift 2;; --result) result=$2; shift 2;; *) shift;; esac
+done
+test "$(pwd -P)" = "$(jq -r '.metadata.agentcanon_working_directory' "$request")"
+test "$EXPERIMENT_RUN_DIR" = "$(jq -r '.metadata.agentcanon_output_directory' "$request")"
+printf 'called\n' >> "$EXPERIMENT_RUN_DIR/fixture-provider-called"
+jq --argjson pid "$$" --arg mode "${MANAGED_FIXTURE_MODE:-valid}" '
+{
+    schema: "agentcanon-managed-run-result/v1", identity: .identity, run_id: .run_id,
+    request_fingerprint: (if $mode == "bad-fingerprint" then ("0" * 64) else .fingerprint end),
+    status: "ok", worker_pid: $pid, worker_pids: [$pid],
+    lifecycle: {
+        run_id: .run_id, terminal_event_id: "terminal-1", observed_at_ns: 1,
+        terminal_status: "finished", total_case_count_at_start: 1,
+        completion_count_before: 0, completion_count_after: 1, scheduler_completed: true,
+        admitted_case_count: 1, terminal_notification_count: 1,
+        child_process_ids: [$pid], process_group_ids: [$pid],
+        direct_children_quiescent: true, descendant_quiescence: "proved",
+        cleanup_failures: [], terminal_coverage_complete: true,
+        requested_case_coverage_complete: true, quiescence_complete: true,
+        completion_coverage_complete: true
+    },
+    descendant_quiescence: "proved",
+    quiescence: {direct_children_quiescent: true, descendant_quiescence: "proved", complete: true, cleanup_failures: []},
+    exit: {code: 0, error: null}, exit_code: 0, error: null,
+    completions: [{case: {}, result: {status: "ok"}}]
 }
-result = {
-    'schema': 'agentcanon-managed-run-result/v1',
-    'identity': request['identity'], 'run_id': request['run_id'],
-    'request_fingerprint': '0' * 64 if mode == 'bad-fingerprint' else request['fingerprint'],
-    'status': 'ok', 'worker_pid': pid, 'worker_pids': [pid],
-    'lifecycle': lifecycle, 'descendant_quiescence': 'proved',
-    'quiescence': {'direct_children_quiescent': True,
-        'descendant_quiescence': 'proved', 'complete': True, 'cleanup_failures': []},
-    'exit': {'code': 0, 'error': None}, 'exit_code': 0, 'error': None,
-    'completions': [{'case': {}, 'result': {'status': 'ok'}}],
-}
-if mode == 'bad-schema': result['schema'] = 'agentcanon-managed-run-result/v2'
-if mode == 'bad-run-id': result['run_id'] = 'other-run'
-if mode == 'bad-identity': result['identity']['run_name'] = 'other-run'
-if mode == 'unproven-completion': lifecycle['completion_coverage_complete'] = False
-json.dump(result, open(result_path, 'w', encoding='utf-8'))
+| if $mode == "bad-schema" then .schema = "agentcanon-managed-run-result/v2" else . end
+| if $mode == "bad-run-id" then .run_id = "other-run" else . end
+| if $mode == "bad-identity" then .identity.run_name = "other-run" else . end
+| if $mode == "unproven-completion" then .lifecycle.completion_coverage_complete = false else . end
+' "$request" > "$result"
 "##,
     )
     .expect("provider protocol double writes");
