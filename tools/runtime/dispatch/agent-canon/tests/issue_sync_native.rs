@@ -18,7 +18,12 @@ fn run(root: &Path, args: &[&str]) -> Output {
         .unwrap()
 }
 fn fixture() -> tempfile::TempDir {
-    let temporary = tempfile::tempdir().unwrap();
+    let temporary = tempfile::tempdir_in(
+        std::env::temp_dir()
+            .canonicalize()
+            .expect("canonical temporary parent"),
+    )
+    .unwrap();
     let root = temporary.path();
     assert!(Command::new("git")
         .args(["init", "-q", "-b", "main"])
@@ -52,7 +57,12 @@ fn fixture() -> tempfile::TempDir {
 fn staging_keeps_body_free_stable_identity_and_noop_time() {
     let temporary = fixture();
     let root = temporary.path().canonicalize().unwrap();
-    let runtime = tempfile::tempdir().unwrap();
+    let runtime = tempfile::tempdir_in(
+        std::env::temp_dir()
+            .canonicalize()
+            .expect("canonical temporary parent"),
+    )
+    .unwrap();
     let runtime = runtime.path().canonicalize().unwrap();
     let mut args = vec![
         "--repo",
@@ -114,7 +124,12 @@ fn staging_keeps_body_free_stable_identity_and_noop_time() {
 fn invalid_receipt_identity_is_rejected_without_publication() {
     let temporary = fixture();
     let root = temporary.path().canonicalize().unwrap();
-    let runtime = tempfile::tempdir().unwrap();
+    let runtime = tempfile::tempdir_in(
+        std::env::temp_dir()
+            .canonicalize()
+            .expect("canonical temporary parent"),
+    )
+    .unwrap();
     let runtime = runtime.path().canonicalize().unwrap();
     let result = run(
         &root,
@@ -145,7 +160,12 @@ fn runtime_symlink_output_preserves_referent() {
     use std::os::unix::fs::symlink;
     let temporary = fixture();
     let root = temporary.path().canonicalize().unwrap();
-    let runtime = tempfile::tempdir().unwrap();
+    let runtime = tempfile::tempdir_in(
+        std::env::temp_dir()
+            .canonicalize()
+            .expect("canonical temporary parent"),
+    )
+    .unwrap();
     let runtime = runtime.path().canonicalize().unwrap();
     let published =
         runtime.join("spool/private-feedback/feedback/issue-packets/published/owner/repo");
@@ -179,7 +199,12 @@ fn runtime_symlink_output_preserves_referent() {
 fn pending_packet_is_metadata_only_with_existing_name_grammar() {
     let temporary = fixture();
     let root = temporary.path().canonicalize().unwrap();
-    let log = tempfile::tempdir().unwrap();
+    let log = tempfile::tempdir_in(
+        std::env::temp_dir()
+            .canonicalize()
+            .expect("canonical temporary parent"),
+    )
+    .unwrap();
     let log = log.path().canonicalize().unwrap();
     let body = log.join("private-body.md");
     fs::write(&body, "private body must stay private\n").unwrap();
@@ -278,7 +303,12 @@ fn candidate_qualification_preserves_authority_and_transient_finding_boundaries(
 #[test]
 fn cli_preserves_unique_prefix_equals_and_rejects_flag_values() {
     let root = fixture();
-    let log = tempfile::tempdir().unwrap();
+    let log = tempfile::tempdir_in(
+        std::env::temp_dir()
+            .canonicalize()
+            .expect("canonical temporary parent"),
+    )
+    .unwrap();
     let output = run(
         root.path(),
         &[
@@ -321,7 +351,12 @@ fn failed_resident_preflight_preserves_packet_before_any_github_operation() {
         .status()
         .unwrap()
         .success());
-    let private = tempfile::tempdir().unwrap();
+    let private = tempfile::tempdir_in(
+        std::env::temp_dir()
+            .canonicalize()
+            .expect("canonical temporary parent"),
+    )
+    .unwrap();
     let body = private.path().join("body.md");
     fs::write(&body, b"Issue body\n").unwrap();
     let log = private.path().join("log");
@@ -377,7 +412,12 @@ fn failed_resident_preflight_preserves_packet_before_any_github_operation() {
 fn github_read_projects_clauses_and_saves_the_same_summary() {
     use std::os::unix::fs::PermissionsExt;
     let root = fixture();
-    let tools = tempfile::tempdir().unwrap();
+    let tools = tempfile::tempdir_in(
+        std::env::temp_dir()
+            .canonicalize()
+            .expect("canonical temporary parent"),
+    )
+    .unwrap();
     let gh = tools.path().join("gh");
     fs::write(&gh,"#!/bin/sh\nprintf '%s\\n' '{\"number\":882,\"title\":\"Issue authority\",\"body\":\"## Problem\\nEvidence: run-1.\\n\\n## Done\\nAdvisory cleanup.\",\"state\":\"OPEN\",\"url\":\"https://github.com/owner/repo/issues/882\"}'\n").unwrap();
     fs::set_permissions(&gh, fs::Permissions::from_mode(0o700)).unwrap();
@@ -425,7 +465,12 @@ fn retry_uses_exact_readback_and_keeps_packet_when_receipt_staging_fails() {
         .status()
         .unwrap()
         .success());
-    let private = tempfile::tempdir().unwrap();
+    let private = tempfile::tempdir_in(
+        std::env::temp_dir()
+            .canonicalize()
+            .expect("canonical temporary parent"),
+    )
+    .unwrap();
     let log = private.path().join("log");
     let pending = log.join("feedback/issue-packets/pending/input.json");
     fs::create_dir_all(pending.parent().unwrap()).unwrap();
