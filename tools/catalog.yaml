@@ -874,12 +874,12 @@ entries:
   - id: wiki-publish
     public: true
     summary: Publishes one markdown wiki page to the dedicated repo.wiki.git sidecar using default-branch-only clone, format gates, source commit binding, and exact readback identity.
-    path: tools/repository/github/wiki_publish.py
+    path: tools/runtime/dispatch/agent-canon/src/wiki_publish.rs
     family: agent_tools
     role: sync
     status: canonical
-    command: python3 tools/repository/github/wiki_publish.py --help
-    dispatch: {argv: ["python3", "tools/repository/github/wiki_publish.py", "--help"]}
+    command: tools/bin/agent-canon wiki-publish --help
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "wiki-publish", "--help"]}
     writes: true
     default_wiring:
       ci: false

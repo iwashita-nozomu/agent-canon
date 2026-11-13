@@ -131,6 +131,7 @@ pub mod tool_dispatch;
 pub mod tool_proof_coverage;
 pub mod tool_selection;
 pub mod update_lifecycle_contract;
+pub mod wiki_publish;
 pub mod work_log;
 pub mod workflow_context;
 pub mod workflow_selection_eval;
