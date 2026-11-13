@@ -212,7 +212,7 @@ class RepoStructureContractTest(unittest.TestCase):
             "documents/structure/repo-structure-contract.toml",
             "tools/catalog.yaml",
             "tools/runtime/dispatch/agent-canon/Cargo.toml",
-            "tools/runtime/lifecycle/update_lifecycle_contract.py",
+            "tools/runtime/dispatch/agent-canon/src/update_lifecycle_contract.rs",
             "eval/definitions/README.md",
         ]:
             self.write_file(root, file_path, f"{file_path}\n")
@@ -345,18 +345,18 @@ class RepoStructureContractTest(unittest.TestCase):
                                                 {
                                                     "type": "file",
                                                     "name": "Cargo.toml",
-                                                }
+                                                },
+                                                {
+                                                    "type": "directory",
+                                                    "name": "src",
+                                                    "contents": [
+                                                        {
+                                                            "type": "file",
+                                                            "name": "update_lifecycle_contract.rs",
+                                                        }
+                                                    ],
+                                                },
                                             ],
-                                        }
-                                    ],
-                                },
-                                {
-                                    "type": "directory",
-                                    "name": "lifecycle",
-                                    "contents": [
-                                        {
-                                            "type": "file",
-                                            "name": "update_lifecycle_contract.py",
                                         }
                                     ],
                                 },

@@ -279,8 +279,7 @@ the runtime profile matrix:
 
 ```bash
 python3 -m pytest -q tests/bootstrap tests/tools/test_bootstrap_container_contract.py
-python3 -m pytest -q tests/agent_tools/test_runtime_artifacts.py \
-  tests/agent_tools/test_tool_dispatch.py
+python3 -m pytest -q tests/agent_tools/test_tool_dispatch.py
 ```
 
 For a selected offline image-receipt check, use the image-owned manifest and

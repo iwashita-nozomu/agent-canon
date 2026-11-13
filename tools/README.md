@@ -8,7 +8,7 @@ upstream design ../documents/runtime/bootstrap-runtime.md shared bootstrap user 
 upstream design ../documents/runtime/runtime-log-archive.md external archive publication contract
 upstream implementation runtime/dispatch/agent-canon/src/bootstrap_runtime.rs lifecycle implementation
 upstream implementation runtime/dispatch/agent-canon/src/tool_dispatch.rs typed dispatch implementation
-upstream implementation runtime/artifacts/runtime_artifacts.py external artifact boundary
+upstream implementation runtime/dispatch/agent-canon/src/runtime_boundary.rs external artifact boundary
 upstream design catalog.yaml public tool registry
 downstream implementation runtime/dispatch/agent-canon/src/catalog/tool_catalog.rs validates catalog documentation
 @dependency-end
@@ -214,8 +214,7 @@ For tool/runtime documentation or code changes:
 
 ```bash
 git diff --check
-python3 -m pytest -q tests/agent_tools/test_runtime_artifacts.py \
-  tests/agent_tools/test_tool_dispatch.py
+python3 -m pytest -q tests/agent_tools/test_tool_dispatch.py
 ```
 
 For bootstrap/container changes, add:

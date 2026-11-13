@@ -12,10 +12,9 @@ use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
-use std::io::Write;
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output, Stdio};
+use std::process::{Command, Output};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
@@ -167,36 +166,15 @@ fn decode_hex(value: &str) -> Vec<u8> {
         .collect()
 }
 
-fn python_canonical_json_oracle(value: &Value) -> Vec<u8> {
-    const PYTHON: &str = "import json,sys; value=json.load(sys.stdin); sys.stdout.buffer.write(json.dumps(value,sort_keys=True,separators=(',',':'),ensure_ascii=False).encode('utf-8'))";
-    let input = serde_json::to_vec(value).expect("serialize Python JSON input");
-    let mut process = Command::new("python3")
-        .args(["-c", PYTHON])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .spawn()
-        .expect("start Python JSON byte oracle");
-    process
-        .stdin
-        .take()
-        .expect("Python oracle stdin")
-        .write_all(&input)
-        .expect("write Python JSON oracle input");
-    let output = process
-        .wait_with_output()
-        .expect("wait for Python JSON byte oracle");
-    assert!(
-        output.status.success(),
-        "Python JSON oracle failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    output.stdout
+fn independent_json_bytes(value: &Value) -> Vec<u8> {
+    // serde_json's sorted Value map is independent of the authority's custom canonical encoder.
+    serde_json::to_vec(value).expect("serialize independent JSON byte oracle")
 }
 
 fn verify_handoff_independently(token: &str, root: &Path) -> Value {
     let envelope_bytes = URL_SAFE.decode(token).expect("decode URL-safe handoff");
     let envelope: Value = serde_json::from_slice(&envelope_bytes).expect("parse handoff envelope");
-    assert_eq!(envelope_bytes, python_canonical_json_oracle(&envelope));
+    assert_eq!(envelope_bytes, independent_json_bytes(&envelope));
     let payload = envelope["payload"].as_object().expect("payload object");
     let payload_keys = payload.keys().map(String::as_str).collect::<BTreeSet<_>>();
     let expected_payload_keys = [
@@ -225,7 +203,7 @@ fn verify_handoff_independently(token: &str, root: &Path) -> Value {
         .expect("payload digest");
     assert_eq!(
         claimed_digest,
-        sha256_hex(&python_canonical_json_oracle(&Value::Object(body)))
+        sha256_hex(&independent_json_bytes(&Value::Object(body)))
     );
 
     let secret_path = root.join(".agent-canon/handoff/secret");
@@ -239,9 +217,7 @@ fn verify_handoff_independently(token: &str, root: &Path) -> Value {
     derive.update(boot_id.trim().as_bytes());
     let session_key = derive.finalize().into_bytes();
     let mut verify = HmacSha256::new_from_slice(&session_key).expect("initialize HMAC oracle");
-    verify.update(&python_canonical_json_oracle(&Value::Object(
-        payload.clone(),
-    )));
+    verify.update(&independent_json_bytes(&Value::Object(payload.clone())));
     verify
         .verify_slice(&decode_hex(signature))
         .expect("standard HMAC-SHA256 verifies the issued token");
@@ -263,56 +239,6 @@ fn pending_handoff_nonces(root: &Path) -> BTreeMap<String, f64> {
     let state_path = root.join(".agent-canon/handoff/nonces.json");
     serde_json::from_slice(&fs::read(state_path).expect("read nonce receipt"))
         .expect("parse nonce receipt")
-}
-
-fn python_owner_verify(token: &str, root: &Path, purpose: &str) -> Output {
-    const SCRIPT: &str = "import os,sys; from pathlib import Path; from tools.repository.workspace.parent_root_side_effects import ParentRootAttestationRequest,ParentRootSideEffectBoundary; root=Path(sys.argv[1]); request=ParentRootAttestationRequest(cwd=root,explicit_root=root,purpose=sys.argv[2]); ParentRootSideEffectBoundary().verify_child_environment(request,os.environ)";
-    Command::new("python3")
-        .args(["-c", SCRIPT])
-        .arg(root)
-        .arg(purpose)
-        .env(
-            "PYTHONPATH",
-            Path::new(env!("CARGO_MANIFEST_DIR"))
-                .ancestors()
-                .nth(4)
-                .expect("repository source root")
-                .as_os_str(),
-        )
-        .env("PYTHONDONTWRITEBYTECODE", "1")
-        .env("AGENT_CANON_CHILD_HANDOFF", token)
-        .env_remove("AGENT_CANON_ACTIVE_REPOSITORY_ROOT")
-        .output()
-        .expect("run Python owner token verifier")
-}
-
-fn python_owner_issue(root: &Path, purpose: &str) -> String {
-    const SCRIPT: &str = "import sys; from pathlib import Path; from tools.repository.workspace.parent_root_side_effects import ParentRootSideEffectBoundary; print(ParentRootSideEffectBoundary().issue_child_handoff(Path(sys.argv[1]),audience=sys.argv[2]))";
-    let output = Command::new("python3")
-        .args(["-c", SCRIPT])
-        .arg(root)
-        .arg(purpose)
-        .env(
-            "PYTHONPATH",
-            Path::new(env!("CARGO_MANIFEST_DIR"))
-                .ancestors()
-                .nth(4)
-                .expect("repository source root")
-                .as_os_str(),
-        )
-        .env("PYTHONDONTWRITEBYTECODE", "1")
-        .env_remove("AGENT_CANON_ACTIVE_REPOSITORY_ROOT")
-        .output()
-        .expect("run Python owner handoff issuer");
-    assert!(
-        output.status.success(),
-        "Python handoff issuer failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    String::from_utf8(output.stdout)
-        .expect("Python handoff token is UTF-8")
-        .trim()
-        .to_owned()
 }
 
 fn json_string(value: &str) -> String {
@@ -653,16 +579,6 @@ fn test_handoff_forgery_and_cross_instance_replay_are_rejected() {
     let envelope =
         verify_handoff_independently(handoff.token().expose_for_transport(), temp.path());
     assert_eq!(envelope["payload"]["audience"], "handoff-test-é");
-    let python_verification = python_owner_verify(
-        handoff.token().expose_for_transport(),
-        temp.path(),
-        "handoff-test-é",
-    );
-    assert!(
-        python_verification.status.success(),
-        "Python owner rejected Rust-issued token: {}",
-        String::from_utf8_lossy(&python_verification.stderr)
-    );
     let mut request = attestation_request(temp.path(), "handoff-test-é");
     request.child_handoff_token = Some(handoff.token().clone());
     assert!(attestor
@@ -675,18 +591,6 @@ fn test_handoff_forgery_and_cross_instance_replay_are_rejected() {
         ParentRootAttestor::new().attest(&request),
         ParentRootReject::HandoffInvalid,
     );
-
-    let python_temp = TempDir::new();
-    git_repo(
-        python_temp.path(),
-        "https://example.invalid/python-issued.git",
-    );
-    let python_token = python_owner_issue(python_temp.path(), "python-issued-test");
-    let mut python_request = attestation_request(python_temp.path(), "python-issued-test");
-    python_request.child_handoff_token = Some(SecretToken::from_untrusted(python_token));
-    ParentRootAttestor::new()
-        .attest(&python_request)
-        .expect("Rust owner verifies Python-issued token and consumes shared receipt");
 
     let mut forged = handoff.token().expose_for_transport().to_owned();
     let index = forged.len().saturating_sub(3);

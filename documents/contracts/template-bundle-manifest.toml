@@ -61,8 +61,8 @@ roots = [
   "tools/runtime/dispatch/agent-canon/src/log_repository_identity.rs",
   "tools/runtime/dispatch/agent-canon/src/eval_archive_paths.rs",
   "tools/runtime/artifacts/__init__.py",
-  "tools/runtime/artifacts/artifact_identity.py",
-  "tools/runtime/artifacts/runtime_artifacts.py",
+  "tools/runtime/dispatch/agent-canon/src/artifacts/artifact_identity.rs",
+  "tools/runtime/dispatch/agent-canon/src/runtime_boundary.rs",
   "tools/runtime/authority/__init__.py",
   "tools/runtime/dispatch/agent-canon/src/hook_safety.rs",
   "tools/runtime/container/__init__.py",
@@ -70,9 +70,7 @@ roots = [
   "tools/runtime/dispatch/agent-canon/src/execution_resource_projection.rs",
   "tools/runtime/lifecycle/__init__.py",
   "tools/runtime/lifecycle/update_lifecycle_contract.py",
-  "tools/runtime/source/__init__.py",
-  "tools/runtime/source/agent_canon_source_root.py",
-  "tools/runtime/values.py",
+  "tools/runtime/dispatch/agent-canon/src/agent_canon_source_root.rs",
 ]
 
 [profiles.native-cli]
