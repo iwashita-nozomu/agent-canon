@@ -2,7 +2,7 @@
 # contract configuration
 # responsibility Generates bounded AgentCanon improvement guidance for its generator surface and manual dispatch.
 # upstream design ../../agents/skills/agent-canon-update.md PR evidence rules
-# upstream implementation ../../eval/producers/generate_agent_improvement_guide.py builds the guide
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/agent_runtime_dashboard.rs builds the guide
 # upstream implementation ../../tools/runtime/artifacts/runtime_artifacts.py owns external report/archive paths
 # @dependency-end
 
@@ -14,7 +14,7 @@ on:
   pull_request:
     paths:
       - ".github/workflows/agent-improvement-guide.yml"
-      - "eval/producers/generate_agent_improvement_guide.py"
+      - "tools/runtime/dispatch/agent-canon/src/agent_runtime_dashboard.rs"
       - "tests/agent_tools/test_generate_agent_improvement_guide.py"
   workflow_dispatch:
 

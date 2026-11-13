@@ -58,7 +58,7 @@ priority order、reader-facing report、before / after impact は依頼または
 ## Finding Packet
 
 Normalize findings through the host GitHub adapter
-`tools/repository/github/issue_sync.py` when an Issue handoff requires it. Use
+`agent-canon issue-sync` when an Issue handoff requires it. Use
 the request, changed paths, or current owner boundary to select scope; use
 `repo-wide` only when requested or authorized by the parent scope and needed to
 answer the question. Preserve every result within the selected scope. Group identical
@@ -125,7 +125,7 @@ stages every tool run must complete.
    - Before / after diff: `python-structure-hash-impact`。比較が明示されたときだけ使う
    - Algorithm modules: `python-algorithm-contract-check`
    - Module groups: `python-module-groups-check`
-   - OOP readability: `tools/oop/<language>/readability.py --format json`
+   - OOP readability: `tools/bin/agent-canon oop-<language>-readability --format json`
    - Dependency surface: `run_repo_dependency_review.sh` and related manifest tools
 1. When priority order is requested or needed to choose repair work, rank the
    selected findings using the relevant available signals and retain the ranking

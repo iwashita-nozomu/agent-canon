@@ -8,7 +8,7 @@ upstream design ../../documents/runtime/runtime-log-archive.md accumulated eval 
 upstream design ../../documents/tools/search-coordination.md coordinated search policy
 upstream design ../../documents/runtime/runtime-log-archive.md defines the external log archive mount
 downstream design issue-finding-report.md converts compact log findings into durable issues
-upstream implementation ../../eval/producers/generate_agent_runtime_dashboard.py owns structured dashboard API fields
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/agent_runtime_dashboard.rs owns structured dashboard API fields
 upstream implementation ../../tools/runtime/archive/runtime_log_archive_git.py resolves the mounted log archive
 downstream implementation ../../.codex/personal/skills/agent-log-analysis/SKILL.md exposes this workflow as a runtime skill
 downstream design agent-eval-accumulation.md repairs missing accumulated eval family evidence
