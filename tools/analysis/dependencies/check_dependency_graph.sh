@@ -5,7 +5,7 @@
 # upstream design ../../../documents/design/source-owned-dependency-validation.md source-derived graph projection authority
 # upstream design ../../../documents/design/dependency-manifest-design.md dependency graph semantics
 # upstream implementation ../../runtime/dispatch/agent-canon/src/source_dependency_graph.rs owns source parsing, canonical binding, and review export
-# upstream implementation ../../runtime/artifacts/runtime_artifacts.py owns external graph scratch and TSV publication
+# upstream implementation ../../runtime/dispatch/agent-canon/src/runtime_boundary.rs owns external graph scratch and TSV publication
 # downstream implementation ../../runtime/dispatch/agent-canon/src/dependency_manifest_graph.rs renders exported dependency TSV
 # downstream implementation ../../../tests/agent_tools/test_dependency_manifest_tools.py verifies source-derived graph review
 # downstream implementation ../../../tests/agent_tools/test_dependency_graph_cycles.py verifies normalized full-topology SCC scope
@@ -14,6 +14,7 @@ set -euo pipefail
 
 ROOT_DIR="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || pwd)"
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+CANON_SOURCE_ROOT="$(cd "$script_dir/../../.." && pwd -P)"
 RUNTIME_ROOT="${AGENT_CANON_RUNTIME_ROOT:-}"
 CONTROL_ROOT="${AGENT_CANON_CONTROL_PARENT_ROOT:-}"
 PRINT_EDGES=0
@@ -37,52 +38,26 @@ fail_runtime_boundary() {
 
 runtime_path() {
   local candidate="$1"
-  python3 - "$script_dir" "$ROOT_DIR" "$CONTROL_ROOT" "$RUNTIME_ROOT" "$candidate" <<'PY'
-from pathlib import Path
-import sys
-
-source, root, control, runtime, candidate = map(Path, sys.argv[1:])
-sys.path.insert(0, str(source.parents[2].resolve(strict=True)))
-from tools.runtime.artifacts.runtime_artifacts import RuntimeArtifactBoundary, RuntimeArtifactError
-
-try:
-    source_root = source.parents[2].resolve(strict=True)
-    target_root = root.resolve(strict=True)
-    control_root = control.resolve(strict=True)
-    boundary = RuntimeArtifactBoundary.for_source(source_root, runtime, create=True)
-    if boundary.root == target_root or boundary.root in target_root.parents:
-        raise RuntimeArtifactError("runtime root must be outside target repository")
-    try:
-        target_root.relative_to(control_root)
-    except ValueError as exc:
-        raise RuntimeArtifactError("target repository is outside control root") from exc
-    print(boundary.resolve(candidate))
-except (OSError, RuntimeArtifactError, ValueError) as exc:
-    print(f"runtime boundary invalid: {exc}", file=sys.stderr)
-    raise SystemExit(2)
-PY
+  local resolved
+  if ! resolved="$("${AGENT_CANON_NATIVE_BIN:-${AGENT_CANON_CLI:-${CANON_SOURCE_ROOT}/tools/bin/agent-canon}}" \
+    runtime-paths path --source-root "$CANON_SOURCE_ROOT" --target-root "$ROOT_DIR" \
+    --control-parent-root "$CONTROL_ROOT" --runtime-root "$RUNTIME_ROOT" --candidate "$candidate" 2>&1)"; then
+    printf 'runtime boundary invalid: %s\n' "$resolved" >&2
+    return 2
+  fi
+  printf '%s\n' "$resolved"
 }
 
 write_runtime_file() {
   local candidate="$1"
   local source_file="$2"
-  python3 - "$script_dir" "$RUNTIME_ROOT" "$candidate" "$source_file" <<'PY'
-from pathlib import Path
-import sys
-
-source, runtime, candidate, source_file = map(Path, sys.argv[1:])
-sys.path.insert(0, str(source.parents[2].resolve(strict=True)))
-from tools.runtime.artifacts.runtime_artifacts import RuntimeArtifactBoundary, RuntimeArtifactError
-
-try:
-    boundary = RuntimeArtifactBoundary.for_source(
-        source.parents[2].resolve(strict=True), runtime, create=True
-    )
-    boundary.atomic_write_bytes(boundary.resolve(candidate), source_file.read_bytes())
-except (OSError, RuntimeArtifactError, ValueError) as exc:
-    print(f"runtime boundary invalid: {exc}", file=sys.stderr)
-    raise SystemExit(2)
-PY
+  local diagnostic
+  if ! diagnostic="$("${AGENT_CANON_NATIVE_BIN:-${AGENT_CANON_CLI:-${CANON_SOURCE_ROOT}/tools/bin/agent-canon}}" \
+    runtime-paths write-file --source-root "$CANON_SOURCE_ROOT" --runtime-root "$RUNTIME_ROOT" \
+    --candidate "$candidate" --input "$source_file" 2>&1)"; then
+    printf 'runtime boundary invalid: %s\n' "$diagnostic" >&2
+    return 2
+  fi
 }
 
 require_runtime_boundary() {

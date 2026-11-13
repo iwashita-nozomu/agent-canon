@@ -10,7 +10,7 @@ upstream environment ../../agent-canon-environment.toml machine-readable environ
 upstream implementation ../../tools/runtime/dispatch/agent-canon/Cargo.toml AgentCanon Rust CLI crate license and dependency manifest
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/tool_catalog.rs validates catalog and docs consistency
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/tool_drift.rs validates tool and documentation trace links
-downstream implementation ../../tools/validation/semantic/convention/check_convention_compliance.py validates shared convention wiring
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/convention_compliance.rs validates shared convention wiring
 @dependency-end
 -->
 

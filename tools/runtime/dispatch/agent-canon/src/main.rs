@@ -648,6 +648,14 @@ fn main() {
         std::process::exit(test_design::run(&args[2..]));
     }
 
+    if args.len() >= 2 && args[1] == "check-convention-compliance" {
+        std::process::exit(agent_canon::convention_compliance::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "runtime-paths" {
+        std::process::exit(agent_canon::runtime_paths::run(&args[2..]));
+    }
+
     if args.len() >= 2
         && matches!(
             args[1].as_str(),
