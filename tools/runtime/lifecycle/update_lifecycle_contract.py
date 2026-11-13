@@ -7,10 +7,10 @@
 # upstream design ../../../agents/skills/agent-canon-update.md owns the source PR sequence.
 # upstream implementation ../artifacts/artifact_identity.py provides canonical JSON serialization.
 # upstream implementation ../dispatch/agent-canon/src/generated_completeness.rs owns the authoritative G2 receipt policy and materializer.
-# upstream implementation ../dispatch/agent-canon/src/github_publish.rs provides the G3 owner API.
+# upstream implementation ../dispatch/agent-canon/src/github_publish.rs provides the authoritative G3 owner API consumed through SourceProjectionGateOwnerApis.
 # downstream implementation ../../runtime/dispatch/agent-canon/src/agent_tool_calls.rs composes native close-agent ToolCalls.
 # downstream implementation ../dispatch/agent-canon/src/github_publish.rs consumes immutable pull-request lifecycle and gate evidence.
-# downstream implementation ../../repository/workspace/repository_topic_clone.py consumes source branch receipts.
+# downstream implementation ../../runtime/dispatch/agent-canon/src/repository_topic_clone.rs consumes source branch receipts.
 # downstream implementation ../../../tests/agent_tools/test_bootstrap_and_close.py validates terminal cleanup guards.
 # @dependency-end
 """Canonical mechanics for resumable AgentCanon update transactions.
@@ -195,6 +195,8 @@ GATE_CONTRACTS: dict[str, dict[str, object]] = {
     "G4": {
         "invariant": "standalone_source_branch_integrity",
         "owners": (
+            "tools/runtime/dispatch/agent-canon/src/repository_topic_clone.rs#ensure_independent_branch",
+            # Existing publication receipts may still name the retired owner.
             "tools/repository/workspace/repository_topic_clone.py#_ensure_branch",
             "agents/skills/agent-canon-update.md",
         ),

@@ -5,7 +5,7 @@ responsibility Defines the repository-topic clone lifecycle contract for generic
 upstream design ../design/dependency-manifest-design.md repository-topic clone intent
 downstream design ../../agents/skills/repository-topic-clone.md operator-facing policy consumer
 downstream design ../tools/repository_topic_clone.md CLI reference consumer
-downstream implementation ../../tools/repository/workspace/repository_topic_clone.py lifecycle implementation
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/repository_topic_clone.rs lifecycle implementation
 downstream implementation ../../tests/agent_tools/test_repository_topic_clone.py validates lifecycle and cleanup gates
 @dependency-end
 -->
@@ -19,7 +19,7 @@ downstream implementation ../../tests/agent_tools/test_repository_topic_clone.py
 
 ## 適用範囲
 
-`tools/repository/workspace/repository_topic_clone.py` が扱う repository checkout の
+`tools/bin/agent-canon repository-topic-clone` が扱う repository checkout の
 一意復元と cleanup はこの規約の対象です。`dependency-module-change` 系統は
 gitlink/pin/projection の共有責務を担い、この文書の clone 実装責務を重複して
 所有しません。
@@ -47,13 +47,9 @@ repository の変更は `independent-clone` を使います。どちらも同じ
 hash や group 階層を path に追加しません。
 
 linked worktree は native Git の shared refs/config と per-worktree index を使います。
-新規worktreeの公開rootはanchorのアクセスmodeを引き継ぎます。準備中のscratchの
-private modeを公開checkoutへ固定し、設定済みtool residentの読取を妨げません。
-writer packet と task marker は各 worktree に属し、別 worktree の状態を共有・上書きしません。
-reserved packet 用の `info/exclude` entry は Git の common directory に属し、
-linked worktree 間で共有されます。
-これは ignore rule の共有であり、worktree ごとの writer packet 自体は共有しません。
-independent clone も同じ path、marker、writer packet、branch identity の検証を通ります。
+新規 worktree の公開 root は anchor の access mode を引き継ぎます。task marker は
+checkout の Git metadata に属し、別 worktree の状態を共有・上書きしません。
+independent clone も同じ computed path、marker、branch identity の検証を通ります。
 
 mode の選択・作成は lifecycle command が行い、manual clone や手動 worktree 作成へ迂回しません。
 
@@ -67,22 +63,14 @@ mode の選択・作成は lifecycle command が行い、manual clone や手動 
   一致すれば `prepare` が canonical marker を materialize できます。
 - clean な exact checkout は local/remote named branch を再利用します。requested branch が
   local/remote のどちらにも無い場合だけ、最新 `origin/main` から作ります。未知の Git facts、
-  packet の symlink/不整合、escaped path は hold し、legacy module marker の互換性は
-  従来どおり exact digest を要求します。
-- source/index に触れない既存 target metadata 更新は、`prepare` の通常の identity 検証前に行います。
-  この操作が更新するのは task marker、Git が選択した common-directory
-  `info/exclude` の reserved packet entry、および ignored writer packet だけです。
-  checkout、Git index、packet 以外の tracked / untracked / ignored worktree file を編集・移動・削除せず、
-  dirty state を clean と報告しません。dirty content の所有権を割り当てる操作でもありません。
-  新規 checkout、branch 変更、`merge-main` は従来どおり clean state を要求します。
-- write-capable clone の `writer-target.json` は handoff の repeated `--allowed-path` を
-  materialize する。既存 packet は検証し、`--allowed-path` 省略時は既存 scope を引き継ぎます。
-  明示入力時の更新は current handoff scope のみ反映します。新規 prepare に allowed path がない場合は
-  packet を作りません。source discovery の `prepare` は scope を推測せずに実行でき、実際の writer scope が
-  決まった後に同じ identity を使って再prepareし、current `--allowed-path` を packet にします。
+  partial/mismatch marker、symlinked path、escaped path は hold します。legacy module marker の
+  read-only compatibility は exact topic/module/URL/branch/placement が一致する場合に限ります。
+  `prepare` が行う Git metadata 更新は computed checkout の canonical identity marker に限ります。
+  tracked、untracked、ignored checkout content や Git index は編集せず、dirty state を clean と
+  報告しません。dirty checkout は保持して prepare/merge/cleanup を拒否します。
 - merge 前に PR/PR head 更新を前倒しせず、`merge-main` は通常 merge を要求する。
-- raw `git merge` / `git rebase` は writer route では使わず、integration executor が
-  `repository_topic_clone.py merge-main` と `finalize-merge` を通す。
+- raw `git merge` / `git rebase` は repository-topic lifecycle route では直接使わず、integration executor が
+  `repository-topic-clone merge-main` と `finalize-merge` を通す。
   これは選択した integration workflow の owner route です。runtime は一般の
   `git commit` を integration executor に限定しません。path-scoped commit admission や
   role id は、実競合レビューや finalizer の parent/tree readback の証明にはなりません。
@@ -91,7 +79,7 @@ mode の選択・作成は lifecycle command が行い、manual clone や手動 
   実行できます。reuse は `prepare` に含まれます。これは repo-local workspace lifecycle
   にだけ適用し、共有 checkout の raw Git mutation authority を変更しません。
 
-  `dependency_module_change.py status` は adapter-only の read command であり、generic
+  `dependency-module-change status` は adapter-only の read command であり、generic
   lifecycle または operation-level approval carve-out には含めません。
 
 コマンドの引数と使用例は [CLI 参照の基本操作](../tools/repository_topic_clone.md#基本操作) を使います。
@@ -187,5 +175,5 @@ repository-topic clone は依存モジュールの branch 特化パスを使わ�
 
 | kind | statement | evidence / owner | status |
 | --- | --- | --- | --- |
-| assumption | `workspace/` は selected repository root の regular/tracked `.gitignore` が所有する repository-owned boundary です。 | `tools/repository/workspace/repository_topic_clone.py` の root/ignore gate、`tests/agent_tools/test_repository_topic_clone.py` の invalid-root regression | explicit |
+| assumption | `workspace/` は selected repository root の regular/tracked `.gitignore` が所有する repository-owned boundary です。 | `tools/runtime/dispatch/agent-canon/src/repository_topic_clone.rs` の root/ignore gate、`tests/agent_tools/test_repository_topic_clone.py` の invalid-root regression | explicit |
 | evidence | `git check-ignore -v --no-index -- workspace/.agent-canon-workspace-probe` の source path が root `.gitignore` と一致します。 | create/merge precondition; global/info exclude source は拒否 | required |
