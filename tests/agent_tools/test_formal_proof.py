@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests natural-language to formal-proof scaffold planning.
-# upstream implementation ../../tools/analysis/proof/formal_proof.py builds proof scaffold artifacts.
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/formal_proof.rs builds proof scaffold artifacts.
 # upstream design ../../agents/skills/formal-proof-workflow.md defines proof workflow requirements.
 # upstream design ../../documents/tools/formal_proof.md documents the CLI contract.
 # @dependency-end
@@ -14,14 +14,15 @@ import json
 import os
 import runpy
 import subprocess
-import sys
 import tempfile
 import unittest
 from pathlib import Path
 from typing import cast
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "analysis" / "proof" / "formal_proof.py"
+AGENT_CANON_CLI = os.environ.get(
+    "AGENT_CANON_CLI", str(PROJECT_ROOT / "tools" / "bin" / "agent-canon")
+)
 PRODUCER_TEST = PROJECT_ROOT / "tests" / "agent_tools" / "test_jit_canonical_ir.py"
 
 
@@ -112,8 +113,8 @@ class FormalProofToolTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(SCRIPT),
+                    AGENT_CANON_CLI,
+                    "formal-proof",
                     "--claim-file",
                     str(claim_path),
                     "--target",
@@ -198,8 +199,8 @@ class FormalProofToolTest(unittest.TestCase):
         """SMT target should expose SMT solver verification commands."""
         result = subprocess.run(
             [
-                sys.executable,
-                str(SCRIPT),
+                AGENT_CANON_CLI,
+                "formal-proof",
                 "--claim",
                 "Claim: every integer greater than two is prime.",
                 "--target",
@@ -241,8 +242,8 @@ class FormalProofToolTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(SCRIPT),
+                    AGENT_CANON_CLI,
+                    "formal-proof",
                     "--python-symbol",
                     f"{sample}::lemma",
                     "--target",
@@ -298,8 +299,8 @@ class FormalProofToolTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(SCRIPT),
+                    AGENT_CANON_CLI,
+                    "formal-proof",
                     "--python-symbol",
                     f"{sample}::Container.lemma",
                     "--format",
@@ -324,8 +325,8 @@ class FormalProofToolTest(unittest.TestCase):
         """Invalid Python symbol references should fail before scaffold output."""
         result = subprocess.run(
             [
-                sys.executable,
-                str(SCRIPT),
+                AGENT_CANON_CLI,
+                "formal-proof",
                 "--python-symbol",
                 "missing_separator",
                 "--format",
@@ -349,8 +350,8 @@ class FormalProofToolTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(SCRIPT),
+                    AGENT_CANON_CLI,
+                    "formal-proof",
                     "--python-symbol",
                     f"{sample}::missing",
                 ],
@@ -368,8 +369,8 @@ class FormalProofToolTest(unittest.TestCase):
         source_output = PROJECT_ROOT / "reports" / f"formal-proof-forbidden-{os.getpid()}"
         result = subprocess.run(
             [
-                sys.executable,
-                str(SCRIPT),
+                AGENT_CANON_CLI,
+                "formal-proof",
                 "--claim",
                 "Claim: one equals one.",
                 "--out-dir",
@@ -392,8 +393,8 @@ class FormalProofToolTest(unittest.TestCase):
             source_output = PROJECT_ROOT / "reports" / f"formal-proof-forbidden-{os.getpid()}"
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(SCRIPT),
+                    AGENT_CANON_CLI,
+                    "formal-proof",
                     "--claim",
                     "Claim: one equals one.",
                     "--runtime-root",

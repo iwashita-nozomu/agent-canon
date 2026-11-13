@@ -154,6 +154,11 @@ run_rust() {
   export CARGO_PROFILE_TEST_DEBUG=0
   local phase="${1:-all}"
   case "${phase}" in
+    controller-driver)
+      [[ "$#" -eq 1 ]] || return 2
+      cargo build --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --locked --offline --features controller-test-driver \
+        --bin agent-canon-controller-test-driver
+      ;;
     all|prepare)
       [[ "$#" -le 1 ]] || return 2
       cargo build --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --locked --offline
@@ -308,7 +313,16 @@ PY
 )
 
 run_workflow_container() {
+  local cargo_target_dir controller_test_driver
+  cargo_target_dir="${CARGO_TARGET_DIR:-${ROOT}/tools/runtime/dispatch/agent-canon/target}"
+  run_rust controller-driver
+  controller_test_driver="${cargo_target_dir}/debug/agent-canon-controller-test-driver"
+  [[ -x "${controller_test_driver}" ]] || {
+    echo "AGENT_CANON_CONTROLLER_TEST_DRIVER=fail" >&2
+    return 1
+  }
   AGENT_CANON_CLI="${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" \
+  AGENT_CANON_CONTROLLER_TEST_DRIVER="${controller_test_driver}" \
   python3 -m pytest -p no:cacheprovider -q \
     tests/tools/test_standalone_static_gate_units.py \
     tests/tools/test_read_only_full_check.py \
@@ -317,10 +331,10 @@ run_workflow_container() {
   AGENT_CANON_NATIVE_BIN="${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" \
     "${ROOT}/tools/bin/agent-canon" check-github-workflows --root "${ROOT}"
   AGENT_CANON_CLI="${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" \
+  AGENT_CANON_CONTROLLER_TEST_DRIVER="${controller_test_driver}" \
   python3 -m pytest -p no:cacheprovider -q \
     tests/tools/test_bootstrap_container_contract.py \
-    tests/tools/test_compile_cache.py \
-    tests/bootstrap/test_bootstrap_runtime.py
+    tests/tools/test_compile_cache.py
 }
 
 case "${UNIT}" in

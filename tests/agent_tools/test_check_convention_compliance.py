@@ -53,7 +53,7 @@ path: tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs
     "documents/runtime/bootstrap-runtime.md": "bootstrap runtime owner\n",
     "bootstrap/container/image/Dockerfile": "FROM scratch\n# bootstrap_runtime\n",
     "tests/tools/test_bootstrap_container_contract.py": "# bootstrap_runtime\ndef test_bootstrap_container_contract(): pass\n",
-    "tests/bootstrap/test_bootstrap_runtime.py": "# bootstrap_runtime\ndef test_bootstrap_runtime(): pass\n",
+    "tools/runtime/dispatch/agent-canon/tests/bootstrap_runtime_native.rs": "// bootstrap_runtime\n#[test] fn test_bootstrap_runtime() {}\n",
     "documents/conventions/README.md": "conventions\n",
     "documents/conventions/common/01_principles.md": "ruff-magic-values.toml\n",
     "documents/rule/naming.md": "naming\n",
@@ -270,7 +270,7 @@ path: tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs
         "check_convention_compliance.py "
         "check-skill-frontmatter "
         "tool_catalog.rs tool_drift.rs notebook-quality "
-        "github_workflow_check.rs bootstrap_runtime.py run_agent_canon docs check "
+        "github_workflow_check.rs bootstrap_runtime.rs run_agent_canon docs check "
         "run_agent_canon responsibility-scope\n"
     ),
     "tools/validation/ci/checks/check_agent_canon_pr.sh": (
@@ -282,7 +282,7 @@ path: tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs
     "bootstrap.sh": "runtime boundary\n",
     "agents/skills/environment-maintenance.md": (
         "tests/tools/test_bootstrap_container_contract.py "
-        "tests/bootstrap/test_bootstrap_runtime.py bootstrap_runtime.py\n"
+        "tools/runtime/dispatch/agent-canon/tests/bootstrap_runtime_native.rs bootstrap_runtime.rs\n"
     ),
     ".codex/README.md": (
         "active events active/inactive legacy `Stop` fail-open bounded redacted\n"

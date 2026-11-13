@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
 
-from tools.analysis.proof.formal_proof import build_verification_commands
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+AGENT_CANON_CLI = os.environ.get(
+    "AGENT_CANON_CLI", str(PROJECT_ROOT / "tools" / "bin" / "agent-canon")
+)
 
 
 class SourceRuntimeBoundaryTest(unittest.TestCase):
@@ -18,7 +20,23 @@ class SourceRuntimeBoundaryTest(unittest.TestCase):
 
     def test_formal_proof_checker_never_embeds_source_reports_default(self) -> None:
         """Generated checker commands do not point at source reports."""
-        command = build_verification_commands("<out-dir>/claim.lean", "lean")[0]
+        result = subprocess.run(
+            [
+                AGENT_CANON_CLI,
+                "formal-proof",
+                "--claim",
+                "Claim: a value equals itself.",
+                "--target",
+                "lean",
+                "--format",
+                "json",
+            ],
+            cwd=PROJECT_ROOT,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        command = json.loads(result.stdout)["verification_commands"][0]
         self.assertNotIn("reports/", command)
         self.assertIn("${AGENT_CANON_RUNTIME_ROOT}", command)
 

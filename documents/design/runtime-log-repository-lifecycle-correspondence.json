@@ -46,14 +46,14 @@
     {"path": "documents/tools/README.md", "owner_stage": "design", "change_kind": "modify"},
     {"path": "tests/agent_tools/test_runtime_log_archive_git.py", "owner_stage": "validation", "change_kind": "modify"},
     {"path": "tests/tools/test_bootstrap_container_contract.py", "owner_stage": "validation", "change_kind": "modify"},
-    {"path": "tests/bootstrap/test_bootstrap_runtime.py", "owner_stage": "validation", "change_kind": "modify"},
+    {"path": "tools/runtime/dispatch/agent-canon/tests/bootstrap_runtime_native.rs", "owner_stage": "validation", "change_kind": "modify"},
     {"path": "tools/runtime/archive/runtime_log_archive_git.py", "owner_stage": "implementation", "change_kind": "modify"},
-    {"path": "tools/runtime/container/bootstrap_runtime.py", "owner_stage": "implementation", "change_kind": "modify"}
+    {"path": "tools/runtime/dispatch/agent-canon/src/bootstrap_runtime.rs", "owner_stage": "implementation", "change_kind": "modify"}
   ],
   "validation_route": [
     {"argv": ["python3", "-m", "pytest", "-q", "tests/agent_tools/test_runtime_log_archive_git.py", "-k", "context_discovery"], "cwd": ".", "owner_stage": "validation"},
     {"argv": ["python3", "-m", "pytest", "-q", "tests/tools/test_bootstrap_container_contract.py"], "cwd": ".", "owner_stage": "validation"},
-    {"argv": ["python3", "-m", "pytest", "-q", "tests/bootstrap/test_bootstrap_runtime.py"], "cwd": ".", "owner_stage": "validation"},
+    {"argv": ["cargo", "test", "--manifest-path", "tools/runtime/dispatch/agent-canon/Cargo.toml", "--test", "bootstrap_runtime_native"], "cwd": ".", "owner_stage": "validation"},
     {"argv": ["bash", "tools/validation/semantic/dependencies/check_dependency_header_format.sh", "--root", ".", "--changed"], "cwd": ".", "owner_stage": "validation"},
     {"argv": ["tools/bin/agent-canon", "docs", "check-bootstrap", "--root", "."], "cwd": ".", "owner_stage": "validation"},
     {"argv": ["git", "diff", "--check"], "cwd": ".", "owner_stage": "validation"}

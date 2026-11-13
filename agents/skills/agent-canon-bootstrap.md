@@ -5,10 +5,10 @@ contract skill
 responsibility Owns the host-controlled lifecycle of the shared AgentCanon tool runtime.
 upstream design ../../documents/design/agent-canon-bootstrap-tool-runtime.md shared runtime, target, and archive boundary
 upstream implementation ../../bootstrap.sh sole host bootstrap entrypoint
-upstream implementation ../../tools/runtime/container/bootstrap_runtime.py typed control-plane implementation
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/bootstrap_runtime.rs typed control-plane implementation
 upstream implementation ../../tools/runtime/dispatch/agent-canon/src/tool_dispatch.rs namespaced tool dispatch and parity boundary
 downstream design ./agent-eval-accumulation.md eval evidence collection and archive handoff
-downstream implementation ../../tests/bootstrap/test_bootstrap_runtime.py lifecycle contract tests
+downstream implementation ../../tools/runtime/dispatch/agent-canon/tests/bootstrap_runtime_native.rs lifecycle contract tests
 downstream implementation ../../tests/agent_tools/test_execution_route_order.py command order regression
 downstream implementation ../../tests/tools/test_bootstrap_container_contract.py image and dispatch contract tests
 @dependency-end
@@ -197,7 +197,7 @@ the runtime-local `CODEX_HOME` links target the corresponding live
 `<install-root>/.codex/...` paths on the host. The config link is directly at
 `CODEX_HOME/config.toml`, so the host Codex process can read it without a HOME
 mount.
-`eval sync` is a two-plane route: resident Python validates the collection and
+`eval sync` is a two-plane route: the resident Rust controller validates the collection and
 writes only a strict body-free request, while the host shell resolves the
 registered target mount and invokes the credentialed archive Git adapter.
 Successful `exec` feedback/knowledge sync uses the same request handoff; the

@@ -2112,7 +2112,7 @@ fn verify_codex_user_bundle_inner(root: &Path) -> BundleResult<Value> {
     const REQUIRED: [&str; 8] = [
         "bootstrap.sh",
         "bootstrap/host/lifecycle/entrypoint.sh",
-        "tools/runtime/container/bootstrap_runtime.py",
+        "tools/runtime/dispatch/agent-canon/src/bootstrap_runtime.rs",
         "hooks/hooks.json",
         "plugin.json",
         CODEX_MARKETPLACE,

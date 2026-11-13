@@ -4,7 +4,7 @@
 # upstream design ../../../documents/runtime/runtime-log-archive.md main Eval delivery boundary
 # upstream implementation ./log_repository_identity.py configured source identity
 # upstream implementation ../artifacts/runtime_artifacts.py bounded external staging paths
-# upstream implementation ../container/bootstrap_runtime.py canonical runtime manifest reader
+# upstream input ../../../bootstrap/host/manifest.toml runtime quota contract
 # upstream design ../../../bootstrap/host/manifest.toml transport resource quotas
 # downstream implementation ./runtime_log_archive_git.py existing sync and archive-eval owner
 # downstream implementation ../../../tests/agent_tools/test_github_eval_delivery.py validates source binding and delivery
@@ -22,6 +22,7 @@ import re
 import shutil
 import stat
 import subprocess
+import tomllib
 import zipfile
 from collections.abc import Callable, Generator
 from contextlib import contextmanager
@@ -38,8 +39,6 @@ from tools.runtime.artifacts.runtime_artifacts import (
     RuntimeArtifactError,
     runtime_spool_boundary,
 )
-from tools.runtime.container.bootstrap_runtime import BootstrapError, load_manifest
-
 WORKFLOW_PATH = ".github/workflows/agent-canon-static-gates.yml"
 ARTIFACT_NAME = re.compile(r"agent-canon-main-eval-([1-9][0-9]*)-([1-9][0-9]*)")
 SHA = re.compile(r"[0-9a-f]{40}")
@@ -69,7 +68,8 @@ class EvalArtifactLimits:
     @classmethod
     def from_manifest(cls, path: Path) -> EvalArtifactLimits:
         try:
-            manifest, _ = load_manifest(path)
+            with path.open("rb") as handle:
+                manifest = tomllib.load(handle)
             container = _object(manifest.get("container"))
             archive = _object(manifest.get("archive"))
             return cls(
@@ -78,7 +78,7 @@ class EvalArtifactLimits:
                 runtime_bytes=_positive_limit(container.get("runtime_quota_bytes")),
                 members=_positive_limit(archive.get("main_eval_max_members")),
             )
-        except (BootstrapError, OSError, ValueError) as exc:
+        except (OSError, tomllib.TOMLDecodeError, ValueError) as exc:
             raise GitHubEvalDeliveryError("github_eval_limits_invalid") from exc
 
 
