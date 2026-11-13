@@ -26,16 +26,25 @@ impl Fixture {
             .join("../../../../")
             .canonicalize()
             .expect("repository root");
-        Self { _temporary: temporary, control, runtime, private_log, repository }
+        Self {
+            _temporary: temporary,
+            control,
+            runtime,
+            private_log,
+            repository,
+        }
     }
 
     fn run(&self, arguments: &[&str], extra: &[(&str, &str)]) -> Output {
         let mut command = Command::new(env!("CARGO_BIN_EXE_agent-canon"));
         command
             .arg("bootstrap-runtime")
-            .arg("--repository-root").arg(&self.repository)
-            .arg("--control-parent-root").arg(&self.control)
-            .arg("--runtime-root").arg(&self.runtime)
+            .arg("--repository-root")
+            .arg(&self.repository)
+            .arg("--control-parent-root")
+            .arg(&self.control)
+            .arg("--runtime-root")
+            .arg(&self.runtime)
             .args(arguments)
             .env("AGENT_CANON_PRIVATE_LOG_ROOT", &self.private_log)
             .env_remove("AGENT_CANON_HOST_INSTALL_ROOT")
@@ -57,21 +66,31 @@ impl Fixture {
             .env_remove("AGENT_CANON_RESTORE_IMAGE_REF")
             .env_remove("AGENT_CANON_CURRENT_IMAGE_ID")
             .env_remove("AGENT_CANON_CURRENT_IMAGE_REF");
-        for (key, value) in extra { command.env(key, value); }
+        for (key, value) in extra {
+            command.env(key, value);
+        }
         command.output().expect("native bootstrap CLI starts")
     }
 }
 
 fn payload(output: &Output) -> Value {
-    serde_json::from_slice(if output.status.success() { &output.stdout } else { &output.stderr })
-        .expect("controller emits a JSON payload")
+    serde_json::from_slice(if output.status.success() {
+        &output.stdout
+    } else {
+        &output.stderr
+    })
+    .expect("controller emits a JSON payload")
 }
 
 #[test]
 fn status_is_native_and_does_not_require_docker() {
     let fixture = Fixture::new();
     let output = fixture.run(&["status"], &[("AGENT_CANON_DOCKER", "missing-docker")]);
-    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     let receipt = payload(&output);
     assert_eq!(receipt["operation"], "status");
     assert_eq!(receipt["code"], "status");
@@ -84,22 +103,62 @@ fn target_task_and_gc_operations_share_one_native_state_owner() {
     let target = fixture._temporary.path().join("target");
     fs::create_dir_all(&target).expect("target directory");
     let installed = fixture.run(&["install"], &[]);
-    assert!(installed.status.success(), "{}", String::from_utf8_lossy(&installed.stderr));
+    assert!(
+        installed.status.success(),
+        "{}",
+        String::from_utf8_lossy(&installed.stderr)
+    );
 
-    let target_output = fixture.run(&["target", "add", "--root", target.to_str().unwrap(), "--mode", "read-only"], &[]);
-    assert!(target_output.status.success(), "{}", String::from_utf8_lossy(&target_output.stderr));
+    let target_output = fixture.run(
+        &[
+            "target",
+            "add",
+            "--root",
+            target.to_str().unwrap(),
+            "--mode",
+            "read-only",
+        ],
+        &[],
+    );
+    assert!(
+        target_output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&target_output.stderr)
+    );
     assert_eq!(payload(&target_output)["operation"], "target_add");
 
-    let admitted = fixture.run(&["task", "admit", "--task-id", "fixture-task", "--root", target.to_str().unwrap()], &[]);
-    assert!(admitted.status.success(), "{}", String::from_utf8_lossy(&admitted.stderr));
+    let admitted = fixture.run(
+        &[
+            "task",
+            "admit",
+            "--task-id",
+            "fixture-task",
+            "--root",
+            target.to_str().unwrap(),
+        ],
+        &[],
+    );
+    assert!(
+        admitted.status.success(),
+        "{}",
+        String::from_utf8_lossy(&admitted.stderr)
+    );
     assert_eq!(payload(&admitted)["code"], "task_reserved");
 
     let released = fixture.run(&["task", "release", "--task-id", "fixture-task"], &[]);
-    assert!(released.status.success(), "{}", String::from_utf8_lossy(&released.stderr));
+    assert!(
+        released.status.success(),
+        "{}",
+        String::from_utf8_lossy(&released.stderr)
+    );
     assert_eq!(payload(&released)["code"], "task_released");
 
     let planned = fixture.run(&["gc", "--dry-run"], &[]);
-    assert!(planned.status.success(), "{}", String::from_utf8_lossy(&planned.stderr));
+    assert!(
+        planned.status.success(),
+        "{}",
+        String::from_utf8_lossy(&planned.stderr)
+    );
     assert_eq!(payload(&planned)["code"], "gc_plan");
 }
 
@@ -107,7 +166,16 @@ fn target_task_and_gc_operations_share_one_native_state_owner() {
 fn structured_exec_requires_the_authenticated_target_digest() {
     let fixture = Fixture::new();
     let request = r#"{"schema":"agent-canon.tool-exec-request.v1"}"#;
-    let output = fixture.run(&["exec", "--target-digest", "fixture", "--request-json", request], &[]);
+    let output = fixture.run(
+        &[
+            "exec",
+            "--target-digest",
+            "fixture",
+            "--request-json",
+            request,
+        ],
+        &[],
+    );
     assert_eq!(output.status.code(), Some(2));
     assert_eq!(payload(&output)["code"], "invalid_exec_request");
 }
