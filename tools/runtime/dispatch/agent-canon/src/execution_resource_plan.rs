@@ -1384,6 +1384,20 @@ mod tests {
     #[test]
     fn actual_flock_excludes_busy_candidate_and_releases_every_owned_descriptor_once() {
         use std::os::unix::fs::PermissionsExt;
+        const ISOLATED: &str = "AGENT_CANON_TEST_ISOLATED_FLOCK";
+        if std::env::var_os(ISOLATED).is_none() {
+            let output = std::process::Command::new(std::env::current_exe().expect("test executable"))
+                .args(["--exact", "execution_resource_plan::tests::actual_flock_excludes_busy_candidate_and_releases_every_owned_descriptor_once", "--nocapture"])
+                .env(ISOLATED, "1")
+                .output()
+                .expect("isolated lock fixture process");
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            return;
+        }
         let root = tempfile::tempdir_in(
             std::env::temp_dir()
                 .canonicalize()
@@ -1401,6 +1415,11 @@ mod tests {
         let first_receipt = first
             .try_reserve(&candidates[..1], &BTreeSet::new(), 1)
             .expect("first reservation");
+        for held in &first.held {
+            let flags = nix::fcntl::fcntl(&held.file, nix::fcntl::FcntlArg::F_GETFD)
+                .expect("lock descriptor flags");
+            assert_ne!(flags & nix::fcntl::FdFlag::FD_CLOEXEC.bits(), 0);
+        }
         assert_eq!(first_receipt.selected_uuids, &candidates[..1]);
         let mut second = transaction_fixture(root.path());
         let second_receipt = second
