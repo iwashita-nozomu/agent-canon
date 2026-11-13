@@ -1,9 +1,9 @@
 //! Test-only process adapter that supplies fake Docker bind mount namespaces.
 
 use agent_canon::bootstrap_runtime::{run_with_target_namespace, TargetNamespace};
+use std::collections::BTreeMap;
 use std::env;
 use std::path::PathBuf;
-use std::collections::BTreeMap;
 
 fn namespace_from_process_environment() -> Result<TargetNamespace, String> {
     let source_root = env::var_os("AGENT_CANON_RUNTIME_TOOLS_ROOT")
@@ -52,16 +52,28 @@ fn run_tool_wrapper(arguments: &[String]) -> i32 {
     dispatch_args.extend(arguments.iter().skip(2).cloned());
     let dispatch_args = namespace.map_process_argv(&dispatch_args);
     let mut environment = env::vars().collect::<BTreeMap<_, _>>();
-    environment.insert("AGENT_CANON_EXECUTION_PLANE".to_string(), "tool-container".to_string());
-    environment.insert("AGENT_CANON_SOURCE_ROOT".to_string(), "/opt/agent-canon/source".to_string());
-    environment.insert("AGENT_CANON_RUNTIME_TOOLS_ROOT".to_string(), "/opt/agent-canon/source".to_string());
+    environment.insert(
+        "AGENT_CANON_EXECUTION_PLANE".to_string(),
+        "tool-container".to_string(),
+    );
+    environment.insert(
+        "AGENT_CANON_SOURCE_ROOT".to_string(),
+        "/opt/agent-canon/source".to_string(),
+    );
+    environment.insert(
+        "AGENT_CANON_RUNTIME_TOOLS_ROOT".to_string(),
+        "/opt/agent-canon/source".to_string(),
+    );
     for (key, value) in namespace.map_process_environment(&environment) {
         env::set_var(key, value);
     }
     if let Ok(digest) = env::var("AGENT_CANON_TARGET_DIGEST") {
         let logical_target = format!("/targets/{digest}");
         let target_environment = BTreeMap::from([
-            ("AGENT_CANON_TARGET_ROOT".to_string(), logical_target.clone()),
+            (
+                "AGENT_CANON_TARGET_ROOT".to_string(),
+                logical_target.clone(),
+            ),
             ("AGENT_CANON_TASK_ROOT".to_string(), logical_target.clone()),
             ("GIT_CONFIG_VALUE_0".to_string(), logical_target),
         ]);
@@ -127,8 +139,10 @@ fn main() {
     };
     let namespace = match (control_root, runtime_root, source_root) {
         (Some(control), Some(runtime), Some(source)) => {
-            match namespace.with_runtime_roots(&control, &runtime)
-                .and_then(|namespace| namespace.with_source_root(&source)) {
+            match namespace
+                .with_runtime_roots(&control, &runtime)
+                .and_then(|namespace| namespace.with_source_root(&source))
+            {
                 Ok(namespace) => namespace,
                 Err(detail) => {
                     eprintln!("test driver: invalid resident mount namespace: {detail}");
