@@ -155,8 +155,9 @@ class ResponsibilityScopeTest(unittest.TestCase):
         self.assertIn("reports/**", paths)
         self.assertIn("documents/runtime/runtime-log-archive.md", paths)
         self.assertIn("documents/runtime/runtime-log-archive-migration.md", paths)
-        self.assertIn("tools/runtime/archive/runtime_log_paths.py", paths)
-        self.assertIn("tools/runtime/archive/runtime_log_archive_git.py", paths)
+        self.assertIn(
+            "tools/runtime/dispatch/agent-canon/src/runtime_log_archive.rs", paths
+        )
         self.assertNotIn(
             "evidence/agent-evals/**",
             scopes["runtime-entrypoints"].get("exclude_paths", []),
@@ -168,11 +169,14 @@ class ResponsibilityScopeTest(unittest.TestCase):
         )
         self.assertIn(".vscode/**", runtime_paths)
         expected_owners = {
-            "tools/runtime/archive/runtime_log_archive_git.py": "eval-and-hook-evidence",
-            "tools/runtime/archive/runtime_log_paths.py": "eval-and-hook-evidence",
+            "tools/runtime/dispatch/agent-canon/src/runtime_log_archive.rs": "eval-and-hook-evidence",
+            "tools/runtime/dispatch/agent-canon/src/runtime_log_archive/runtime_event.rs": "eval-and-hook-evidence",
+            "tools/runtime/dispatch/agent-canon/src/runtime_log_archive/hook_spool.rs": "eval-and-hook-evidence",
+            "tools/runtime/dispatch/agent-canon/src/eval_archive_paths.rs": "shared-tooling",
+            "tools/runtime/dispatch/agent-canon/src/log_repository_identity.rs": "shared-tooling",
             "tests/agent_tools/test_eval_accumulation_check.py": "eval-and-hook-evidence",
             "tests/agent_tools/test_runtime_log_archive_git.py": "eval-and-hook-evidence",
-            "tests/agent_tools/test_runtime_log_paths.py": "eval-and-hook-evidence",
+            "tools/runtime/dispatch/agent-canon/tests/runtime_log_archive_native.rs": "eval-and-hook-evidence",
             ".obsidian/app.json": "runtime-entrypoints",
             ".obsidian/appearance.json": "runtime-entrypoints",
             ".obsidian/core-plugins.json": "runtime-entrypoints",

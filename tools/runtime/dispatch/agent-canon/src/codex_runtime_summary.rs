@@ -3,6 +3,7 @@
 // responsibility Exports bounded Codex history, SQLite, and session summaries to the external runtime archive.
 // upstream design ../../../../../documents/runtime/runtime-log-archive.md owns the archive path and privacy contract
 // upstream implementation hook_event_log.rs owns the UTC timestamp and shared archive path slug
+// upstream implementation eval_archive_paths.rs owns external archive paths and source marker resolution
 // upstream implementation log_repository_identity.rs owns source-repository archive keys
 // upstream implementation runtime_boundary.rs owns safe external-runtime path resolution and append locking
 // upstream implementation python_json.rs owns Python-compatible JSON parsing and serialization
@@ -863,23 +864,7 @@ fn recent_cutoff(recent_days: Option<&BigInt>) -> Option<BigInt> {
 }
 
 fn agent_canon_root(root: &Path) -> Result<PathBuf, String> {
-    const MARKERS: &[(&str, usize)] = &[
-        ("tools/runtime/archive/runtime_log_paths.py", 3),
-        ("eval/definitions/README.md", 2),
-        ("documents/runtime/runtime-log-archive.md", 2),
-    ];
-    for (marker, depth) in MARKERS {
-        let marker_path = root.join(marker);
-        if marker_path.is_file() {
-            let marker_path = resolve_non_strict(&marker_path)?;
-            return marker_path
-                .ancestors()
-                .nth(depth + 1)
-                .map(Path::to_path_buf)
-                .ok_or_else(|| format!("cannot resolve AgentCanon root from marker {marker}"));
-        }
-    }
-    Ok(root.to_path_buf())
+    crate::eval_archive_paths::canonical_source_root(root)
 }
 
 fn object_member<'a>(value: &'a JsonValue, key: &str) -> Option<&'a JsonValue> {

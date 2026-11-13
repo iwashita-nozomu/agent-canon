@@ -81,7 +81,6 @@ if [ -d python ]; then
 else
   AGENT_CANON_W2_OWNER_PATHS=(
     "${WORKSPACE_ROOT}/tools/runtime/artifacts/artifact_identity.py" \
-    "${WORKSPACE_ROOT}/tools/runtime/artifacts/report_artifact_checks.py" \
     tests/agent_tools/test_artifact_identity.py \
     tests/agent_tools/test_codex_hooks.py \
   )

@@ -1263,7 +1263,7 @@ fn full(summary: &Value) -> String {
         "- hook_jsonl_archive_mount: `.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/<hook-name>.jsonl`",
         "- hook_jsonl_archive_remote: `git@github.com:iwashita-nozomu/agent-canon-log.git`",
         "- agent_report_archive_index: `.agent-canon/log-archive/agent-reports/<repo-key>/index.jsonl`",
-        "- agent_report_archive_command: `python3 tools/runtime/archive/runtime_log_archive_git.py archive-agent-report --report-dir reports/agents/<run-id>`",
+        "- agent_report_archive_command: `tools/bin/agent-canon runtime-log-archive-git archive-agent-report --report-dir reports/agents/<run-id>`",
         "- workflow_selection_eval_reports: `.agent-canon/log-archive/eval-results/workflow-selection/<eval-run-id>-<status>.md`",
         "- github_issue_refs: repository-qualified URLs from private run-local packets; otherwise `github_issue_lookup_required`",
         "- private_knowledge: `agent-canon-log/knowledge/topics/*/candidate.md` (on-demand; locator/count only)",

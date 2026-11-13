@@ -34,6 +34,13 @@ pub(crate) fn read_parent_owned_file(
     Err(unsupported())
 }
 
+pub(crate) fn sync_parent_owned_directory(
+    _: &AttestedParent,
+    _: &ParentOwnedPathReceipt,
+) -> Result<(), AuthorityError> {
+    Err(unsupported())
+}
+
 pub(crate) fn remove_parent_owned_file(
     _: &AttestedParent,
     _: &ParentOwnedPathReceipt,

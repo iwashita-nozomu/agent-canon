@@ -7,7 +7,7 @@
 # upstream implementation ../../tests/bootstrap/docker.sh provides the full-check image runtime environment
 # upstream implementation ../../tools/runtime/dispatch/agent-canon/src/eval_accumulation.rs writes accumulated eval reports
 # upstream implementation ../../tools/runtime/dispatch/agent-canon/src/eval_accumulation_check.rs validates accumulated eval reports
-# upstream implementation ../../tools/runtime/archive/runtime_log_paths.py resolves mounted log archive paths
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/eval_archive_paths.rs resolves mounted log archive paths
 # @dependency-end
 
 from __future__ import annotations

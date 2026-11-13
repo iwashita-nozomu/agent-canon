@@ -203,7 +203,7 @@ downstream design workflow_monitoring.md records in-workflow monitoring and self
 
 ## Runtime Log Archive Evidence（runtime log archive evidence）
 
-<!-- active run を `python3 tools/runtime/archive/runtime_log_archive_git.py archive-agent-report --report-dir reports/agents/<run-id>` で archive し、`python3 tools/runtime/archive/runtime_log_archive_git.py push`、`python3 tools/runtime/archive/runtime_log_archive_git.py check-clean --porcelain` を user-facing completion 前に実行します。蓄積 runtime family を意図的に集める場合だけ broad `sync` を使います。archive が dirty、誤った `logs/<environment-key>-<chat-key>` branch、foreign repo-key の dirty path/commit tree を含む場合は closeout を unlock しません。archive/push が commit したか no-op か、archive branch と repo key を記録します。 -->
+<!-- active run を `tools/bin/agent-canon runtime-log-archive-git archive-agent-report --report-dir reports/agents/<run-id>` で archive し、`tools/bin/agent-canon runtime-log-archive-git push`、`tools/bin/agent-canon runtime-log-archive-git check-clean --porcelain` を user-facing completion 前に実行します。蓄積 runtime family を意図的に集める場合だけ broad `sync` を使います。archive が dirty、誤った `logs/<environment-key>-<chat-key>` branch、foreign repo-key の dirty path/commit tree を含む場合は closeout を unlock しません。archive/push が commit したか no-op か、archive branch と repo key を記録します。 -->
 
 - runtime_log_archive_sync_command:
 - runtime_log_archive_sync_status:
