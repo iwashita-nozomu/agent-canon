@@ -822,12 +822,12 @@ entries:
   - id: repo-structure-contract
     public: true
     summary: Compares an observed repository tree with the AgentCanon structure contract.
-    path: tools/validation/semantic/structure/repo_structure_contract.py
+    path: tools/runtime/dispatch/agent-canon/src/repo_structure_contract.rs
     family: agent_tools
     role: checker
     status: canonical
-    command: python3 tools/validation/semantic/structure/repo_structure_contract.py
-    dispatch: {argv: ["python3", "tools/validation/semantic/structure/repo_structure_contract.py"]}
+    command: tools/bin/agent-canon repo-structure-contract
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "repo-structure-contract"]}
     writes: false
     default_wiring:
       ci: false
