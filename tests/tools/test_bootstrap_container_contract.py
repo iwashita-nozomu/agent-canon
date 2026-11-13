@@ -7,7 +7,7 @@
 # upstream implementation ../../bootstrap/container/image/Dockerfile image definition
 # upstream implementation ../../bootstrap/container/lifecycle/entrypoint.sh health and dispatch entrypoint
 # upstream implementation ../../bootstrap/container/image/dependencies.toml typed image capabilities
-# upstream implementation ../../tools/runtime/container/devcontainer_dependencies.py canonical Cargo snapshot digest owner
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/environment_dependencies.rs canonical Cargo snapshot digest owner
 # @dependency-end
 
 from __future__ import annotations

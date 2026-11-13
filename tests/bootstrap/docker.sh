@@ -6,7 +6,7 @@
 # downstream implementation ../../tools/validation/ci/runners/run_all_checks.sh owns the full-check body
 # downstream implementation ./test_live_projection_authority.py validates live projection authority
 # downstream design ./lean-proof-dependencies.toml pins the native proof toolchain
-# downstream implementation ../../tools/analysis/dependencies/dependency_plan.py installs the selected proof profile dependencies
+# downstream implementation ../../tools/runtime/dispatch/agent-canon/src/environment_dependencies.rs installs the selected proof profile dependencies
 # downstream implementation ../../tools/runtime/dispatch/agent-canon/src/lean_proof_env.rs runs native Lean checks
 # @dependency-end
 
@@ -49,7 +49,7 @@ export ELAN_HOME="${runtime_root}/elan"
 export PATH="${ELAN_HOME}/bin:${PATH}"
 mkdir -p "${fixtures}" "${HOME}"
 git -C "${workspace}" init --quiet
-python3 -m tools.analysis.dependencies.dependency_plan install \
+"${tool}" environment-dependencies install \
   --workspace "${workspace}" \
   --manifest /opt/agent-canon/source/tests/bootstrap/lean-proof-dependencies.toml \
   --format json
