@@ -27,7 +27,7 @@ GPU/JAX 環境の所有境界、artifact / visualization.py renderer / README �
 
 1. `experiments/registry.toml` の registered command が managed runner から topic の
    `run.py` を呼ぶことを確認する。README の標準入口は次の形です。
-   `python3 -m tools.experiments.execution.run_managed_experiment --topic <topic> --variant <variant> -- python3 experiments/<topic>/run.py`
+   `tools/bin/agent-canon run-managed-experiment --topic <topic> --variant <variant> -- python3 experiments/<topic>/run.py`
 2. runner が作る run directory と `EXPERIMENT_RUN_DIR`、topic config、raw/summary artifact の
    境界を確認する。`visualization.py` は reader/renderer であり、launcher や config 正本ではない。
 3. topic code/config に GPU visibility、JAX platform、allocator、preallocation、単一 GPU 固定、

@@ -70,7 +70,7 @@ const EXPERIMENT_EXECUTION_SURFACE_PATHS: &[&str] = &[
     "tools/runtime/dispatch/agent-canon/src/experiment_registry.rs",
     "tools/runtime/dispatch/agent-canon/src/annex_retention.rs",
     "tools/runtime/dispatch/agent-canon/src/experiment_registry/store.rs",
-    "tools/experiments/execution/run_managed_experiment.py",
+    "tools/runtime/dispatch/agent-canon/src/managed_experiment.rs",
 ];
 const LIBRARY_SURFACE_PREFIXES: &[&str] = &[
     "vendor/",
@@ -177,8 +177,8 @@ const AGENT_CANON_NEW_TOOL_SOURCE_ROUTE_GATE_TEMPLATES: &[GateTemplate] = &[Gate
 }];
 const EXPERIMENT_EXECUTION_SURFACE_GATE_TEMPLATES: &[GateTemplate] = &[GateTemplate {
     gate: "experiment_execution_surface_guard",
-    command_template: "if [ -e experiments/registry.toml ]; then tools/bin/agent-canon experiment-registry; else echo EXPERIMENT_REGISTRY_CHECK=skipped_no_project_registry; fi && python3 -m pytest tests/tools/test_run_managed_experiment.py -q",
-    handoff: "route planned edits through $experiment-lifecycle and $test-design; preserve the managed runner, registry checker, registry contract, and deterministic raw-only git-annex retention contract with lightweight registry and runner validation evidence",
+    command_template: "if [ -e experiments/registry.toml ]; then tools/bin/agent-canon experiment-registry; else echo EXPERIMENT_REGISTRY_CHECK=skipped_no_project_registry; fi && cargo test --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --test managed_experiment_native",
+    handoff: "route planned edits through $experiment-lifecycle and $test-design; preserve the native managed CLI, registry checker, registry contract, and deterministic raw-only git-annex retention contract with protocol fixture evidence",
 }];
 const LIBRARY_GATE_TEMPLATES: &[GateTemplate] = &[GateTemplate {
     gate: "library_implementation_guard",

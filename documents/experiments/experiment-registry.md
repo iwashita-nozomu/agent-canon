@@ -140,7 +140,7 @@ tools/bin/agent-canon create-experiment-topic <topic>
 実行、publication、LATEST 更新には variant を必ず明示します。
 
 ```bash
-python3 -m tools.experiments.execution.run_managed_experiment --topic <topic> --variant <variant> -- python3 experiments/<topic>/run.py
+tools/bin/agent-canon run-managed-experiment --topic <topic> --variant <variant> -- python3 experiments/<topic>/run.py
 agent-canon save-experiment-result-annex --raw-dir experiments/<topic>/result/<run-id>/raw --annex-repo "$EXPERIMENT_RAW_ANNEX_REPO"
 agent-canon update-latest-result experiments/<topic>/result --variant <variant>
 ```
@@ -148,7 +148,7 @@ agent-canon update-latest-result experiments/<topic>/result --variant <variant>
 ## server 実行ルール
 
 - project `Makefile` は registry の smoke / formal command へ到達する target を持ちます。標準名は `make experiment-smoke TOPIC=<topic>` と `make experiment-formal TOPIC=<topic>` です。
-- formal run は `tools/experiments/execution/run_managed_experiment.py` を使います。
+- formal run は `tools/bin/agent-canon run-managed-experiment` を使います。Rust の managed owner が registry/config snapshot、immutable source snapshot、external admitted-runner protocol を統合します。
 - 可能なら Make target の内側で `--use-registered-command formal` を使い、registry の formal command をそのまま実行します。
 - GPU run では full physical/MIG UUID admission environment が generic runner
   construction 前に確定します。CPU/index/prefix/direct/compatibility fallback は
@@ -179,5 +179,5 @@ registered command から `{config_path}` が欠ける場合も fail します�
 の補助診断であり、patch 前の必須 evidence ではありません。
 native registry command の契約は
 `tools/runtime/dispatch/agent-canon/tests/experiment_registry_native.rs` が検証します。
-`tests/tools/test_run_managed_experiment.py` は managed runner の契約を検証します。
+`tools/runtime/dispatch/agent-canon/tests/managed_experiment_native.rs` は managed CLI、source snapshot、external provider protocol、terminal coverage の契約を検証します。
 この文書の説明だけの変更に runner test や formal run を要求しません。

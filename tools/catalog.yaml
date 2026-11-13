@@ -1167,7 +1167,7 @@ entries:
     tests:
       - tests/agent_tools/test_tool_catalog.py
       - tests/agent_tools/test_tool_dispatch.py
-      - tests/tools/test_run_managed_experiment.py
+      - tools/runtime/dispatch/agent-canon/tests/managed_experiment_native.rs
 
   - id: run-accumulated-agent-evals
     summary: Runs registered AgentCanon eval producers with append-only accumulation before archive validation.
@@ -2563,12 +2563,12 @@ entries:
 
   - id: run-managed-experiment
     summary: Creates and tracks shared managed experiment runs.
-    path: tools/experiments/execution/run_managed_experiment.py
+    path: tools/runtime/dispatch/agent-canon/src/managed_experiment.rs
     family: experiments
     role: experiment
     status: canonical
-    command: python3 -m tools.experiments.execution.run_managed_experiment
-    dispatch: {argv: ["python3", "-m", "tools.experiments.execution.run_managed_experiment"]}
+    command: tools/bin/agent-canon run-managed-experiment
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "run-managed-experiment"]}
     writes: true
     default_wiring:
       ci: false
@@ -2578,7 +2578,7 @@ entries:
       - documents/tools/README.md
       - documents/experiments/experiment-registry.md
     tests:
-      - tests/tools/test_run_managed_experiment.py
+      - tools/runtime/dispatch/agent-canon/tests/managed_experiment_native.rs
 
   - id: html-artifact-access
     public: true
