@@ -3,7 +3,7 @@
 contract reference
 responsibility Documents tool and skill routing refactor policy.
 upstream design README.md AgentCanon documentation index
-downstream implementation ../../tools/agent/orchestration/route.py selects short tool and skill routes
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs selects native short tool and skill routes
 downstream design ../../agents/skills/task-routing.md public skill for route decisions
 downstream design ../tools/route.md route tool reader documentation
 @dependency-end
@@ -37,9 +37,9 @@ evidence, not an AgentCanon product dependency.
 - Public tool names stay short: one or two words before `.py` when possible.
 - Public skill names describe the user action, not the implementation pattern.
 - Long candidate names are compatibility aliases, not new files.
-- Repeated routing decisions go through `route.py --area <area>`.
+- Repeated routing decisions go through `tools/bin/agent-canon route --area <area>`.
 - Prompt-derived public skill selection goes through
-  `python3 tools/agent/orchestration/route.py --prompt <text> --mode routing-only` so candidate evidence,
+  `tools/bin/agent-canon route --prompt <text> --mode routing-only` so candidate evidence,
   current-wave `ACTIVE_SKILLS`, and later-wave `DEFERRED_SKILLS` are produced
   by the fast deterministic harness. Routing rules and stage policy live in
   `agents/skills/catalog.yaml` under `skill_families[].routing`.
@@ -56,48 +56,48 @@ evidence, not an AgentCanon product dependency.
 
 | Area | Short Command | Skill | Replaces Long Candidates |
 | ---- | ------------- | ----- | ------------------------ |
-| `surface` | `route.py --area surface` | `$task-routing` | `profile_surface_resolver.py`, `$runtime-surface-minimize` |
-| `profile` | `route.py --area profile` | `$task-routing` | `optional_profile_matrix.py`, `$profile-selection` |
-| `checks` | `route.py --area checks` | `$task-routing` | `workflow_step_router.py`, `$workflow-lite-routing`, `validation_min_set.py` |
-| `env` | `route.py --area env` | `$task-routing` | `environment_profile_detect.py`, `$environment-profile` |
-| `read` | `route.py --area read` | `$task-routing` | `read_order_compactor.py`, `$onboarding-lite` |
-| `remote` | `route.py --area remote` | `$task-routing` | `remote_policy_router.py`, `$remote-policy-cleanup` |
-| `canon` | `route.py --area canon` | `$task-routing` | `submodule_state_router.py`, `$submodule-routing` |
-| `mcp` | `route.py --area mcp` | `$task-routing` | `mcp_optional_preflight.py`, `$mcp-profile` |
-| `goal` | `route.py --area goal` | `$task-routing` | `goal_contract_router.py`, `$goal-lite` |
-| `runtime` | `route.py --area runtime` | `$task-routing` | `runtime_capability_probe.py`, `$runtime-capability-routing` |
-| `tokens` | `route.py --area tokens` | `$task-routing` | `token_budget_gate.py`, `$token-lite` |
-| `skills` | `route.py --area skills` | `$task-routing` | `skill_workflow_mapper.py`, `$routing-single-source` |
-| `agents` | `route.py --area agents` | `$task-routing` | `multi_agent_mode_selector.py`, `$agent-mode` |
-| `closeout` | `route.py --area closeout` | `$task-routing` | `closeout_profile_gate.py`, `$closeout-lite` |
-| `deps` | `route.py --area deps` | `$task-routing` | `dependency_manifest_scope.py`, `$dependency-manifest-lite` |
-| `conventions` | `route.py --area conventions` | `$task-routing` | `convention_subcheck_router.py`, `$convention-gate-lite` |
-| `docs` | `route.py --area docs` | `$task-routing` | `canon_doc_router.py`, `$doc-canon-flex` |
-| `logs` | `route.py --area logs` | `$task-routing` | `log_retention_decider.py`, `$log-retention-lite` |
-| `tools` | `route.py --area tools` | `$task-routing` | `tool_catalog_summarizer.py`, `$tool-selection` |
+| `surface` | `agent-canon route --area surface` | `$task-routing` | `profile_surface_resolver.py`, `$runtime-surface-minimize` |
+| `profile` | `agent-canon route --area profile` | `$task-routing` | `optional_profile_matrix.py`, `$profile-selection` |
+| `checks` | `agent-canon route --area checks` | `$task-routing` | `workflow_step_router.py`, `$workflow-lite-routing`, `validation_min_set.py` |
+| `env` | `agent-canon route --area env` | `$task-routing` | `environment_profile_detect.py`, `$environment-profile` |
+| `read` | `agent-canon route --area read` | `$task-routing` | `read_order_compactor.py`, `$onboarding-lite` |
+| `remote` | `agent-canon route --area remote` | `$task-routing` | `remote_policy_router.py`, `$remote-policy-cleanup` |
+| `canon` | `agent-canon route --area canon` | `$task-routing` | `submodule_state_router.py`, `$submodule-routing` |
+| `mcp` | `agent-canon route --area mcp` | `$task-routing` | `mcp_optional_preflight.py`, `$mcp-profile` |
+| `goal` | `agent-canon route --area goal` | `$task-routing` | `goal_contract_router.py`, `$goal-lite` |
+| `runtime` | `agent-canon route --area runtime` | `$task-routing` | `runtime_capability_probe.py`, `$runtime-capability-routing` |
+| `tokens` | `agent-canon route --area tokens` | `$task-routing` | `token_budget_gate.py`, `$token-lite` |
+| `skills` | `agent-canon route --area skills` | `$task-routing` | `skill_workflow_mapper.py`, `$routing-single-source` |
+| `agents` | `agent-canon route --area agents` | `$task-routing` | `multi_agent_mode_selector.py`, `$agent-mode` |
+| `closeout` | `agent-canon route --area closeout` | `$task-routing` | `closeout_profile_gate.py`, `$closeout-lite` |
+| `deps` | `agent-canon route --area deps` | `$task-routing` | `dependency_manifest_scope.py`, `$dependency-manifest-lite` |
+| `conventions` | `agent-canon route --area conventions` | `$task-routing` | `convention_subcheck_router.py`, `$convention-gate-lite` |
+| `docs` | `agent-canon route --area docs` | `$task-routing` | `canon_doc_router.py`, `$doc-canon-flex` |
+| `logs` | `agent-canon route --area logs` | `$task-routing` | `log_retention_decider.py`, `$log-retention-lite` |
+| `tools` | `agent-canon route --area tools` | `$task-routing` | `tool_catalog_summarizer.py`, `$tool-selection` |
 
 ## Refactor Boundary
 
 This pass adds the routing surface and alias map. It does not delete existing
 specialized checkers. Existing tools remain canonical when they perform real
-validation or repair. `route.py` only decides which specialized path to use and
+validation or repair. The native `agent-canon route` command only decides which specialized path to use and
 prints compact `ROUTE`, `AREA`, `NEXT_ACTION`, `COMMANDS`, and `EVIDENCE`
 tokens.
 
 ## Ownership Layout
 
 - Deterministic prompt-to-skill routing lives in
-  `tools/agent/orchestration/route.py --prompt` and reads
+  `tools/bin/agent-canon route --prompt` and reads
   `agents/skills/catalog.yaml`.
 - `agents/skills/catalog.yaml` remains the skill registry for id, purpose,
   doc/shim paths, prompt trigger groups, and stage policy. Routing metadata
-  changes include the runtime-alignment schema check and route.py tests in the
+  changes include the runtime-alignment schema check and native route tests in the
   same diff.
 - Codex CLI capabilities are not mirrored into AgentCanon routing docs. Runtime
   capability belongs in a probe or route output, and skill routing should name
   only the current task's core AgentCanon functions.
 
-For broad user prompts, `python3 tools/agent/orchestration/route.py --prompt "<request>" --mode routing-only`
+For broad user prompts, `tools/bin/agent-canon route --prompt "<request>" --mode routing-only`
 prints `ROUTE=skill-selection`, `MODE`, `SKILLS`, `ACTIVE_SKILLS`,
 `DEFERRED_SKILLS`, `MATCHED_SKILLS`, `REASONS`, and `EVIDENCE`. The returned
 `SKILLS` is the full selected set, while `ACTIVE_SKILLS` is the current-stage

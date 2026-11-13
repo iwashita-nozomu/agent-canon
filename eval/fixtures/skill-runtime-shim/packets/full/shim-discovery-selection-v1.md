@@ -3,7 +3,7 @@
 contract data
 responsibility Defines the answer-free discovery-selection fresh packet.
 upstream design ../../../../../documents/design/skill-runtime-shim-materialization.md approved packet contract
-downstream implementation ../../../../../eval/producers/skill_shim_evaluation.py packet producer
+downstream implementation ../../../../../tools/runtime/dispatch/agent-canon/src/skill_shim_evaluation.rs packet producer
 @dependency-end
 -->
 

@@ -13,7 +13,7 @@
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/tool_proof_coverage.rs reports catalog proof obligations
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/tool_drift.rs validates tool/convention trace contracts
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/responsibility_scope.rs validates responsibility-scope coverage
-# upstream implementation ../../../../eval/producers/run_accumulated_agent_evals.py writes required eval family reports before accumulation validation
+# upstream implementation ../../../runtime/dispatch/agent-canon/src/eval_accumulation.rs writes required eval family reports before accumulation validation
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/eval_accumulation_check.rs validates eval result accumulation
 # upstream implementation ../../../runtime/archive/runtime_log_archive_git.py manages mounted hook/eval log archive branches
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/skill_frontmatter.rs validates runtime skill YAML frontmatter
@@ -421,7 +421,7 @@ accumulated_eval_args=(
   --log-dir "${AGENT_CANON_CI_EVAL_LOG_DIR_VALUE}"
 )
 if AGENT_CANON_HOOK_ARCHIVE_DIR="${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}" \
-  "$PYTHON_BIN" "${WORKSPACE_ROOT}/eval/producers/run_accumulated_agent_evals.py" "${accumulated_eval_args[@]}" 2>&1; then
+  run_agent_canon run-accumulated-agent-evals "${accumulated_eval_args[@]}" 2>&1; then
   echo "✅ accumulated agent eval producers 成功"
 else
   echo "❌ accumulated agent eval producers 失敗"

@@ -191,6 +191,69 @@ fn source_capability_writes_only_the_approved_file() {
 }
 
 #[test]
+fn atomic_source_write_can_create_only_the_approved_target_parents() {
+    let root = TempRoot::new();
+    let relative = Path::new(".codex/personal/skills/example/SKILL.md");
+    let target = root.0.join(relative);
+    let capability = capability(&root.0, &[".codex/personal/skills/example/SKILL.md"]);
+
+    capability
+        .atomic_write_text_with_parents(relative, "generated\n", 0o644, true)
+        .expect("atomic writer creates missing parents beneath the exact grant");
+
+    assert_eq!(fs::read(&target).unwrap(), b"generated\n");
+    assert!(target.parent().unwrap().is_dir());
+    assert!(capability
+        .atomic_write_text_with_parents(
+            Path::new(".codex/personal/skills/other/SKILL.md"),
+            "deny\n",
+            0o644,
+            true
+        )
+        .is_err());
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        assert_eq!(
+            fs::metadata(&target).unwrap().permissions().mode() & 0o777,
+            0o644
+        );
+    }
+}
+
+#[test]
+fn source_capability_atomically_replaces_only_the_approved_file() {
+    let root = TempRoot::new();
+    let approved = root.write("documents/runtime/graph.md", "before\n");
+    let untouched = root.write("documents/runtime/untouched.md", "untouched\n");
+    let capability = capability(&root.0, &["documents/runtime/graph.md"]);
+
+    capability
+        .atomic_write_text(&approved, "after\n", 0o644)
+        .expect("approved source file is atomically replaced");
+
+    assert_eq!(fs::read_to_string(&approved).unwrap(), "after\n");
+    assert_eq!(fs::read_to_string(&untouched).unwrap(), "untouched\n");
+    assert_eq!(
+        fs::read_dir(approved.parent().unwrap()).unwrap().count(),
+        2,
+        "the same-directory temporary file is removed after publication"
+    );
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        assert_eq!(
+            approved.metadata().unwrap().permissions().mode() & 0o777,
+            0o644
+        );
+    }
+    assert!(capability
+        .atomic_write_text(&untouched, "must remain denied\n", 0o644)
+        .is_err());
+    assert_eq!(fs::read_to_string(&untouched).unwrap(), "untouched\n");
+}
+
+#[test]
 fn source_capability_removes_only_the_approved_file() {
     let root = TempRoot::new();
     let approved = root.write("docs/approved.md", "remove me\n");
@@ -459,6 +522,9 @@ fn source_capability_rechecks_symlink_components_before_write_or_remove() {
     symlink(&outside, &guide).expect("replacement symlink is created");
     assert!(capability
         .write_text(&guide, "must not follow link\n")
+        .is_err());
+    assert!(capability
+        .atomic_write_text(&guide, "must not replace link\n", 0o644)
         .is_err());
     assert!(capability.remove_file(&guide).is_err());
     assert!(fs::symlink_metadata(&guide)

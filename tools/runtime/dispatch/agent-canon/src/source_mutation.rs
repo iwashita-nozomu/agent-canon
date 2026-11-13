@@ -165,6 +165,17 @@ impl SourceMutationCapability {
 
     /// Atomically replace one approved UTF-8 source file without following a path symlink.
     pub fn atomic_write_text(&self, path: &Path, text: &str, mode: u32) -> Result<()> {
+        self.atomic_write_text_with_parents(path, text, mode, false)
+    }
+
+    /// Atomically replace one approved UTF-8 source file, creating only missing parent directories beneath the same exact capability.
+    pub fn atomic_write_text_with_parents(
+        &self,
+        path: &Path,
+        text: &str,
+        mode: u32,
+        create_parents: bool,
+    ) -> Result<()> {
         use std::sync::atomic::{AtomicU64, Ordering};
 
         static NEXT_TEMP: AtomicU64 = AtomicU64::new(0);
@@ -184,12 +195,14 @@ impl SourceMutationCapability {
             )));
         };
         let (directory, target_name) =
-            open_file_parent_nofollow(&self.source_root, relative, false).map_err(|error| {
-                SourceMutationError::new(format!(
-                    "cannot open mutation parent for {}: {error}",
-                    path.display()
-                ))
-            })?;
+            open_file_parent_nofollow(&self.source_root, relative, create_parents).map_err(
+                |error| {
+                    SourceMutationError::new(format!(
+                        "cannot open mutation parent for {}: {error}",
+                        path.display()
+                    ))
+                },
+            )?;
         match directory.symlink_metadata(name) {
             Ok(metadata) if metadata.is_file() => {}
             Ok(metadata) if metadata.is_symlink() => {

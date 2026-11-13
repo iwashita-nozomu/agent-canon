@@ -9,7 +9,7 @@ upstream design ../../documents/rule/dependency-module-changes.md detailed depen
 upstream design ../../documents/contracts/github-first-module-and-devcontainer-policy.md canonical topic workspace and VS Code workspace boundary
 upstream design ../../documents/design/request-intent-and-update-relation.md immediate dependency-checkout cleanup projection
 downstream implementation ../../tools/repository/workspace/dependency_module_change.py lifecycle tool
-downstream implementation ../../tools/validation/semantic/runtime/check_agent_runtime_alignment.py validates skill registration
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/runtime_alignment.rs validates skill registration
 @dependency-end
 -->
 

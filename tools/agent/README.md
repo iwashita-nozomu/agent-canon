@@ -15,7 +15,7 @@ For the implementation being maintained, use its existing owner:
 
 - [Skill helpers](skills/README.md): skill routing, document reading, and materialization.
 - [Orchestration](orchestration/): task routing, handoff, team, and review helpers.
-- [Templates](templates/): code, bundle, and entrypoint rendering.
+- [Templates](templates/): template source ownership; native Rust APIs render bounded views.
 
 Public command identity, audience, and placement remain owned by
 [the tool catalog](../catalog.yaml); a directory name does not make an internal

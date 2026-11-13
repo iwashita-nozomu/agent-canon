@@ -103,3 +103,19 @@ fn subagent_selection_and_receipt_match_all_frozen_cpython_cases() {
         }
     }
 }
+
+#[test]
+fn selection_ignores_untrusted_coordination_capability_fields() {
+    let payload = parse_json(
+        r#"{
+            "tool_name":"send_message",
+            "coordination_capability_status":"available",
+            "coordination_effective_operations":["send_message"],
+            "coordination_evidence_ref":"reports/runtime/capability.json",
+            "coordination_mode":"direct_peer"
+        }"#,
+    )
+    .expect("selection input parses");
+    let selected = select_subagents(&payload, None).expect("selection succeeds");
+    assert_eq!(selected.action.to_text().as_deref(), Some("send_message"));
+}
