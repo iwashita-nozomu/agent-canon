@@ -48,12 +48,16 @@ from tools.agent.orchestration.team_config import (
 )
 
 
-from tools.agent.orchestration.subagent_selection import COLLABORATION_OPERATIONS
-
 from tools.agent.skills.skill_route_catalog import load_skill_route_rules
 
 
 PROJECT_CONFIG_PATH = ROOT / ".codex" / "config.toml"
+COLLABORATION_OPERATIONS = (
+    "send_message",
+    "followup_task",
+    "list_agents",
+    "interrupt_agent",
+)
 HOOKS_JSON_PATH = ROOT / ".codex" / "hooks.json"
 CODEX_AGENT_ROOT = ROOT / ".codex" / "agents"
 SKILL_SHIM_ROOT = ROOT / ".codex" / "personal" / "skills"
@@ -1212,7 +1216,7 @@ def validate_subagent_protocol_docs() -> None:
                 "agents/task_catalog.yaml",
                 "agents/agents_config.json",
                 ".codex/agents/*.toml",
-                "python3 tools/agent/orchestration/route.py --prompt",
+                "tools/bin/agent-canon route --prompt",
             ):
                 ensure(marker in text, f"{path} missing owner-map marker: {marker}")
         else:

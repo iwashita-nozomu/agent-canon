@@ -211,7 +211,7 @@ const CONTRACTS: &[ToolContract] = &[
     },
     ToolContract {
         name: "run_accumulated_agent_evals",
-        tool: "eval/producers/run_accumulated_agent_evals.py",
+        tool: "tools/runtime/dispatch/agent-canon/src/eval_accumulation.rs",
         links: &[
             direct_link("eval/definitions/README.md"),
             direct_link("documents/runtime/runtime-log-archive.md"),

@@ -46,7 +46,7 @@ skill, entrypoint, or routine that calls it.
 | Research routines | [experiment-change-loop.md](experiment-change-loop.md), [research-perspective-review.md](research-perspective-review.md) | `$experiment-lifecycle`, `$adaptive-improvement-loop`, `$research-workflow` |
 | Validation and project health | [static-check.md](static-check.md), [project-health.md](project-health.md) | selected validation profiles and [project-review](project-review.md) |
 | GitHub status | [github-status-lifecycle.md](github-status-lifecycle.md) | [pr-processing](../skills/pr-processing.md) when Issue status reconciliation is requested |
-| Subagent startup routines | [subagent-startup.md](subagent-startup.md) | `$subagent-bootstrap`, `route.py --area agents` |
+| Subagent startup routines | [subagent-startup.md](subagent-startup.md) | `$subagent-bootstrap`, `agent-canon route --area agents` |
 
 Artifact placement is owned directly by [ARTIFACT_PLACEMENT.md](../canonical/ARTIFACT_PLACEMENT.md).
 For Codex entry and task continuation, use [repo-onboarding](../skills/repo-onboarding.md);

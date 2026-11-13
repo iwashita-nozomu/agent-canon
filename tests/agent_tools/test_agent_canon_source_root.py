@@ -121,9 +121,10 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
     def test_exec_parser_accepts_command(self) -> None:
         """Accept an exact source-relative command and its arguments."""
         parser = build_parser()
-        parsed = parser.parse_args(["exec", "tools/agent/orchestration/route.py", "--list"])
+        parsed = parser.parse_args(["exec", "tools/bin/agent-canon", "route", "--list"])
         self.assertEqual(parsed.mode, "exec")
-        self.assertEqual(parsed.command, "tools/agent/orchestration/route.py")
+        self.assertEqual(parsed.command, "tools/bin/agent-canon")
+        self.assertEqual(parsed.args, ["route", "--list"])
         self.assertEqual(parsed.args, ["--list"])
 
     def test_public_entrypoints_are_executable_for_source_root_dispatch(self) -> None:
@@ -137,6 +138,7 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
         """Run a source-owned route from an isolated development clone."""
         with tempfile.TemporaryDirectory() as workspace:
             clone = Path(workspace) / "agent-canon"
+
             def copy_ignore(directory: str, names: list[str]) -> set[str]:
                 """Ignore clone-local state while retaining canonical packages."""
                 ignored = set(
@@ -150,9 +152,10 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
                         ".ruff_cache",
                     )(directory, names)
                 )
-                if Path(directory).resolve() == (
-                    PROJECT_ROOT / "tools" / "repository"
-                ).resolve():
+                if (
+                    Path(directory).resolve()
+                    == (PROJECT_ROOT / "tools" / "repository").resolve()
+                ):
                     ignored.discard("workspace")
                 return ignored
 
@@ -168,8 +171,8 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
                     sys.executable,
                     PUBLIC_RESOLVER,
                     "exec",
-                    "python3",
-                    "tools/agent/orchestration/route.py",
+                    "tools/bin/agent-canon",
+                    "route",
                     "--list",
                 ],
                 cwd=clone,
@@ -194,9 +197,10 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
                         ".git", ".agent-canon", "reports", "workspace"
                     )(directory, names)
                 )
-                if Path(directory).resolve() == (
-                    PROJECT_ROOT / "tools" / "repository"
-                ).resolve():
+                if (
+                    Path(directory).resolve()
+                    == (PROJECT_ROOT / "tools" / "repository").resolve()
+                ):
                     ignored.discard("workspace")
                 return ignored
 
@@ -236,11 +240,7 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
             script = root / "tools" / "agent_tool.sh"
             script.parent.mkdir(parents=True, exist_ok=True)
             script.write_text(
-                "#!/usr/bin/env sh\n"
-                "if [ \"$1\" = \"pass\" ]; then\n"
-                "  exit 0\n"
-                "fi\n"
-                "exit 1\n"
+                '#!/usr/bin/env sh\nif [ "$1" = "pass" ]; then\n  exit 0\nfi\nexit 1\n'
             )
             script.chmod(stat.S_IXUSR | stat.S_IRUSR)
 

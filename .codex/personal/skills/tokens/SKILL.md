@@ -2,7 +2,7 @@
 name: tokens
 description: "Use when token budget, role footprint, context reuse, or token-efficiency evidence is an explicit decision."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"39e4e3341e0b44198e719928238e30e491941b073515891159d867c800ecf5b4"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"50e2d6b6b35f588ceab1c05897d2b73d950c6c11ff380cb7360d48caa736118a"} -->
 
 <!--
 @dependency-start

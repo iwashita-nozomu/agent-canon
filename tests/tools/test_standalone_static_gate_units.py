@@ -950,7 +950,7 @@ def test_units_do_not_duplicate_rust_or_full_wrapper_commands() -> None:
     for command in (
         "cargo build",
         "tool-catalog",
-        "run_accumulated_agent_evals.py",
+        "run-accumulated-agent-evals",
         "check-github-workflows",
     ):
         assert command not in wrapper

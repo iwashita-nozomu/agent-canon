@@ -3,26 +3,18 @@
 # @dependency-start
 # contract test
 # responsibility Verifies eval child runtime propagation and source immutability.
-# upstream implementation ../../eval/producers/run_accumulated_agent_evals.py propagates typed runtime roots
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/eval_accumulation.rs propagates typed runtime roots
 # upstream design ../../documents/design/agent-canon-bootstrap-tool-runtime.md external artifact boundary
 # @dependency-end
 
 from __future__ import annotations
 
 import hashlib
-import json
 import os
 import subprocess
-import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT))
-
-from eval.producers.run_accumulated_agent_evals import (  # noqa: E402
-    EvalProducer,
-    run_producers,
-)
 
 
 def _tracked_snapshot() -> tuple[str, dict[str, str]]:
@@ -57,44 +49,6 @@ def _tracked_snapshot() -> tuple[str, dict[str, str]]:
     return status, digests
 
 
-def test_producer_child_receives_typed_runtime_and_root_capabilities(
-    tmp_path: Path,
-) -> None:
-    """Keep producer-definition and observed-target capabilities distinct."""
-    source = tmp_path / "source"
-    target = tmp_path / "target"
-    runtime = tmp_path / "runtime"
-    source.mkdir()
-    target.mkdir()
-    runtime.mkdir()
-    observed: dict[str, str] = {}
-
-    def fake_runner(command, cwd, env):  # type: ignore[no-untyped-def]
-        observed.update(env)
-        return subprocess.CompletedProcess(command, 0, "ok\n", "")
-
-    run_producers(
-        root=source,
-        producers=(EvalProducer("fixture", ("fixture",)),),
-        log_dir=runtime / "logs",
-        target_root=target,
-        runtime_root=runtime,
-        runner=fake_runner,
-    )
-
-    assert observed["AGENT_CANON_RUNTIME_ROOT"] == str(runtime.resolve())
-    assert observed["AGENT_CANON_PARENT_ROOT"] == str(source.resolve())
-    assert observed["AGENT_CANON_TARGET_ROOT"] == str(target.resolve())
-    assert (
-        json.loads(observed["AGENT_CANON_PARENT_ROOT_CAPABILITY"])["kind"]
-        == "parent-root"
-    )
-    assert (
-        json.loads(observed["AGENT_CANON_TARGET_ROOT_CAPABILITY"])["kind"]
-        == "target-root"
-    )
-
-
 def test_eval_producers_leave_source_status_and_bytes_unchanged(tmp_path: Path) -> None:
     """Real producer execution must leave AgentCanon source unchanged."""
     runtime = tmp_path / "runtime"
@@ -104,36 +58,28 @@ def test_eval_producers_leave_source_status_and_bytes_unchanged(tmp_path: Path) 
     environment.pop("AGENT_CANON_HOOK_ARCHIVE_DIR", None)
     environment.pop("AGENT_CANON_LOG_ROOT", None)
     environment.pop("AGENT_CANON_RUNTIME_ROOT", None)
-    commands = (
-        (
+    result = subprocess.run(
+        [
             str(ROOT / "tools/bin/agent-canon"),
-            "evaluate-workflow-selection",
-            "--accumulate",
+            "run-accumulated-agent-evals",
+            "--root",
+            str(ROOT),
+            "--run-id",
+            "runtime-propagation-test",
             "--runtime-root",
             str(runtime),
-        ),
-        (
-            str(ROOT / "tools/bin/agent-canon"),
-            "evaluate-codex-agent-roles",
-            "--accumulate",
-            "--runtime-root",
-            str(runtime),
-        ),
+        ],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
     )
-    for command in commands:
-        result = subprocess.run(
-            list(command),
-            cwd=ROOT,
-            check=False,
-            capture_output=True,
-            text=True,
-            env=environment,
-        )
-        # A semantic eval may legitimately report status=fail while this test
-        # verifies the execution plane and source immutability. Exit 2+ is an
-        # infrastructure/usage failure and remains blocking here.
-        assert result.returncode in {0, 1}, result.stdout + result.stderr
-        assert "Traceback" not in result.stderr
+    # A semantic eval may legitimately report status=fail while this test
+    # verifies the execution plane and source immutability. Exit 2+ is an
+    # infrastructure/usage failure and remains blocking here.
+    assert result.returncode in {0, 1}, result.stdout + result.stderr
+    assert "Traceback" not in result.stderr
     after_status, after_files = _tracked_snapshot()
     assert after_status == before_status
     assert after_files == before_files
