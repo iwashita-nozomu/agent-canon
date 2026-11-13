@@ -9,6 +9,39 @@ use agent_canon::python_json::{canonical_json_ascii_bytes, parse_json};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
+#[test]
+fn unique_key_decoder_retains_python_constants_and_byte_encodings() {
+    use agent_canon::python_json::{
+        parse_json_bytes_unique_keys, parse_json_unique_keys, JsonNumber, JsonValue,
+    };
+    let JsonValue::Object(object) =
+        parse_json_unique_keys("{\"metric\":NaN}").expect("Python permits NaN constants")
+    else {
+        panic!("object expected");
+    };
+    assert!(
+        matches!(&object.0[0].1, JsonValue::Number(JsonNumber::Float(value)) if value.is_nan())
+    );
+    assert!(parse_json_unique_keys("{\"metric\":NaN,\"nested\":{\"x\":1,\"x\":2}}").is_err());
+    let mut utf16 = vec![0xff, 0xfe];
+    utf16.extend(
+        "{\"name\":\"result\"}"
+            .encode_utf16()
+            .flat_map(u16::to_le_bytes),
+    );
+    assert!(matches!(
+        parse_json_bytes_unique_keys(&utf16),
+        Ok(JsonValue::Object(_))
+    ));
+    let mut repeated = vec![0xff, 0xfe];
+    repeated.extend(
+        "{\"x\":1,\"x\":2}"
+            .encode_utf16()
+            .flat_map(u16::to_le_bytes),
+    );
+    assert!(parse_json_bytes_unique_keys(&repeated).is_err());
+}
+
 #[derive(Deserialize)]
 struct GoldenFile {
     cases: Vec<GoldenCase>,
