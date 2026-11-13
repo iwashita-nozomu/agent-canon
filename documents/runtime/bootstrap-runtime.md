@@ -18,6 +18,9 @@ which adopts one shared, bounded tool container from the published
 multi-architecture GHCR image and then
 launches tools against explicitly registered targets.
 
+The native `bootstrap-runtime` controller runs inside the Unix resident. Host
+installations invoke it through the existing bootstrap/Docker route.
+
 The bootstrap owns only shell/Docker/Git adapters. The shared toolresident owns
 Python, Rust, and language-server tools and is distinct from every project
 product/test/development container. Project builds, product tests, GPU access,

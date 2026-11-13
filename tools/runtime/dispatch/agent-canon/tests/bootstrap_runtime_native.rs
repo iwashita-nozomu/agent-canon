@@ -1,4 +1,5 @@
 //! Native CLI contracts for the resident lifecycle controller.
+#![cfg(unix)]
 
 use serde_json::Value;
 use std::fs;

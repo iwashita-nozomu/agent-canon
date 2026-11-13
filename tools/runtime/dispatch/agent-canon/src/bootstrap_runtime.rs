@@ -12,9 +12,9 @@
 use crate::log_repository_identity::{normalize_remote, stable_source_repository_id};
 use cap_fs_ext::{DirExt, FollowSymlinks, OpenOptionsFollowExt};
 use cap_std::ambient_authority;
-use cap_std::fs::{
-    Dir, DirBuilder, DirBuilderExt, OpenOptions, OpenOptionsExt, Permissions, PermissionsExt,
-};
+use cap_std::fs::{Dir, DirBuilder, OpenOptions};
+#[cfg(unix)]
+use cap_std::fs::{DirBuilderExt, OpenOptionsExt, Permissions, PermissionsExt};
 use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -433,6 +433,13 @@ pub fn run(args: &[String]) -> i32 {
 /// Run the same native controller with an explicit read-only target namespace.
 /// The shipped CLI calls [`run`] with the real resident mount namespace.
 pub fn run_with_target_namespace(args: &[String], target_namespace: TargetNamespace) -> i32 {
+    if !cfg!(unix) {
+        eprintln!(
+            "{}",
+            json!({"schema":SCHEMA_RECEIPT,"status":"error","code":"unsupported_platform","detail":"bootstrap-runtime runs inside the Unix resident container"})
+        );
+        return 2;
+    }
     match parse_cli(args) {
         Ok(None) => {
             println!("{}", usage());
@@ -585,11 +592,6 @@ fn private_permissions(mode: u32) -> Permissions {
     Permissions::from_mode(mode)
 }
 
-#[cfg(not(unix))]
-fn private_permissions(_mode: u32) -> Permissions {
-    Permissions::default()
-}
-
 struct RuntimeFs {
     root: Dir,
 }
@@ -602,6 +604,8 @@ impl RuntimeFs {
     }
 
     fn open_dir(&self, path: &Path, create: bool, mode: u32) -> Result<Dir> {
+        #[cfg(not(unix))]
+        let _ = mode;
         let parts = path_parts(path)?;
         let mut directory = self
             .root
@@ -611,9 +615,13 @@ impl RuntimeFs {
             match directory.open_dir_nofollow(&name) {
                 Ok(next) => directory = next,
                 Err(error) if create && error.kind() == std::io::ErrorKind::NotFound => {
-                    let mut builder = DirBuilder::new();
+                    let builder = DirBuilder::new();
                     #[cfg(unix)]
-                    builder.mode(mode);
+                    let builder = {
+                        let mut builder = builder;
+                        builder.mode(mode);
+                        builder
+                    };
                     directory
                         .create_dir_with(&name, &builder)
                         .map_err(|error| {
@@ -642,6 +650,7 @@ impl RuntimeFs {
 
     fn ensure_directory(&self, path: &Path, mode: u32) -> Result<()> {
         let directory = self.open_dir(path, true, mode)?;
+        #[cfg(unix)]
         directory
             .set_permissions(".", private_permissions(mode))
             .map_err(|error| {
@@ -650,9 +659,13 @@ impl RuntimeFs {
                     format!("cannot protect directory {}: {error}", path.display()),
                 )
             })?;
+        #[cfg(not(unix))]
+        let _ = directory;
         let observed = directory
             .metadata(".")
             .map_err(|error| BootstrapError::new("runtime_directory_invalid", error.to_string()))?;
+        #[cfg(not(unix))]
+        let _ = observed;
         #[cfg(unix)]
         if observed.permissions().mode() & 0o777 != mode {
             return Err(BootstrapError::new(
@@ -676,9 +689,13 @@ impl RuntimeFs {
             match parent.open_dir_nofollow(name) {
                 Ok(next) => parent = next,
                 Err(error) if create && error.kind() == std::io::ErrorKind::NotFound => {
-                    let mut builder = DirBuilder::new();
+                    let builder = DirBuilder::new();
                     #[cfg(unix)]
-                    builder.mode(0o700);
+                    let builder = {
+                        let mut builder = builder;
+                        builder.mode(0o700);
+                        builder
+                    };
                     parent.create_dir_with(name, &builder).map_err(|error| {
                         BootstrapError::new("runtime_directory_invalid", error.to_string())
                     })?;
@@ -743,6 +760,8 @@ impl RuntimeFs {
     }
 
     fn create_file(&self, path: &Path, mode: u32) -> Result<cap_std::fs::File> {
+        #[cfg(not(unix))]
+        let _ = mode;
         let (parent, leaf) = self.parent(path, true)?;
         let mut options = OpenOptions::new();
         options
@@ -785,6 +804,8 @@ impl RuntimeFs {
     }
 
     fn atomic_write(&self, path: &Path, bytes: &[u8], mode: u32) -> Result<()> {
+        #[cfg(not(unix))]
+        let _ = mode;
         let parent_path = path
             .parent()
             .ok_or_else(|| BootstrapError::new("path_invalid", "state path has no parent"))?;
@@ -819,6 +840,7 @@ impl RuntimeFs {
                 .map_err(|error| BootstrapError::new("state_write_failed", error.to_string()))?;
             file.sync_all()
                 .map_err(|error| BootstrapError::new("state_write_failed", error.to_string()))?;
+            #[cfg(unix)]
             file.set_permissions(private_permissions(mode))
                 .map_err(|error| BootstrapError::new("state_write_failed", error.to_string()))?;
             drop(file);
@@ -853,6 +875,8 @@ impl RuntimeFs {
     }
 
     fn ensure_new_file(&self, path: &Path, mode: u32) -> Result<()> {
+        #[cfg(not(unix))]
+        let _ = mode;
         let (parent, leaf) = self.parent(path, true)?;
         match parent.symlink_metadata(&leaf) {
             Ok(metadata) if metadata.file_type().is_symlink() || !metadata.is_file() => {
@@ -3459,7 +3483,10 @@ impl BootstrapRuntime {
             for (surface, relative, source, published_source) in desired {
                 let target = if surface == "config" { self.paths.codex_home.join(&relative) } else { self.paths.codex_home.join(&surface).join(&relative) };
                 if let Some(parent) = target.parent() { self.fs.ensure_directory(parent, 0o700)?; }
+                #[cfg(unix)]
                 let mut created = false;
+                #[cfg(not(unix))]
+                let created = false;
                 match fs::symlink_metadata(&target) {
                     Ok(metadata) if metadata.file_type().is_symlink() => {
                         let existing = fs::read_link(&target).map_err(|error| BootstrapError::new("skill_collision", error.to_string()))?;
@@ -3473,7 +3500,8 @@ impl BootstrapRuntime {
                         std::os::unix::fs::symlink(&published_source, &target).map_err(|error| BootstrapError::new("skill_link_failed", error.to_string()))?;
                         #[cfg(not(unix))]
                         return Err(BootstrapError::new("skill_link_failed", "Codex skill links require a symlink-capable platform"));
-                        created = true;
+                        #[cfg(unix)]
+                        {created = true;}
                     }
                     Err(error) => return Err(BootstrapError::new("skill_link_failed", error.to_string())),
                 }
@@ -3724,6 +3752,8 @@ fn run_tool_process(
     timeout: Duration,
     lease: &cap_std::fs::File,
 ) -> Result<Output> {
+    #[cfg(not(unix))]
+    let _ = lease;
     let mut command = Command::new(&argv[0]);
     command
         .args(&argv[1..])
@@ -4666,7 +4696,7 @@ fn run_codex_hook(event: &str) -> Result<i32> {
     Ok(output.code().unwrap_or(1))
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod tests {
     use super::*;
     #[cfg(unix)]
@@ -5127,6 +5157,7 @@ mod tests {
         assert!(bounded_preview(&"あ".repeat(600), 512).chars().count() <= 512);
     }
 
+    #[cfg(unix)]
     #[test]
     fn codex_prepare_uses_one_directory_link_and_preserves_link_identity() {
         let fixture = Fixture::new();
