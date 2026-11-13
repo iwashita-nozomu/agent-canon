@@ -1666,7 +1666,8 @@ pub fn materialize_fresh_clone_source_projection_packet<G2Error, G3Error>(
         "pr_essence": {
             "problem": "exercise standalone source publication from a fresh clone",
             "intent": "queue the observed AgentCanon source branch update",
-            "canonical_owner": "tools/runtime/dispatch/agent-canon/src/repository_topic_clone.rs",
+            // Retain the v1 acceptance fixture identity and its callback/hash bindings.
+            "canonical_owner": "tools/repository/workspace/repository_topic_clone.py",
             "contract_delta": "fresh-clone source PR",
             "evidence_refs": [fresh_clone_projection_evidence(
                 "fresh-clone-pr-essence", &identity
