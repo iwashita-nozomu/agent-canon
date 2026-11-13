@@ -293,7 +293,7 @@ home and the neutral image workspace, keeping all receipt checks enabled:
   --control-parent-root <authorized-parent-root> \
   exec --root <registered-agent-canon-source> -- \
   env CARGO_HOME=/usr/local/share/agent-canon/toolchains/cargo \
-  python3 tools/analysis/dependencies/dependency_plan.py image-verify \
+  ./tools/bin/agent-canon environment-dependencies image-verify \
     --workspace /usr/local/share/agent-canon/runtime \
     --manifest /usr/local/share/agent-canon/runtime/dependencies.toml
 ```

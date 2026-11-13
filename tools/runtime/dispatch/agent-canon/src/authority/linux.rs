@@ -750,6 +750,85 @@ pub(crate) fn read_parent_owned_file(
     Ok(bytes)
 }
 
+pub(crate) fn remove_parent_owned_file(
+    attested: &AttestedParent,
+    receipt: &ParentOwnedPathReceipt,
+) -> Result<(), AuthorityError> {
+    attested.verify_live_identity()?;
+    let root = validate_receipt(attested, receipt)?;
+    let Some(target) = receipt.target else {
+        verify_lexical_snapshot(root, receipt, false, false)?;
+        attested.verify_live_identity()?;
+        return Ok(());
+    };
+    if target.kind != EntryKind::File {
+        return Err(error(
+            ParentRootReject::RootRaceDetected,
+            "parent-owned removal target is not a regular file",
+        ));
+    }
+    let snapshot = receipt.lexical_snapshot.as_ref().ok_or_else(|| {
+        error(
+            ParentRootReject::RootRaceDetected,
+            "parent-owned removal receipt has no lexical snapshot",
+        )
+    })?;
+    let expected_entry = snapshot.entry.as_ref().ok_or_else(|| {
+        error(
+            ParentRootReject::RootRaceDetected,
+            "parent-owned removal receipt has no lexical entry",
+        )
+    })?;
+    if !matches!(expected_entry.kind, EntryKind::File | EntryKind::Symlink) {
+        return Err(error(
+            ParentRootReject::RootRaceDetected,
+            "parent-owned removal entry is not a file or symlink",
+        ));
+    }
+    let parent_parts = relative_components(root.path(), &snapshot.parent_path)?;
+    let (parent, opened_components) =
+        open_component_chain(root, &parent_parts, &snapshot.parent_components, false)?;
+    if opened_components != snapshot.parent_components
+        || opened_components
+            .last()
+            .map(|part| part.identity)
+            .unwrap_or(root.identity)
+            != snapshot.parent_identity
+    {
+        return Err(error(
+            ParentRootReject::RootRaceDetected,
+            "lexical parent identity changed before removal",
+        ));
+    }
+    let leaf = receipt.lexical_path.file_name().ok_or_else(|| {
+        error(
+            ParentRootReject::RootRaceDetected,
+            "parent-owned removal name is unavailable",
+        )
+    })?;
+    verify_lexical_snapshot(root, receipt, true, false)?;
+    attested.verify_live_identity()?;
+    verify_component_identities(root, &parent_parts, &snapshot.parent_components)?;
+    verify_target_identity(
+        &parent,
+        leaf,
+        Some(TargetIdentity {
+            identity: expected_entry.identity,
+            kind: expected_entry.kind,
+        }),
+        false,
+    )?;
+    parent.remove_file(leaf).map_err(|_| {
+        error(
+            ParentRootReject::RootRaceDetected,
+            "cannot remove parent-owned file through its capability",
+        )
+    })?;
+    sync_directory(&parent)?;
+    attested.verify_live_identity()?;
+    Ok(())
+}
+
 pub(crate) fn atomic_replace_parent_owned_file(
     attested: &AttestedParent,
     receipt: &ParentOwnedPathReceipt,
