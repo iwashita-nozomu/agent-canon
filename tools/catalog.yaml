@@ -53,6 +53,9 @@ runtime_schema:
   # one-file catalog entry below. Keeping this inventory here prevents the
   # dispatcher from silently dropping a first-class Rust route.
   rust_public_commands:
+    - id: rust-github-status-lifecycle
+      selector: github-status-lifecycle
+      path: tools/runtime/dispatch/agent-canon/src/github_status_lifecycle.rs
     - id: rust-skill-shim-evaluation
       selector: skill-shim-evaluation
       path: tools/runtime/dispatch/agent-canon/src/skill_shim_evaluation.rs
@@ -1296,12 +1299,12 @@ entries:
   - id: semantic-provider-html-report
     public: true
     summary: Renders semantic-index compare-providers JSON through Quarto as a static HTML projection report with the provider-delta-to-shared-candidate-logic SVG; local resources stay beside the HTML unless --embed-resources is requested.
-    path: tools/analysis/search/reporting/semantic_provider_html_report.py
+    path: tools/runtime/dispatch/agent-canon/src/semantic_index/semantic_provider_html_report.rs
     family: agent_tools
     role: docs
     status: canonical
-    command: python3 tools/analysis/search/reporting/semantic_provider_html_report.py --compare-json reports/agents/<run-id>/semantic_provider_compare.json --output reports/agents/<run-id>/semantic_provider_compare.html
-    dispatch: {argv: ["python3", "tools/analysis/search/reporting/semantic_provider_html_report.py", "--compare-json", "reports/agents/<run-id>/semantic_provider_compare.json", "--output", "reports/agents/<run-id>/semantic_provider_compare.html"]}
+    command: tools/bin/agent-canon semantic-provider-html-report --compare-json reports/agents/<run-id>/semantic_provider_compare.json --output reports/agents/<run-id>/semantic_provider_compare.html
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "semantic-provider-html-report", "--compare-json", "reports/agents/<run-id>/semantic_provider_compare.json", "--output", "reports/agents/<run-id>/semantic_provider_compare.html"]}
     writes: true
     default_wiring:
       ci: false
@@ -2516,12 +2519,12 @@ entries:
 
   - id: save-experiment-result-annex
     summary: Saves one experiment result as one deterministic git-annex archive.
-    path: tools/experiments/artifacts/save_experiment_result_annex.py
+    path: tools/runtime/dispatch/agent-canon/src/annex_retention.rs
     family: experiments
     role: experiment
     status: canonical
-    command: python3 -m tools.experiments.artifacts.save_experiment_result_annex
-    dispatch: {argv: ["python3", "-m", "tools.experiments.artifacts.save_experiment_result_annex"]}
+    command: tools/bin/agent-canon save-experiment-result-annex
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "save-experiment-result-annex"]}
     writes: true
     default_wiring:
       ci: false

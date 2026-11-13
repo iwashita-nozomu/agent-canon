@@ -8,7 +8,7 @@ upstream design ../../documents/experiments/result-log-retention-and-visualizati
 upstream implementation ./catalog.yaml public skill identity and routing metadata
 downstream design ./experiment-lifecycle.md experiment run-state and publication owner
 downstream design ./result-artifact-writeout.md concrete artifact identity and checksum owner
-downstream implementation ../../tools/experiments/artifacts/save_experiment_result_annex.py deterministic archive serialization owner
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/annex_retention.rs deterministic archive serialization owner
 @dependency-end
 -->
 

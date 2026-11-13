@@ -68,7 +68,7 @@ const EXPERIMENT_EXECUTION_SURFACE_PATHS: &[&str] = &[
     "documents/design/experiment_runner.md",
     "experiments/registry.toml",
     "tools/runtime/dispatch/agent-canon/src/experiment_registry.rs",
-    "tools/experiments/artifacts/save_experiment_result_annex.py",
+    "tools/runtime/dispatch/agent-canon/src/annex_retention.rs",
     "tools/runtime/dispatch/agent-canon/src/experiment_registry/store.rs",
     "tools/experiments/execution/run_managed_experiment.py",
 ];

@@ -20,7 +20,7 @@ downstream implementation ../../tools/catalog.yaml command catalog and public co
 downstream implementation ../../tools/repository/github/review_backlog_scan.sh semantic-index command runner
 downstream implementation ../../tests/agent_tools/test_review_backlog_scan.py command/report behavior oracle
 downstream implementation ../../tests/agent_tools/test_tool_catalog.py command catalog oracle
-downstream implementation ../../tools/analysis/search/reporting/semantic_provider_html_report.py provider-report consumer
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/semantic_index/semantic_provider_html_report.rs provider-report consumer
 downstream design README.md AgentCanon design reader index
 @dependency-end
 -->
@@ -157,7 +157,7 @@ SQLite、embedding、report、utility、tests は、現在それぞれの owner 
 | `tools/runtime/dispatch/agent-canon/src/main.rs` | `mod semantic_index`; `semantic_index::run(&args[2..])`; `std::process::exit` | `main.rs` → `semantic_index/mod.rs::pub(crate) fn run` → `semantic_index/cli.rs::pub(super) fn run` の一経路にする |
 | `tools/catalog.yaml` | `tools/bin/agent-canon semantic-index build --include documents --include agents`; command metadata | `cli.rs` の command/option contract と同じ source map を持つ |
 | `tools/repository/github/review_backlog_scan.sh` | `build`, `embed-provider`, `merge-candidates`, `thin-docs`, `search`, `eval-output`, `compare-providers` | shell runner は CLI process boundary のまま、Rust internals を import しない |
-| `tools/analysis/search/reporting/semantic_provider_html_report.py` | `semantic_index_provider_compare` JSON を読む report consumer | `report.rs` の JSON schema を読む下流 consumer |
+| `tools/runtime/dispatch/agent-canon/src/semantic_index/semantic_provider_html_report.rs` | `semantic_index_provider_compare` JSON を読む report consumer | `report.rs` の JSON schema を読む下流 consumer |
 | `tests/agent_tools/test_review_backlog_scan.py` | sqlite/jsonl/json output path、summary marker、output Eval | command process の behavior oracle |
 | `tests/agent_tools/test_tool_catalog.py` | catalog command string と build-before-report | catalog/CLI compatibility oracle |
 | `tests/fixtures/semantic-index/basic` | Eval fixture の dependency header と input docs | `eval.rs` の fixture contract oracle |

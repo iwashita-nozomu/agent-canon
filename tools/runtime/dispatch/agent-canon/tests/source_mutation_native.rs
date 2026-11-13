@@ -191,6 +191,75 @@ fn source_capability_writes_only_the_approved_file() {
 }
 
 #[test]
+fn streaming_publication_preserves_collisions_and_cleans_partial_output() {
+    use std::io::Write;
+
+    let root = TempRoot::new();
+    root.write("archive/keep.txt", "keep\n");
+    let target = root.0.join("archive/result.tar.gz");
+    let capability = capability(&root.0, &["archive/result.tar.gz"]);
+    capability
+        .publish_noreplace_with(&target, 0o644, |file| file.write_all(b"archive bytes"))
+        .expect("first publication succeeds");
+    assert!(capability
+        .publish_noreplace_with(&target, 0o644, |file| file.write_all(b"replacement"))
+        .is_err());
+    assert_eq!(fs::read(&target).unwrap(), b"archive bytes");
+    fs::remove_file(&target).unwrap();
+    assert!(capability
+        .publish_noreplace_with(&target, 0o644, |file| {
+            file.write_all(b"partial")?;
+            Err(std::io::Error::other("injected writer failure"))
+        })
+        .is_err());
+    assert!(!target.exists());
+    let names: Vec<_> = fs::read_dir(root.0.join("archive"))
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name())
+        .collect();
+    assert_eq!(names, vec![std::ffi::OsString::from("keep.txt")]);
+}
+
+#[test]
+fn external_copy_keeps_explicit_read_and_write_roots() {
+    let source = TempRoot::new();
+    let target = TempRoot::new();
+    let input = source.write("input.md", "copy bytes\n");
+    let output = target.0.join("assets/output.md");
+    let capability = capability(&target.0, &["assets/output.md"]);
+    capability
+        .copy_file_from_root_with_metadata(&source.0, &input, &output)
+        .unwrap();
+    assert_eq!(fs::read(&output).unwrap(), b"copy bytes\n");
+    let outsider = TempRoot::new();
+    let outside_input = outsider.write("private.md", "keep\n");
+    assert!(capability
+        .copy_file_from_root_with_metadata(&source.0, &outside_input, &output)
+        .is_err());
+    assert!(capability
+        .copy_file_from_root_with_metadata(&source.0, &input, &target.0.join("unapproved.md"))
+        .is_err());
+    assert_eq!(fs::read(&output).unwrap(), b"copy bytes\n");
+}
+
+#[cfg(unix)]
+#[test]
+fn explicit_output_parent_creation_rejects_symlink_components() {
+    use agent_canon::source_mutation::ensure_file_parent_nofollow;
+    use std::os::unix::fs::symlink;
+    let root = TempRoot::new();
+    let outside = TempRoot::new();
+    let output = root.0.join("nested/assets/result.html");
+    assert_eq!(
+        ensure_file_parent_nofollow(&output).unwrap(),
+        output.parent().unwrap()
+    );
+    symlink(&outside.0, root.0.join("alias")).unwrap();
+    assert!(ensure_file_parent_nofollow(&root.0.join("alias/created/result.html")).is_err());
+    assert!(!outside.0.join("created").exists());
+}
+
+#[test]
 fn atomic_source_write_can_create_only_the_approved_target_parents() {
     let root = TempRoot::new();
     let relative = Path::new(".codex/personal/skills/example/SKILL.md");
