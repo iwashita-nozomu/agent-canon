@@ -12,6 +12,7 @@ FROM ubuntu:24.04@sha256:33ceb71981b602c1a7443a53469e4dba065f7503eab3078a2d7a57a
 
 ARG TARGETOS
 ARG TARGETARCH
+ARG AGENT_CANON_BOOTSTRAP_RUST_VERSION=1.99.1
 ENV PYTHONDONTWRITEBYTECODE=1 \
     CARGO_HOME=/var/lib/agent-canon/cache/cargo \
     RUSTUP_HOME=/usr/local/share/agent-canon/toolchains/rustup \
@@ -42,13 +43,10 @@ LABEL org.opencontainers.image.title="AgentCanon shared tool runtime" \
       io.agent-canon.run.pids-limit="512" \
       io.agent-canon.run.tmpfs="/tmp"
 
-# Install bootstrap packages and manifest-owned environment dependencies in one image layer.
+# Bootstrap the native planner with the manifest's pinned Rust version, then
+# install the full manifest-owned environment in the same image layer.
 RUN --mount=type=bind,source=bootstrap/container/image/dependencies.toml,target=/src/bootstrap/container/image/dependencies.toml,readonly \
-    --mount=type=bind,source=tools/runtime/container/devcontainer_dependencies.py,target=/src/tools/runtime/container/devcontainer_dependencies.py,readonly \
-    --mount=type=bind,source=tools/analysis/dependencies/dependency_plan.py,target=/src/tools/analysis/dependencies/dependency_plan.py,readonly \
-    --mount=type=bind,source=tools/repository/workspace/parent_root_side_effects.py,target=/src/tools/repository/workspace/parent_root_side_effects.py,readonly \
-    --mount=type=bind,source=tools/runtime/artifacts/runtime_artifacts.py,target=/src/tools/runtime/artifacts/runtime_artifacts.py,readonly \
-    --mount=type=bind,source=tools/runtime/values.py,target=/src/tools/runtime/values.py,readonly \
+    --mount=type=bind,source=.,target=/src/repository,readonly \
     --mount=type=bind,source=tools,target=/src/all-tools,readonly \
     set -eux; \
     export CARGO_HOME=/usr/local/share/agent-canon/toolchains/cargo; \
@@ -66,8 +64,12 @@ RUN --mount=type=bind,source=bootstrap/container/image/dependencies.toml,target=
     curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 --output /usr/local/bin/rustup-init "https://static.rust-lang.org/rustup/archive/1.28.2/${rustup_target}/rustup-init"; \
     echo "$rustup_sha  /usr/local/bin/rustup-init" | sha256sum --check --strict; \
     chmod 0555 /usr/local/bin/rustup-init; \
-    python3 /src/tools/analysis/dependencies/dependency_plan.py \
-      image-install --workspace /src \
+    rustup-init -y --no-modify-path --default-toolchain "$AGENT_CANON_BOOTSTRAP_RUST_VERSION" --profile minimal; \
+    cargo build --locked --release \
+      --manifest-path /src/repository/tools/runtime/dispatch/agent-canon/Cargo.toml; \
+    install -m 0555 "$CARGO_TARGET_DIR/release/agent-canon" /usr/local/bin/agent-canon-dependency-bootstrap; \
+    /usr/local/bin/agent-canon-dependency-bootstrap environment-dependencies \
+      image-install --workspace /src/repository \
       --manifest /src/bootstrap/container/image/dependencies.toml \
       --final-binary-dir /usr/local/bin --format text; \
     bash -ceu 'shopt -s globstar nullglob; for manifest in /src/all-tools/**/Cargo.toml; do cargo fetch --locked --manifest-path "$manifest"; done'; \
@@ -77,7 +79,7 @@ RUN --mount=type=bind,source=bootstrap/container/image/dependencies.toml,target=
     chmod 0444 /usr/local/share/agent-canon/.agent-canon-tool-container; \
     printf 'agent-canon-runtime/v1\n' > /usr/local/share/agent-canon/runtime/.agent-canon-runtime; \
     chmod 0444 /usr/local/share/agent-canon/runtime/.agent-canon-runtime; \
-    rm -rf /var/lib/agent-canon/cache/cargo-target /root/.npm /root/.cache /tmp/* /usr/local/bin/rustup-init /usr/local/share/agent-canon/pipx/shared; \
+    rm -rf /var/lib/agent-canon/cache/cargo-target /root/.npm /root/.cache /tmp/* /usr/local/bin/rustup-init /usr/local/bin/agent-canon-dependency-bootstrap /usr/local/share/agent-canon/pipx/shared; \
     DEBIAN_FRONTEND=noninteractive apt-get purge -y --auto-remove pipx; \
     rm -rf /var/lib/apt/lists/*
 
