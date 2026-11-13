@@ -274,11 +274,25 @@ fn sync_publishes_to_the_selected_local_archive_branch_and_reads_back_clean_stat
     init_repo(&source);
     init_repo(&canon);
     fs::create_dir_all(&runtime).unwrap();
-    git(&source, &["remote", "add", "origin", "https://github.com/example/source.git"]);
-    Command::new("git").args(["init", "-q", "--bare", remote.to_str().unwrap()]).status().unwrap();
+    git(
+        &source,
+        &[
+            "remote",
+            "add",
+            "origin",
+            "https://github.com/example/source.git",
+        ],
+    );
+    Command::new("git")
+        .args(["init", "-q", "--bare", remote.to_str().unwrap()])
+        .status()
+        .unwrap();
     let seed = root.join("archive-seed");
     init_repo(&seed);
-    git(&seed, &["remote", "add", "origin", remote.to_str().unwrap()]);
+    git(
+        &seed,
+        &["remote", "add", "origin", remote.to_str().unwrap()],
+    );
     git(&seed, &["push", "-u", "origin", "main"]);
 
     let ensure = archive_command(
@@ -290,7 +304,11 @@ fn sync_publishes_to_the_selected_local_archive_branch_and_reads_back_clean_stat
         &["ensure"],
         None,
     );
-    assert!(ensure.status.success(), "{}", String::from_utf8_lossy(&ensure.stdout));
+    assert!(
+        ensure.status.success(),
+        "{}",
+        String::from_utf8_lossy(&ensure.stdout)
+    );
     assert!(String::from_utf8_lossy(&ensure.stdout).contains("RUNTIME_LOG_ARCHIVE_ENSURE=pass"));
 
     let sync = archive_command(
@@ -302,9 +320,15 @@ fn sync_publishes_to_the_selected_local_archive_branch_and_reads_back_clean_stat
         &["sync", "--no-agent-reports"],
         None,
     );
-    assert!(sync.status.success(), "{}", String::from_utf8_lossy(&sync.stdout));
+    assert!(
+        sync.status.success(),
+        "{}",
+        String::from_utf8_lossy(&sync.stdout)
+    );
     assert!(String::from_utf8_lossy(&sync.stdout).contains("RUNTIME_LOG_ARCHIVE_SYNC=pass"));
-    assert!(String::from_utf8_lossy(&sync.stdout).contains("RUNTIME_LOG_ARCHIVE_PUSH_STATUS=committed"));
+    assert!(
+        String::from_utf8_lossy(&sync.stdout).contains("RUNTIME_LOG_ARCHIVE_PUSH_STATUS=committed")
+    );
 
     let status = archive_command(
         &source,
@@ -315,6 +339,12 @@ fn sync_publishes_to_the_selected_local_archive_branch_and_reads_back_clean_stat
         &["check-clean", "--porcelain"],
         None,
     );
-    assert!(status.status.success(), "{}", String::from_utf8_lossy(&status.stdout));
-    assert!(String::from_utf8_lossy(&status.stdout).contains("RUNTIME_LOG_ARCHIVE_CHECK_CLEAN=pass"));
+    assert!(
+        status.status.success(),
+        "{}",
+        String::from_utf8_lossy(&status.stdout)
+    );
+    assert!(
+        String::from_utf8_lossy(&status.stdout).contains("RUNTIME_LOG_ARCHIVE_CHECK_CLEAN=pass")
+    );
 }
