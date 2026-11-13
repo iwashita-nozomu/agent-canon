@@ -1534,10 +1534,10 @@ pub fn run(args: &[String]) -> i32 {
         #[cfg(not(target_os = "linux"))]
         {
             let _ = (&explicit, &cwd, count, memory);
-            return Err(failure(
+            Err(failure(
                 "gpu_command_lifecycle_unsupported",
                 "GPU descendant retention requires Linux procfs and subreaper support",
-            ));
+            ))
         }
         #[cfg(target_os = "linux")]
         {

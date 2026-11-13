@@ -548,6 +548,7 @@ impl RuntimeDirectory {
     }
 
     /// Observe an existing entry through its parent handle without reading user bytes.
+    #[cfg(target_os = "linux")]
     pub(crate) fn entry_exists(&self, relative: &Path) -> std::io::Result<bool> {
         let (parent, name) = match self.parent(relative, false) {
             Ok(value) => value,
