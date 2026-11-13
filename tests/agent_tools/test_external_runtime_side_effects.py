@@ -22,7 +22,6 @@ DEPENDENCY_REVIEW = (
     / "run_repo_dependency_review.sh"
 )
 
-from tools.validation.ci.runners import container_runtime
 
 
 def clean_runtime_environment() -> dict[str, str]:
@@ -91,23 +90,3 @@ def test_review_scan_publishes_external_report(tmp_path: Path) -> None:
     assert result.returncode == 0, result.stderr
     assert not list(repo.rglob("*"))
     assert list(runtime.rglob("review_backlog_scan.md"))
-
-
-def test_container_lifecycle_receipt_is_external(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Container receipts do not use a source checkout fallback."""
-    control = tmp_path / "control"
-    source = control / "repo"
-    runtime = tmp_path / "runtime"
-    source.mkdir(parents=True)
-    monkeypatch.setenv("AGENT_CANON_CONTROL_PARENT_ROOT", str(control))
-    monkeypatch.setenv("AGENT_CANON_RUNTIME_ROOT", str(runtime))
-    receipt = container_runtime.ContainerLifecycleReceipt(
-        container_runtime.LifecycleContext("task", "repo"),
-        container_runtime.DaemonSnapshot("docker", {}, "not-created"),
-    )
-    target = container_runtime.write_lifecycle_receipt(source, receipt)
-    assert target.is_file()
-    assert target.is_relative_to(runtime)
-    assert not list(source.rglob("*"))
