@@ -39,10 +39,10 @@ role と model の参照先は
 - [devcontainer/parent-devcontainer-policy.md](devcontainer/parent-devcontainer-policy.md)
   - 親root と AgentCanon source の devcontainer 境界、wrapper 順序、compose 出力、
     親 hook 契約を定義します。
-  - `tools/runtime/container/devcontainer_dependencies.py` が `pyproject.toml` の
+  - `tools/runtime/dispatch/agent-canon/src/environment_dependencies.rs` が `pyproject.toml` の
     optional-dependencies extras の名前・順序・重複と存在を検証し、標準 editable
     install / `pip check` を所有します。pack/env の typed extras は
-    `tools/runtime/container/devcontainer_dependencies.py` から Compose 境界へ
+    `tools/runtime/dispatch/agent-canon/src/environment_dependencies.rs` から Compose 境界へ
     projection されます。
 - [experiment_runner.md](experiment_runner.md)
   - `experiment_runner` の契約と実行モデル

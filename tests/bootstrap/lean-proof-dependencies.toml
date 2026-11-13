@@ -2,7 +2,7 @@
 # contract environment
 # responsibility Pins the exact Lean toolchain for the disposable native proof profile.
 # downstream implementation ./docker.sh invokes this manifest only in the lean-proof profile
-# downstream implementation ../../tools/analysis/dependencies/dependency_plan.py installs these typed records
+# downstream implementation ../../tools/runtime/dispatch/agent-canon/src/environment_dependencies.rs installs these typed records
 # downstream implementation ./docker.sh runs the selected native proof checks
 # @dependency-end
 

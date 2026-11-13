@@ -116,6 +116,7 @@ pub(crate) mod python_cli_options;
 pub mod python_json;
 pub mod python_sequence_matcher;
 pub mod python_text;
+pub mod repo_structure_contract;
 pub mod report_artifact_checks;
 pub mod run_evaluation;
 pub mod runtime_boundary;
