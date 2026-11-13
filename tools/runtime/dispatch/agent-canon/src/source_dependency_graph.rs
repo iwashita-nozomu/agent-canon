@@ -1212,6 +1212,8 @@ pub fn run(args: &[String]) -> i32 {
 
 /// Return deterministic strongly-connected components for non-reference
 /// dependency edges, filtering only after the complete topology is known.
+/// The two-pass traversal follows Sharir (1981):
+/// https://doi.org/10.1016/0898-1221(81)90008-0 .
 fn cycle_components(
     edges: &[SourceDependencyEdge],
     selected: Option<&BTreeSet<String>>,
