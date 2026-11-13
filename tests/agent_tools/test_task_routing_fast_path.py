@@ -4,19 +4,21 @@
 # contract test
 # responsibility Tests task-routing fast path without Decision Sufficiency.
 # upstream design ../../agents/skills/task-routing.md task-routing fast-path contract
-# upstream implementation ../../tools/agent/orchestration/route.py selects routes
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs native selector owns routes
 # @dependency-end
 
 from __future__ import annotations
 
 import json
 import subprocess
-import sys
 import unittest
+import os
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-ROUTE = PROJECT_ROOT / "tools" / "agent" / "orchestration" / "route.py"
+AGENT_CANON_CLI = Path(
+    os.environ.get("AGENT_CANON_CLI", str(PROJECT_ROOT / "tools/bin/agent-canon"))
+)
 TASK_ROUTING = PROJECT_ROOT / "agents" / "skills" / "task-routing.md"
 DECISION_FIELDS = {
     "decision_sufficiency_packet_ref",
@@ -66,7 +68,7 @@ class TaskRoutingFastPathTest(unittest.TestCase):
         for arguments, expected in scenarios:
             with self.subTest(arguments=arguments):
                 result = subprocess.run(
-                    [sys.executable, str(ROUTE), *arguments],
+                    [str(AGENT_CANON_CLI), "route", *arguments],
                     cwd=PROJECT_ROOT,
                     check=False,
                     capture_output=True,
@@ -109,8 +111,8 @@ class TaskRoutingFastPathTest(unittest.TestCase):
             with self.subTest(mode_args=mode_args):
                 result = subprocess.run(
                     [
-                        sys.executable,
-                        str(ROUTE),
+                        str(AGENT_CANON_CLI),
+                        "route",
                         "--prompt",
                         route,
                         *mode_args,
@@ -133,8 +135,8 @@ class TaskRoutingFastPathTest(unittest.TestCase):
         """An explicitly typed write mode remains available to edit callers."""
         result = subprocess.run(
             [
-                sys.executable,
-                str(ROUTE),
+                str(AGENT_CANON_CLI),
+                "route",
                 "--prompt",
                 "Implement the requested routing fix.",
                 "--mode",
@@ -157,8 +159,8 @@ class TaskRoutingFastPathTest(unittest.TestCase):
         """Test design remains available only through explicit selection."""
         result = subprocess.run(
             [
-                sys.executable,
-                str(ROUTE),
+                str(AGENT_CANON_CLI),
+                "route",
                 "--prompt",
                 "$test-design after the owning mechanism exists",
                 "--mode",
@@ -178,8 +180,8 @@ class TaskRoutingFastPathTest(unittest.TestCase):
 
         ordinary = subprocess.run(
             [
-                sys.executable,
-                str(ROUTE),
+                str(AGENT_CANON_CLI),
+                "route",
                 "--prompt",
                 "The unresolved oracle risk remains after the owning mechanism exists.",
                 "--mode",

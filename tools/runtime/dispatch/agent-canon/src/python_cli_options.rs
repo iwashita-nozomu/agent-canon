@@ -16,6 +16,9 @@ pub(crate) fn resolve_long_option_prefix<'a, T: Copy>(
     value: &str,
     options: &'a [(&'a str, T)],
 ) -> Result<T, LongOptionError<'a>> {
+    if let Some((_, name)) = options.iter().find(|(option, _)| *option == value) {
+        return Ok(*name);
+    }
     let matches = options
         .iter()
         .filter(|(option, _)| option.starts_with(value))
@@ -27,5 +30,34 @@ pub(crate) fn resolve_long_option_prefix<'a, T: Copy>(
         _ => Err(LongOptionError::Ambiguous(
             matches.iter().map(|(option, _)| *option).collect(),
         )),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn complete_option_wins_while_short_shared_prefix_stays_ambiguous() {
+        let options = [
+            ("--source-mutation", 0),
+            ("--source-mutation-evidence", 1),
+            ("--source-mutation-capability-json", 2),
+        ];
+        assert_eq!(
+            resolve_long_option_prefix("--source-mutation", &options),
+            Ok(0)
+        );
+        assert!(matches!(
+            resolve_long_option_prefix("--source", &options),
+            Err(LongOptionError::Ambiguous(_))
+        ));
+        assert_eq!(
+            resolve_long_option_prefix("--source-mutation-e", &options),
+            Ok(1)
+        );
+        assert_eq!(
+            resolve_long_option_prefix("--missing", &options),
+            Err(LongOptionError::Unrecognized)
+        );
     }
 }

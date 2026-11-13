@@ -2,11 +2,9 @@
 # contract implementation
 # responsibility Provides structural refiners for decoded runtime values.
 # downstream implementation dispatch/agent-canon/src/environment_dependencies.rs owns native dependency manifest and receipt values
-# downstream implementation ../agent/orchestration/model_profile_registry.py narrows registry values
-# downstream implementation ../agent/orchestration/team_config.py narrows config values
-# downstream implementation ../agent/orchestration/packets.py narrows packet values
+# downstream implementation ./dispatch/agent-canon/src/codex_agent_role_eval/model_profiles.rs parses registry values
 # downstream implementation ./artifacts/artifact_identity.py narrows canonical JSON maps
-# downstream implementation ../agent/skills/skill_shim_materializer.py narrows YAML frontmatter values
+# downstream implementation ./dispatch/agent-canon/src/catalog/skill_materialization.rs parses YAML frontmatter values natively
 # @dependency-end
 """Refine only the container shape of decoded values; domain schemas stay local."""
 

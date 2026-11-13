@@ -255,7 +255,7 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                 (
                     "workflow family and role candidates",
                     "agents/task_catalog.yaml",
-                    "check_agent_runtime_alignment.py",
+                    "tools/bin/agent-canon check-agent-runtime-alignment",
                 ),
                 (
                     "task bootstrap and CLI entrypoints",
@@ -268,12 +268,12 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                 (
                     "role behavior and stage conditions",
                     ".codex/agents/*.toml",
-                    "check_agent_runtime_alignment.py",
+                    "tools/bin/agent-canon check-agent-runtime-alignment",
                 ),
                 (
                     "skill routing and public skill surface",
                     "agents/skills/catalog.yaml",
-                    "tools/agent/orchestration/route.py --prompt",
+                    "tools/bin/agent-canon route --prompt",
                 ),
                 (
                     "report and closeout structure",
@@ -297,7 +297,7 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                 ),
                 (
                     "skill and agent installation",
-                    "tools/agent/skills/skill_shim_materializer.py",
+                    "tools/runtime/dispatch/agent-canon/src/catalog/skill_materialization.rs",
                     "skill materializer check",
                 ),
                 (
@@ -330,12 +330,12 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                 (
                     "workflow family and role candidates",
                     "agents/task_catalog.yaml",
-                    "check_agent_runtime_alignment.py",
+                    "tools/bin/agent-canon check-agent-runtime-alignment",
                 ),
                 (
                     "public skill registry",
                     "agents/skills/catalog.yaml",
-                    "check_agent_runtime_alignment.py",
+                    "tools/bin/agent-canon check-agent-runtime-alignment",
                 ),
                 (
                     "AgentCanon update transaction",
@@ -365,7 +365,7 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                 (
                     "skill selection",
                     "agents/skills/catalog.yaml",
-                    "python3 tools/agent/orchestration/route.py --prompt",
+                    "tools/bin/agent-canon route --prompt",
                 ),
                 (
                     "implementation guidance and closeout",

@@ -259,7 +259,7 @@ skill routing は、既存の changed-path routing と設計 owner の capabilit
 | `agents/skills/catalog.yaml` | OOP/type design owner の capability identity and selection |
 | `agents/skills/skill-dependencies.yaml` | prerequisite, successor, and dependency order |
 | `agents/canonical/CODEX_SUBAGENTS.md` | touched surface に応じた reviewer guidance |
-| `tools/agent/orchestration/route.py` | OOP/type design capability と既存 route packet を materialize |
+| `tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs` | OOP/type design capability と既存 route packet を materialize |
 
 Python implementation path（`python/`、`tests/`、
 `.py` / `.pyi`）、native C/C++ implementation path（native suffix または `src/`、`include/`、

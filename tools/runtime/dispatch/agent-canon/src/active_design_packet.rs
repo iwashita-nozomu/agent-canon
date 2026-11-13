@@ -2,7 +2,7 @@
 // contract implementation
 // responsibility Owns native normalization and mapping for the persisted active-design-packet contract.
 // upstream design ../../../../../agents/COMMUNICATION_PROTOCOL.md active design packet schema
-// upstream implementation ../../../../../tools/agent/orchestration/packets.py owns the source packet schema and normalized contract
+// upstream design ../../../../../agents/COMMUNICATION_PROTOCOL.md owns the persisted active-design packet schema and normalized contract
 // @dependency-end
 
 use crate::artifacts::artifact_identity::canonical_json_bytes;
@@ -711,4 +711,34 @@ pub fn validate_active_design_packet_reference_projection(
             .get(field)
             .is_some_and(|value| value.as_vec().is_some())
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use yaml_rust2::YamlLoader;
+
+    #[test]
+    fn canonical_team_packet_normalizes_with_expected_section_order_and_dependencies() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../../");
+        let root = root.canonicalize().expect("repository root resolves");
+        let source = std::fs::read_to_string(root.join("agents/agents_config.json"))
+            .expect("canonical team config reads");
+        let documents = YamlLoader::load_from_str(&source).expect("JSON is YAML-compatible");
+        let raw_packet = &documents[0]["artifacts"]["active_design_packet"];
+        let packet =
+            normalize_active_design_packet_config(raw_packet, "artifacts.active_design_packet")
+                .expect("canonical active-design packet remains valid");
+        assert_eq!(packet.schema, ACTIVE_DESIGN_PACKET_SCHEMA);
+        assert_eq!(
+            packet.abstract_design_frame.entry_id,
+            "abstract-design-frame"
+        );
+        assert_eq!(
+            packet.implementation_source_packet.entry_id,
+            "implementation-source-packet"
+        );
+        assert_eq!(packet.clause_registry.len(), 4);
+        assert!(packet.document_flow_required);
+    }
 }
