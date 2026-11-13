@@ -170,6 +170,7 @@ Commands:
   check-solid-evidence [paths...] [--root ROOT] [--changed] [--base-ref BASE_REF] [--evidence EVIDENCE] [--exclude EXCLUDE] [--verbose] [--format text|json]
   rust-migration-audit --root <repo-root>
   github-status-lifecycle --repo OWNER/REPO --issue NUMBER --facts-json PATH [options]
+  wiki-publish --wiki-root PATH --source-root PATH --source-commit SHA [options]
   orphan-lifecycle <inventory|authorize-cleanup> [options]
   update-latest-result RESULT_ROOT --variant VARIANT [--result-dir PATH]
   parent-repository-audit <list|check> --root ROOT [options]
@@ -399,6 +400,9 @@ fn main() {
     }
     if args.len() >= 2 && args[1] == "github-status-lifecycle" {
         std::process::exit(agent_canon::github_status_lifecycle::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "wiki-publish" {
+        std::process::exit(agent_canon::wiki_publish::run(&args[2..]));
     }
     if args.len() >= 2 && args[1] == "orphan-lifecycle" {
         std::process::exit(agent_canon::orphan_lifecycle::run(&args[2..]));
