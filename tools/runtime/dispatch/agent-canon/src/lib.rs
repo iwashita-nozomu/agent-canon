@@ -97,6 +97,7 @@ pub mod hook_dispatcher;
 pub mod hook_event_log;
 pub mod hook_safety;
 pub mod html_artifact_access;
+pub mod issue_sync;
 pub mod latest_result;
 pub mod lean_proof_env;
 pub mod log_policy;

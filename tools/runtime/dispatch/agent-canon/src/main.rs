@@ -182,6 +182,7 @@ Commands:
   skill-shim-materializer <check|materialize|readback> [options]
   skill-shim-evaluation [options]
   run-accumulated-agent-evals [options]
+  issue-sync [--repo OWNER/REPO] [--issue-url URL] [options]
   update-latest-result RESULT_ROOT --variant VARIANT [--result-dir PATH]
   parent-repository-audit <list|check> --root ROOT [options]
   html-artifact-access REPORT_PATH [options]
@@ -447,6 +448,9 @@ fn main() {
     }
     if args.len() >= 2 && args[1] == "orphan-lifecycle" {
         std::process::exit(agent_canon::orphan_lifecycle::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "issue-sync" {
+        std::process::exit(agent_canon::issue_sync::run(&args[2..]));
     }
     if args.len() >= 2 && args[1] == agent_canon::codex_agent_role_eval::SELECTOR {
         std::process::exit(agent_canon::codex_agent_role_eval::run(&args[2..]));
