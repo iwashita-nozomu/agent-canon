@@ -401,9 +401,10 @@ mod tests {
     #[test]
     fn child_environment_keeps_parent_target_and_runtime_roots_distinct() {
         let temporary = tempfile::tempdir().expect("root capability fixture creates");
-        let source = temporary.path().join("source");
-        let target = temporary.path().join("target");
-        let runtime = temporary.path().join("runtime");
+        let temporary_root = temporary.path().canonicalize().expect("physical fixture root");
+        let source = temporary_root.join("source");
+        let target = temporary_root.join("target");
+        let runtime = temporary_root.join("runtime");
         std::fs::create_dir_all(&source).expect("source root creates");
         std::fs::create_dir_all(&target).expect("target root creates");
         std::fs::create_dir_all(&runtime).expect("runtime root creates");
