@@ -4030,7 +4030,7 @@ struct DependencyCliArgs {
 
 enum ParsedDependencyCli {
     Help,
-    Arguments(DependencyCliArgs),
+    Arguments(Box<DependencyCliArgs>),
 }
 
 const DEPENDENCY_USAGE: &str = "usage: agent-canon environment-dependencies [-h] [--workspace WORKSPACE] [--manifest MANIFEST] [--receipts RECEIPTS] [--final-binary-dir FINAL_BINARY_DIR] [--extras EXTRAS] [--records RECORDS [RECORDS ...]] [--format {text,json}] {validate,dry-run,install,boundary,project-install,image-install,image-verify}";
@@ -4134,7 +4134,7 @@ fn parse_dependency_cli(args: &[String]) -> std::result::Result<ParsedDependency
     }
     parsed.command =
         command.ok_or_else(|| "the following arguments are required: command".to_string())?;
-    Ok(ParsedDependencyCli::Arguments(parsed))
+    Ok(ParsedDependencyCli::Arguments(Box::new(parsed)))
 }
 
 fn dependency_cli_help() -> String {
@@ -4631,14 +4631,16 @@ fn assert_frozen_image_node(
             path.display()
         )));
     }
-    let expected_mode = if directory {
-        IMAGE_DIRECTORY_MODE
-    } else {
-        IMAGE_FILE_MODE
-    };
+    #[cfg(not(unix))]
+    let _ = owner;
     #[cfg(unix)]
     {
         use std::os::unix::fs::MetadataExt;
+        let expected_mode = if directory {
+            IMAGE_DIRECTORY_MODE
+        } else {
+            IMAGE_FILE_MODE
+        };
         if metadata.uid() != owner.0
             || metadata.gid() != owner.1
             || metadata.mode() & 0o7777 != expected_mode
