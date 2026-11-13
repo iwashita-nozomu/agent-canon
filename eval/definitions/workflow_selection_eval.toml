@@ -292,14 +292,14 @@ id = "agent-log-analysis"
 description = "Accumulated runtime log analysis should route to compact dashboard tooling."
 expected_workflows = ["codex-task-workflow"]
 expected_skills = ["agent-log-analysis"]
-expected_tools = ["generate_agent_runtime_dashboard.py"]
+expected_tools = ["generate-agent-runtime-dashboard"]
 limit = 25
 prompt_templates = [
-  "generate_agent_runtime_dashboard.py で {subject} の routing miss と selection gap を分析して",
-  "生ログを読みすぎず generate_agent_runtime_dashboard.py で {subject} を要約して",
-  "generate_agent_runtime_dashboard.py で {subject} の toolcall skillcall coverage を compact report で見て",
-  "generate_agent_runtime_dashboard.py でルーティングログから {subject} の selection gap を探して",
-  "generate_agent_runtime_dashboard.py で {subject} の agent dashboard を生成し、recent trend を確認して",
+  "generate-agent-runtime-dashboard で {subject} の routing miss と selection gap を分析して",
+  "生ログを読みすぎず generate-agent-runtime-dashboard で {subject} を要約して",
+  "generate-agent-runtime-dashboard で {subject} の toolcall skillcall coverage を compact report で見て",
+  "generate-agent-runtime-dashboard でルーティングログから {subject} の selection gap を探して",
+  "generate-agent-runtime-dashboard で {subject} の agent dashboard を生成し、recent trend を確認して",
 ]
 subjects = [
   "skill selection",

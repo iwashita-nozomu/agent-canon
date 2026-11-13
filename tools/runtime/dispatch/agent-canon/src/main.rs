@@ -166,6 +166,9 @@ Commands:
   jsonl-to-md <input> <output>
   summarize-hlo-jsonl [--top N] [--only-case CASE] <jsonl>
   historical-skill-usage-read --path <skill_usage.jsonl>
+  generate-agent-improvement-guide [--root ROOT] [--runtime-root ROOT] [--out PATH] [--output-mode 600|644]
+  generate-agent-runtime-dashboard [--root ROOT] [--runtime-root ROOT] [--out PATH] [--compact-out PATH] [--api-out PATH] [--recent-days DAYS]
+  issue-sync [--repo OWNER/REPO] [--issue-url URL] [options]
   eval-accumulation-check [--root ROOT] [--runtime-root ROOT] [--family-registry PATH] [--format text|json] [--compact-out PATH]
   oop-python-rule-inventory|oop-cpp-rule-inventory [--root <repo-root>] [--format text|json|markdown]
   oop-python-readability|oop-cpp-readability [paths...] [--root ROOT] [options]
@@ -300,6 +303,15 @@ fn main() {
                 "cpp"
             },
         ));
+    }
+    if args.len() >= 2 && args[1] == agent_canon::agent_runtime_dashboard::GUIDE_SELECTOR {
+        std::process::exit(agent_canon::agent_runtime_dashboard::run_guide_cli(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == agent_canon::agent_runtime_dashboard::DASHBOARD_SELECTOR {
+        std::process::exit(agent_canon::agent_runtime_dashboard::run_dashboard_cli(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "issue-sync" {
+        std::process::exit(agent_canon::issue_sync::run(&args[2..]));
     }
     if args.len() >= 2 && args[1] == "tool-catalog" {
         std::process::exit(catalog::tool_catalog::run(&args[2..]));

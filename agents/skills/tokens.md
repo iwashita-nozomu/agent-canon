@@ -77,7 +77,7 @@ do not create an unrelated baseline or a new metric/threshold.
   `tools/bin/agent-canon compare-codex-token-footprints`. Use
   `tools/bin/agent-canon evaluate-codex-agent-roles` only when role attribution is
   unresolved. For an accumulated trend question, use existing dashboard
-  summaries and `eval/producers/generate_agent_runtime_dashboard.py` as its
+  summaries and `tools/bin/agent-canon generate-agent-runtime-dashboard` as its
   owner; run collection or repair through `$agent-eval-accumulation` only when
   selected.
 - For unresolved log interpretation, use `$agent-log-analysis` with bounded

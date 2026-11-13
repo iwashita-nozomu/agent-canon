@@ -9,7 +9,7 @@
 // upstream implementation path_resolution.rs preserves non-strict resolved paths
 // upstream reference ../../../../../tests/fixtures/python_integer_division/python_golden.json freezes CPython threshold ratio inputs
 // downstream implementation main.rs exposes the token footprint CLI
-// downstream implementation ../../../../../eval/producers/generate_agent_runtime_dashboard.py records the native command
+// downstream implementation ./agent_runtime_dashboard.rs records the native command
 // downstream implementation ../../../../../tests/agent_tools/test_compare_codex_token_footprints.py preserves the CLI scenarios
 // @dependency-end
 
