@@ -1,14 +1,13 @@
 //! Native host owner for the AgentCanon runtime-log archive.
+mod context_discovery;
 mod github_eval_delivery;
 mod hook_spool;
+mod runtime_event;
 // @dependency-start
 // contract implementation
 // responsibility Owns archive path/identity resolution, bounded Git branch lifecycle, immutable runtime-event publication, and source-bound archive readback.
 // upstream design ../../../../../documents/runtime/runtime-log-archive.md archive branch, spool, publication, and privacy contract
 // upstream design ../../../../../documents/runtime/runtime-log-archive-migration.md explicit legacy source migration contract
-// upstream implementation ../../../../../tools/runtime/archive/runtime_log_archive_git.py retired Python behavior being ported
-// upstream implementation ../../../../../tools/runtime/archive/runtime_log_paths.py retired path behavior mapped to eval_archive_paths.rs
-// upstream implementation ../../../../../tools/runtime/archive/github_eval_delivery.py retired GitHub artifact input being ported
 // upstream implementation ../../../../../tools/runtime/dispatch/agent-canon/src/runtime_boundary.rs owns external runtime and spool capabilities
 // upstream implementation ../../../../../tools/runtime/dispatch/agent-canon/src/source_mutation.rs owns exact source deletion capabilities
 // upstream implementation ../../../../../tools/runtime/dispatch/agent-canon/src/log_repository_identity.rs owns stable source identity
@@ -16,11 +15,11 @@ mod hook_spool;
 // upstream implementation ../../../../../tools/runtime/dispatch/agent-canon/src/report_artifact_checks.rs owns generated report and review checks
 // downstream implementation main.rs exposes the native runtime-log-archive-git CLI
 // downstream implementation ../../../../../bootstrap/host/lifecycle/entrypoint.sh invokes archive-eval on the host adapter
-// downstream test ../../../../../tests/agent_tools/test_runtime_log_archive_git.py validates archive command/output behavior
+// downstream test ../tests/runtime_log_archive_native.rs validates archive command/output behavior
 // @dependency-end
 
 use agent_canon::authority::{
-    AttestationRequest, NonEmptyTrimmedString, Nonce128, ParentRootAttestor,
+    AttestationRequest, AttestedParent, NonEmptyTrimmedString, Nonce128, ParentRootAttestor,
 };
 use agent_canon::eval_archive_paths;
 use agent_canon::log_repository_identity::{
@@ -35,7 +34,7 @@ use cap_fs_ext::{DirExt, FollowSymlinks, OpenOptionsFollowExt};
 use cap_std::ambient_authority;
 use cap_std::fs::{Dir, OpenOptions};
 use regex::bytes::Regex as BytesRegex;
-use serde_json::{Map, Value, json};
+use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::ffi::OsStr;
@@ -138,7 +137,7 @@ struct ArchiveStatusSummary {
 
 struct PreparedArchiveTransaction {
     context: ArchiveContext,
-    lock: RuntimeFileLock,
+    _lock: RuntimeFileLock,
     archive_head_before: String,
     ensured_branch: String,
 }
@@ -166,7 +165,6 @@ struct LegacyImportRecord {
 
 struct LegacyImportPlan {
     family: String,
-    legacy_root: PathBuf,
     index_path: PathBuf,
     inventory_sha256: String,
     records: Vec<LegacyImportRecord>,
@@ -498,6 +496,23 @@ pub(crate) fn run(args: &[String]) -> i32 {
         Err(error) => return print_archive_error(error),
     };
     match parsed.command.as_str() {
+        "append-context-discovery" => match context_discovery::append(&context, &command_options) {
+            Ok(code) => code,
+            Err(error) => {
+                println!("CONTEXT_DISCOVERY_ERROR_CODE={}", error.code);
+                println!("CONTEXT_DISCOVERY_APPEND=fail");
+                1
+            }
+        },
+        "materialize-runtime-event" => match runtime_event::materialize(&context, &command_options)
+        {
+            Ok(code) => code,
+            Err(error) => {
+                println!("RUNTIME_EVENT_ERROR_CODE={}", error.code);
+                println!("RUNTIME_EVENT_MATERIALIZE=fail");
+                1
+            }
+        },
         "repo-key" => command_repo_key(&context),
         "ensure" => command_ensure(&context, command_options.flag("--no-fetch"))
             .unwrap_or_else(print_archive_error),
@@ -561,18 +576,18 @@ fn build_context(options: &GlobalOptions) -> Result<ArchiveContext, ArchiveError
         .canon_root
         .clone()
         .unwrap_or_else(source_root_fallback);
-    let canon_root = crate::path_resolution::resolve_non_strict(&canon_input)
+    let canon_root = agent_canon::path_resolution::resolve_non_strict(&canon_input)
         .map_err(|error| ArchiveError::new("canon_root_invalid", error))?;
     let source_input = options
         .source_root
         .clone()
         .unwrap_or_else(|| canon_root.clone());
-    let source_root = crate::path_resolution::resolve_non_strict(&source_input)
+    let source_root = agent_canon::path_resolution::resolve_non_strict(&source_input)
         .map_err(|error| ArchiveError::new("source_root_invalid", error))?;
     let runtime_root = options
         .runtime_root
         .clone()
-        .map(|path| crate::path_resolution::resolve_non_strict(&path))
+        .map(|path| agent_canon::path_resolution::resolve_non_strict(&path))
         .transpose()
         .map_err(|error| ArchiveError::new("runtime_root_invalid", error))?;
     let remote = options
@@ -580,7 +595,7 @@ fn build_context(options: &GlobalOptions) -> Result<ArchiveContext, ArchiveError
         .clone()
         .unwrap_or_else(|| LOG_ARCHIVE_REMOTE.to_owned());
     let archive_root = if let Some(path) = &options.archive_root {
-        let path = crate::path_resolution::resolve_non_strict(path)
+        let path = agent_canon::path_resolution::resolve_non_strict(path)
             .map_err(|error| ArchiveError::new("archive_root_invalid", error))?;
         resolve_external_artifact_path(&canon_root, &path)
             .map_err(|error| ArchiveError::new("archive_root_invalid", error))?
@@ -621,7 +636,7 @@ fn build_context(options: &GlobalOptions) -> Result<ArchiveContext, ArchiveError
     let parent_root = env::var_os("AGENT_CANON_PARENT_ROOT")
         .filter(|value| !value.is_empty())
         .map(PathBuf::from)
-        .map(|path| crate::path_resolution::resolve_non_strict(&path))
+        .map(|path| agent_canon::path_resolution::resolve_non_strict(&path))
         .transpose()
         .map_err(|error| ArchiveError::new("parent_root_invalid", error))?;
     if let Some(parent_root) = &parent_root {
@@ -732,7 +747,7 @@ fn attest_parent(context: &ArchiveContext) -> Result<Option<AttestedParent>, Arc
         .map_err(|error| {
             ArchiveError::new(
                 "parent_root_invalid",
-                format!("{}:{}", error.reject, error.detail),
+                format!("{}:{}", error.reject, error.detail()),
             )
         })
 }
@@ -753,7 +768,7 @@ fn parent_owned_path(
         .map_err(|error| {
             ArchiveError::new(
                 "parent_root_path_rejected",
-                format!("{}:{}", error.reject, error.detail),
+                format!("{}:{}", error.reject, error.detail()),
             )
         })
 }
@@ -765,7 +780,7 @@ fn ensure_external_directory(
 ) -> Result<PathBuf, ArchiveError> {
     let directory = parent_owned_path(context, directory, purpose)?;
     let (boundary_root, relative) = if let Some(parent_root) = &context.parent_root {
-        let parent_root = crate::path_resolution::resolve_non_strict(parent_root)
+        let parent_root = agent_canon::path_resolution::resolve_non_strict(parent_root)
             .map_err(|error| ArchiveError::new("parent_root_invalid", error))?;
         let relative = directory.strip_prefix(&parent_root).map_err(|_| {
             ArchiveError::new(
@@ -1167,7 +1182,7 @@ fn prepare_archive_transaction(
     }
     Ok(PreparedArchiveTransaction {
         context: context.clone(),
-        lock,
+        _lock: lock,
         archive_head_before: archive_oid(context, "HEAD"),
         ensured_branch,
     })
@@ -1282,11 +1297,11 @@ fn verify_remote_archive_readback(
     if remote_tree.is_empty() || remote_tree != receipt.archive_tree_oid {
         return Err(ArchiveError::new("archive_readback_mismatch", "tree"));
     }
-    let archive_root = crate::path_resolution::resolve_non_strict(&context.archive_root)
+    let archive_root = agent_canon::path_resolution::resolve_non_strict(&context.archive_root)
         .map_err(|error| ArchiveError::new("archive_readback_mismatch", error))?;
     let mut blobs = BTreeMap::new();
     for path in required_paths {
-        let path = crate::path_resolution::resolve_non_strict(path)
+        let path = agent_canon::path_resolution::resolve_non_strict(path)
             .map_err(|_| ArchiveError::new("archive_readback_mismatch", "path"))?;
         let relative = path
             .strip_prefix(&archive_root)
@@ -1349,7 +1364,7 @@ fn canonical_compact_json(value: &Value) -> Result<Vec<u8>, ArchiveError> {
 }
 
 fn open_file_nofollow(path: &Path) -> Result<cap_std::fs::File, ArchiveError> {
-    let path = crate::path_resolution::resolve_non_strict(path)
+    let path = agent_canon::path_resolution::resolve_non_strict(path)
         .map_err(|error| ArchiveError::new("archive_file_invalid", error))?;
     let root = path
         .ancestors()
@@ -1380,7 +1395,7 @@ fn open_file_nofollow(path: &Path) -> Result<cap_std::fs::File, ArchiveError> {
     }
     let mut options = OpenOptions::new();
     options.read(true).follow(FollowSymlinks::No);
-    let mut file = directory
+    let file = directory
         .open_with(name, &options)
         .map_err(|error| ArchiveError::new("archive_file_invalid", error.to_string()))?;
     if !file
@@ -1605,9 +1620,9 @@ fn rebase_to_remote(context: &ArchiveContext) -> (bool, String) {
     );
     let detail = rebased
         .map(|output| {
-            let detail = output_text(&output.stderr);
+            let detail = output_bytes_text(&output.stderr);
             if detail.trim().is_empty() {
-                output_text(&output.stdout)
+                output_bytes_text(&output.stdout)
             } else {
                 detail
             }
@@ -1701,12 +1716,6 @@ fn publish_prepared_archive(
             };
         }
     }
-    let commit = archive_oid(context, "HEAD");
-    let mut tree = if commit.is_empty() {
-        String::new()
-    } else {
-        archive_oid(context, &format!("{commit}^{{tree}}"))
-    };
     let (pushed, push_succeeded, push_status) = compare_and_push(transaction, no_pull);
     let mut status = if pushed && push_succeeded {
         "committed".to_owned()
@@ -1714,7 +1723,7 @@ fn publish_prepared_archive(
         "uncertain".to_owned()
     };
     let commit = archive_oid(context, "HEAD");
-    tree = if commit.is_empty() {
+    let tree = if commit.is_empty() {
         String::new()
     } else {
         archive_oid(context, &format!("{commit}^{{tree}}"))
@@ -1743,7 +1752,7 @@ fn archive_runtime_root(context: &ArchiveContext) -> Result<PathBuf, ArchiveErro
                 .filter(|value| !value.is_empty())
                 .map(PathBuf::from)
         })
-        .map(|path| crate::path_resolution::resolve_non_strict(&path))
+        .map(|path| agent_canon::path_resolution::resolve_non_strict(&path))
         .transpose()
         .map_err(|error| ArchiveError::new("runtime_root_invalid", error))?
         .ok_or_else(|| ArchiveError::new("runtime_root_required", RUNTIME_ROOT_ENV))
@@ -2295,7 +2304,6 @@ fn legacy_import_plan(
     let _ = index_appended;
     Ok(LegacyImportPlan {
         family: family.to_owned(),
-        legacy_root: legacy_root.to_path_buf(),
         index_path,
         inventory_sha256,
         records,
@@ -2311,7 +2319,7 @@ fn command_import_legacy(
         .value("legacy-root")
         .map(PathBuf::from)
         .unwrap_or_else(|| context.canon_root.join("agents/evals/results/hook-runs"));
-    let legacy_root = crate::path_resolution::resolve_non_strict(&legacy_root)
+    let legacy_root = agent_canon::path_resolution::resolve_non_strict(&legacy_root)
         .map_err(|error| ArchiveError::new("legacy_root_invalid", error))?;
     let destination_prefix = safe_archive_relative_path(
         options
@@ -2345,7 +2353,7 @@ fn command_import_eval_results(
         .value("legacy-root")
         .map(PathBuf::from)
         .unwrap_or_else(|| context.canon_root.join("agents/evals/results"));
-    let legacy_root = crate::path_resolution::resolve_non_strict(&legacy_root)
+    let legacy_root = agent_canon::path_resolution::resolve_non_strict(&legacy_root)
         .map_err(|error| ArchiveError::new("legacy_root_invalid", error))?;
     let destination_prefix = safe_archive_relative_path(
         options
@@ -2453,9 +2461,9 @@ fn source_is_tracked(
     context: &ArchiveContext,
     source: &Path,
 ) -> Result<Option<PathBuf>, ArchiveError> {
-    let source_root = crate::path_resolution::resolve_non_strict(&context.canon_root)
+    let source_root = agent_canon::path_resolution::resolve_non_strict(&context.canon_root)
         .map_err(|error| ArchiveError::new("source_root_invalid", error))?;
-    let source = crate::path_resolution::resolve_non_strict(source)
+    let source = agent_canon::path_resolution::resolve_non_strict(source)
         .map_err(|error| ArchiveError::new("legacy_source_invalid", error))?;
     let Ok(relative) = source.strip_prefix(&source_root) else {
         return Ok(None);
@@ -2496,7 +2504,7 @@ fn delete_source_file(context: &ArchiveContext, source: &Path) -> Result<(), Arc
         .assert_allowed(source)
         .map_err(|error| ArchiveError::new("legacy_source_delete_failed", error.to_string()))?;
     if let Some(relative) = source_is_tracked(context, &source)? {
-        let source_root = crate::path_resolution::resolve_non_strict(&context.canon_root)
+        let source_root = agent_canon::path_resolution::resolve_non_strict(&context.canon_root)
             .map_err(|error| ArchiveError::new("source_root_invalid", error))?;
         let result = Command::new("git")
             .arg("-C")
@@ -2799,7 +2807,7 @@ fn report_archive_root(context: &ArchiveContext) -> PathBuf {
 }
 
 fn iter_report_files(report_dir: &Path) -> Result<Vec<PathBuf>, ArchiveError> {
-    let root = crate::path_resolution::resolve_non_strict(report_dir)
+    let root = agent_canon::path_resolution::resolve_non_strict(report_dir)
         .map_err(|error| ArchiveError::new("report_directory_invalid", error))?;
     let metadata = fs::symlink_metadata(&root)
         .map_err(|error| ArchiveError::new("report_directory_invalid", error.to_string()))?;
@@ -2853,7 +2861,7 @@ fn iter_report_files(report_dir: &Path) -> Result<Vec<PathBuf>, ArchiveError> {
 
 fn report_snapshot_digest(report_dir: &Path, files: &[PathBuf]) -> Result<String, ArchiveError> {
     use sha2::{Digest, Sha256};
-    let root = crate::path_resolution::resolve_non_strict(report_dir)
+    let root = agent_canon::path_resolution::resolve_non_strict(report_dir)
         .map_err(|error| ArchiveError::new("report_directory_invalid", error))?;
     let mut digest = Sha256::new();
     for path in files {
@@ -2917,7 +2925,7 @@ fn archive_agent_report_prepared(
     max_file_bytes: Option<i64>,
 ) -> Result<(Value, usize, usize, PathBuf, Vec<PathBuf>), ArchiveError> {
     let context = &transaction.context;
-    let report_dir = crate::path_resolution::resolve_non_strict(report_dir)
+    let report_dir = agent_canon::path_resolution::resolve_non_strict(report_dir)
         .map_err(|error| ArchiveError::new("report_directory_invalid", error))?;
     if !report_dir.starts_with(&context.source_root) {
         return Err(ArchiveError::new(
@@ -3076,7 +3084,7 @@ fn archive_agent_report_prepared(
         ],
         true,
     )?;
-    let mut output = json!({
+    let output = json!({
         "archive_id": archive_id,
         "manifest": manifest,
         "index_appended": index_appended,
@@ -3418,7 +3426,7 @@ fn validate_prepared_report_provenance(
     let source_prefix = safe_provenance_path(payload.get("source_prefix"), "source_prefix")?;
     let source_tree_digest = hex_field(
         payload.get("source_tree_digest_sha256"),
-        64,
+        REPORT_SNAPSHOT_DIGEST_CHARS,
         "source_tree_digest_sha256",
     )?;
     let source_file_count = payload
@@ -3473,9 +3481,10 @@ fn validate_prepared_report_provenance(
         .split(|byte| *byte == b'\0')
         .filter(|record| !record.is_empty())
     {
-        let Some((_metadata, path)) = record.split_once(|byte| *byte == b'\t') else {
+        let Some(separator) = record.iter().position(|byte| *byte == b'\t') else {
             return Err(provenance_error("source_tree_invalid"));
         };
+        let path = &record[separator + 1..];
         let path =
             std::str::from_utf8(path).map_err(|_| provenance_error("source_tree_invalid"))?;
         source_tree_paths.insert(path.to_owned());
@@ -3605,7 +3614,7 @@ fn validate_prepared_report_provenance(
         .ok_or_else(|| provenance_error("redaction_rule_counts_invalid"))?;
     let top_counts = top_counts
         .iter()
-        .map(|(key, value)| (key.clone(), value.as_u64()))
+        .map(|(key, value)| value.as_u64().map(|value| (key.clone(), value)))
         .collect::<Option<BTreeMap<_, _>>>()
         .ok_or_else(|| provenance_error("redaction_rule_counts_invalid"))?;
     if top_counts != aggregate_rule_counts {
@@ -3738,7 +3747,7 @@ fn archive_agent_report_provenance(
     options: &CommandOptions,
 ) -> Result<i32, ArchiveError> {
     let context = &transaction.context;
-    let report_dir = crate::path_resolution::resolve_non_strict(report_dir)
+    let report_dir = agent_canon::path_resolution::resolve_non_strict(report_dir)
         .map_err(|error| provenance_error(&format!("prepared_tree_missing:{error}")))?;
     let metadata =
         fs::symlink_metadata(&report_dir).map_err(|_| provenance_error("prepared_tree_missing"))?;
@@ -3750,7 +3759,7 @@ fn archive_agent_report_provenance(
             .value("provenance")
             .ok_or_else(|| ArchiveError::usage("missing --provenance"))?,
     );
-    let provenance_path = crate::path_resolution::resolve_non_strict(&provenance_path)
+    let provenance_path = agent_canon::path_resolution::resolve_non_strict(&provenance_path)
         .map_err(|_| provenance_error("input_missing"))?;
     let validated = validate_prepared_report_provenance(context, &report_dir, &provenance_path)?;
     let destination = report_archive_root(context)
@@ -3935,7 +3944,7 @@ fn copy_agent_reports_prepared(
         ));
     }
     let root = report_root
-        .map(|path| crate::path_resolution::resolve_non_strict(path))
+        .map(|path| agent_canon::path_resolution::resolve_non_strict(path))
         .transpose()
         .map_err(|error| ArchiveError::new("report_root_invalid", error))?
         .unwrap_or_else(|| context.source_root.join("reports/agents"));
@@ -4195,7 +4204,7 @@ fn porcelain_status(context: &ArchiveContext) -> Result<String, ArchiveError> {
         ],
         false,
     )?;
-    Ok(output_text(&output.stdout))
+    Ok(output_bytes_text(&output.stdout))
 }
 
 fn porcelain_path(line: &str) -> String {
@@ -4272,9 +4281,11 @@ fn archive_tree_keys(context: &ArchiveContext) -> Vec<String> {
 }
 
 fn associated_repo_keys(context: &ArchiveContext) -> BTreeSet<String> {
-    let canon_key =
-        log_repository_identity::repo_log_key(&context.canon_root, &source_identity_environment())
-            .unwrap_or_else(|_| "unidentified-source".to_owned());
+    let canon_key = agent_canon::log_repository_identity::repo_log_key(
+        &context.canon_root,
+        &source_identity_environment(),
+    )
+    .unwrap_or_else(|_| "unidentified-source".to_owned());
     [context.repo_key.clone(), canon_key].into_iter().collect()
 }
 

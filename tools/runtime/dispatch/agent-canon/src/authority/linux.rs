@@ -1,13 +1,13 @@
 use super::{
-    digest_bytes, digest_hex, encode_hex, AttestationRequest, AttestedParent, AuthorityError,
-    ChildHandoffReceipt, ChildHandoffRequest, ComponentIdentity, EntryKind, FileIdentity, FileMode,
-    HandoffMode, HandoffStorage, HandoffTransport, LexicalEntrySnapshot, LexicalSnapshot,
-    NonEmptyTrimmedString, Nonce128, OwnerRoot, ParentOwnedNoReplaceOutcome,
-    ParentOwnedPathReceipt, ParentRootReject, PhysicalRoot, RootKind, RootPrecedence, SecretToken,
-    Sha256Digest, TargetIdentity, VerifiedChildHandoff, HANDOFF_SCHEMA,
+    AttestationRequest, AttestedParent, AuthorityError, ChildHandoffReceipt, ChildHandoffRequest,
+    ComponentIdentity, EntryKind, FileIdentity, FileMode, HANDOFF_SCHEMA, HandoffMode,
+    HandoffStorage, HandoffTransport, LexicalEntrySnapshot, LexicalSnapshot, NonEmptyTrimmedString,
+    Nonce128, OwnerRoot, ParentOwnedNoReplaceOutcome, ParentOwnedPathReceipt, ParentRootReject,
+    PhysicalRoot, RootKind, RootPrecedence, SecretToken, Sha256Digest, TargetIdentity,
+    VerifiedChildHandoff, digest_bytes, digest_hex, encode_hex,
 };
-use base64::engine::general_purpose::URL_SAFE;
 use base64::Engine;
+use base64::engine::general_purpose::URL_SAFE;
 use cap_fs_ext::{DirExt, FollowSymlinks, OpenOptionsFollowExt};
 use cap_std::ambient_authority;
 use cap_std::fs::{
@@ -748,6 +748,44 @@ pub(crate) fn read_parent_owned_file(
     verify_lexical_snapshot(root, receipt, true, false)?;
     attested.verify_live_identity()?;
     Ok(bytes)
+}
+
+pub(crate) fn sync_parent_owned_directory(
+    attested: &AttestedParent,
+    receipt: &ParentOwnedPathReceipt,
+) -> Result<(), AuthorityError> {
+    attested.verify_live_identity()?;
+    let root = validate_receipt(attested, receipt)?;
+    let target = receipt.target.ok_or_else(|| {
+        error(
+            ParentRootReject::RootRaceDetected,
+            "parent-owned sync receipt has no target identity",
+        )
+    })?;
+    if target.kind != EntryKind::File {
+        return Err(error(
+            ParentRootReject::RootRaceDetected,
+            "parent-owned sync target is not a regular file",
+        ));
+    }
+    let parts = relative_components(root.path(), &receipt.physical_path)?;
+    let (parent_parts, leaf) = split_leaf(&parts)?;
+    let (parent, opened_components) =
+        open_component_chain(root, parent_parts, &receipt.parent_components, false)?;
+    if opened_components != receipt.parent_components {
+        return Err(error(
+            ParentRootReject::RootRaceDetected,
+            "parent directory identity changed before sync",
+        ));
+    }
+    verify_target_identity(&parent, leaf, Some(target), false)?;
+    verify_lexical_snapshot(root, receipt, true, false)?;
+    sync_directory(&parent)?;
+    verify_component_identities(root, parent_parts, &receipt.parent_components)?;
+    verify_target_identity(&parent, leaf, Some(target), false)?;
+    verify_lexical_snapshot(root, receipt, true, false)?;
+    attested.verify_live_identity()?;
+    Ok(())
 }
 
 pub(crate) fn remove_parent_owned_file(
@@ -2569,7 +2607,7 @@ fn verify_handoff(
             return Err(error(
                 ParentRootReject::HandoffInvalid,
                 "invalid handoff storage",
-            ))
+            ));
         }
     };
     let mode = match required_string(payload, "mode")? {
@@ -2579,7 +2617,7 @@ fn verify_handoff(
             return Err(error(
                 ParentRootReject::HandoffInvalid,
                 "invalid handoff mode",
-            ))
+            ));
         }
     };
     let expected_storage = if transport == HandoffTransport::ParentLocalFile {
@@ -3368,10 +3406,12 @@ mod strict_json_tests {
 
     #[test]
     fn raw_object_parser_rejects_nested_duplicate_keys() {
-        assert!(strict_json(
-            br#"{"outer":{"value":1,"value":2}}"#,
-            ParentRootReject::HandoffInvalid,
-        )
-        .is_err());
+        assert!(
+            strict_json(
+                br#"{"outer":{"value":1,"value":2}}"#,
+                ParentRootReject::HandoffInvalid,
+            )
+            .is_err()
+        );
     }
 }

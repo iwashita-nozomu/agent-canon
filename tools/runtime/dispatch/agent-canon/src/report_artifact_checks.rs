@@ -2,7 +2,7 @@
 // contract implementation
 // responsibility Owns native report checks, status parsing, token fields, run-bundle placement, and generated report rejection.
 // upstream design ../../../../../documents/design/request-intent-and-update-relation.md selected report evidence contract
-// upstream implementation ../../../../../tools/runtime/artifacts/report_artifact_checks.py retains selected report placement checks
+// upstream design ../../../../../documents/runtime/runtime-log-archive.md retains selected report placement checks
 // upstream design ../../../../../agents/canonical/ARTIFACT_PLACEMENT.md generated artifact placement policy
 // upstream design ../../../../../templates/agents/closeout_gate.md closeout evidence template
 // upstream design ../../../../../tools/README.md native tool index
@@ -341,11 +341,7 @@ pub fn run_generated_artifact_guard(args: &[String]) -> i32 {
         eprintln!("agent-canon generated-artifact-guard: failed to write output: {error}");
         return 1;
     }
-    if blockers.is_empty() {
-        0
-    } else {
-        1
-    }
+    if blockers.is_empty() { 0 } else { 1 }
 }
 
 const PLAN_SECTIONS: &[(&str, &str)] = &[
@@ -400,18 +396,14 @@ pub fn generated_eval_transient_blockers(workspace: &Path) -> Vec<String> {
             states.insert(path, "tracked");
         }
     }
-    for path in git_report_paths(workspace, &["--others", "--exclude-standard"])
-        .unwrap_or_default()
+    for path in git_report_paths(workspace, &["--others", "--exclude-standard"]).unwrap_or_default()
     {
         if eval_transient_capture_path(&path) {
             states.entry(path).or_insert("untracked");
         }
     }
-    for path in git_report_paths(
-        workspace,
-        &["--others", "--ignored", "--exclude-standard"],
-    )
-    .unwrap_or_default()
+    for path in git_report_paths(workspace, &["--others", "--ignored", "--exclude-standard"])
+        .unwrap_or_default()
     {
         if eval_transient_capture_path(&path) {
             states.entry(path).or_insert("ignored");
@@ -859,13 +851,17 @@ pub fn report_artifact_placement_blockers(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+    use std::process::Command;
 
     #[test]
     fn empty_planned_work_units_keep_the_waterfall_diagnostic() {
         let text = "# Schedule\n## Stage Plan\n| Stage | Owner |\n| --- | --- |\n| plan | manager |\n## Clause Coverage\n| Clause | Stage |\n| --- | --- |\n| C1 | plan |\n## Planned Work Units\n| Unit | Clause |\n| --- | --- |\n";
-        assert!(check_schedule_artifact(text)
-            .iter()
-            .any(|blocker| blocker == "schedule.md:planned_work_units_empty"));
+        assert!(
+            check_schedule_artifact(text)
+                .iter()
+                .any(|blocker| blocker == "schedule.md:planned_work_units_empty")
+        );
     }
 
     #[test]
@@ -886,5 +882,69 @@ mod tests {
             check_final_review_artifact("## Decision\nnot approved\n"),
             vec!["final_review.md:decision_not_approve"]
         );
+    }
+
+    #[test]
+    fn eval_transient_classifier_orders_tracked_untracked_and_ignored_paths() {
+        let workspace = tempfile::tempdir().unwrap();
+        let root = workspace.path();
+        Command::new("git")
+            .args(["init", "-q"])
+            .current_dir(root)
+            .status()
+            .unwrap();
+        fs::write(
+            root.join(".gitignore"),
+            "reports/agent-eval-runs/ignored-run/\n",
+        )
+        .unwrap();
+        let tracked = root.join("reports/agent-eval-runs/tracked-run/01-role.stdout.txt");
+        fs::create_dir_all(tracked.parent().unwrap()).unwrap();
+        fs::write(&tracked, "tracked\n").unwrap();
+        Command::new("git")
+            .args([
+                "add",
+                ".gitignore",
+                "reports/agent-eval-runs/tracked-run/01-role.stdout.txt",
+            ])
+            .current_dir(root)
+            .status()
+            .unwrap();
+        let untracked = root.join("reports/agent-eval-runs/untracked-run/02-role.stderr.txt");
+        fs::create_dir_all(untracked.parent().unwrap()).unwrap();
+        fs::write(&untracked, "untracked\n").unwrap();
+        let ignored = root.join("reports/agent-eval-runs/ignored-run/03-role.stderr.txt");
+        fs::create_dir_all(ignored.parent().unwrap()).unwrap();
+        fs::write(&ignored, "ignored\n").unwrap();
+
+        assert_eq!(
+            generated_eval_transient_blockers(root),
+            vec![
+                "generated_report_artifact_ignored_left_in_tree:reports/agent-eval-runs/ignored-run/03-role.stderr.txt",
+                "generated_report_artifact_tracked_left_in_tree:reports/agent-eval-runs/tracked-run/01-role.stdout.txt",
+                "generated_report_artifact_untracked_left_in_tree:reports/agent-eval-runs/untracked-run/02-role.stderr.txt",
+            ]
+        );
+    }
+
+    #[test]
+    fn eval_transient_classifier_excludes_non_capture_outputs() {
+        let workspace = tempfile::tempdir().unwrap();
+        let root = workspace.path();
+        Command::new("git")
+            .args(["init", "-q"])
+            .current_dir(root)
+            .status()
+            .unwrap();
+        for relative in [
+            "reports/agent-eval-runs/run/summary.json",
+            "reports/agent-eval-runs/run/nested/role.stdout.txt",
+            "reports/agent-runtime-dashboard/role.stdout.txt",
+        ] {
+            let path = root.join(relative);
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(path, "generated\n").unwrap();
+        }
+        assert!(generated_eval_transient_blockers(root).is_empty());
     }
 }

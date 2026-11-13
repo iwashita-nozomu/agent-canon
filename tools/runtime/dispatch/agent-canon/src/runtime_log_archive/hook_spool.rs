@@ -28,7 +28,6 @@ pub(super) struct IngestResult {
     pub accepted: Vec<EventSnapshot>,
     pub duplicates: Vec<EventSnapshot>,
     pub index_path: PathBuf,
-    pub cursor_path: PathBuf,
     pub index_sha256: String,
     pub cursor_sha256: String,
 }
@@ -639,7 +638,6 @@ pub(super) fn ingest(
         accepted: accepted.into_iter().map(|item| item.0).collect(),
         duplicates,
         index_path: context.archive_root.join(index_relative),
-        cursor_path: context.archive_root.join(cursor_relative),
         index_sha256,
         cursor_sha256: hash(&observed_cursor),
     })
@@ -728,4 +726,65 @@ pub(super) fn finalize(
         }
     }
     Ok(removed)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{hash, parse_event, parse_index, parse_projection};
+    use serde_json::json;
+
+    #[test]
+    fn hook_event_requires_canonical_jsonl_bytes_and_owned_fields() {
+        let value = json!({
+            "hook_run_id": "run-1",
+            "timestamp": "2026-11-13T00:00:00Z",
+            "payload_fingerprint": "fingerprint",
+            "status": "pass",
+            "source_repo_key": "repo-key",
+            "hook_log_namespace": "test",
+        });
+        let mut bytes = serde_json::to_vec(&value).unwrap();
+        bytes.push(b'\n');
+        assert!(parse_event(&bytes).is_ok());
+        assert!(parse_event(b"{\"hook_run_id\":\"run-1\"}").is_err());
+        let mut noncanonical = serde_json::to_vec(&value).unwrap();
+        noncanonical.extend_from_slice(b" \n");
+        assert!(parse_event(&noncanonical).is_err());
+    }
+
+    #[test]
+    fn projection_rejects_conflicting_event_id_and_index_requires_ordered_rows() {
+        let event = |status: &str| {
+            let value = json!({
+                "hook_run_id": "run-1",
+                "timestamp": "2026-11-13T00:00:00Z",
+                "payload_fingerprint": "fingerprint",
+                "status": status,
+                "source_repo_key": "repo-key",
+                "hook_log_namespace": "test",
+            });
+            let mut bytes = serde_json::to_vec(&value).unwrap();
+            bytes.push(b'\n');
+            bytes
+        };
+        let first = event("pass");
+        assert!(parse_projection(&first).is_ok());
+        let mut conflict = first.clone();
+        conflict.extend_from_slice(&event("fail"));
+        assert!(parse_projection(&conflict).is_err());
+        assert_eq!(hash(&first).len(), 64);
+        let index = json!({
+            "event_id": "run-1",
+            "event_sha256": "0".repeat(64),
+            "hook_name": "SessionStart",
+            "projection_path": "hook-runs/repo/test/SessionStart-head.jsonl",
+            "runtime_namespace": "test",
+            "schema": "agent_canon.hook_spool_index.v1",
+            "transaction_id": "1".repeat(64),
+        });
+        let mut row = serde_json::to_vec(&index).unwrap();
+        row.push(b'\n');
+        assert_eq!(parse_index(&row).unwrap().len(), 1);
+        assert!(parse_index(&[b'{', b'}', b'\n']).is_err());
+    }
 }

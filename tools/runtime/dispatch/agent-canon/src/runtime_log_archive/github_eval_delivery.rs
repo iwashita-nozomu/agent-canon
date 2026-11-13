@@ -11,10 +11,10 @@ use flate2::read::DeflateDecoder;
 use rawzip::{CompressionMethod, ZipArchive as RawZipArchive, ZipArchiveEntryWayfinder};
 use serde_json::Value;
 use sha2::Digest;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io::{self, Read, Write};
-use std::path::{Component, Path, PathBuf};
+use std::path::{Component, Path};
 use std::process::{Command, Stdio};
 use std::sync::OnceLock;
 
@@ -492,7 +492,7 @@ fn extract_archive(
 }
 
 fn zip_member_bytes(
-    archive: &RawZipArchive<fs::File>,
+    archive: &RawZipArchive<impl rawzip::ReaderAt>,
     member: &ZipMember,
     maximum: u64,
 ) -> Result<Vec<u8>, ArchiveError> {
@@ -1014,4 +1014,50 @@ fn deliver_one_artifact(
     }
     remove_stage_directory(boundary, &stage)?;
     Ok(true)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{artifact_name, normalized_member_path, stage_run_id};
+
+    #[test]
+    fn accepted_artifact_paths_are_scoped_to_collection_families() {
+        assert_eq!(
+            normalized_member_path("collection.json").unwrap().0,
+            "collection.json"
+        );
+        assert_eq!(
+            normalized_member_path("eval-results/run/result.json")
+                .unwrap()
+                .0,
+            "eval-results/run/result.json"
+        );
+        assert_eq!(
+            normalized_member_path("producer-logs/run.log").unwrap().0,
+            "producer-logs/run.log"
+        );
+        for path in [
+            "../outside.json",
+            "/absolute.json",
+            "eval-results/../outside.json",
+            "other/file.json",
+            "C:/outside.json",
+            "eval-results\\outside.json",
+        ] {
+            assert!(normalized_member_path(path).is_err(), "path={path:?}");
+        }
+    }
+
+    #[test]
+    fn artifact_and_stage_names_require_exact_run_identity() {
+        assert_eq!(artifact_name("agent-canon-main-eval-123-2"), Some((123, 2)));
+        assert_eq!(artifact_name("agent-canon-main-eval-0-2"), None);
+        assert_eq!(artifact_name("agent-canon-main-eval-123-0"), None);
+        let run_id = "main-0123456789abcdef0123456789abcdef01234567-123-2";
+        assert_eq!(
+            stage_run_id(&format!("{run_id}-55")),
+            Some(run_id.to_owned())
+        );
+        assert_eq!(stage_run_id("arbitrary-stage-55"), None);
+    }
 }

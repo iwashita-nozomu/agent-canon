@@ -7,7 +7,7 @@ upstream design ../../README.md standalone AgentCanon source entrypoint and user
 upstream design ../runtime/runtime-log-archive.md agent-canon-log publication and append-only archive policy
 upstream design ../../agents/skills/agent-canon-update.md AgentCanon source and parent integration workflow
 upstream implementation ../../tools/runtime/dispatch/agent-canon/src/environment_dependencies.rs native dependency planning and image installation logic
-upstream implementation ../../tools/runtime/archive/runtime_log_archive_git.py existing archive publication owner
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/runtime_log_archive.rs existing archive publication owner
 downstream implementation ../../bootstrap.sh host bootstrap entrypoint
 downstream implementation ../../bootstrap/container/image/Dockerfile shared Python, Rust, and native CLI tool image
 downstream implementation ../../tools/runtime/container/bootstrap_runtime.py resident container lifecycle and mount registry
@@ -451,8 +451,8 @@ discovery entry とし、project-local [AGENTS.md](../../AGENTS.md) は親 repos
 
 ## Eval Collection And agent-canon-log
 
-既存 producer、`run_accumulated_agent_evals.py`、`runtime_log_paths.py`、
-`runtime_log_archive_git.py` を再利用し、第二 publisher を作りません。
+既存 producer、`run_accumulated_agent_evals.py`、`eval_archive_paths.rs`、
+`runtime-log-archive-git` を再利用し、第二 publisher を作りません。
 
 `eval collect` は tool container で producer を実行し、外部 runtime root に
 `agent_canon.eval_collection.v1` receiptを作ります。run id、task id、source repository、

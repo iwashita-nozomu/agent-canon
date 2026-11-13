@@ -61,7 +61,7 @@ class ClassifyPathRiskTest(unittest.TestCase):
             ),
             "documents/conventions/example.md": ("docs", "eval"),
             "bootstrap/host/manifest.toml": ("eval", "workflow-container"),
-            "tools/runtime/archive/github_eval_delivery.py": ("contracts", "eval"),
+            "tools/runtime/dispatch/agent-canon/src/runtime_log_archive/github_eval_delivery.rs": ("rust", "contracts", "eval"),
             ".github/workflows/other.yml": ("eval", "workflow-container"),
             "documents/design/example.md": ("docs",),
         }

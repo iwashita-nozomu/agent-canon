@@ -348,10 +348,9 @@ _agent_canon_sync_operation() (
     fi
   fi
 
-  if [[ -f "$install_root/tools/runtime/archive/runtime_log_archive_git.py" &&
-        ! -L "$install_root/tools/runtime/archive/runtime_log_archive_git.py" ]] &&
-     command -v python3 >/dev/null 2>&1; then
-    python3 "$install_root/tools/runtime/archive/runtime_log_archive_git.py" \
+  local archive_cli=${AGENT_CANON_NATIVE_BIN:-${AGENT_CANON_CLI:-$install_root/tools/bin/agent-canon}}
+  if [[ -x "$archive_cli" ]] && "$archive_cli" --version >/dev/null 2>&1; then
+    "$archive_cli" runtime-log-archive-git \
       --source-root "$install_root" \
       --canon-root "$install_root" \
       --archive-root "$AGENT_CANON_PRIVATE_LOG_ROOT" \

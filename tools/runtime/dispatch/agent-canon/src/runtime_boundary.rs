@@ -795,7 +795,7 @@ impl RuntimeDirectory {
             use cap_std::fs::OpenOptionsExt;
             options.mode(0o600);
         }
-        let mut file = parent.directory.open_with(&name, &options)?.into_std();
+        let file = parent.directory.open_with(&name, &options)?.into_std();
         if !file.metadata()?.is_file() {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,

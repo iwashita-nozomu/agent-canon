@@ -149,7 +149,7 @@ catalog/checker owners rather than adding a second README registry.
 | scoped StableHLO SSA closure | `tools/bin/agent-canon stablehlo-value-closure` |
 | theorem graph proof-frontier checks | `tools/bin/agent-canon theorem-graph-circularity-check` |
 | generated artifact guard | `tools/bin/agent-canon generated-artifact-guard` |
-| archive state | `python3 tools/runtime/archive/runtime_log_archive_git.py status` |
+| archive state | `tools/bin/agent-canon runtime-log-archive-git status` |
 | Codex runtime summary export | `tools/bin/agent-canon export-codex-runtime-summary` |
 | eval archive structure | `tools/bin/agent-canon eval-accumulation-check` |
 | path-risk/profile selection | `tools/bin/agent-canon classify-path-risk` |
@@ -167,8 +167,8 @@ runtime root. Do not rely on source-local `reports/`, `.agent-canon/`,
 `target/`, `$HOME/.cache`, or `$HOME/.local` defaults.
 
 Existing eval producers remain the producer owner. `eval collect` creates a
-versioned collection in the runtime spool; `eval sync` uses the typed host Git
-adapter and `runtime_log_archive_git.py` to publish to the separate
+versioned collection in the runtime spool; `eval sync` invokes the native
+runtime-log archive command to publish to the separate
 [`agent-canon-log`](https://github.com/iwashita-nozomu/agent-canon-log)
 repository. Archive branch/retention belong to that repository. Publication is
 successful only after remote ref/tree/blob readback; failure retains spool and

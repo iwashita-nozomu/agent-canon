@@ -14,11 +14,11 @@
 //! Read-only archive paths used by the native eval accumulation checker.
 
 use crate::log_repository_identity::{
-    repo_log_key, SOURCE_REMOTE_ENV, SOURCE_REMOTE_NAME_ENV, STABLE_ID_ENV,
+    SOURCE_REMOTE_ENV, SOURCE_REMOTE_NAME_ENV, STABLE_ID_ENV, repo_log_key,
 };
 use crate::python_text::python_strip;
-use crate::runtime_boundary::{resolve_external_artifact_path, RuntimeArtifactBoundary};
 use crate::runtime_boundary::RuntimeSpoolBoundary;
+use crate::runtime_boundary::{RuntimeArtifactBoundary, resolve_external_artifact_path};
 use std::collections::{BTreeMap, HashSet};
 use std::env;
 use std::path::{Path, PathBuf};
@@ -132,7 +132,8 @@ pub fn writable_log_archive_root(
         .map(|value| python_strip(&value).to_owned())
         .filter(|value| !value.is_empty());
     if let Some(override_value) = override_value {
-        let candidate = crate::path_expansion::expand_user_path(Path::new(&override_value))?;
+        let candidate = crate::path_expansion::expand_user_path(Path::new(&override_value))
+            .map_err(|error| error.to_string())?;
         if candidate.is_absolute() {
             let resolved = resolve_external_artifact_path(canon_root, &candidate)?;
             let declared = env::var_os(PRIVATE_LOG_ROOT_ENV)
@@ -143,7 +144,8 @@ pub fn writable_log_archive_root(
                     "absolute archive override must equal the declared private-log mount root"
                         .to_owned()
                 })?;
-            let declared = crate::path_expansion::expand_user_path(Path::new(&declared))?;
+            let declared = crate::path_expansion::expand_user_path(Path::new(&declared))
+                .map_err(|error| error.to_string())?;
             let declared = crate::path_resolution::resolve_non_strict(&declared)?;
             if declared != resolved {
                 return Err(
@@ -237,7 +239,8 @@ pub fn log_environment_key(root: &Path) -> String {
             }
         }
     }
-    let canonical = crate::path_resolution::resolve_non_strict(root).unwrap_or_else(|_| root.into());
+    let canonical =
+        crate::path_resolution::resolve_non_strict(root).unwrap_or_else(|_| root.into());
     safe_slug(
         canonical
             .file_name()
@@ -249,9 +252,8 @@ pub fn log_environment_key(root: &Path) -> String {
 /// Return a source-compatible lowercase path segment.
 pub fn safe_slug(value: &str) -> String {
     static INVALID: OnceLock<regex::Regex> = OnceLock::new();
-    let invalid = INVALID.get_or_init(|| {
-        regex::Regex::new(r"[^A-Za-z0-9_.-]+").expect("static slug pattern")
-    });
+    let invalid = INVALID
+        .get_or_init(|| regex::Regex::new(r"[^A-Za-z0-9_.-]+").expect("static slug pattern"));
     let folded = CaseMapper::new().fold_string(&invalid.replace_all(value, "-"));
     let slug = folded.trim_matches(['.', '_', '-']);
     let slug = slug.chars().take(MAX_KEY_LENGTH).collect::<String>();
@@ -272,15 +274,19 @@ pub fn short_hash(value: &str) -> String {
 
 /// Return the active Codex chat/session trace identifier when one is supplied.
 pub fn codex_trace_key() -> String {
-    ["CODEX_THREAD_ID", "CODEX_SESSION_ID", "CODEX_CONVERSATION_ID"]
-        .iter()
-        .find_map(|name| {
-            env::var(name)
-                .ok()
-                .map(|value| python_strip(&value).to_owned())
-                .filter(|value| !value.is_empty())
-        })
-        .unwrap_or_default()
+    [
+        "CODEX_THREAD_ID",
+        "CODEX_SESSION_ID",
+        "CODEX_CONVERSATION_ID",
+    ]
+    .iter()
+    .find_map(|name| {
+        env::var(name)
+            .ok()
+            .map(|value| python_strip(&value).to_owned())
+            .filter(|value| !value.is_empty())
+    })
+    .unwrap_or_default()
 }
 
 /// Return the privacy-preserving local chat metadata key.
@@ -289,7 +295,11 @@ pub fn log_chat_key(source_root: &Path) -> String {
     if !trace.is_empty() {
         safe_slug(&trace)
     } else {
-        format!("no-chat-{}", repo_log_key(source_root, &source_identity_environment()).unwrap_or_else(|_| "unidentified-source".to_owned()))
+        format!(
+            "no-chat-{}",
+            repo_log_key(source_root, &source_identity_environment())
+                .unwrap_or_else(|_| "unidentified-source".to_owned())
+        )
     }
 }
 
@@ -332,8 +342,12 @@ pub fn source_git_head(source_root: &Path) -> String {
                 };
                 let text = String::from_utf8_lossy(&output.stdout);
                 let mut lines = text.lines();
-                let Some(discovered) = lines.next() else { return String::new() };
-                let Some(head) = lines.next() else { return String::new() };
+                let Some(discovered) = lines.next() else {
+                    return String::new();
+                };
+                let Some(head) = lines.next() else {
+                    return String::new();
+                };
                 if lines.next().is_some() {
                     return String::new();
                 }
@@ -341,9 +355,15 @@ pub fn source_git_head(source_root: &Path) -> String {
                     .unwrap_or_else(|_| source_root.to_path_buf());
                 let discovered = crate::path_resolution::resolve_non_strict(Path::new(discovered))
                     .unwrap_or_else(|_| PathBuf::from(discovered));
-                return if discovered == requested { head.trim().to_owned() } else { String::new() };
+                return if discovered == requested {
+                    head.trim().to_owned()
+                } else {
+                    String::new()
+                };
             }
-            Ok(None) if started.elapsed() < GIT_HEAD_TIMEOUT => std::thread::sleep(Duration::from_millis(10)),
+            Ok(None) if started.elapsed() < GIT_HEAD_TIMEOUT => {
+                std::thread::sleep(Duration::from_millis(10))
+            }
             Ok(None) | Err(_) => {
                 let _ = child.kill();
                 let _ = child.wait();
@@ -364,7 +384,11 @@ pub fn agent_canon_git_commit_key(canon_root: &Path) -> String {
 }
 
 pub fn hook_log_file_name(hook_name: &str, canon_root: &Path) -> String {
-    format!("{}-{}.jsonl", safe_slug(hook_name), agent_canon_git_commit_key(canon_root))
+    format!(
+        "{}-{}.jsonl",
+        safe_slug(hook_name),
+        agent_canon_git_commit_key(canon_root)
+    )
 }
 
 pub fn codex_runtime_summary_file(canon_root: &Path) -> String {
@@ -378,7 +402,9 @@ pub fn agent_report_archive_dir(
 ) -> Result<PathBuf, String> {
     let source_key = repo_log_key(active_root, &source_identity_environment())
         .map_err(|error| format!("source repository key is unavailable: {error}"))?;
-    Ok(log_archive_root(canon_root, runtime_root)?.join("agent-reports").join(source_key))
+    Ok(log_archive_root(canon_root, runtime_root)?
+        .join("agent-reports")
+        .join(source_key))
 }
 
 pub fn codex_runtime_summary_dir(
@@ -388,7 +414,9 @@ pub fn codex_runtime_summary_dir(
 ) -> Result<PathBuf, String> {
     let source_key = repo_log_key(active_root, &source_identity_environment())
         .map_err(|error| format!("source repository key is unavailable: {error}"))?;
-    Ok(log_archive_root(canon_root, runtime_root)?.join("codex-runtime").join(source_key))
+    Ok(log_archive_root(canon_root, runtime_root)?
+        .join("codex-runtime")
+        .join(source_key))
 }
 
 pub fn codex_runtime_chat_dir(
@@ -397,9 +425,11 @@ pub fn codex_runtime_chat_dir(
     conversation_id: &str,
     runtime_root: Option<&Path>,
 ) -> Result<PathBuf, String> {
-    Ok(codex_runtime_summary_dir(active_root, canon_root, runtime_root)?
-        .join(CODEX_RUNTIME_CHAT_DIR_NAME)
-        .join(safe_slug(conversation_id)))
+    Ok(
+        codex_runtime_summary_dir(active_root, canon_root, runtime_root)?
+            .join(CODEX_RUNTIME_CHAT_DIR_NAME)
+            .join(safe_slug(conversation_id)),
+    )
 }
 
 pub fn codex_runtime_summary_path(
@@ -408,8 +438,10 @@ pub fn codex_runtime_summary_path(
     conversation_id: &str,
     runtime_root: Option<&Path>,
 ) -> Result<PathBuf, String> {
-    Ok(codex_runtime_chat_dir(active_root, canon_root, conversation_id, runtime_root)?
-        .join(codex_runtime_summary_file(canon_root)))
+    Ok(
+        codex_runtime_chat_dir(active_root, canon_root, conversation_id, runtime_root)?
+            .join(codex_runtime_summary_file(canon_root)),
+    )
 }
 
 pub fn codex_runtime_index_path(
@@ -417,8 +449,10 @@ pub fn codex_runtime_index_path(
     canon_root: &Path,
     runtime_root: Option<&Path>,
 ) -> Result<PathBuf, String> {
-    Ok(codex_runtime_summary_dir(active_root, canon_root, runtime_root)?
-        .join(CODEX_RUNTIME_INDEX_FILE))
+    Ok(
+        codex_runtime_summary_dir(active_root, canon_root, runtime_root)?
+            .join(CODEX_RUNTIME_INDEX_FILE),
+    )
 }
 
 /// Resolve the existing active report family for a native Eval producer.
@@ -635,7 +669,8 @@ mod source_root_tests {
         )
         .unwrap();
 
-        let key = repo_log_key(&source, &BTreeMap::new()).unwrap();
+        let environment = source_identity_environment();
+        let key = repo_log_key(&source, &environment).unwrap();
         assert_eq!(
             key,
             crate::log_repository_identity::stable_source_repository_id(
@@ -663,6 +698,29 @@ mod source_root_tests {
         assert_eq!(
             hook_event_spool_root(&source, Some(&runtime)).unwrap(),
             runtime.join("spool/hook-events").join(key)
+        );
+        assert_eq!(
+            runtime_event_publication_outcome_spool_root(&source, Some(&runtime)).unwrap(),
+            runtime.join("spool/publication-outcome")
+        );
+        assert_eq!(
+            agent_report_archive_dir(&source, &canon, Some(&runtime)).unwrap(),
+            archive.join("agent-reports").join(&key)
+        );
+        assert_eq!(
+            codex_runtime_index_path(&source, &canon, Some(&runtime)).unwrap(),
+            archive.join("codex-runtime").join(&key).join("index.jsonl")
+        );
+        assert_eq!(
+            codex_runtime_summary_path(&source, &canon, "conversation-1", Some(&runtime),).unwrap(),
+            archive
+                .join("codex-runtime")
+                .join(&key)
+                .join("chats/conversation-1/summary-no-git-head.jsonl")
+        );
+        assert_eq!(
+            hook_log_file_name("SessionStart", &canon),
+            "sessionstart-no-git-head.jsonl"
         );
         assert_eq!(safe_slug("  Team / Project  "), "team-project");
         assert_eq!(safe_slug("---"), "unknown");
