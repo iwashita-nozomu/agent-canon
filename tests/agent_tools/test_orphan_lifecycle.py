@@ -3,37 +3,128 @@
 # @dependency-start
 # contract test
 # responsibility Verifies semantic branch, PR, and worktree classification plus fail-closed cleanup admission.
-# upstream implementation ../../tools/repository/git/orphan_lifecycle.py inventories and classifies orphan candidates.
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/orphan_lifecycle.rs inventories and classifies orphan candidates.
 # upstream design ../../documents/operations/orphan-lifecycle.md defines lifecycle states and cleanup admission.
 # @dependency-end
 
 from __future__ import annotations
 
-import importlib.util
 import json
+import os
 import subprocess
-import sys
 import tempfile
 import unittest
 from pathlib import Path
-from types import ModuleType
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-TOOL_PATH = PROJECT_ROOT / "tools" / "repository" / "git" / "orphan_lifecycle.py"
 
 
-def load_tool() -> ModuleType:
-    """Load the standalone tool as a module."""
-    spec = importlib.util.spec_from_file_location("orphan_lifecycle", TOOL_PATH)
-    if spec is None or spec.loader is None:
-        raise RuntimeError("unable to load orphan lifecycle tool")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
+class NativeTool:
+    """Translate test fixture inputs into the public native CLI."""
+
+    TRACE_SCHEMA = "agent_canon.orphan_trace.v1"
+    root: Path
+    trace_input: dict[str, object]
+
+    @staticmethod
+    def load_trace(path: Path) -> dict[str, object]:
+        return json.loads(path.read_text())
+
+    def build_inventory(self, root, main_ref, trace):
+        self.root, self.trace_input = root, trace
+        with tempfile.TemporaryDirectory() as temporary:
+            trace_path = Path(temporary) / "trace.json"
+            trace_path.write_text(json.dumps(trace))
+            result = subprocess.run(
+                [
+                    os.environ["AGENT_CANON_CLI"],
+                    "orphan-lifecycle",
+                    "inventory",
+                    "--root",
+                    str(root),
+                    "--main-ref",
+                    main_ref,
+                    "--trace",
+                    str(trace_path),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+        assert result.returncode == 0, result.stderr
+        return json.loads(result.stdout)
+
+    def authorize_cleanup(
+        self, inventory, *, fresh_inventory, expected_digest, selections
+    ):
+        # The product CLI obtains the fresh snapshot itself from the same fixture.
+        assert fresh_inventory["repository_root"] == str(self.root)
+        with tempfile.TemporaryDirectory() as temporary:
+            snapshot = Path(temporary) / "inventory.json"
+            trace = Path(temporary) / "trace.json"
+            snapshot.write_text(json.dumps(inventory))
+            trace.write_text(json.dumps(self.trace_input))
+            args = [
+                os.environ["AGENT_CANON_CLI"],
+                "orphan-lifecycle",
+                "authorize-cleanup",
+                "--root",
+                str(self.root),
+                "--inventory",
+                str(snapshot),
+                "--inventory-digest",
+                expected_digest,
+                "--trace",
+                str(trace),
+            ]
+            for selection in selections:
+                args.extend(["--select", selection])
+            result = subprocess.run(args, check=False, capture_output=True, text=True)
+        assert result.returncode in (0, 1), result.stderr
+        return json.loads(result.stdout)
 
 
-TOOL = load_tool()
+TOOL = NativeTool()
+
+
+def test_output_is_confined_to_explicit_external_runtime(tmp_path: Path) -> None:
+    fixture = GitFixture(tmp_path)
+    runtime = tmp_path / "runtime"
+    runtime.mkdir()
+    command = [
+        os.environ["AGENT_CANON_CLI"],
+        "orphan-lifecycle",
+        "inventory",
+        "--root",
+        str(fixture.repo),
+        "--output",
+        "report.json",
+    ]
+    result = subprocess.run(
+        command,
+        env={**os.environ, "AGENT_CANON_RUNTIME_ROOT": str(runtime)},
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert json.loads((runtime / "report.json").read_text()) == json.loads(
+        result.stdout
+    )
+    assert not (fixture.repo / "report.json").exists()
+    outside = tmp_path / "outside.json"
+    outside.write_text("preserve")
+    (runtime / "alias.json").symlink_to(outside)
+    command[-1] = "alias.json"
+    rejected = subprocess.run(
+        command,
+        env={**os.environ, "AGENT_CANON_RUNTIME_ROOT": str(runtime)},
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert rejected.returncode == 2
+    assert outside.read_text() == "preserve"
 
 
 class GitFixture:
