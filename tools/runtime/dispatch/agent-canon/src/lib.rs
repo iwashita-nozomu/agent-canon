@@ -100,6 +100,7 @@ pub mod lean_proof_env;
 pub mod log_repository_identity;
 pub mod lsp_code_analysis;
 pub mod native_release;
+pub mod orphan_lifecycle;
 pub mod owner_guarantee;
 pub mod parent_repository_audit;
 pub mod path_expansion;
