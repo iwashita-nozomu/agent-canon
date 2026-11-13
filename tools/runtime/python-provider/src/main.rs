@@ -229,11 +229,18 @@ mod tests {
         }
         let xref = bytes.len();
         bytes.extend_from_slice(b"xref\n0 6\n0000000000 65535 f \n");
-        for offset in &offsets[1..] { bytes.extend_from_slice(format!("{offset:010} 00000 n \n").as_bytes()); }
-        bytes.extend_from_slice(format!("trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n").as_bytes());
+        for offset in &offsets[1..] {
+            bytes.extend_from_slice(format!("{offset:010} 00000 n \n").as_bytes());
+        }
+        bytes.extend_from_slice(
+            format!("trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n").as_bytes(),
+        );
         let result = Python::attach(|py| pdf(py, &bytes)).unwrap();
         assert_eq!(result["method"], "pypdf");
-        assert!(result["text"].as_str().unwrap().contains("Native provider PDF"));
+        assert!(result["text"]
+            .as_str()
+            .unwrap()
+            .contains("Native provider PDF"));
     }
 
     #[test]
