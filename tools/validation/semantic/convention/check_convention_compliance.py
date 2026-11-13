@@ -340,7 +340,7 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                 (
                     "AgentCanon update transaction",
                     "documents/agent-canon/agent-canon-update-route.md",
-                    "update_lifecycle_contract.py",
+                    "tools/runtime/dispatch/agent-canon/src/update_lifecycle_contract.rs",
                 ),
             ),
         ),

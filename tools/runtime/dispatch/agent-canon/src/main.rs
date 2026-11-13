@@ -8,6 +8,7 @@
 // downstream implementation lib.rs owns the existing private-feedback command route
 // downstream implementation native_release.rs routes native release planning and publication
 // downstream implementation lib.rs exposes the shared native docs command API
+// downstream implementation artifacts/artifact_identity.rs exposes artifact identity materialize/verify CLI
 // downstream implementation check_algorithm_config_partition.rs checks algorithm config ownership and default policy
 // downstream implementation config.rs applies managed Codex context defaults while preserving TOML values
 // downstream implementation dependency_headers.rs checks selected dependency manifests and typed edge syntax
@@ -135,6 +136,7 @@ Commands:
   source-dependency-graph [--root <repo-root> --edges-out PATH --manifests-out PATH] | resolve-targets --root ROOT --source FILE --target PATH
   agent-search [search options]
   check-github-workflows [--root <repo-root>]\n  check-dependency-headers [--root <repo-root>] [--changed] [--surface <glob>]... [paths...]
+  artifact-identity [--root ROOT] <materialize ARTIFACT|verify RECORD>
   classify-path-risk [--path PATH]... [--paths-file PATH] [--format text|json|github-output] [--full-confidence]
   docs <check|format|find-redundant-designs|find-similar-designs|organize-designs|check-bootstrap|check-entrypoints> [options] [paths...]
   codex-config --source-config <path>
@@ -654,6 +656,10 @@ fn main() {
         )
     {
         std::process::exit(agent_canon::container_runtime::run(&args[1], &args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "artifact-identity" {
+        std::process::exit(agent_canon::artifacts::artifact_identity::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "notebook-quality" {

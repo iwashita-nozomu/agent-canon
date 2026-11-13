@@ -312,7 +312,7 @@ const CONTRACTS: &[ToolContract] = &[
         tool: "tools/runtime/dispatch/agent-canon/src/bootstrap_runtime.rs",
         links: &[
             direct_link("documents/design/agent-canon-bootstrap-tool-runtime.md"),
-            direct_link("tools/runtime/source/agent_canon_source_root.py"),
+            direct_link("tools/runtime/dispatch/agent-canon/src/agent_canon_source_root.rs"),
             direct_link("bootstrap.sh"),
             direct_link("bootstrap/container/image/Dockerfile"),
             direct_link("tools/runtime/dispatch/agent-canon/tests/bootstrap_runtime_native.rs"),

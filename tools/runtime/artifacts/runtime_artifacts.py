@@ -5,7 +5,7 @@
 # upstream design ../../../documents/design/agent-canon-bootstrap-tool-runtime.md runtime-root ownership and side-effect boundary
 # downstream implementation ../dispatch/agent-canon/src/eval_archive_paths.rs resolves external runtime paths
 # downstream implementation ../dispatch/agent-canon/src/eval_accumulation.rs propagates runtime capabilities to producers
-# downstream implementation ../../../tests/agent_tools/test_runtime_artifacts.py validates source exclusion and atomic writes
+# downstream test ../dispatch/agent-canon/tests/artifacts_native.rs preserves source exclusion and atomic writes
 # @dependency-end
 """Resolve and publish AgentCanon runtime artifacts outside source trees.
 

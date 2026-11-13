@@ -11,7 +11,7 @@ upstream implementation ../../tools/runtime/dispatch/agent-canon/src/runtime_log
 downstream implementation ../../bootstrap.sh host bootstrap entrypoint
 downstream implementation ../../bootstrap/container/image/Dockerfile shared Python, Rust, and native CLI tool image
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/bootstrap_runtime.rs resident container lifecycle and mount registry
-downstream implementation ../../tools/runtime/artifacts/runtime_artifacts.py external runtime artifact boundary
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/runtime_boundary.rs external runtime artifact boundary
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/tool_dispatch.rs native catalog-namespaced typed dispatcher
 downstream implementation ../../tools/runtime/dispatch/agent-canon/tests/bootstrap_runtime_native.rs bootstrap lifecycle and compatibility tests
 downstream implementation ../../.github/workflows/agent-canon-native-release.yml builds and publishes native CLI archives
@@ -115,7 +115,7 @@ Docker label readback で既存 owner を検出し、`shared_runtime_owned_elsew
 ```
 
 Bootstrap lifecycle codeだけが固定された `.runtime/` surfaces を直接管理します。
-`tools/runtime/artifacts/runtime_artifacts.py` は source-local artifact を例外なく拒否し、
+`tools/runtime/dispatch/agent-canon/src/runtime_boundary.rs` は source-local artifact を例外なく拒否し、
 分析 tool は source read-only、telemetry は external root、mutation tool は明示 target
 capability を受けた場合だけ source を変更します。
 

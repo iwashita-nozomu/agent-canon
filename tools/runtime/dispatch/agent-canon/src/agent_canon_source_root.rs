@@ -1,7 +1,7 @@
 // @dependency-start
 // contract implementation
 // responsibility Resolves the current repository root and existing AgentCanon source-root overrides for the hook.
-// upstream implementation ../../../../../tools/runtime/source/agent_canon_source_root.py owns the shared root-resolution contract.
+// upstream implementation ../../../../../tools/runtime/dispatch/agent-canon/src/agent_canon_source_root.rs owns the shared root-resolution contract.
 // downstream implementation ./hook_dispatcher.rs uses the current repository root for hook state.
 // @dependency-end
 //! Read-only source-root selection used by the native hook dispatcher.
@@ -183,4 +183,112 @@ fn env_value(environment: &BTreeMap<String, String>, key: &str) -> String {
         .get(key)
         .map(|value| python_strip(value).to_owned())
         .unwrap_or_default()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn catalog(root: &Path) {
+        let directory = root.join("agents/skills");
+        std::fs::create_dir_all(&directory).expect("create fixture catalog directory");
+        std::fs::write(directory.join("catalog.yaml"), "skills: []\n")
+            .expect("write fixture catalog");
+    }
+
+    #[test]
+    fn standalone_root_discovery_uses_nearest_catalog_and_preserves_layout() {
+        let temporary = tempfile::tempdir().expect("temporary root");
+        let source = temporary.path().join("source");
+        let nested = source.join("tools/runtime");
+        std::fs::create_dir_all(&nested).expect("create nested source path");
+        catalog(&source);
+
+        let roots = resolve_source_roots(&nested, &BTreeMap::new()).expect("standalone roots");
+
+        assert_eq!(
+            roots.current_repository_root,
+            source.canonicalize().unwrap()
+        );
+        assert_eq!(roots.source_root, roots.current_repository_root);
+        assert_eq!(roots.canon_root, roots.current_repository_root);
+        assert_eq!(roots.layout, LAYOUT_STANDALONE);
+    }
+
+    #[test]
+    fn external_overrides_keep_current_source_and_canon_roots_distinct() {
+        let temporary = tempfile::tempdir().expect("temporary root");
+        let current = temporary.path().join("parent");
+        let source = temporary.path().join("development/source");
+        let canon = temporary.path().join("installed/canon");
+        std::fs::create_dir_all(&current).expect("create current root");
+        catalog(&current);
+        catalog(&source);
+        catalog(&canon);
+        let environment = BTreeMap::from([
+            (
+                SOURCE_ROOT_OVERRIDE_ENV.to_owned(),
+                source.display().to_string(),
+            ),
+            (
+                CANON_ROOT_OVERRIDE_ENV.to_owned(),
+                canon.display().to_string(),
+            ),
+        ]);
+
+        let roots = resolve_source_roots(&current, &environment).expect("external roots");
+
+        assert_eq!(
+            roots.current_repository_root,
+            current.canonicalize().unwrap()
+        );
+        assert_eq!(roots.source_root, source.canonicalize().unwrap());
+        assert_eq!(roots.canon_root, canon.canonicalize().unwrap());
+        assert_eq!(roots.layout, LAYOUT_EXTERNAL);
+    }
+
+    #[test]
+    fn missing_override_catalog_returns_the_typed_owner_failure() {
+        let temporary = tempfile::tempdir().expect("temporary root");
+        let current = temporary.path().join("parent");
+        let source = temporary.path().join("source-without-catalog");
+        std::fs::create_dir_all(&current).expect("create current root");
+        catalog(&current);
+        std::fs::create_dir_all(&source).expect("create source root");
+        let environment = BTreeMap::from([(
+            SOURCE_ROOT_OVERRIDE_ENV.to_owned(),
+            source.display().to_string(),
+        )]);
+
+        let failure = resolve_source_roots(&current, &environment).unwrap_err();
+
+        assert_eq!(failure.code, "agent_canon_source_root_override_missing");
+    }
+
+    #[test]
+    fn unregistered_current_root_fails_closed_without_override() {
+        let temporary = tempfile::tempdir().expect("temporary root");
+
+        let failure = resolve_source_roots(temporary.path(), &BTreeMap::new()).unwrap_err();
+
+        assert_eq!(failure.code, "agent_canon_source_root_missing");
+    }
+
+    #[test]
+    fn hook_resolution_returns_only_the_current_root_and_layout() {
+        let temporary = tempfile::tempdir().expect("temporary root");
+        let source = temporary.path().join("source");
+        let nested = source.join("tools/hooks");
+        std::fs::create_dir_all(&nested).expect("create nested source path");
+        catalog(&source);
+
+        let resolution =
+            resolve_agent_canon_source_root(&nested, &BTreeMap::new()).expect("hook source root");
+
+        assert_eq!(
+            resolution.current_repository_root,
+            source.canonicalize().unwrap()
+        );
+        assert_eq!(resolution.layout, LAYOUT_STANDALONE);
+    }
 }

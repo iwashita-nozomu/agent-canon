@@ -139,7 +139,7 @@ path = "tools/agent"
 kind = "dir"
 
 [[profile.required]]
-path = "tools/runtime/lifecycle/update_lifecycle_contract.py"
+path = "tools/runtime/dispatch/agent-canon/src/update_lifecycle_contract.rs"
 kind = "file"
 
 [[profile.required]]

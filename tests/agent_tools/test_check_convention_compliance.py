@@ -337,7 +337,7 @@ path: tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs
         "`tools/bin/agent-canon check-agent-runtime-alignment` |\n"
         "| AgentCanon update transaction | "
         "`documents/agent-canon/agent-canon-update-route.md` | "
-        "`update_lifecycle_contract.py` |\n"
+        "`update_lifecycle_contract.rs` |\n"
     ),
 }
 

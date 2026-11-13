@@ -68,9 +68,9 @@ fn init_repository(root: &Path) {
             .status
             .success()
     );
-    let owner = root.join("tools/runtime/artifacts/artifact_identity.py");
+    let owner = root.join("tools/runtime/dispatch/agent-canon/src/artifacts/artifact_identity.rs");
     fs::create_dir_all(owner.parent().unwrap()).expect("create artifact owner directory");
-    fs::write(&owner, b"# committed fixture owner\n").expect("write owner fixture");
+    fs::write(&owner, b"// committed fixture owner\n").expect("write owner fixture");
     fs::write(root.join("tracked.md"), b"committed bytes\n").expect("write tracked fixture");
     assert!(git(root, &["add", "."]).status.success());
     assert!(git(root, &["commit", "-qm", "fixture"]).status.success());

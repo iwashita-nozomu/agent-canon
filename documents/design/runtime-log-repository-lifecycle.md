@@ -7,7 +7,7 @@ upstream design ../runtime/runtime-log-archive.md reader-facing runtime-log cons
 upstream design ../runtime/runtime-log-archive-migration.md legacy import and migration owner
 upstream design ../../agents/internal-routines/design-implementation-correspondence.md universal design-to-implementation correspondence
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/log_repository_identity.rs stable identity and remote normalization
-downstream implementation ../../tools/runtime/source/agent_canon_source_root.py source-root resolution
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/agent_canon_source_root.rs source-root resolution
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/eval_archive_paths.rs logical archive paths
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/runtime_log_archive.rs archive transaction, snapshot, publication, legacy import, and readback
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/runtime_alignment.rs runtime alignment validation
@@ -27,7 +27,7 @@ downstream implementation ../../tests/agent_tools/test_log_repository_lifecycle.
 | --- | --- | --- | --- |
 | archive policy、stable branch policy、merge attributes、legacy inventory、retention/deletion authority | 外部 `agent-canon-log` PR #4 | policy/schema/retention を推測・複製しない | [PR #4](https://github.com/iwashita-nozomu/agent-canon-log/pull/4)、[merge 9f101301](https://github.com/iwashita-nozomu/agent-canon-log/commit/9f10130184539beaebe8991bbcfb5665d476fbe5) |
 | source identity / remote relationship | `log_repository_identity.rs` と外部 policy | normalized remote-derived identity と override の一致を検証し、remote を provenance として保持する | `normalize_remote`, `stable_source_repository_id`, `source_repository_id_for_write` |
-| source root / logical archive paths | AgentCanon source-root/path owners | path は durable locator、実体は runtime resolve | `agent_canon_source_root.py`, `eval_archive_paths.rs` |
+| source root / logical archive paths | AgentCanon source-root/path owners | path は durable locator、実体は runtime resolve | `agent_canon_source_root.rs`, `eval_archive_paths.rs` |
 | operator preflight | `runtime-log-archive-git` の `ensure`, `status`, `check-clean` | archive clone、fetch、branch、dirty state を準備・観測する。publication transaction は開始しない | CLI parser と `archive_status_summary` |
 | internal sync transaction | `runtime-log-archive-git` | stage→snapshot→commit→compare/rebase/push→readback の順序を実行する | `prepare_archive_transaction`, `stage_archive_paths`, `publish_prepared_archive`, `_compare_and_push`, `_verify_remote_archive_readback` |
 | legacy import / source deletion boundary | import command owner + external policy authority | `--delete-source` は legacy import-only。通常 sync/archive/push/ensure/status では authority がない | `LegacyImportPlan`, `_legacy_import_plan`, `_finalize_legacy_import` |
@@ -185,7 +185,7 @@ tools/bin/agent-canon runtime-log-archive-git check-clean --porcelain
 | design surface | current implementation | current evidence |
 | --- | --- | --- |
 | stable remote normalization / stable ID / branch | [`tools/runtime/dispatch/agent-canon/src/log_repository_identity.rs`](../../tools/runtime/dispatch/agent-canon/src/log_repository_identity.rs) `normalize_remote`, `stable_source_repository_id`, `source_remote`, `source_repository_id_for_write`, `stable_source_id_from_runtime_env` | case-insensitive `.git` normalization, remote-derived override match, typed missing/mismatch preflight, read-only unidentified fallback, lifecycle identity/branch tests |
-| root layout resolution | [`tools/runtime/source/agent_canon_source_root.py`](../../tools/runtime/source/agent_canon_source_root.py) `resolve_agent_canon_source_root` | standalone/vendored/override tests in `test_log_repository_lifecycle.py` |
+| root layout resolution | [`tools/runtime/dispatch/agent-canon/src/agent_canon_source_root.rs`](../../tools/runtime/dispatch/agent-canon/src/agent_canon_source_root.rs) `resolve_source_roots` | standalone/external override tests in the native owner |
 | logical spool/archive paths and metadata | [`tools/runtime/dispatch/agent-canon/src/eval_archive_paths.rs`](../../tools/runtime/dispatch/agent-canon/src/eval_archive_paths.rs) `repo_log_key`, `hook_event_spool_root`, `log_branch_key`, `agent_canon_git_commit_key`, `mounted_log_archive_root` | runtime path and hook hot-path contract tests |
 | operator preflight | [`tools/runtime/dispatch/agent-canon/src/runtime_log_archive.rs`](../../tools/runtime/dispatch/agent-canon/src/runtime_log_archive.rs) CLI `ensure`, `status`, `check-clean`; `archive_status_summary` | branch mismatch, foreign tree, dirty-state tests |
 | internal transaction | same file `prepare_archive_transaction`, `stage_archive_paths`, `snapshot_hook_spool_events`, `publish_prepared_archive`, `_compare_and_push`, `_verify_remote_archive_readback` | stage/snapshot/commit/push/ref/tree/blob readback order and retry tests |
@@ -204,7 +204,7 @@ AgentCanon-log PR #4 (merge `9f101301`) owns archive policy, stable branch polic
 | clause | current/planned implementation owner | exact file / symbol | reverse mapping rule |
 | --- | --- | --- | --- |
 | `RL-001` | current identity adapter; external policy authority | `tools/runtime/dispatch/agent-canon/src/log_repository_identity.rs:normalize_remote`, `:source_remote`, `:source_repository_id_for_write`, `:stable_source_id_from_runtime_env` | remote normalization, override match, missing remote, typed preflight, or relationship changes cite RL-001 and #4 evidence |
-| `RL-002..RL-003` | current root/path/branch owners | `tools/runtime/source/agent_canon_source_root.py`, `tools/runtime/dispatch/agent-canon/src/eval_archive_paths.rs`, `runtime-log-archive-git:build_context` | root marker, logical locator, branch/ref changes cite the relevant clause |
+| `RL-002..RL-003` | current root/path/branch owners | `tools/runtime/dispatch/agent-canon/src/agent_canon_source_root.rs`, `tools/runtime/dispatch/agent-canon/src/eval_archive_paths.rs`, `runtime-log-archive-git:build_context` | root marker, logical locator, branch/ref changes cite the relevant clause |
 | `RL-004` | current preflight and transaction owner | `runtime-log-archive-git` CLI `ensure/status/check-clean`, `prepare_archive_transaction`, `stage_archive_paths`, `publish_prepared_archive`, `_verify_remote_archive_readback` | any preflight/transaction state or order change must preserve the split and exact sequence |
 | `RL-005..RL-006` | current snapshot/archive owner | `runtime-log-archive-git:report_snapshot_digest`, `:snapshot_hook_spool_events`, `:_archive_agent_report_prepared` | bytes, digest, idempotence, collision, or retention-on-failure changes cite clauses |
 | `RL-007..RL-008` | current concurrency/publication/readback owner | `runtime-log-archive-git:acquire_publication_attempt_lock`, `:_compare_and_push`, `:_verify_remote_archive_readback`, `:finalize_hook_spool_readback` | lock/retry/force/readback changes require lifecycle evidence |

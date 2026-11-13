@@ -3,7 +3,6 @@
 // responsibility Owns native immutable update-lifecycle records, binding, and gate-verdict mechanics.
 // upstream design ../../../../../documents/agent-canon/agent-canon-update-route.md owns update lifecycle meaning
 // upstream implementation artifacts/artifact_identity.rs owns canonical JSON bytes and body hashes
-// upstream implementation ../../../../../tools/runtime/lifecycle/update_lifecycle_contract.py remains the full lifecycle owner until later slices migrate
 // upstream implementation ../src/python_json.rs owns Python-compatible DSV text and byte payload parsing
 // downstream implementation ../../../../../tests/agent_tools/test_publication_integrator.py checks gate identity replay stability
 // downstream implementation ../tests/github_publish_native.rs consumes G3 gate verdicts
