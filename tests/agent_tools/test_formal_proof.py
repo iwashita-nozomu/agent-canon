@@ -73,7 +73,7 @@ class FormalProofToolTest(unittest.TestCase):
             {
                 "status": "awaiting_native_receipt",
                 "paths": [
-                    "tools/analysis/proof/jit_canonical_ir.py",
+                    "tools/runtime/dispatch/agent-canon/src/jit_canonical_ir.rs",
                     "generated Lean return projection",
                 ],
             },
@@ -86,14 +86,14 @@ class FormalProofToolTest(unittest.TestCase):
             "JIT boundary",
             "backend runtime",
         }
-        self.assertTrue({"tools/analysis/proof/jit_canonical_ir.py", "lean/"} <= math_forbidden)
+        self.assertTrue({"tools/runtime/dispatch/agent-canon/src/jit_canonical_ir.rs", "lean/"} <= math_forbidden)
         self.assertTrue(forbidden_production_surfaces <= math_forbidden)
         self.assertTrue(forbidden_production_surfaces <= proof_forbidden)
         self.assertTrue(forbidden_production_surfaces.isdisjoint(proof_allowed))
         self.assertTrue(proof_allowed.isdisjoint(math_allowed))
         self.assertEqual(
             failure["producer_surface"],
-            "tools/analysis/proof/jit_canonical_ir.py",
+            "tools/runtime/dispatch/agent-canon/src/jit_canonical_ir.rs",
         )
 
     def test_writes_lean_scaffold_and_search_queries(self) -> None:

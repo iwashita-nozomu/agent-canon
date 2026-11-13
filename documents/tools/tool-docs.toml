@@ -257,33 +257,33 @@ summary = "Tool behavior and performance Lean proof-obligation coverage checker 
 [[tool]]
 id = "jit-canonical-ir"
 classification = "public"
-tool = "tools/analysis/proof/jit_canonical_ir.py"
+tool = "tools/runtime/dispatch/agent-canon/src/jit_canonical_ir.rs"
 doc = "documents/tools/jit_canonical_ir.md"
-language = "python"
+language = "rust"
 summary = "JIT root to StableHLO-derived operational IR and backend trace documentation."
 
 [[tool]]
 id = "cpp-source-canonical-ir"
 classification = "internal"
-tool = "tools/analysis/code/cpp_source_canonical_ir.py"
+tool = "tools/runtime/dispatch/agent-canon/src/cpp_source_canonical_ir.rs"
 doc = "documents/tools/cpp_source_canonical_ir.md"
-language = "python"
+language = "rust"
 summary = "C++ source-only operational IR wrapper documentation."
 
 [[tool]]
 id = "cpp-template-to-lean"
 classification = "public"
-tool = "tools/analysis/proof/cpp_template_to_lean.py"
+tool = "tools/runtime/dispatch/agent-canon/src/cpp_template_to_lean.rs"
 doc = "documents/tools/cpp_template_to_lean.md"
-language = "python"
+language = "rust"
 summary = "Full C++ template source root to complete Lean evidence route documentation."
 
 [[tool]]
 id = "operational-ir-to-lean"
 classification = "internal"
-tool = "tools/analysis/proof/operational_ir_to_lean.py"
+tool = "tools/runtime/dispatch/agent-canon/src/operational_ir_to_lean.rs"
 doc = "documents/tools/operational_ir_to_lean.md"
-language = "python"
+language = "rust"
 summary = "Shared thin operational IR to Lean evidence renderer documentation."
 
 [[tool]]

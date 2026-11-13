@@ -1112,7 +1112,7 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
                 "tools/experiments/execution/execution_resource_plan.py",
                 "tools/experiments/execution/run_managed_experiment.py",
                 "tools/runtime/dispatch/agent-canon/src/experiment_registry/store.rs",
-                "tools/analysis/proof/jit_canonical_ir.py",
+                "tools/runtime/dispatch/agent-canon/src/jit_canonical_ir.rs",
                 "experiments/registry.toml",
                 "experiments/topic/cases.py",
             ):
@@ -1135,7 +1135,7 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
                 "tools/experiments/execution/execution_resource_plan.py",
                 "tools/experiments/execution/run_managed_experiment.py",
                 "tools/runtime/dispatch/agent-canon/src/experiment_registry/store.rs",
-                "tools/analysis/proof/jit_canonical_ir.py",
+                "tools/runtime/dispatch/agent-canon/src/jit_canonical_ir.rs",
                 "experiments/topic/run.py",
             ):
                 path = root / relative_path

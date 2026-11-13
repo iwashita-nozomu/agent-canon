@@ -11,10 +11,10 @@ upstream design literature-survey.md source search and bibliography workflow.
 upstream design research-workflow.md external research and implementation loop.
 upstream implementation ../../tools/runtime/dispatch/agent-canon/src/lean_proof_env.rs creates Lean proof-search, theorem-search, and counterexample environments.
 upstream design ../../documents/tools/lean_capability_matrix.md routes Lean/Mathlib/Aesop/Plausible/LeanSearchClient capabilities by proof-frontier shape.
-upstream implementation ../../tools/analysis/proof/jit_canonical_ir.py extracts StableHLO-derived thin operational IR and backend traces.
-upstream implementation ../../tools/analysis/code/cpp_source_canonical_ir.py extracts C++ source-canonical IR into thin operational IR.
-upstream implementation ../../tools/analysis/proof/operational_ir_to_lean.py renders thin operational IR into Lean evidence definitions.
-upstream implementation ../../tools/analysis/proof/cpp_template_to_lean.py fully expands C++ template roots into Lean evidence.
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/jit_canonical_ir.rs extracts StableHLO-derived thin operational IR and backend traces.
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/cpp_source_canonical_ir.rs extracts C++ source-canonical IR into thin operational IR.
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/operational_ir_to_lean.rs renders thin operational IR into Lean evidence definitions.
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/cpp_template_to_lean.rs fully expands C++ template roots into Lean evidence.
 upstream implementation ../../tools/runtime/dispatch/agent-canon/src/jit_ir_to_lean.rs lowers JIT-canonical IR into Lean evidence modules.
 upstream design ../../references/agent-canon-technology-bibliography.md records proof-assistant references.
 downstream implementation ../../.codex/personal/skills/formal-proof-workflow/SKILL.md exposes the skill to Codex.

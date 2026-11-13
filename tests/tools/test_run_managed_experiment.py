@@ -1175,9 +1175,11 @@ def test_public_alternate_gpu_routes_are_typed_or_managed() -> None:
     jit_source = (
         Path(__file__).resolve().parents[2]
         / "tools"
-        / "analysis"
-        / "proof"
-        / "jit_canonical_ir.py"
+        / "runtime"
+        / "dispatch"
+        / "agent-canon"
+        / "src"
+        / "jit_canonical_ir.rs"
     ).read_text(encoding="utf-8")
     planner_source = (
         Path(__file__).resolve().parents[2]

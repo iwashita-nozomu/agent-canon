@@ -106,8 +106,9 @@ mod tool_rejection_preflight;
 #[cfg(not(test))]
 use agent_canon::runtime_boundary;
 use agent_canon::{
-    catalog, codex_runtime_summary, compare_agent_run_paths, entrypoint_composer, extract_docx,
-    formal_proof, generated_completeness, lean_recursive_proof_search, native_release,
+    catalog, codex_runtime_summary, compare_agent_run_paths, cpp_source_canonical_ir,
+    cpp_template_to_lean, entrypoint_composer, extract_docx, formal_proof, generated_completeness,
+    jit_canonical_ir, lean_recursive_proof_search, native_release, operational_ir_to_lean,
     report_artifact_checks, run_evaluation, stablehlo_value_closure, template_bundle,
     theorem_graph_board, theorem_graph_circularity_check, tool_dispatch, tool_proof_coverage,
 };
@@ -146,6 +147,10 @@ Commands:
   tool-rejection-preflight [paths...] [--root <repo-root>] [--changed] [--format text|json]
   check-merge-structure --source <ref> [--target <ref>] [--compare-commit <ref>] [--repo-root <path>]
   jit-ir-to-lean --jit-ir <path> --namespace <Lean.Namespace> --out <path>
+  operational-ir-to-lean --ir <path> --namespace <Lean.Namespace> [options]
+  jit-canonical-ir --python-symbol PATH::QUALNAME --input-factory PATH::QUALNAME --out PATH [options]
+  cpp-source-canonical-ir --root ROOT --cpp-symbol PATH::QUALNAME [--format json|markdown|text] [--out PATH]
+  cpp-template-to-lean --root ROOT --cpp-symbol PATH::QUALNAME --namespace NAMESPACE [options]
   log-surface-inventory [--root <repo-root>] [--format text|json] [--output <path>] [--check --baseline <path>]
   stablehlo-value-closure --ir <path> --function NAME --value SSA [--region-id ID] [--max-nodes N] [--format text|json]
   theorem-graph-circularity-check --graph <path> [--out <path>] [--format text|json|markdown] [--fail-on-finding]
@@ -296,6 +301,18 @@ fn main() {
 
     if args.len() >= 2 && args[1] == stablehlo_value_closure::SELECTOR {
         std::process::exit(stablehlo_value_closure::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == jit_canonical_ir::SELECTOR {
+        std::process::exit(jit_canonical_ir::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == cpp_source_canonical_ir::SELECTOR {
+        std::process::exit(cpp_source_canonical_ir::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == cpp_template_to_lean::SELECTOR {
+        std::process::exit(cpp_template_to_lean::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == theorem_graph_circularity_check::SELECTOR {
@@ -589,6 +606,10 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "jit-ir-to-lean" {
         std::process::exit(jit_ir_to_lean::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == operational_ir_to_lean::SELECTOR {
+        std::process::exit(operational_ir_to_lean::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "jsonl-to-md" {
