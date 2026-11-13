@@ -2434,8 +2434,12 @@ mod tests {
 
         let (graph, markdown, json_path, evidence) =
             write_graph_artifacts(temp.path(), &options).expect("write external graph pair");
-        assert!(markdown.starts_with(runtime.path()));
-        assert!(json_path.starts_with(runtime.path()));
+        let runtime_path = runtime
+            .path()
+            .canonicalize()
+            .expect("canonical runtime root");
+        assert!(markdown.starts_with(&runtime_path));
+        assert!(json_path.starts_with(&runtime_path));
         assert!(markdown.is_file());
         assert!(json_path.is_file());
         assert!(evidence.is_none());
@@ -2494,8 +2498,17 @@ mod tests {
 
         let (graph, markdown, json_path, evidence) =
             write_graph_artifacts(temp.path(), &options).expect("write tracked graph pair");
-        assert_eq!(markdown, temp.path().join(GRAPH_MARKDOWN_PATH));
-        assert_eq!(json_path, temp.path().join(GRAPH_JSON_PATH));
+        assert_eq!(
+            markdown,
+            temp.path()
+                .join(GRAPH_MARKDOWN_PATH)
+                .canonicalize()
+                .unwrap()
+        );
+        assert_eq!(
+            json_path,
+            temp.path().join(GRAPH_JSON_PATH).canonicalize().unwrap()
+        );
         assert_eq!(
             fs::read(&markdown).expect("read updated graph markdown"),
             render_graph_mermaid(&graph)
