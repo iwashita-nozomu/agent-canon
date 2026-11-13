@@ -101,20 +101,20 @@ class CheckToolCatalogTest(unittest.TestCase):
 
         self.assertEqual(
             managed["path"],
-            "tools/experiments/execution/run_managed_experiment.py",
+            "tools/runtime/dispatch/agent-canon/src/managed_experiment.rs",
         )
         self.assertEqual(
             managed["command"],
-            "python3 -m tools.experiments.execution.run_managed_experiment",
+            "tools/bin/agent-canon run-managed-experiment",
         )
         self.assertIn(
-            "tests/tools/test_run_managed_experiment.py",
+            "tools/runtime/dispatch/agent-canon/tests/managed_experiment_native.rs",
             managed["tests"],
         )
         self.assertFalse(
             any(
                 entry["path"]
-                == "tools/experiments/execution/execution_resource_plan.py"
+                == "tools/runtime/dispatch/agent-canon/src/execution_resource_plan.rs"
                 for entry in catalog["entries"]
             )
         )

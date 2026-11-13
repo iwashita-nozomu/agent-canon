@@ -460,7 +460,7 @@ class ToolRejectionPreflightTest(unittest.TestCase):
                 str(PROJECT_ROOT),
                 "--format",
                 "json",
-                "tools/experiments/execution/run_managed_experiment.py",
+                "tools/runtime/dispatch/agent-canon/src/managed_experiment.rs",
                 "tools/runtime/dispatch/agent-canon/src/experiment_registry.rs",
                 "tools/runtime/dispatch/agent-canon/src/experiment_registry/store.rs",
                 "documents/experiments/experiment-registry.md",
@@ -480,7 +480,7 @@ class ToolRejectionPreflightTest(unittest.TestCase):
         self.assertEqual(
             guarded_paths,
             {
-                "tools/experiments/execution/run_managed_experiment.py",
+                "tools/runtime/dispatch/agent-canon/src/managed_experiment.rs",
                 "tools/runtime/dispatch/agent-canon/src/experiment_registry.rs",
                 "tools/runtime/dispatch/agent-canon/src/experiment_registry/store.rs",
                 "documents/experiments/experiment-registry.md",
@@ -496,7 +496,7 @@ class ToolRejectionPreflightTest(unittest.TestCase):
             "tools/bin/agent-canon experiment-registry",
             guarded_gate["command"],
         )
-        self.assertIn("test_run_managed_experiment.py", guarded_gate["command"])
+        self.assertIn("managed_experiment_native", guarded_gate["command"])
         self.assertIn("$experiment-lifecycle", guarded_gate["handoff"])
         self.assertIn("$test-design", guarded_gate["handoff"])
 

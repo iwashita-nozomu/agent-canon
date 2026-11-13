@@ -9,8 +9,8 @@
 # downstream implementation tools/analysis/documents/prose_reasoning_graph.py creates prose graph DBs under the explicit external runtime
 # downstream environment agents/skills/gpu-execution.md routes the audited provider identity
 # downstream environment documents/tools/dependency-tools-and-licenses.md projects environment tool ownership for readers
-# downstream environment tests/tools/test_run_managed_experiment.py verifies provider identity binding
-# downstream environment tools/experiments/execution/run_managed_experiment.py binds the audited external provider identity
+# downstream environment tools/runtime/dispatch/agent-canon/tests/managed_experiment_native.rs verifies provider identity binding
+# downstream environment tools/runtime/dispatch/agent-canon/src/managed_experiment.rs binds the audited external provider identity
 # @dependency-end
 
 manifest_kind = "agent_canon_environment"

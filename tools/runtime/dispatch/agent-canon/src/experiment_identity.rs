@@ -179,3 +179,75 @@ pub fn validate_segment(value: &str, field: &str) -> Result<(), String> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn identity_round_trips_through_the_nested_v2_wire_shape() {
+        let identity = ExperimentIdentity::new("topic.v1", "formal", "run.3").unwrap();
+        let value = identity.to_value();
+        assert_eq!(value["identity"]["schema"], IDENTITY_SCHEMA);
+        assert_eq!(ExperimentIdentity::from_value(&value).unwrap(), identity);
+        assert_eq!(
+            identity.result_relative_path(),
+            PathBuf::from("experiments/topic.v1/result/run.3")
+        );
+        assert_eq!(
+            identity.raw_relative_path(),
+            PathBuf::from("experiments/topic.v1/result/run.3/raw")
+        );
+        assert_eq!(
+            identity.report_relative_path(),
+            PathBuf::from("experiments/topic.v1/report/run.3.md")
+        );
+    }
+
+    #[test]
+    fn identity_segments_reject_traversal_separators_whitespace_and_normalization() {
+        for value in ["", ".", "..", "a/b", "a\\b", "a b", "a\0b", "Ａ"] {
+            assert!(
+                ExperimentIdentity::new(value, "formal", "run").is_err(),
+                "{value:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn raw_path_inverse_accepts_only_the_complete_canonical_shape() {
+        let identity = ExperimentIdentity::new("demo", "formal", "run-a").unwrap();
+        assert_eq!(
+            ExperimentIdentity::from_raw_relative_path(&identity.raw_relative_path(), "formal")
+                .unwrap(),
+            identity
+        );
+        for path in [
+            Path::new("experiments/demo/result/run-a"),
+            Path::new("experiments/demo/result/run-a/summary"),
+            Path::new("experiments/demo/result/run-a/raw/extra"),
+            Path::new("../experiments/demo/result/run-a/raw"),
+        ] {
+            assert!(ExperimentIdentity::from_raw_relative_path(path, "formal").is_err());
+        }
+    }
+
+    #[test]
+    fn identity_payload_rejects_top_level_duplicates() {
+        let mut value = ExperimentIdentity::new("demo", "formal", "run-a")
+            .unwrap()
+            .to_value();
+        value["topic"] = json!("demo");
+        assert!(ExperimentIdentity::from_value(&value).is_err());
+    }
+
+    #[test]
+    fn strict_json_identity_input_rejects_nested_and_outer_duplicate_keys() {
+        for input in [
+            r#"{"identity":{"schema":"agentcanon.experiment-run-identity/v2","schema":"agentcanon.experiment-run-identity/v2","topic":"topic","variant":"variant","run_name":"run"}}"#,
+            r#"{"identity":{"schema":"agentcanon.experiment-run-identity/v2","topic":"topic","variant":"variant","run_name":"run"},"identity":{"schema":"agentcanon.experiment-run-identity/v2","topic":"topic","variant":"variant","run_name":"run"}}"#,
+        ] {
+            assert!(crate::python_json::parse_json_reject_duplicates(input).is_err());
+        }
+    }
+}

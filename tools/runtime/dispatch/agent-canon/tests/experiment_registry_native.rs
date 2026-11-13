@@ -72,6 +72,10 @@ fn build_repo() -> RepoFixture {
     let temp = tempfile::tempdir().expect("temporary registry repo creates");
     let root = fs::canonicalize(temp.path()).expect("fixture root resolves platform aliases");
     copy_fixture_tree(&fixture_root(), &root);
+    let managed_owner = root.join("tools/runtime/dispatch/agent-canon/src/managed_experiment.rs");
+    fs::create_dir_all(managed_owner.parent().expect("managed owner has parent"))
+        .expect("managed owner fixture parent creates");
+    fs::write(&managed_owner, "// registry path fixture\n").expect("managed owner fixture writes");
     fs::rename(
         root.join("registry.toml"),
         root.join("experiments/registry.toml"),
@@ -306,7 +310,7 @@ fn inner_commands_must_not_reenter_the_managed_runner() {
     replace_registry(
         &repo,
         "default_inner_command = \"python3 experiments/demo_topic/run.py --run-dir {run_dir} --config {config_path} --mode default\"",
-        "default_inner_command = \"python3 -m tools.experiments.execution.run_managed_experiment --topic demo_topic --variant default\"",
+        "default_inner_command = \"tools/bin/agent-canon run-managed-experiment --topic demo_topic --variant default\"",
     );
 
     let output = run_cli(&repo, &[]);
