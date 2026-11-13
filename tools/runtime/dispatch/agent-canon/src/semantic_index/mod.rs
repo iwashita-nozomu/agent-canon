@@ -14,10 +14,10 @@ mod embedding;
 mod eval;
 mod model;
 mod pipeline;
-pub(crate) mod semantic_provider_html_report;
 mod query;
 mod relations;
 mod report;
+pub(crate) mod semantic_provider_html_report;
 mod source;
 mod storage;
 
