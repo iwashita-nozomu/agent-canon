@@ -4,7 +4,7 @@ contract agent-runtime
 responsibility Documents legacy eval manifest path compatibility for this repository.
 upstream design ../../eval/README.md evidence directory ownership
 upstream design ../../eval/definitions/README.md canonical eval manifest source
-downstream implementation ../../eval/checkers/eval_manifest_paths.py resolves legacy manifest paths
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/eval_manifest_paths.rs resolves legacy manifest paths
 downstream implementation ../../templates/documents/github/issue/eval-capture.yml captures eval issues.
 downstream implementation ../../documents/operations/issue-label-taxonomy.md defines eval labels and routing.
 @dependency-end

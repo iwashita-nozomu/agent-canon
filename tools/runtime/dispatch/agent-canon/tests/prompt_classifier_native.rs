@@ -190,6 +190,26 @@ fn signals_value(signals: &PromptIntakeSignals) -> JsonValue {
     ]))
 }
 
+fn classify_without_context(prompt_text: &str) -> PromptIntakeSignals {
+    let prompt = JsonString::from_text(prompt_text);
+    let repo_root = PathBuf::from(".");
+    let empty_context = JsonValue::Object(JsonObject(Vec::new()));
+    let lanes = Vec::<SkillLaneEvidence>::new();
+    let validation_repair = Vec::<JsonString>::new();
+    prompt_intake_signals(&PromptClassifierInputs {
+        prompt: &prompt,
+        repo_root: &repo_root,
+        catalog: &empty_context,
+        routing_rules: &empty_context,
+        structural_lane_evidence: &lanes,
+        validation_repair_evidence: &validation_repair,
+    })
+}
+
+fn has_text(values: &[JsonString], expected: &str) -> bool {
+    values.iter().any(|value| value.equals_text(expected))
+}
+
 fn skill_set(value: &JsonValue) -> BTreeSet<Vec<u32>> {
     array(value)
         .expect("skills are an array")
@@ -311,6 +331,141 @@ fn prompt_classifier_matches_frozen_cpython_outputs_and_order_contract() {
                 );
             }
             other => panic!("unknown skills comparison contract {other:?} for {name}"),
+        }
+    }
+}
+
+#[test]
+fn prompt_classifier_preserves_direct_python_classifier_cases() {
+    let cases: &[(&str, &str, &[&str], &[&str])] = &[
+        (
+            "validation-repair",
+            "failed validation; do not delete tests or weaken oracle before repairing the failing contract",
+            &[],
+            &[],
+        ),
+        (
+            "declared-skill",
+            "Use $codex-task-workflow for a validation failure; do not delete tests or weaken the oracle.",
+            &["codex-task-workflow"],
+            &["codex-task-workflow"],
+        ),
+        (
+            "oracle-mismatch",
+            "The test oracle has a spec mismatch; fix test design.",
+            &[],
+            &[],
+        ),
+        (
+            "user-guided-debugging",
+            "Use user-guided refactor cadence: show one concrete issue, patch only that target, and do not run validation unless I ask.",
+            &[],
+            &["user-guided-debugging"],
+        ),
+        (
+            "ordinary-docs",
+            "Please update the docs; no validation unless asked.",
+            &[],
+            &["user-guided-debugging"],
+        ),
+        (
+            "parent-repo-skill-lane",
+            "親レポに固有スキルを置けるようにする設計修正",
+            &[],
+            &["task-routing", "structure-refactor"],
+        ),
+        (
+            "advisory-routing",
+            "Which route contract applies for this repository task?",
+            &[],
+            &["codex-task-workflow"],
+        ),
+    ];
+
+    for (name, prompt, expected_selected, forbidden_candidates) in cases {
+        let signals = classify_without_context(prompt);
+        for expected in *expected_selected {
+            assert!(
+                has_text(&signals.skills, expected),
+                "selected {expected} in {name}"
+            );
+        }
+        for forbidden in *forbidden_candidates {
+            assert!(
+                !has_text(&signals.candidate_skills, forbidden),
+                "unexpected candidate {forbidden} in {name}"
+            );
+        }
+    }
+}
+
+#[test]
+fn prompt_classifier_preserves_focused_python_routing_oracles() {
+    let declared = classify_without_context("use $task-routing");
+    assert_eq!(declared.skills, vec![JsonString::from_text("task-routing")]);
+
+    for prompt in [
+        "Use the parent/same-repository branch with linked-worktree for the AgentCanon update.",
+        "Use the dependency repository's independent-clone for the AgentCanon update.",
+    ] {
+        let signals = classify_without_context(prompt);
+        assert!(has_text(&signals.candidate_workflows, "agent-canon-update"));
+        assert!(has_text(
+            &signals.candidate_workflows,
+            "agent-canon-update-route"
+        ));
+    }
+
+    let refactor = classify_without_context(
+        "複数の関係ファイルに及ぶ routing evaluator refactor を既存 oracle と一致させて",
+    );
+    assert!(has_text(&refactor.candidate_workflows, "large-delivery"));
+    assert!(has_text(&refactor.candidate_skills, "refactor-loop"));
+}
+
+#[test]
+fn experiment_wrapper_removal_route_inputs_keep_direct_owner_oracles() {
+    let cases: &[(&str, &str, &[&str], &[&str])] = &[
+        (
+            "existing-html-results",
+            "Render the existing experiment results as a browser-readable HTML page",
+            &["html-output"],
+            &["experiment-lifecycle"],
+        ),
+        (
+            "rerun-and-render-html",
+            "Rerun the experiment and render its result as a browser-readable HTML page",
+            &["experiment-lifecycle", "html-output"],
+            &[],
+        ),
+        (
+            "persist-experiment-artifacts",
+            "Persist experiment artifact evidence without writing a report",
+            &["experiment-lifecycle", "result-artifact-writeout"],
+            &[],
+        ),
+    ];
+    let removed = ["html-experiment-report", "save-experiment-results"];
+
+    for (name, prompt, expected_candidates, forbidden_candidates) in cases {
+        let signals = classify_without_context(prompt);
+        for expected in *expected_candidates {
+            assert!(
+                has_text(&signals.candidate_skills, expected),
+                "missing candidate {expected} in {name}"
+            );
+        }
+        for forbidden in *forbidden_candidates {
+            assert!(
+                !has_text(&signals.candidate_skills, forbidden),
+                "unexpected candidate {forbidden} in {name}"
+            );
+        }
+        for retired in removed {
+            assert!(
+                !has_text(&signals.candidate_skills, retired),
+                "retired candidate {retired} in {name}"
+            );
         }
     }
 }

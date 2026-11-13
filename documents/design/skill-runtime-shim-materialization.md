@@ -491,7 +491,7 @@ route golden は実在する `eval/definitions/workflow_selection_eval.toml` の
 `expected_case_count=525`、`expected_generated_case_count=525` を読み、manifest loader
 が展開した 525 cases の固定 prompt を、実在する `route.py` の CLI または
 `load_skill_route_rules` + `decide_skills` + `RouteRenderer("json")` の実在関数へ直接
-渡す golden producer に接続します。`evaluate_workflow_selection.py` や
+渡す golden producer に接続します。`workflow_selection_eval.rs` や
 `.codex/hooks/skill_usage_logger.py` を route golden の判定器として呼びません。
 
 golden producer の各 case output は次の exact schema です。success/failure の全 field
@@ -574,15 +574,15 @@ host-provided system skill delegation
 この probe は新しい routing keyword を追加するためではなく、既存 catalog route が
 shim body の短縮に影響されないことを確認するためだけに使います。
 
-525-case workflow-selection evidence remains a separate deterministic evaluator owned by
-`eval/producers/evaluate_workflow_selection.py`, whose current implementation loads
-`.codex/hooks/skill_usage_logger.py` and records workflow-selection evidence. That evaluator
-and its logger are not the route golden producer and are not the shim routing owner.
+The native workflow-selection owner expands the frozen 525-case manifest and
+compares the existing classifier's results with its expected values.
+`skill_shim_evaluation.py` obtains those same manifest cases through the native
+read-only `workflow-selection-manifest` bridge and runs the route CLI.
 
 決定論評価の実在 CLI は次です。
 
 ~~~bash
-python3 eval/producers/evaluate_workflow_selection.py \
+tools/bin/agent-canon evaluate-workflow-selection \
   --root . --manifest eval/definitions/workflow_selection_eval.toml \
   --report-out <run-dir>/workflow-selection.md
 ~~~
@@ -600,8 +600,7 @@ python3 tools/agent/orchestration/route.py --root . --prompt-file <case-prompt-f
 in-process 版を選ぶ場合も、同じ `route.py` の
 `load_skill_route_rules(...)`、`decide_skills(...)`、`RouteRenderer("json")` を直接
 呼び、別の route classifier を作りません。planned producer の出力は上記
-`RouteGoldenCase` exact schema とし、`evaluate_workflow_selection.py` の logger-based
-result を route JSON に変換しません。
+`RouteGoldenCase` schema を使い、route CLI の実出力を保存します。
 
 ## Prompt Token Reduction and Fresh gpt-5.4-mini Evaluation
 
@@ -852,7 +851,7 @@ python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py
 tools/bin/agent-canon check-skill-frontmatter --root .
 python3 tools/agent/skills/skill_dependency_map.py check --root .
 python3 tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs --root .
-python3 eval/producers/evaluate_workflow_selection.py \
+tools/bin/agent-canon evaluate-workflow-selection \
   --root . --manifest eval/definitions/workflow_selection_eval.toml \
   --report-out <run-dir>/workflow-selection.md
 ~~~

@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests workflow selection eval behavior.
-# upstream implementation ../../eval/producers/evaluate_workflow_selection.py runs workflow selection evals
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/workflow_selection_eval.rs runs workflow selection evals
 # upstream design ../../eval/definitions/workflow_selection_eval.toml defines canonical workflow selection cases
 # @dependency-end
 
@@ -12,16 +12,18 @@ from __future__ import annotations
 import hashlib
 import os
 import subprocess
-import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "eval" / "producers" / "evaluate_workflow_selection.py"
-sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-from eval.producers.evaluate_workflow_selection import load_manifest  # noqa: E402
-from tools.runtime.archive.runtime_log_paths import mounted_log_archive_root  # noqa: E402
+
+
+def native_cli() -> str:
+    selected_cli = os.environ.get("AGENT_CANON_CLI")
+    if not selected_cli:
+        raise RuntimeError("AGENT_CANON_CLI must select the current native executable")
+    return selected_cli
 
 
 class EvaluateWorkflowSelectionTest(unittest.TestCase):
@@ -31,11 +33,12 @@ class EvaluateWorkflowSelectionTest(unittest.TestCase):
         """The canonical workflow selection manifest should pass."""
         result = subprocess.run(
             [
-                sys.executable,
-                str(SCRIPT),
+                native_cli(),
+                "evaluate-workflow-selection",
                 "--root",
                 str(PROJECT_ROOT),
             ],
+            cwd=PROJECT_ROOT,
             check=False,
             capture_output=True,
             text=True,
@@ -48,79 +51,6 @@ class EvaluateWorkflowSelectionTest(unittest.TestCase):
         self.assertIn("WORKFLOW_SELECTION_EVAL_GENERATED_CASES=525", result.stdout)
         self.assertIn("WORKFLOW_SELECTION_EVAL_COUNT_FAILURES=none", result.stdout)
 
-    def test_current_manifest_expands_required_task_groups(self) -> None:
-        """The canonical manifest should expand to 21 stable 25-case groups."""
-        manifest = load_manifest(
-            PROJECT_ROOT / "eval" / "definitions" / "workflow_selection_eval.toml"
-        )
-        expected_groups = {
-            "routing-advisory",
-            "scoped-lite-code",
-            "scoped-change-behavior",
-            "validation-failure-cause-analysis",
-            "docs-structure",
-            "markdown-style",
-            "large-refactor",
-            "platform-environment",
-            "research-benchmark",
-            "adaptive-loop",
-            "computational-optimization",
-            "experiment-html-report",
-            "tool-finding-report",
-            "agent-log-analysis",
-            "agent-canon-update",
-            "pr-processing",
-            "repo-structure-drift",
-            "academic-paper",
-            "oop-readability",
-            "user-guided-debugging",
-            "run-report-archive",
-        }
-
-        self.assertEqual(len(manifest.cases), 525)
-        self.assertEqual(manifest.generated_case_count, 525)
-        self.assertEqual(manifest.expected_case_count, 525)
-        self.assertEqual(manifest.expected_generated_case_count, 525)
-        self.assertEqual(manifest.count_failures, ())
-        self.assertEqual({case.group_id for case in manifest.cases}, expected_groups)
-        for group_id in expected_groups:
-            self.assertEqual(
-                sum(1 for case in manifest.cases if case.group_id == group_id),
-                25,
-                group_id,
-            )
-        docs_cases = [
-            case for case in manifest.cases if case.group_id == "docs-structure"
-        ]
-        large_cases = [
-            case for case in manifest.cases if case.group_id == "large-refactor"
-        ]
-        validation_cases = [
-            case
-            for case in manifest.cases
-            if case.group_id == "validation-failure-cause-analysis"
-        ]
-        self.assertTrue(
-            all(
-                {"structure-planning", "prose-reasoning-graph"}.issubset(
-                    case.expected_skills
-                )
-                for case in docs_cases
-            )
-        )
-        self.assertTrue(
-            all(case.expected_skills == ("refactor-loop",) for case in large_cases)
-        )
-        self.assertTrue(
-            all(
-                "codex-task-workflow" in case.expected_skills
-                for case in validation_cases
-            )
-        )
-        self.assertTrue(
-            all("test-design" not in case.expected_skills for case in validation_cases)
-        )
-
     def test_accumulates_unique_report_without_prompt_text(self) -> None:
         """Accumulated reports should be uniquely named and not copy raw prompts."""
         source_run_id = "source-run-42"
@@ -130,13 +60,13 @@ class EvaluateWorkflowSelectionTest(unittest.TestCase):
             runtime_root = temp_root / "runtime"
             self.copy_runtime_fixture(root)
             before = self.snapshot_tree(root)
-            archive_root = mounted_log_archive_root(root, runtime_root)
+            archive_root = runtime_root / "archive" / "agent-canon-log"
             archive_root.mkdir(parents=True)
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(SCRIPT),
+                    native_cli(),
+                    "evaluate-workflow-selection",
                     "--root",
                     str(root),
                     "--runtime-root",
@@ -145,6 +75,7 @@ class EvaluateWorkflowSelectionTest(unittest.TestCase):
                     "--run-id",
                     source_run_id,
                 ],
+                cwd=PROJECT_ROOT,
                 check=False,
                 capture_output=True,
                 text=True,
@@ -203,11 +134,12 @@ class EvaluateWorkflowSelectionTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(SCRIPT),
+                    native_cli(),
+                    "evaluate-workflow-selection",
                     "--root",
                     str(root),
                 ],
+                cwd=PROJECT_ROOT,
                 check=False,
                 capture_output=True,
                 text=True,
@@ -242,11 +174,12 @@ class EvaluateWorkflowSelectionTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(SCRIPT),
+                    native_cli(),
+                    "evaluate-workflow-selection",
                     "--root",
                     str(root),
                 ],
+                cwd=PROJECT_ROOT,
                 check=False,
                 capture_output=True,
                 text=True,
@@ -284,11 +217,12 @@ class EvaluateWorkflowSelectionTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(SCRIPT),
+                    native_cli(),
+                    "evaluate-workflow-selection",
                     "--root",
                     str(root),
                 ],
+                cwd=PROJECT_ROOT,
                 check=False,
                 capture_output=True,
                 text=True,
@@ -303,12 +237,8 @@ class EvaluateWorkflowSelectionTest(unittest.TestCase):
         self.assertIn("WORKFLOW_SELECTION_EVAL_STATUS=fail", result.stdout)
 
     def copy_runtime_fixture(self, root: Path) -> None:
-        """Copy the classifier and manifest needed by the eval runner."""
-        for relative in (
-            "tools/agent/orchestration/prompt_classifier.py",
-            "tools/agent/skills/skill_lane_detector.py",
-            "eval/definitions/workflow_selection_eval.toml",
-        ):
+        """Copy the controlled manifest input for the native eval CLI."""
+        for relative in ("eval/definitions/workflow_selection_eval.toml",):
             source = PROJECT_ROOT / relative
             destination = root / relative
             destination.parent.mkdir(parents=True, exist_ok=True)

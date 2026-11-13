@@ -17,7 +17,7 @@
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/eval_accumulation_check.rs validates eval result accumulation
 # upstream implementation ../../../runtime/archive/runtime_log_archive_git.py manages mounted hook/eval log archive branches
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/skill_frontmatter.rs validates runtime skill YAML frontmatter
-# upstream implementation ../../../../eval/producers/evaluate_workflow_selection.py validates workflow selection routing cases
+# upstream implementation ../../../runtime/dispatch/agent-canon/src/workflow_selection_eval.rs validates workflow selection routing cases
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/github_workflow_check.rs validates GitHub workflow and PR checklist contracts
 # upstream implementation ../../../../bootstrap/container/image/Dockerfile defines the shared tool image
 # upstream implementation ../../../runtime/container/bootstrap_runtime.py owns lifecycle readback

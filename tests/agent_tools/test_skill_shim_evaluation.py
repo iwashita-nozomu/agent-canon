@@ -78,12 +78,12 @@ class SkillShimEvaluationTest(unittest.TestCase):
                     "--model",
                     "gpt-5.4-mini",
                     "--manifest",
+                    str(PROJECT_ROOT / "eval/definitions/skill_runtime_shim_eval.toml"),
+                    "--host-evaluation-dir",
                     str(
                         PROJECT_ROOT
-                        / "eval/definitions/skill_runtime_shim_eval.toml"
+                        / "tests/fixtures/skill-runtime-shim/host-evaluations"
                     ),
-                    "--host-evaluation-dir",
-                    str(PROJECT_ROOT / "tests/fixtures/skill-runtime-shim/host-evaluations"),
                     "--output",
                     str(output),
                 ],
@@ -95,14 +95,18 @@ class SkillShimEvaluationTest(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             payload = json.loads(output.read_text(encoding="utf-8"))
-            self.assertEqual(payload["schema"], "agent_canon.skill_runtime_shim.measurement")
+            self.assertEqual(
+                payload["schema"], "agent_canon.skill_runtime_shim.measurement"
+            )
             self.assertEqual(payload["summary"]["scenario_row_count"], 12)
             context = build_context(PROJECT_ROOT)
             self.assertEqual(
                 payload["summary"]["candidate_row_count"],
                 2 * len(context.skill_ids) + payload["summary"]["scenario_row_count"],
             )
-            self.assertEqual(payload["summary"]["deterministic_reduction_status"], "pass")
+            self.assertEqual(
+                payload["summary"]["deterministic_reduction_status"], "pass"
+            )
             self.assertEqual(
                 payload["summary"]["paired_reduction_row_count"],
                 len(context.skill_ids) + payload["summary"]["scenario_row_count"] // 2,
@@ -138,6 +142,19 @@ def test_route_golden_uses_external_runtime_receipt(tmp_path: Path) -> None:
 
     def fake_run(args, **kwargs):
         command = list(args)
+        if "workflow-selection-manifest" in command:
+            return subprocess.CompletedProcess(
+                args,
+                0,
+                json.dumps(
+                    {
+                        "expected_case_count": manifest.expected_case_count,
+                        "expected_generated_case_count": manifest.expected_generated_case_count,
+                        "cases": [vars(case) for case in manifest.cases],
+                    }
+                ).encode(),
+                b"",
+            )
         if "--prompt-file" in command:
             prompt_path = Path(command[command.index("--prompt-file") + 1])
             assert prompt_path.is_relative_to(runtime_root)
@@ -149,11 +166,14 @@ def test_route_golden_uses_external_runtime_receipt(tmp_path: Path) -> None:
             )
         return original_run(args, **kwargs)
 
-    with mock.patch.dict(
-        os.environ, {"AGENT_CANON_RUNTIME_ROOT": str(runtime_root)}, clear=False
-    ), mock.patch.object(
-        skill_shim_evaluation, "load_manifest", return_value=manifest
-    ), mock.patch.object(skill_shim_evaluation.subprocess, "run", side_effect=fake_run):
+    with (
+        mock.patch.dict(
+            os.environ, {"AGENT_CANON_RUNTIME_ROOT": str(runtime_root)}, clear=False
+        ),
+        mock.patch.object(
+            skill_shim_evaluation.subprocess, "run", side_effect=fake_run
+        ),
+    ):
         payload = route_golden(
             parent_root,
             parent_root / "manifest.toml",
@@ -227,7 +247,9 @@ def test_route_golden_uses_external_runtime_receipt(tmp_path: Path) -> None:
             with self.assertRaisesRegex(ProducerError, "host_observation_incomplete"):
                 _host_observation(path)
 
-    def test_deterministic_reduction_status_requires_positive_pair_reduction(self) -> None:
+    def test_deterministic_reduction_status_requires_positive_pair_reduction(
+        self,
+    ) -> None:
         """One non-positive scenario pair must fail the all-pair status."""
         rows = [
             {
@@ -288,7 +310,9 @@ def test_route_golden_uses_external_runtime_receipt(tmp_path: Path) -> None:
             _paired_reduction_summary(rows, scenario_rows),
         )
 
-    def test_deterministic_reduction_status_fail_closed_for_duplicate_or_missing_pairs(self) -> None:
+    def test_deterministic_reduction_status_fail_closed_for_duplicate_or_missing_pairs(
+        self,
+    ) -> None:
         """Duplicate or missing deterministic current/generated pairs fail closed."""
         current = {
             "row_type": "candidate",

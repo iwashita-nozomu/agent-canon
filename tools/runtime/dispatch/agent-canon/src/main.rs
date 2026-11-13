@@ -119,6 +119,7 @@ Usage: agent-canon <command> [arguments]
 
 Commands:
   evaluate-codex-agent-roles [--root ROOT] [--runtime-root PATH] [--accumulate] [--format text|json]
+  evaluate-workflow-selection [--root ROOT] [--manifest PATH] [--accumulate] [--runtime-root PATH]
   check-skill-tool-invocation-graph [--root ROOT]
   knowledge|k <search|read|add|status|sync|capture>
   feedback|f <add|status|sync|capture>
@@ -351,6 +352,25 @@ fn main() {
 
     if args.len() >= 2 && args[1] == agent_canon::experiment_registry::SELECTOR {
         std::process::exit(agent_canon::experiment_registry::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "evaluate-workflow-selection" {
+        std::process::exit(agent_canon::workflow_selection_eval::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "workflow-selection-manifest" {
+        if args.len() != 4 || args[2] != "--manifest" {
+            eprintln!("usage: agent-canon workflow-selection-manifest --manifest PATH");
+            std::process::exit(2);
+        }
+        match agent_canon::workflow_selection_eval::manifest_json(std::path::Path::new(&args[3])) {
+            Ok(manifest) => {
+                println!("{manifest}");
+                std::process::exit(0);
+            }
+            Err(error) => {
+                eprintln!("{error}");
+                std::process::exit(2);
+            }
+        }
     }
     if args.len() >= 2 && args[1] == "sync-experiment-registry-context" {
         std::process::exit(agent_canon::experiment_registry::context::run(&args[2..]));
