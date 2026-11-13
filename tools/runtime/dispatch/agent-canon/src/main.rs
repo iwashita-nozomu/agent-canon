@@ -170,6 +170,7 @@ Commands:
   check-solid-evidence [paths...] [--root ROOT] [--changed] [--base-ref BASE_REF] [--evidence EVIDENCE] [--exclude EXCLUDE] [--verbose] [--format text|json]
   rust-migration-audit --root <repo-root>
   repo-structure-contract [--root ROOT] [--contract PATH] [options]
+  check-agent-canon-log-policy [--input PATH|--remote URL] [--commit SHA]
   wiki-publish --wiki-root PATH --source-root PATH --source-commit SHA [options]
   orphan-lifecycle <inventory|authorize-cleanup> [options]
   update-latest-result RESULT_ROOT --variant VARIANT [--result-dir PATH]
@@ -400,6 +401,9 @@ fn main() {
     }
     if args.len() >= 2 && args[1] == "repo-structure-contract" {
         std::process::exit(agent_canon::repo_structure_contract::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "check-agent-canon-log-policy" {
+        std::process::exit(agent_canon::log_policy::run(&args[2..]));
     }
     if args.len() >= 2 && args[1] == "wiki-publish" {
         std::process::exit(agent_canon::wiki_publish::run(&args[2..]));
