@@ -6,7 +6,7 @@ upstream design README.md structured analysis package index
 upstream design graph-dsl.md Graph DSL Core storage contract
 upstream design ../prose-reasoning-graph/dsl-spec.md prose graph DSL and projection contract
 upstream design ../design/dependency-manifest-design.md dependency manifest DSL and validation model
-upstream implementation ../../tools/analysis/documents/prose_reasoning_graph.py current prose graph SQLite implementation
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/prose_reasoning_graph.rs current prose graph SQLite implementation
 upstream implementation ../../tools/runtime/dispatch/agent-canon/src/structured_analysis.rs Rust structured-analysis CLI implementation
 upstream implementation ../../tools/analysis/dependencies/check_dependency_graph.sh emits dependency manifest graph artifacts
 downstream design dependency-header-analysis.md maps dependency header graph data into this DB model
@@ -19,7 +19,7 @@ downstream design document-canon-analysis.md maps duplicate and non-canonical do
 
 This document is the SQLite materialization contract implemented by
 `../../tools/runtime/dispatch/agent-canon/src/structured_analysis.rs`. Broader prose, dependency,
-report, and corpus adapters keep their contracts through `prose_reasoning_graph.py`.
+report, and corpus adapters keep their contracts through `prose-reasoning-graph`.
 This file records the shared Graph DSL Core storage created and validated by
 `initialize_graph_schema` and
 `validate_graph_contract`.
@@ -131,7 +131,7 @@ checks the shared schema:
 
 Adapter-specific semantics stay outside this command. For example,
 dependency-header pass/fail remains with `check_dependency_graph.sh`, and prose
-rewrite semantics remain with `prose_reasoning_graph.py`.
+rewrite semantics remain with `prose-reasoning-graph`.
 
 ## Build Flow
 

@@ -7,9 +7,9 @@ upstream design ../structured-analysis/graph-dsl.md shared Graph DSL Core storag
 upstream design ../../agents/workflows/workflow-references.md writing and discourse prior art
 coverage dsl_design_trace requires source-truth anchor|source truth|source span; lower graph|lower text unit; typed relation; projection view|derived projection|reader-state|macro-claim
 coverage graph_format_trace requires node record|nodes table; edge record|edges table; payload_json|payload json
-downstream implementation ../../tools/analysis/documents/prose_reasoning_graph.py current MVP implementation
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/prose_reasoning_graph.rs current MVP implementation
 downstream implementation ../../tests/agent_tools/test_prose_reasoning_graph.py validates current graph behavior
-downstream design ../../tools/analysis/documents/prose_reasoning_graph.py documents CLI usage
+downstream design ../../tools/runtime/dispatch/agent-canon/src/prose_reasoning_graph.rs documents CLI usage
 downstream design ../../tools/README.md documents graph visualization tool routing from the documentation hub
 downstream design ../../tools/runtime/dispatch/agent-canon/src/dependency_manifest_graph.rs documents dependency graph visualization adapter
 downstream design ../tools/semantic_provider_html_report.md documents semantic provider visualization adapter
@@ -144,7 +144,7 @@ structured graph. The Rust `agent-canon structured-analysis document-inventory`
 command reads the declared responsibility and upstream design trace, then emits
 generic `document_responsibility_gap` findings when the document does not cover
 the source surface it claims as part of its stated job. The Python
-`prose_reasoning_graph.py` parser does not create this layer directly, but
+`prose-reasoning-graph` parser does not create this layer directly, but
 workflows materialize the findings in the same structured graph DB before
 diagnostic integration.
 
@@ -661,7 +661,7 @@ Every graph visualization adapter records this boundary:
   they are reproducible outputs with projected provenance and renderer
   decisions.
 
-The canonical implementation direction is a shared `prose_reasoning_graph.py`
+The canonical implementation direction is a shared `prose-reasoning-graph`
 projection / visualization entrypoint fed by adapters. Existing domain-specific
 renderers remain valid while they document their adapter mapping and route
 future reusable graph UI behavior through this contract.
