@@ -547,7 +547,7 @@ run_convention() {
   record_command \
     "convention" \
     "$REPORT_DIR/convention_compliance.txt" \
-    python3 "$TOOL_DIR/validation/semantic/convention/check_convention_compliance.py"
+    run_agent_canon check-convention-compliance
 }
 
 write_report() {

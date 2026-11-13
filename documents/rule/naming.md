@@ -3,7 +3,7 @@
 contract policy
 responsibility Documents 文書および識別子の命名規約。
 upstream design ./README.md document rule canon index
-downstream implementation ../../tools/validation/semantic/convention/check_convention_compliance.py convention validation
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/convention_compliance.rs convention validation
 @dependency-end
 -->
 

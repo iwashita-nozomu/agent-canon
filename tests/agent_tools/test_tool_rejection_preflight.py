@@ -70,6 +70,10 @@ class ToolRejectionPreflightTest(unittest.TestCase):
             "tools/bin/agent-canon check-github-workflows",
         )
         expected = expected.replace(LEGACY_WORKFLOW_SOURCE, NATIVE_WORKFLOW_SOURCE)
+        expected = expected.replace(
+            "python3 tools/validation/semantic/convention/check_convention_compliance.py",
+            "agent-canon check-convention-compliance",
+        )
         self.assertNotIn(LEGACY_COMMAND, expected)
         return expected
 

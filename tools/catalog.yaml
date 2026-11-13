@@ -1549,12 +1549,12 @@ entries:
 
   - id: check-convention-compliance
     summary: Verifies convention sources and workflow gate wiring stay connected.
-    path: tools/validation/semantic/convention/check_convention_compliance.py
+    path: tools/runtime/dispatch/agent-canon/src/convention_compliance.rs
     family: agent_tools
     role: checker
     status: canonical
-    command: python3 tools/validation/semantic/convention/check_convention_compliance.py
-    dispatch: {argv: ["python3", "tools/validation/semantic/convention/check_convention_compliance.py"]}
+    command: tools/bin/agent-canon check-convention-compliance
+    dispatch: {argv: ["tools/bin/agent-canon", "check-convention-compliance"]}
     writes: false
     default_wiring:
       ci: true

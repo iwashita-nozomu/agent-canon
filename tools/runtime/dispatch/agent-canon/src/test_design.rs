@@ -666,7 +666,7 @@ fn contains_static_analysis_command(text_lower: &str) -> bool {
         "agent-canon check-dependency-headers",
         "scan_dependency_headers.sh",
         "check_dependency_header_format.sh",
-        "check_convention_compliance.py",
+        "check-convention-compliance",
         "repo-structure-contract",
         "\"responsibility-scope\"",
         "agent-canon docs check",

@@ -8,7 +8,7 @@
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/notebook_quality.rs validates notebooks as readable runnable demos
 # upstream implementation ../../../bin/agent-canon invokes the canonical Rust algorithm contract checker
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/python_algorithm_contract.rs owns the algorithm contract checker
-# upstream implementation ../../semantic/convention/check_convention_compliance.py validates convention/workflow gate wiring
+# upstream implementation ../../../runtime/dispatch/agent-canon/src/convention_compliance.rs validates convention/workflow gate wiring
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/catalog/tool_catalog.rs validates structured tool catalog
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/tool_proof_coverage.rs reports catalog proof obligations
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/tool_drift.rs validates tool/convention trace contracts
@@ -378,7 +378,7 @@ if [ -d python ]; then
     EXIT_CODE=1
   fi
 fi
-if "$PYTHON_BIN" "${WORKSPACE_ROOT}/tools/validation/semantic/convention/check_convention_compliance.py" 2>&1; then
+if "${AGENT_CANON_CLI_CMD:-${WORKSPACE_ROOT}/tools/bin/agent-canon}" check-convention-compliance 2>&1; then
   echo "✅ convention compliance wiring checks 成功"
 else
   echo "❌ convention compliance wiring checks 失敗"

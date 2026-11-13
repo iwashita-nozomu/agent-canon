@@ -82,7 +82,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertNotIn(
             "missing-manifest-link:convention_compliance:"
-            "tools/validation/semantic/convention/check_convention_compliance.py:"
+            "tools/runtime/dispatch/agent-canon/src/convention_compliance.rs:"
             "agents/canonical/CODEX_COMPLETION.md",
             result.stdout,
         )
@@ -92,17 +92,10 @@ class CheckToolConventionDriftTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_convention_contract(root)
-            tool = (
-                root
-                / "tools"
-                / "validation"
-                / "semantic"
-                / "convention"
-                / "check_convention_compliance.py"
-            )
+            tool = root / "tools/runtime/dispatch/agent-canon/src/convention_compliance.rs"
             tool.write_text(
                 tool.read_text(encoding="utf-8").replace(
-                    "# upstream design ../../../../agents/canonical/CODEX_COMPLETION.md completion evidence\n",
+                    "// upstream design ../../../../../agents/canonical/CODEX_COMPLETION.md completion evidence\n",
                     "",
                 ),
                 encoding="utf-8",
@@ -114,7 +107,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             self.assertIn("TOOL_CONVENTION_DRIFT=fail", result.stdout)
             self.assertIn(
                 "missing-manifest-link:convention_compliance:"
-                "tools/validation/semantic/convention/check_convention_compliance.py:"
+                "tools/runtime/dispatch/agent-canon/src/convention_compliance.rs:"
                 "agents/canonical/CODEX_COMPLETION.md",
                 result.stdout,
             )
@@ -158,7 +151,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                         "<!--",
                         "@dependency-start",
                         "responsibility Defines convention index.",
-                        "downstream environment ../../tools/validation/semantic/convention/check_convention_compliance.py checker",
+                        "downstream environment ../../tools/runtime/dispatch/agent-canon/src/convention_compliance.rs checker",
                         "@dependency-end",
                         "-->",
                         "",
@@ -474,23 +467,23 @@ class CheckToolConventionDriftTest(unittest.TestCase):
         self.write_file(root, "README.md", "# Fixture\n")
         self.write_file(
             root,
-            "tools/validation/semantic/convention/check_convention_compliance.py",
+            "tools/runtime/dispatch/agent-canon/src/convention_compliance.rs",
             "\n".join(
                 [
-                    "# @dependency-start",
-                    "# responsibility Checks convention compliance.",
-                    "# upstream design ../../../../documents/conventions/README.md conventions",
-                    "# upstream design ../../../../agents/canonical/CODEX_COMPLETION.md completion evidence",
-                    "# upstream design ../../../../documents/codex/codex-configuration-reference.md Codex configuration",
-                    "# upstream design ../../../../documents/conventions/coding-conventions-house-style.md source style",
-                    "# upstream design ../../../../.codex/README.md runtime hook behavior",
-                    "# upstream design ../../../catalog.yaml tool catalog",
-                    "# upstream implementation ./convention_compliance_contracts.toml marker contracts",
-                    "# upstream implementation ../skills/check-skill-frontmatter skill frontmatter",
-                    "# downstream implementation ../../ci/runners/run_all_checks.sh ci",
-                    "# downstream implementation ../../../runtime/dispatch/agent-canon/src/tool_drift.rs drift gate",
-                    "# downstream implementation ../../../../tests/agent_tools/test_check_convention_compliance.py tests",
-                    "# @dependency-end",
+                    "// @dependency-start",
+                    "// responsibility Checks convention compliance.",
+                    "// upstream design ../../../../../documents/conventions/README.md conventions",
+                    "// upstream design ../../../../../agents/canonical/CODEX_COMPLETION.md completion evidence",
+                    "// upstream design ../../../../../documents/codex/codex-configuration-reference.md Codex configuration",
+                    "// upstream design ../../../../../documents/conventions/coding-conventions-house-style.md source style",
+                    "// upstream design ../../../../../.codex/README.md runtime hook behavior",
+                    "// upstream design ../../../../catalog.yaml tool catalog",
+                    "// upstream implementation ../../../../validation/semantic/convention/convention_compliance_contracts.toml marker contracts",
+                    "// upstream implementation skill_frontmatter.rs skill frontmatter",
+                    "// downstream implementation ../../../../validation/ci/runners/run_all_checks.sh ci",
+                    "// downstream implementation tool_drift.rs drift gate",
+                    "// downstream implementation ../../../../../tests/agent_tools/test_check_convention_compliance.py tests",
+                    "// @dependency-end",
                     "",
                 ]
             ),
@@ -608,7 +601,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             "tools/runtime/artifacts/runtime_artifacts.py",
             "tools/runtime/dispatch/agent-canon/src/report_artifact_checks.rs",
             "tools/runtime/dispatch/agent-canon/src/runtime_alignment.rs",
-            "tools/validation/semantic/convention/check_convention_compliance.py",
+            "tools/runtime/dispatch/agent-canon/src/convention_compliance.rs",
             "tools/runtime/lifecycle/update_lifecycle_contract.py",
             "tools/runtime/dispatch/agent-canon/src/main.rs",
             "tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs",

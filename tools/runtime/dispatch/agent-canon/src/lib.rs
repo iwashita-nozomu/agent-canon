@@ -71,6 +71,7 @@ pub mod code_template_rendering;
 pub mod codex_agent_role_eval;
 pub mod codex_runtime_summary;
 pub mod compare_agent_run_paths;
+pub mod convention_compliance;
 pub mod cpp_source_canonical_ir;
 pub mod cpp_template_to_lean;
 mod dashboard_render;

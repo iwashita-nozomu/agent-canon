@@ -10,7 +10,7 @@ upstream design ../../agents/internal-routines/design-implementation-corresponde
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs capability and phase route materialization
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs native graph construction, writing, and readback
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/runtime_alignment.rs runtime alignment readback
-downstream implementation ../../tools/validation/semantic/convention/check_convention_compliance.py canonical route convention gate
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/convention_compliance.rs canonical route convention gate
 @dependency-end
 -->
 
