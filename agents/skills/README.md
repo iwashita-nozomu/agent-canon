@@ -11,7 +11,7 @@ upstream design ../../documents/design/responsibility-cleanup.md skill maintenan
 downstream design ../canonical/CODEX_WORKFLOW.md consumes the shared skill canon during task routing
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/runtime_alignment.rs validates public and official skill boundaries
 upstream design code-visualization.md visualization selection and native renderer delegation
-downstream implementation ../../tools/agent/skills/skill_route_catalog.py validates public skill routing
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs validates public skill routing
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs validates the dependency dictionary and generates its graph projections
 @dependency-end
 -->
