@@ -51,9 +51,13 @@ runtime_path() {
 write_runtime_file() {
   local candidate="$1"
   local source_file="$2"
-  "${AGENT_CANON_NATIVE_BIN:-${AGENT_CANON_CLI:-${CANON_SOURCE_ROOT}/tools/bin/agent-canon}}" \
+  local diagnostic
+  if ! diagnostic="$("${AGENT_CANON_NATIVE_BIN:-${AGENT_CANON_CLI:-${CANON_SOURCE_ROOT}/tools/bin/agent-canon}}" \
     runtime-paths write-file --source-root "$CANON_SOURCE_ROOT" --runtime-root "$RUNTIME_ROOT" \
-    --candidate "$candidate" --input "$source_file" >/dev/null
+    --candidate "$candidate" --input "$source_file" 2>&1)"; then
+    printf 'runtime boundary invalid: %s\n' "$diagnostic" >&2
+    return 2
+  fi
 }
 
 require_runtime_boundary() {
