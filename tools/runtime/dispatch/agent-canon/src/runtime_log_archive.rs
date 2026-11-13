@@ -676,11 +676,8 @@ fn run_process(cwd: &Path, program: &str, args: &[String]) -> Result<Output, Arc
 }
 
 fn git(archive_root: &Path, args: &[String], check: bool) -> Result<Output, ArchiveError> {
-    let mut command = vec!["-C".to_owned(), archive_root.display().to_string()];
-    command.extend_from_slice(args);
-    let cwd = archive_root.parent().unwrap_or_else(|| Path::new("/"));
     for attempt in 0..=GIT_INDEX_LOCK_RETRIES {
-        let result = run_process(cwd, "git", &command)?;
+        let result = run_process(archive_root, "git", args)?;
         if result.status.success()
             || !git_index_locked(&result)
             || attempt == GIT_INDEX_LOCK_RETRIES
@@ -1058,8 +1055,10 @@ fn ensure_archive(
         })?;
         ensure_external_directory(context, parent, "runtime-archive-clone")?;
         let clone = Command::new("git")
-            .args(["clone", context.remote.as_str()])
-            .arg(&context.archive_root)
+            .args(["clone", "--", context.remote.as_str()])
+            .arg(context.archive_root.file_name().ok_or_else(|| {
+                ArchiveError::new("archive_root_invalid", "archive path has no directory name")
+            })?)
             .current_dir(parent)
             .output()
             .map_err(|error| ArchiveError::new("process_unavailable", error.to_string()))?;

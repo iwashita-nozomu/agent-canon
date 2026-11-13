@@ -155,6 +155,7 @@ pub mod repository_topic_clone;
 pub mod run_evaluation;
 pub mod runtime_alignment;
 pub mod runtime_boundary;
+pub mod runtime_paths;
 pub mod scip_index;
 pub mod skill_lane_detector;
 pub mod source_mutation;
