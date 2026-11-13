@@ -10,7 +10,7 @@
 // downstream implementation main.rs routes the materialize-agent-canon-pr-g2 command
 // downstream implementation ../../../../validation/ci/checks/check_agent_canon_pr.sh invokes G2 after ordered checks
 // downstream test ../tests/generated_completeness_native.rs freezes G2 bytes, errors, authority, and persistence
-// downstream test ../../../../../tests/agent_tools/test_github_publish.py consumes frozen G1/G2 publication contexts
+// downstream test ../tests/github_publish_native.rs consumes frozen G1/G2 publication contexts
 // downstream test ../../../../../tests/agent_tools/test_bootstrap_and_close.py consumes frozen G1/G2 closeout context
 // @dependency-end
 

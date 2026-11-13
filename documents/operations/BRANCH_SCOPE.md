@@ -233,7 +233,7 @@ AgentCanon source と parent project の tracked changes は、それぞれの�
 - PR の公開・取り込みでは最新 main と実際に統合し、完成した差分と remote の
   source を確認します。未知のユーザー状態は reset / clean / stash で失わせません。
 - commit別の依存調査報告、関数一覧、証跡表、進捗記録を通常作業へ追加しません。
-- 初回 push と PR 作成は `python3 tools/repository/github/github_publish.py publish-pr --user-task "<current user task>" --repo <owner/name> --title "<title>" --body-file <body.md>` を使います。branch push だけなら `github_publish.py push` を使います。
+- 初回 push と PR 作成は `agent-canon github-publish publish-pr --user-task "<current user task>" --repo <owner/name> --title "<title>" --body-file <body.md>` を使います。branch push だけなら `github_publish.py push` を使います。
 - 選択した commit / push の実行結果は会話で報告します。実行していない操作や
   未確認の内容を完了とは説明しません。
 - 共有・引継ぎ・PR 公開が既存の権限と目的に含まれる場合は、追加の許可取りへ

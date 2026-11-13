@@ -63,7 +63,6 @@ def _module_belongs_to_current_checkout(module_name: str) -> bool:
 
 for _module_name in (
     "tools",
-    "tools.repository.github.github_publish",
     "tools.runtime.archive.log_repository_identity",
     "tools.runtime.archive.runtime_log_paths",
     "tools.runtime.archive.runtime_log_archive_git",
@@ -72,7 +71,6 @@ for _module_name in (
     if not _module_belongs_to_current_checkout(_module_name):
         sys.modules.pop(_module_name, None)
 
-from tools.repository.github import github_publish
 from tools.runtime.archive.log_repository_identity import stable_source_repository_id
 from tools.runtime.archive.runtime_log_paths import (
     mounted_log_archive_root,
@@ -480,26 +478,6 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             self.assertEqual(tuple(target.parent.glob(".*.tmp")), ())
             self.assertEqual(tuple(moved_parent.glob(".*.tmp")), ())
             self.assertFalse((moved_parent / target.name).exists())
-
-    def test_writer_without_parent_root_fails_before_external_file_creation(
-        self,
-    ) -> None:
-        """A representative adapter cannot fall back to an unbounded writer."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            target = root / "external-summary.json"
-            with patch.dict(os.environ, {}, clear=False):
-                os.environ.pop("AGENT_CANON_PARENT_ROOT", None)
-                with self.assertRaises(
-                    github_publish.ParentRootSideEffectError
-                ) as raised:
-                    github_publish._write_publication_summary(target, b"{}\n")
-            self.assertEqual(
-                raised.exception.reject,
-                github_publish.ParentRootReject.HANDOFF_INVALID,
-            )
-            self.assertFalse(target.exists())
-            self.assertEqual(tuple(root.iterdir()), ())
 
     def test_secure_publication_reports_cleanup_failure_without_suppression(
         self,
