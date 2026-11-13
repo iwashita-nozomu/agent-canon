@@ -172,6 +172,7 @@ Commands:
   check-semantic-responsibility-contract [paths...] [--root ROOT] [--template TEMPLATE] [--instance INSTANCE] [--artifact-root ARTIFACT_ROOT] [--format text|json]
   check-solid-evidence [paths...] [--root ROOT] [--changed] [--base-ref BASE_REF] [--evidence EVIDENCE] [--exclude EXCLUDE] [--verbose] [--format text|json]
   rust-migration-audit --root <repo-root>
+  save-experiment-result-annex --raw-dir PATH [--annex-repo PATH] [options]
   github-status-lifecycle --repo OWNER/REPO --issue NUMBER --facts-json PATH [options]
   semantic-provider-html-report --compare-json PATH --output PATH [options]
   check-proof-trace-alignment --trace-module PATH [options]
@@ -293,6 +294,9 @@ fn main() {
     }
     if args.len() >= 2 && args[1] == "tool-catalog" {
         std::process::exit(catalog::tool_catalog::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "save-experiment-result-annex" {
+        std::process::exit(agent_canon::annex_retention::run(&args[2..]));
     }
     if args.len() >= 2 && args[1] == "render-code-template" {
         std::process::exit(agent_canon::code_template_rendering::run(&args[2..]));
