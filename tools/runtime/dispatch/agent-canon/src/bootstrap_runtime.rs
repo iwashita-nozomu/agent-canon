@@ -4766,7 +4766,12 @@ mod tests {
 
     #[test]
     fn test_namespace_maps_host_surface_path_environment() {
-        let temporary = tempfile::tempdir().expect("namespace fixture");
+        let temporary = tempfile::tempdir_in(
+            std::env::temp_dir()
+                .canonicalize()
+                .expect("canonical temporary parent"),
+        )
+        .expect("namespace fixture");
         let control = temporary.path().join("control");
         let runtime = control.join("runtime");
         let source = temporary.path().join("source");
@@ -4826,7 +4831,12 @@ mod tests {
 
         fn new_with_target_mounts(mounts: impl IntoIterator<Item = (PathBuf, PathBuf)>) -> Self {
             let environment = EnvGuard::new();
-            let temporary = tempfile::tempdir().expect("controller fixture root");
+            let temporary = tempfile::tempdir_in(
+                std::env::temp_dir()
+                    .canonicalize()
+                    .expect("canonical temporary parent"),
+            )
+            .expect("controller fixture root");
             let control = temporary.path().join("control");
             let runtime_root = control.join("runtime");
             let private_log = temporary.path().join("private-log");
@@ -4921,7 +4931,12 @@ mod tests {
 
     #[test]
     fn target_removal_keeps_the_previous_mount_generation_reversible() {
-        let targets_root = tempfile::tempdir().expect("target namespace fixture");
+        let targets_root = tempfile::tempdir_in(
+            std::env::temp_dir()
+                .canonicalize()
+                .expect("canonical temporary parent"),
+        )
+        .expect("target namespace fixture");
         let first = targets_root.path().join("first-target");
         let second = targets_root.path().join("second-target");
         fs::create_dir_all(&first).expect("first target root");
@@ -5123,7 +5138,12 @@ mod tests {
     #[test]
     fn worker_timeout_and_output_redaction_keep_failure_context_bounded() {
         let _environment = EnvGuard::new();
-        let temporary = tempfile::tempdir().expect("worker fixture");
+        let temporary = tempfile::tempdir_in(
+            std::env::temp_dir()
+                .canonicalize()
+                .expect("canonical temporary parent"),
+        )
+        .expect("worker fixture");
         let fs = RuntimeFs::new().expect("rooted filesystem");
         let lease_path = temporary.path().join("lease.lock");
         let lease = fs.create_file(&lease_path, 0o600).expect("lease file");
@@ -5264,7 +5284,12 @@ mod tests {
     #[test]
     fn source_snapshot_and_producer_matrix_keep_independent_eval_evidence() {
         let _environment = EnvGuard::new();
-        let temporary = tempfile::tempdir().expect("eval fixture");
+        let temporary = tempfile::tempdir_in(
+            std::env::temp_dir()
+                .canonicalize()
+                .expect("canonical temporary parent"),
+        )
+        .expect("eval fixture");
         Command::new("git")
             .args(["init", "--quiet", temporary.path().to_str().unwrap()])
             .status()
@@ -5311,7 +5336,12 @@ mod tests {
     #[test]
     fn eval_exchange_copy_rejects_symlinks_and_preserves_regular_files() {
         let _environment = EnvGuard::new();
-        let temporary = tempfile::tempdir().expect("exchange fixture");
+        let temporary = tempfile::tempdir_in(
+            std::env::temp_dir()
+                .canonicalize()
+                .expect("canonical temporary parent"),
+        )
+        .expect("exchange fixture");
         let filesystem = RuntimeFs::new().expect("rooted filesystem");
         let source = temporary.path().join("source");
         let destination = temporary.path().join("destination");

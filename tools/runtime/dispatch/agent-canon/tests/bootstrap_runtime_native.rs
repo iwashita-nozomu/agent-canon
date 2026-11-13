@@ -17,7 +17,12 @@ struct Fixture {
 
 impl Fixture {
     fn new() -> Self {
-        let temporary = tempfile::tempdir().expect("temporary runtime fixture");
+        let temporary = tempfile::tempdir_in(
+            std::env::temp_dir()
+                .canonicalize()
+                .expect("canonical temporary parent"),
+        )
+        .expect("temporary runtime fixture");
         let control = temporary.path().join("control");
         let runtime = control.join("runtime");
         let private_log = temporary.path().join("private-log");
