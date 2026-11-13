@@ -733,10 +733,7 @@ const TOOL_KEYWORDS: &[SimpleKeywordRule] = &[
             "dependency graph",
         ],
     ),
-    (
-        "runtime-log-archive-git",
-        &["runtime-log-archive-git"],
-    ),
+    ("runtime-log-archive-git", &["runtime-log-archive-git"]),
     (
         "runtime_log_archive_git.py",
         &[

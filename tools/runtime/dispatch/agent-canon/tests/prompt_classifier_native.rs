@@ -257,12 +257,18 @@ fn assert_non_skill_fields_exact(actual: &JsonValue, expected: &JsonValue, name:
 
 #[test]
 fn native_archive_name_routes_to_the_current_tool_and_preserves_legacy_hints() {
-    let native=classify_without_context("runtime-log-archive-git で結果を書き出して");
-    assert!(has_text(&native.candidate_tools,"runtime-log-archive-git"));
-    assert!(has_text(&native.candidate_workflows,"codex-task-workflow"));
-    assert!(has_text(&native.candidate_skills,"result-artifact-writeout"));
-    let legacy=classify_without_context("runtime_log_archive_git.py");
-    assert!(has_text(&legacy.candidate_tools,"runtime_log_archive_git.py"));
+    let native = classify_without_context("runtime-log-archive-git で結果を書き出して");
+    assert!(has_text(&native.candidate_tools, "runtime-log-archive-git"));
+    assert!(has_text(&native.candidate_workflows, "codex-task-workflow"));
+    assert!(has_text(
+        &native.candidate_skills,
+        "result-artifact-writeout"
+    ));
+    let legacy = classify_without_context("runtime_log_archive_git.py");
+    assert!(has_text(
+        &legacy.candidate_tools,
+        "runtime_log_archive_git.py"
+    ));
 }
 
 #[test]
