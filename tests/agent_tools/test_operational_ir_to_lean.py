@@ -1,8 +1,8 @@
 # @dependency-start
 # contract test
 # responsibility Tests shared thin operational IR to Lean evidence rendering.
-# upstream implementation ../../tools/analysis/proof/operational_ir_to_lean.py renders Lean evidence.
-# upstream implementation ../../tools/analysis/code/cpp_source_canonical_ir.py produces C++ source IR.
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/operational_ir_to_lean.rs renders Lean evidence.
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/cpp_source_canonical_ir.rs produces C++ source IR.
 # upstream design ../../documents/tools/operational_ir_to_lean.md documents the renderer contract.
 # @dependency-end
 """Tests for operational IR to Lean evidence rendering."""
@@ -10,21 +10,22 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
-import sys
 import textwrap
 from pathlib import Path
 from typing import cast
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "analysis" / "proof" / "operational_ir_to_lean.py"
-CPP_IR_SCRIPT = PROJECT_ROOT / "tools" / "analysis" / "code" / "cpp_source_canonical_ir.py"
+AGENT_CANON_CLI = os.environ.get(
+    "AGENT_CANON_CLI", str(PROJECT_ROOT / "tools" / "bin" / "agent-canon")
+)
 
 
 def run_tool(*args: str) -> subprocess.CompletedProcess[str]:
     """Run the operational IR to Lean renderer."""
     return subprocess.run(
-        [sys.executable, str(SCRIPT), *args],
+        [AGENT_CANON_CLI, "operational-ir-to-lean", *args],
         cwd=PROJECT_ROOT,
         check=False,
         capture_output=True,
@@ -35,7 +36,7 @@ def run_tool(*args: str) -> subprocess.CompletedProcess[str]:
 def run_cpp_ir(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
     """Run the C++ source-canonical IR producer."""
     return subprocess.run(
-        [sys.executable, str(CPP_IR_SCRIPT), "--root", str(root), *args],
+        [AGENT_CANON_CLI, "cpp-source-canonical-ir", "--root", str(root), *args],
         cwd=PROJECT_ROOT,
         check=False,
         capture_output=True,

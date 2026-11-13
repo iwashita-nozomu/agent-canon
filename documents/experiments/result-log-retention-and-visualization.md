@@ -33,7 +33,7 @@ JSONL and accumulated eval archive branch policy belong to
 ## Storage Classes
 
 - `reports/agents/<run-id>/` stores source-repo-local agent workflow evidence,
-  reviews, validation, monitoring, and closeout material. `runtime_log_archive_git.py
+  reviews, validation, monitoring, and closeout material. `runtime-log-archive-git
   sync` copies those run bundles into the external log archive under
   `agent-reports/<repo-key>/<run-id>/` for accumulated retention.
 - `reports/` stores repo-wide automation reports, dependency reviews, lint
@@ -129,7 +129,7 @@ directly from inside a container and tunneling to the container IP.
 - If a generated artifact is needed for review but should not be tracked, put
   its path and checksum in `verification.txt` or the experiment report.
 - If a run-local `reports/agents/<run-id>/` bundle is needed after the current
-  task, archive it mechanically with `runtime_log_archive_git.py
+  task, archive it mechanically with `runtime-log-archive-git
   archive-agent-report`; do not create a hand-written duplicate report in the
   source tree.
 - For experiment source placement, follow

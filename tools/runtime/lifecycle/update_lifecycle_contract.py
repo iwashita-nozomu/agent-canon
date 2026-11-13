@@ -7,9 +7,9 @@
 # upstream design ../../../agents/skills/agent-canon-update.md owns the source PR sequence.
 # upstream implementation ../artifacts/artifact_identity.py provides canonical JSON serialization.
 # upstream implementation ../dispatch/agent-canon/src/generated_completeness.rs owns the authoritative G2 receipt policy and materializer.
-# upstream implementation ../../repository/github/github_publish.py provides the authoritative G3 owner API consumed through SourceProjectionGateOwnerApis.
+# upstream implementation ../dispatch/agent-canon/src/github_publish.rs provides the G3 owner API.
 # downstream implementation ../../runtime/dispatch/agent-canon/src/agent_tool_calls.rs composes native close-agent ToolCalls.
-# downstream implementation ../../repository/github/github_publish.py consumes immutable pull-request lifecycle and gate evidence.
+# downstream implementation ../dispatch/agent-canon/src/github_publish.rs consumes immutable pull-request lifecycle and gate evidence.
 # downstream implementation ../../repository/workspace/repository_topic_clone.py consumes source branch receipts.
 # downstream implementation ../../../tests/agent_tools/test_bootstrap_and_close.py validates terminal cleanup guards.
 # @dependency-end

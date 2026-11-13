@@ -65,8 +65,8 @@ paths = [
   "documents/runtime/runtime-log-archive.md",
   "documents/runtime/runtime-log-archive-migration.md",
   "reports/**",
-  "tools/runtime/archive/runtime_log_archive_git.py",
-  "tools/runtime/archive/runtime_log_paths.py",
+  "tools/runtime/dispatch/agent-canon/src/runtime_log_archive.rs",
+  "tools/runtime/dispatch/agent-canon/src/runtime_log_archive/**",
   "tests/agent_tools/test_eval_accumulation_check.py",
   "tests/agent_tools/test_eval_learning.py",
   "tests/agent_tools/test_eval_trend.py",
@@ -76,13 +76,13 @@ paths = [
   "tests/agent_tools/test_hook_outcomes.py",
   "tests/agent_tools/test_pre_task_outcome_capture.py",
   "tests/agent_tools/test_runtime_log_archive_git.py",
-  "tests/agent_tools/test_runtime_log_paths.py",
+  "tools/runtime/dispatch/agent-canon/tests/runtime_log_archive_native.rs",
   "tests/agent_tools/test_skill_evaluation.py",
   "tests/agent_tools/test_skill_eval_report.py",
 ]
 protecting_tools = [
   "tools/runtime/dispatch/agent-canon/src/eval_accumulation_check.rs",
-  "tools/runtime/archive/runtime_log_archive_git.py",
+  "tools/runtime/dispatch/agent-canon/src/runtime_log_archive.rs",
 ]
 issues = []
 
@@ -97,8 +97,9 @@ paths = [
 ]
 exclude_paths = [
   "eval/**",
-  "tools/runtime/archive/runtime_log_archive_git.py",
-  "tools/runtime/archive/runtime_log_paths.py",
+  "tools/runtime/dispatch/agent-canon/src/runtime_log_archive.rs",
+  "tools/runtime/dispatch/agent-canon/src/runtime_log_archive/**",
+  "tools/runtime/dispatch/agent-canon/tests/runtime_log_archive_native.rs",
 ]
 protecting_tools = [
   "tools/runtime/dispatch/agent-canon/src/responsibility_scope.rs",
@@ -118,7 +119,7 @@ exclude_paths = [
   "eval/**",
   "tests/agent_tools/test_eval_accumulation_check.py",
   "tests/agent_tools/test_runtime_log_archive_git.py",
-  "tests/agent_tools/test_runtime_log_paths.py",
+  "tools/runtime/dispatch/agent-canon/tests/runtime_log_archive_native.rs",
 ]
 protecting_tools = [
   "tools/runtime/dispatch/agent-canon/src/responsibility_scope.rs",
