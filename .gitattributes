@@ -41,5 +41,5 @@ tools/validation/ci/config/actionlint.yaml text eol=lf
 
 # NVIDIA parser fixtures intentionally retain invalid whitespace/CRLF bytes as
 # raw evidence; do not run Git's text whitespace diff oracle over these files.
-tests/fixtures/nvidia/*.txt -diff
-tests/fixtures/nvidia/*.xml -diff
+tests/fixtures/nvidia/*.txt -text -diff
+tests/fixtures/nvidia/*.xml -text -diff
