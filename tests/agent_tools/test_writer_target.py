@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+
 import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -22,11 +23,11 @@ from tools.runtime.authority.writer_target import (  # noqa: E402
     validate_writer_target_allocations,
     validate_writer_target_identity,
 )
-from tools.agent.orchestration.tool_calls import materialize_subagent_spawn_tool_call  # noqa: E402
 
 
 def target(root: str, branch: str = "fix/942") -> WriterTarget:
     return WriterTarget(root, branch, "iwashita-nozomu/agent-canon", ("tools/",))
+
 
 def test_shared_checkout_writer_targets_are_rejected_before_spawn() -> None:
     shared = target("/tmp/agent-canon-shared")
@@ -79,62 +80,6 @@ def test_writer_target_is_required_for_writer_and_not_for_reader() -> None:
     )
 
 
-def test_spawn_tool_call_validates_writer_target_before_materialization() -> None:
-    identity = {
-        "cwd": "/tmp/spawn",
-        "git_root": "/tmp/spawn",
-        "branch": "fix/942",
-        "head": "c" * 40,
-        "remote": "local/repo",
-    }
-    writer = WriterTarget("/tmp/spawn", "fix/942", "local/repo", ("tools/",))
-    call = materialize_subagent_spawn_tool_call(
-        role="worker",
-        agent_type="worker",
-        input="write the assigned files",
-        checkout_identity=identity,
-        writer_target=writer,
-    )
-    assert call["arguments"]["writer_target"] == writer.as_dict()
-    for mismatch, expected in (
-        (
-            WriterTarget("/tmp/other", "fix/942", "local/repo", ("tools/",)),
-            "checkout_root_identity_mismatch",
-        ),
-        (
-            WriterTarget("/tmp/spawn", "main", "local/repo", ("tools/",)),
-            "branch_identity_mismatch",
-        ),
-        (
-            WriterTarget("/tmp/spawn", "fix/942", "other/repo", ("tools/",)),
-            "remote_identity_mismatch",
-        ),
-    ):
-        with pytest.raises(ValueError, match=expected):
-            materialize_subagent_spawn_tool_call(
-                role="worker",
-                agent_type="worker",
-                input="write the assigned files",
-                checkout_identity=identity,
-                writer_target=mismatch,
-            )
-    with pytest.raises(ValueError, match="required_before_spawn"):
-        materialize_subagent_spawn_tool_call(
-            role="worker",
-            agent_type="worker",
-            input="write the assigned files",
-            checkout_identity=identity,
-        )
-    publisher_call = materialize_subagent_spawn_tool_call(
-        role="publisher",
-        agent_type="worker",
-        input="publish the assigned Issue",
-        checkout_identity=identity,
-        workspace_write_capable=False,
-    )
-    assert "writer_target" not in publisher_call["arguments"]
-
-
 def test_identity_must_match_prepared_target() -> None:
     writer = target("/tmp/prepared")
     identity = {
@@ -147,6 +92,7 @@ def test_identity_must_match_prepared_target() -> None:
     assert validate_writer_target_identity(writer, identity) == writer
     with pytest.raises(WriterTargetError, match="branch_identity_mismatch"):
         validate_writer_target_identity(writer, {**identity, "branch": "main"})
+
 
 def test_writer_target_rejects_relative_root() -> None:
     with pytest.raises(WriterTargetError, match="checkout_root_must_be_absolute"):

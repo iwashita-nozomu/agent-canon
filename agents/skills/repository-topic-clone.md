@@ -9,7 +9,7 @@ upstream design ../internal-routines/design-implementation-correspondence.md des
 upstream design ../../documents/rule/repository-topic-clone.md repository-topic clone policy
 upstream design ../../documents/contracts/github-first-module-and-devcontainer-policy.md topic workspace boundary
 downstream implementation ../../tools/repository/workspace/repository_topic_clone.py lifecycle tool
-downstream implementation ../../tools/validation/semantic/runtime/check_agent_runtime_alignment.py validates skill registration
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/runtime_alignment.rs validates skill registration
 @dependency-end
 -->
 

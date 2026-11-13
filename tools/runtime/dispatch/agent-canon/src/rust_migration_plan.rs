@@ -331,7 +331,6 @@ fn family_for(path: &str) -> &'static str {
         || path.starts_with("tools/runtime/source/")
         || path.starts_with("tools/support/")
         || path == "tools/runtime/values.py"
-        || path.ends_with("/workspace_scope.py")
         || path.ends_with("/parent_root_side_effects.py")
     {
         return "authority-foundation";

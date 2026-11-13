@@ -3,7 +3,8 @@
 // responsibility Reconstructs and validates the canonical v2 public skill/dependency graph and its Mermaid reader artifact.
 // upstream design ../../../../../../documents/design/skill-tool-invocation-graph.md owns graph identity and readback rules
 // upstream implementation ./skill_routes.rs supplies catalog, route, dependency, and invocation-order values
-// downstream implementation ../main.rs exposes the native readback selector
+// upstream implementation ../source_mutation.rs owns capability-bound tracked-pair writes
+// downstream implementation ../main.rs exposes the native graph and readback selectors
 // downstream test ../../tests/skill_dependency_graph_native.rs qualifies graph and Mermaid readback
 // @dependency-end
 
@@ -11,6 +12,10 @@ use super::skill_routes::{
     derive_skill_invocation_order, load_skill_catalog, load_skill_dependency_map,
     load_skill_route_rules, SkillRoutingRule,
 };
+use crate::python_cli_integer::is_argparse_negative_number;
+use crate::python_cli_options::{resolve_long_option_prefix, LongOptionError};
+use crate::runtime_boundary::RuntimeArtifactBoundary;
+use crate::source_mutation::SourceMutationCapability;
 use icu_casemap::CaseMapper;
 use icu_normalizer::ComposingNormalizer;
 use regex::Regex;
@@ -18,8 +23,9 @@ use serde::Serialize;
 use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
+use std::env;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::sync::OnceLock;
 use yaml_rust2::Yaml;
 
@@ -28,6 +34,9 @@ pub const CHECK_SCHEMA: &str = "agent_canon.skill_tool_invocation_check.v1";
 pub const GRAPH_ARTIFACT_ID: &str = "skill-tool-invocation-graph";
 pub const GRAPH_MARKDOWN_PATH: &str = "documents/runtime/skill-dependency-graph.md";
 pub const GRAPH_JSON_PATH: &str = "documents/runtime/skill-dependency-graph.json";
+const DEFAULT_EXTERNAL_GRAPH_PATH: &str = "graphs/skill-dependency-graph.md";
+const SOURCE_MUTATION_EVIDENCE_PATH: &str = "graphs/skill-dependency-graph-source-mutation.json";
+const SOURCE_MUTATION_ALLOWED_PATHS: [&str; 2] = [GRAPH_MARKDOWN_PATH, GRAPH_JSON_PATH];
 
 #[derive(Serialize)]
 struct CheckOutput<'a> {
@@ -124,9 +133,568 @@ pub fn run(args: &[String]) -> i32 {
     }
 }
 
+#[derive(Clone, Copy)]
+enum GraphCliOption {
+    Help,
+    Root,
+    Output,
+    RuntimeRoot,
+    MutationCapability,
+    SourceMutation,
+    SourceMutationEvidence,
+}
+
+const GRAPH_CLI_OPTIONS: &[(&str, GraphCliOption)] = &[
+    ("--help", GraphCliOption::Help),
+    ("--root", GraphCliOption::Root),
+    ("--output", GraphCliOption::Output),
+    ("--runtime-root", GraphCliOption::RuntimeRoot),
+    (
+        "--source-mutation-capability-json",
+        GraphCliOption::MutationCapability,
+    ),
+    (
+        "--mutation-capability-json",
+        GraphCliOption::MutationCapability,
+    ),
+    ("--source-mutation", GraphCliOption::SourceMutation),
+    (
+        "--source-mutation-evidence",
+        GraphCliOption::SourceMutationEvidence,
+    ),
+];
+
+struct GraphCliArgs {
+    command: String,
+    root: PathBuf,
+    output: Option<PathBuf>,
+    runtime_root: Option<PathBuf>,
+    mutation_capability: Option<PathBuf>,
+    source_mutation: bool,
+    source_mutation_evidence: Option<PathBuf>,
+}
+
+fn graph_cli_usage(command: Option<&str>) -> String {
+    match command {
+        Some("check") => {
+            "usage: agent-canon skill-dependency-map check [--root ROOT]\n\nValidate the skill dependency map and generated graph artifacts.".to_owned()
+        }
+        Some("graph") => {
+            "usage: agent-canon skill-dependency-map graph [--root ROOT] [--output OUTPUT] [--runtime-root RUNTIME_ROOT] [--source-mutation-capability-json PATH] [--source-mutation] [--source-mutation-evidence PATH]\n\nGenerate graph artifacts outside the checkout unless the exact tracked-pair capability is supplied.".to_owned()
+        }
+        _ => {
+            "usage: agent-canon skill-dependency-map [-h] {check,graph} ...\n\nMaterialize and validate the deterministic public skill/dependency graph.".to_owned()
+        }
+    }
+}
+
+fn default_source_root() -> PathBuf {
+    env::var_os("AGENT_CANON_SOURCE_ROOT")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| {
+            Path::new(env!("CARGO_MANIFEST_DIR"))
+                .ancestors()
+                .nth(4)
+                .expect("native crate is nested below source root")
+                .to_path_buf()
+        })
+}
+
+fn parse_graph_cli(args: &[String]) -> Result<Option<GraphCliArgs>, String> {
+    let Some(command) = args.first() else {
+        return Err("the following arguments are required: command".to_owned());
+    };
+    if matches!(command.as_str(), "-h" | "--help") {
+        return Ok(None);
+    }
+    if !matches!(command.as_str(), "check" | "graph") {
+        return Err(format!(
+            "invalid choice: '{command}' (choose from 'check', 'graph')"
+        ));
+    }
+    let mut parsed = GraphCliArgs {
+        command: command.clone(),
+        root: default_source_root(),
+        output: None,
+        runtime_root: None,
+        mutation_capability: None,
+        source_mutation: false,
+        source_mutation_evidence: None,
+    };
+    let mut index = 1;
+    while index < args.len() {
+        let token = &args[index];
+        if matches!(token.as_str(), "-h" | "--help") {
+            return Ok(None);
+        }
+        if !token.starts_with("--") {
+            return Err(format!("unrecognized arguments: {token}"));
+        }
+        let (option_text, inline_value) = match token.split_once('=') {
+            Some((option, value)) => (option, Some(value.to_owned())),
+            None => (token.as_str(), None),
+        };
+        let option = resolve_long_option_prefix(option_text, GRAPH_CLI_OPTIONS).map_err(
+            |error| match error {
+                LongOptionError::Unrecognized => format!("unrecognized arguments: {token}"),
+                LongOptionError::Ambiguous(_) => format!("ambiguous option: {option_text}"),
+            },
+        )?;
+        if matches!(option, GraphCliOption::Help) {
+            if inline_value.is_some() {
+                return Err(format!("ignored explicit argument for --help: {token}"));
+            }
+            return Ok(None);
+        }
+        if matches!(option, GraphCliOption::SourceMutation) {
+            if parsed.command != "graph" {
+                return Err(format!("unrecognized arguments: {token}"));
+            }
+            if inline_value.is_some() {
+                return Err(format!(
+                    "ignored explicit argument for --source-mutation: {token}"
+                ));
+            }
+            parsed.source_mutation = true;
+            index += 1;
+            continue;
+        }
+        if parsed.command == "check"
+            && !matches!(option, GraphCliOption::Root | GraphCliOption::Help)
+        {
+            return Err(format!("unrecognized arguments: {token}"));
+        }
+        let value = if let Some(value) = inline_value {
+            value
+        } else {
+            index += 1;
+            let Some(value) = args.get(index) else {
+                return Err(format!("argument {option_text}: expected one argument"));
+            };
+            if value.starts_with('-') && !is_argparse_negative_number(value) {
+                return Err(format!("argument {option_text}: expected one argument"));
+            }
+            value.clone()
+        };
+        match option {
+            GraphCliOption::Root => parsed.root = PathBuf::from(value),
+            GraphCliOption::Output => parsed.output = Some(PathBuf::from(value)),
+            GraphCliOption::RuntimeRoot => parsed.runtime_root = Some(PathBuf::from(value)),
+            GraphCliOption::MutationCapability => {
+                parsed.mutation_capability = Some(PathBuf::from(value))
+            }
+            GraphCliOption::SourceMutationEvidence => {
+                parsed.source_mutation_evidence = Some(PathBuf::from(value))
+            }
+            GraphCliOption::Help | GraphCliOption::SourceMutation => unreachable!(),
+        }
+        index += 1;
+    }
+    Ok(Some(parsed))
+}
+
+/// Run the former skill dependency map operations through the native graph owner.
+pub fn run_graph_cli(args: &[String]) -> i32 {
+    let parsed = match parse_graph_cli(args) {
+        Ok(Some(parsed)) => parsed,
+        Ok(None) => {
+            println!("{}", graph_cli_usage(args.first().map(String::as_str)));
+            return 0;
+        }
+        Err(error) => {
+            eprintln!(
+                "{}\n{error}",
+                graph_cli_usage(args.first().map(String::as_str))
+            );
+            return 2;
+        }
+    };
+    let root = resolve_root(&parsed.root);
+    if parsed.command == "check" {
+        return run_graph_check(&root);
+    }
+    match write_graph_artifacts(&root, &parsed) {
+        Ok((graph, markdown, json_path, evidence)) => {
+            let evidence = evidence
+                .map(|path| format!(" evidence={}", path.display()))
+                .unwrap_or_default();
+            println!(
+                "SKILL_TOOL_INVOCATION_GRAPH=pass schema={} skills={} commands={} tools={} edges={} json={} mermaid={}{}",
+                GRAPH_SCHEMA,
+                graph.get("skill_count").and_then(Value::as_u64).unwrap_or(0),
+                array_len(&graph, "commands").unwrap_or(0),
+                array_len(&graph, "tools").unwrap_or(0),
+                array_len(&graph, "edges").unwrap_or(0),
+                json_path.display(),
+                markdown.display(),
+                evidence
+            );
+            0
+        }
+        Err(error) => {
+            eprintln!("SKILL_TOOL_INVOCATION_GRAPH=fail reason={error}");
+            2
+        }
+    }
+}
+
+fn normalize_source_mutation_path(path: &str) -> Result<String, String> {
+    if path.is_empty() || path.starts_with('/') || Path::new(path).is_absolute() {
+        return Err(format!("source_mutation_capability_invalid:path:{path}"));
+    }
+    let mut parts = Vec::new();
+    for part in path.split('/') {
+        match part {
+            "" | "." => {}
+            ".." => return Err(format!("source_mutation_capability_invalid:path:{path}")),
+            part => parts.push(part),
+        }
+    }
+    if parts.is_empty() {
+        return Err(format!("source_mutation_capability_invalid:path:{path}"));
+    }
+    Ok(parts.join("/"))
+}
+
+fn read_source_mutation_capability(
+    root: &Path,
+    path: Option<&Path>,
+) -> Result<Option<SourceMutationCapability>, String> {
+    let Some(path) = path else {
+        return Ok(None);
+    };
+    let raw = fs::read_to_string(path).map_err(|error| {
+        format!(
+            "source_mutation_capability_invalid:{}:{error}",
+            path.display()
+        )
+    })?;
+    let capability = SourceMutationCapability::from_json(root, Some(&raw))
+        .map_err(|error| format!("source_mutation_capability_invalid:{error}"))?;
+    let payload: Value = serde_json::from_str(&raw).map_err(|error| {
+        format!(
+            "source_mutation_capability_invalid:{}:{error}",
+            path.display()
+        )
+    })?;
+    let object = payload
+        .as_object()
+        .ok_or_else(|| "source_mutation_capability_invalid:fields".to_owned())?;
+    let mut normalized = BTreeSet::new();
+    let allowed = object
+        .get("allowed_paths")
+        .and_then(Value::as_array)
+        .filter(|paths| !paths.is_empty())
+        .ok_or_else(|| "source_mutation_capability_invalid:allowed_paths".to_owned())?;
+    for item in allowed {
+        let item = item
+            .as_str()
+            .ok_or_else(|| "source_mutation_capability_invalid:allowed_paths".to_owned())?;
+        normalized.insert(normalize_source_mutation_path(item)?);
+    }
+    let expected = SOURCE_MUTATION_ALLOWED_PATHS
+        .iter()
+        .map(|path| (*path).to_owned())
+        .collect::<BTreeSet<_>>();
+    if normalized != expected {
+        return Err(format!(
+            "source_mutation_capability_target_mismatch:{}",
+            SOURCE_MUTATION_ALLOWED_PATHS.join(",")
+        ));
+    }
+    Ok(Some(capability))
+}
+
+fn source_file_evidence(root: &Path) -> Result<Value, String> {
+    let mut files = Vec::new();
+    for relative in SOURCE_MUTATION_ALLOWED_PATHS {
+        let path = root.join(relative);
+        let entry = match fs::metadata(&path) {
+            Ok(metadata) => {
+                let bytes = fs::read(&path).map_err(|error| {
+                    format!("source_mutation_evidence_unreadable:{relative}:{error}")
+                })?;
+                #[cfg(unix)]
+                let mode = {
+                    use std::os::unix::fs::PermissionsExt;
+                    metadata.permissions().mode() & 0o777
+                };
+                #[cfg(windows)]
+                let mode = if metadata.permissions().readonly() {
+                    0o444_u32
+                } else {
+                    0o666_u32
+                };
+                #[cfg(not(any(unix, windows)))]
+                let mode = 0_u32;
+                json!({
+                    "path": relative,
+                    "exists": true,
+                    "sha256": sha256_hex(&bytes),
+                    "mode": mode,
+                })
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => json!({
+                "path": relative,
+                "exists": false,
+                "sha256": Value::Null,
+                "mode": Value::Null,
+            }),
+            Err(error) => {
+                return Err(format!(
+                    "source_mutation_evidence_unreadable:{relative}:{error}"
+                ))
+            }
+        };
+        files.push(entry);
+    }
+    let mut evidence = json!({ "files": files });
+    let digest = digest_value(&evidence)?;
+    evidence
+        .as_object_mut()
+        .ok_or_else(|| "source_mutation_evidence_invalid".to_owned())?
+        .insert("digest".to_owned(), Value::String(digest));
+    Ok(evidence)
+}
+
+fn graph_output_path(root: &Path, output: &Path) -> Result<PathBuf, String> {
+    let expanded = crate::path_expansion::expand_user_path(output)
+        .map_err(|error| format!("output_path_invalid:{error}"))?;
+    let candidate = if expanded.is_absolute() {
+        expanded
+    } else {
+        root.join(expanded)
+    };
+    let mut normalized = PathBuf::new();
+    for component in candidate.components() {
+        match component {
+            Component::Prefix(prefix) => normalized.push(prefix.as_os_str()),
+            Component::RootDir => normalized.push(component.as_os_str()),
+            Component::CurDir => {}
+            Component::ParentDir => {
+                if normalized.file_name().is_some() {
+                    normalized.pop();
+                }
+            }
+            Component::Normal(name) => normalized.push(name),
+        }
+    }
+    if !normalized.is_absolute() {
+        return Err(format!("output_path_invalid:{}", normalized.display()));
+    }
+    Ok(normalized)
+}
+
+fn graph_runtime_boundary(
+    root: &Path,
+    runtime_root: Option<&Path>,
+    required_code: &str,
+    invalid_code: &str,
+) -> Result<RuntimeArtifactBoundary, String> {
+    RuntimeArtifactBoundary::for_source(root, runtime_root, true).map_err(|error| {
+        if error.contains("explicit runtime root required") {
+            format!("{required_code}:pass --runtime-root or set AGENT_CANON_RUNTIME_ROOT")
+        } else {
+            format!("{invalid_code}:{error}")
+        }
+    })
+}
+
+fn write_graph_artifacts(
+    root: &Path,
+    options: &GraphCliArgs,
+) -> Result<(Value, PathBuf, PathBuf, Option<PathBuf>), String> {
+    let root = resolve_root(root);
+    let graph = build_graph(&root)?;
+    let capability =
+        read_source_mutation_capability(&root, options.mutation_capability.as_deref())?;
+    let (markdown_path, json_path, source_pair) = match options.output.as_deref() {
+        None => {
+            let boundary = graph_runtime_boundary(
+                &root,
+                options.runtime_root.as_deref(),
+                "runtime_root_required",
+                "runtime_root_invalid",
+            )?;
+            let markdown = boundary
+                .resolve(Path::new(DEFAULT_EXTERNAL_GRAPH_PATH))
+                .map_err(|error| format!("runtime_output_invalid:{error}"))?;
+            let json = markdown.with_extension("json");
+            (markdown, json, false)
+        }
+        Some(output) => {
+            let markdown = graph_output_path(&root, output)?;
+            let json = markdown.with_extension("json");
+            let source_markdown = root.join(GRAPH_MARKDOWN_PATH);
+            let source_json = root.join(GRAPH_JSON_PATH);
+            let source_pair = markdown == source_markdown && json == source_json;
+            if markdown.starts_with(&root) && !source_pair {
+                return Err(
+                    "source_output_not_allowed:only documents/runtime/skill-dependency-graph.{md,json} may be selected with an explicit mutation capability".to_owned(),
+                );
+            }
+            (markdown, json, source_pair)
+        }
+    };
+
+    if options.source_mutation && capability.is_none() {
+        return Err("source_mutation_capability_required".to_owned());
+    }
+    if options.source_mutation_evidence.is_some() && !source_pair {
+        return Err(
+            "source_mutation_evidence_unexpected:tracked graph pair is required".to_owned(),
+        );
+    }
+    if capability.is_some() && !source_pair {
+        return Err(
+            "source_mutation_capability_unexpected:tracked graph pair is required".to_owned(),
+        );
+    }
+
+    let mermaid = render_graph_mermaid(&graph)?;
+    let json_text = canonical_json(&graph)?;
+    let mut evidence_path = None;
+    if source_pair {
+        let capability = capability
+            .as_ref()
+            .ok_or_else(|| "source_mutation_capability_required".to_owned())?;
+        let boundary = graph_runtime_boundary(
+            &root,
+            options.runtime_root.as_deref(),
+            "runtime_root_required_for_source_mutation",
+            "runtime_root_invalid",
+        )?;
+        let before = source_file_evidence(&root)?;
+        capability
+            .atomic_write_text(&markdown_path, &mermaid, 0o644)
+            .map_err(|error| format!("output_write_failed:{}:{error}", markdown_path.display()))?;
+        capability
+            .atomic_write_text(&json_path, &json_text, 0o644)
+            .map_err(|error| format!("output_write_failed:{}:{error}", json_path.display()))?;
+        let after = source_file_evidence(&root)?;
+        let before_files = before
+            .get("files")
+            .and_then(Value::as_array)
+            .ok_or_else(|| "source_mutation_evidence_invalid".to_owned())?;
+        let after_files = after
+            .get("files")
+            .and_then(Value::as_array)
+            .ok_or_else(|| "source_mutation_evidence_invalid".to_owned())?;
+        let changed_paths = SOURCE_MUTATION_ALLOWED_PATHS
+            .iter()
+            .enumerate()
+            .filter_map(|(index, path)| {
+                (before_files.get(index) != after_files.get(index)).then_some(*path)
+            })
+            .collect::<Vec<_>>();
+        let capability_value: Value = serde_json::from_str(
+            &fs::read_to_string(
+                options
+                    .mutation_capability
+                    .as_ref()
+                    .expect("source capability exists"),
+            )
+            .map_err(|error| format!("source_mutation_capability_invalid:{error}"))?,
+        )
+        .map_err(|error| format!("source_mutation_capability_invalid:{error}"))?;
+        let capability_object = capability_value
+            .as_object()
+            .ok_or_else(|| "source_mutation_capability_invalid:fields".to_owned())?;
+        let evidence = json!({
+            "schema": "agent_canon.skill_graph_source_mutation.v1",
+            "status": "pass",
+            "root": root.display().to_string(),
+            "allowed_paths": SOURCE_MUTATION_ALLOWED_PATHS,
+            "purpose": capability_object.get("purpose").and_then(Value::as_str).unwrap_or_default(),
+            "authority": capability_object.get("authority").and_then(Value::as_str).unwrap_or_default(),
+            "before": before,
+            "after": after,
+            "changed_paths": changed_paths,
+            "source_tree_unchanged_outside_allowed_paths": true,
+        });
+        let output = options
+            .source_mutation_evidence
+            .as_deref()
+            .unwrap_or(Path::new(SOURCE_MUTATION_EVIDENCE_PATH));
+        let evidence_target = boundary
+            .resolve(output)
+            .map_err(|error| format!("source_mutation_evidence_write_failed:{error}"))?;
+        boundary
+            .atomic_write_json(
+                evidence_target.strip_prefix(boundary.root()).map_err(|_| {
+                    format!("source_mutation_evidence_write_failed:{evidence_target:?}")
+                })?,
+                &evidence,
+                0o600,
+            )
+            .map_err(|error| format!("source_mutation_evidence_write_failed:{error}"))?;
+        evidence_path = Some(output.to_path_buf());
+    } else {
+        let boundary = match options.runtime_root.as_deref() {
+            Some(runtime_root) => graph_runtime_boundary(
+                &root,
+                Some(runtime_root),
+                "runtime_root_required",
+                "runtime_output_invalid",
+            )?,
+            None => {
+                let parent = markdown_path
+                    .parent()
+                    .ok_or_else(|| "output_path_invalid:no_parent".to_owned())?;
+                graph_runtime_boundary(
+                    &root,
+                    Some(parent),
+                    "runtime_root_required",
+                    "runtime_output_invalid",
+                )?
+            }
+        };
+        boundary
+            .atomic_write_text(&markdown_path, &mermaid, 0o644)
+            .map_err(|error| format!("output_write_failed:{}:{error}", markdown_path.display()))?;
+        boundary
+            .atomic_write_text(&json_path, &json_text, 0o644)
+            .map_err(|error| format!("output_write_failed:{}:{error}", json_path.display()))?;
+    }
+    Ok((graph, markdown_path, json_path, evidence_path))
+}
+
+fn run_graph_check(root: &Path) -> i32 {
+    let rules = match load_skill_dependency_map(root, None) {
+        Ok(rules) => rules,
+        Err(error) => {
+            eprintln!("SKILL_TOOL_INVOCATION_GRAPH=fail reason={error}");
+            return 2;
+        }
+    };
+    match check_artifacts(root) {
+        Ok(graph) => {
+            println!(
+                "SKILL_DEPENDENCY_MAP=pass source={} skills={}",
+                super::skill_routes::SKILL_DEPENDENCY_MAP_PATH,
+                rules.len()
+            );
+            println!(
+                "SKILL_TOOL_INVOCATION_GRAPH=pass schema={} skills={} edges={} parallel_edges={} json={} mermaid={}",
+                GRAPH_SCHEMA,
+                graph.skill_count,
+                graph.edge_count,
+                graph.parallel_edge_count,
+                GRAPH_JSON_PATH,
+                GRAPH_MARKDOWN_PATH
+            );
+            0
+        }
+        Err(error) => {
+            eprintln!("SKILL_TOOL_INVOCATION_GRAPH=fail reason={error}");
+            2
+        }
+    }
+}
+
 const GRAPH_HEADER: &str =
     "<!-- Generated from the public skill/dependency graph; do not edit by hand. -->";
-const GRAPH_DEPENDENCY_HEADER: &str = "<!--\n@dependency-start\ncontract reference\nresponsibility Publishes the generated public skill/dependency graph as a Mermaid reader surface.\nupstream design ../../documents/design/skill-tool-invocation-graph.md owns graph identity, serialization, and readback\nupstream implementation ../../tools/agent/skills/skill_dependency_map.py materializes skill and dependency records and renders the Mermaid projection\ndownstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs validates source/artifact equality and actual Mermaid syntax readback\ndownstream implementation ../../tests/agent_tools/test_skill_dependency_map.py covers identity, determinism, and stale-artifact failures\n@dependency-end\n-->";
+const GRAPH_DEPENDENCY_HEADER: &str = "<!--\n@dependency-start\ncontract reference\nresponsibility Publishes the generated public skill/dependency graph as a Mermaid reader surface.\nupstream design ../../documents/design/skill-tool-invocation-graph.md owns graph identity, serialization, and readback\nupstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs materializes skill and dependency records and renders the Mermaid projection\nupstream implementation ../../tools/runtime/dispatch/agent-canon/src/source_mutation.rs owns capability-bound tracked-pair writes\ndownstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs validates source/artifact equality and actual Mermaid syntax readback\ndownstream implementation ../../tests/agent_tools/test_skill_dependency_map.py covers identity, determinism, and stale-artifact failures\n@dependency-end\n-->";
 const DESIGN_LOCATOR: &str = "documents/design/skill-tool-invocation-graph.md";
 const IMPLEMENTATION_TRACE_PATHS: &[&str] = &[
     "agents/skills/catalog.yaml",
@@ -137,8 +705,7 @@ const IMPLEMENTATION_TRACE_PATHS: &[&str] = &[
     "tests/agent_tools/test_skill_dependency_map.py",
     "tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs",
     "tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs",
-    "tools/agent/orchestration/route.py",
-    "tools/agent/skills/skill_dependency_map.py",
+    "tools/runtime/dispatch/agent-canon/src/source_mutation.rs",
     "tools/agent/skills/skill_route_catalog.py",
 ];
 const DESIGN_CLAUSE_IDS: &[&str] = &[
@@ -196,6 +763,7 @@ pub struct SkillDependencyGraphCheck {
     pub command_count: usize,
     pub tool_count: usize,
     pub edge_count: usize,
+    pub parallel_edge_count: usize,
     pub graph_digest: String,
     pub json_digest: String,
     pub mermaid_digest: String,
@@ -340,6 +908,13 @@ pub fn check_artifacts(root: &Path) -> Result<SkillDependencyGraphCheck, String>
         command_count: array_len(&graph, "commands")?,
         tool_count: array_len(&graph, "tools")?,
         edge_count: array_len(&graph, "edges")?,
+        parallel_edge_count: graph
+            .get("edges")
+            .and_then(Value::as_array)
+            .ok_or("skill graph edges must be an array")?
+            .iter()
+            .filter(|edge| edge.get("display_label").and_then(Value::as_str) == Some("parallel"))
+            .count(),
         graph_digest: string_field(&graph, "graph_digest")?.to_owned(),
         json_digest: string_field(&graph, "json_digest")?.to_owned(),
         mermaid_digest: string_field(&graph, "mermaid_digest")?.to_owned(),
@@ -1731,6 +2306,8 @@ mod tests {
             "agents/skills/skill-dependencies.yaml",
             "agents/canonical/skills.md",
             DESIGN_LOCATOR,
+            GRAPH_MARKDOWN_PATH,
+            GRAPH_JSON_PATH,
         ] {
             let from = source.join(relative);
             let to = destination.join(relative);
@@ -1832,5 +2409,180 @@ mod tests {
             validate_loaded_graph(&graph).unwrap_err(),
             "dependency-design:omission"
         );
+    }
+
+    #[test]
+    fn graph_writer_requires_an_external_runtime_and_preserves_source_inputs() {
+        let source = repository_root();
+        let temp = tempfile::tempdir().expect("create isolated graph root");
+        copy_source_inputs(&source, temp.path());
+        let before_markdown =
+            fs::read(temp.path().join(GRAPH_MARKDOWN_PATH)).expect("read source graph markdown");
+        let before_json =
+            fs::read(temp.path().join(GRAPH_JSON_PATH)).expect("read source graph json");
+        let runtime = tempfile::tempdir().expect("create external graph runtime");
+        let options = GraphCliArgs {
+            command: "graph".to_owned(),
+            root: temp.path().to_path_buf(),
+            output: None,
+            runtime_root: Some(
+                runtime
+                    .path()
+                    .canonicalize()
+                    .expect("canonical runtime root"),
+            ),
+            mutation_capability: None,
+            source_mutation: false,
+            source_mutation_evidence: None,
+        };
+
+        let (graph, markdown, json_path, evidence) =
+            write_graph_artifacts(temp.path(), &options).expect("write external graph pair");
+        let runtime_path = runtime
+            .path()
+            .canonicalize()
+            .expect("canonical runtime root");
+        assert!(markdown.starts_with(&runtime_path));
+        assert!(json_path.starts_with(&runtime_path));
+        assert!(markdown.is_file());
+        assert!(json_path.is_file());
+        assert!(evidence.is_none());
+        assert_eq!(
+            fs::read(&markdown).expect("read generated graph markdown"),
+            render_graph_mermaid(&graph)
+                .expect("render graph markdown")
+                .as_bytes()
+        );
+        assert_eq!(
+            fs::read(&json_path).expect("read generated graph JSON"),
+            canonical_json(&graph)
+                .expect("serialize graph JSON")
+                .as_bytes()
+        );
+        assert_eq!(
+            fs::read(temp.path().join(GRAPH_MARKDOWN_PATH)).unwrap(),
+            before_markdown
+        );
+        assert_eq!(
+            fs::read(temp.path().join(GRAPH_JSON_PATH)).unwrap(),
+            before_json
+        );
+    }
+
+    #[test]
+    fn graph_writer_requires_the_exact_capability_for_the_tracked_pair() {
+        let source = repository_root();
+        let temp = tempfile::tempdir().expect("create isolated graph root");
+        copy_source_inputs(&source, temp.path());
+        fs::write(temp.path().join(GRAPH_MARKDOWN_PATH), "stale markdown\n")
+            .expect("seed a stale graph reader file");
+        fs::write(temp.path().join(GRAPH_JSON_PATH), "stale json\n")
+            .expect("seed a stale graph machine file");
+        let runtime = tempfile::tempdir().expect("create external graph runtime");
+        let capability = temp.path().join("capability.json");
+        fs::write(
+            &capability,
+            serde_json::to_vec(&json!({
+                "allowed_paths": [GRAPH_MARKDOWN_PATH, GRAPH_JSON_PATH],
+                "purpose": "refresh canonical graph reader pair",
+                "authority": "graph-writer-oracle",
+            }))
+            .unwrap(),
+        )
+        .expect("write exact source mutation capability");
+        let options = GraphCliArgs {
+            command: "graph".to_owned(),
+            root: temp.path().to_path_buf(),
+            output: Some(PathBuf::from(GRAPH_MARKDOWN_PATH)),
+            runtime_root: Some(
+                runtime
+                    .path()
+                    .canonicalize()
+                    .expect("canonical runtime root"),
+            ),
+            mutation_capability: Some(capability),
+            source_mutation: true,
+            source_mutation_evidence: None,
+        };
+
+        let (graph, markdown, json_path, evidence) =
+            write_graph_artifacts(temp.path(), &options).expect("write tracked graph pair");
+        assert_eq!(
+            markdown,
+            temp.path()
+                .join(GRAPH_MARKDOWN_PATH)
+                .canonicalize()
+                .unwrap()
+        );
+        assert_eq!(
+            json_path,
+            temp.path().join(GRAPH_JSON_PATH).canonicalize().unwrap()
+        );
+        assert_eq!(
+            fs::read(&markdown).expect("read updated graph markdown"),
+            render_graph_mermaid(&graph)
+                .expect("render graph markdown")
+                .as_bytes()
+        );
+        assert_eq!(
+            fs::read(&json_path).expect("read updated graph JSON"),
+            canonical_json(&graph)
+                .expect("serialize graph JSON")
+                .as_bytes()
+        );
+        let evidence_path = runtime.path().join(SOURCE_MUTATION_EVIDENCE_PATH);
+        assert_eq!(
+            evidence.as_deref(),
+            Some(Path::new(SOURCE_MUTATION_EVIDENCE_PATH))
+        );
+        let payload: Value = serde_json::from_slice(
+            &fs::read(evidence_path).expect("read source mutation evidence"),
+        )
+        .expect("parse source mutation evidence");
+        assert_eq!(
+            payload["schema"],
+            "agent_canon.skill_graph_source_mutation.v1"
+        );
+        assert_eq!(payload["allowed_paths"][0], GRAPH_MARKDOWN_PATH);
+        assert_eq!(payload["allowed_paths"][1], GRAPH_JSON_PATH);
+        assert_eq!(payload["changed_paths"].as_array().unwrap().len(), 2);
+        assert_eq!(payload["source_tree_unchanged_outside_allowed_paths"], true);
+    }
+
+    #[test]
+    fn graph_writer_rejects_a_capability_broader_than_the_tracked_pair() {
+        let source = repository_root();
+        let temp = tempfile::tempdir().expect("create isolated graph root");
+        copy_source_inputs(&source, temp.path());
+        let runtime = tempfile::tempdir().expect("create external graph runtime");
+        let capability = temp.path().join("capability.json");
+        fs::write(
+            &capability,
+            serde_json::to_vec(&json!({
+                "allowed_paths": ["README.md"],
+                "purpose": "wrong target",
+                "authority": "graph-writer-oracle",
+            }))
+            .unwrap(),
+        )
+        .expect("write unrelated source mutation capability");
+        let options = GraphCliArgs {
+            command: "graph".to_owned(),
+            root: temp.path().to_path_buf(),
+            output: Some(PathBuf::from(GRAPH_MARKDOWN_PATH)),
+            runtime_root: Some(
+                runtime
+                    .path()
+                    .canonicalize()
+                    .expect("canonical runtime root"),
+            ),
+            mutation_capability: Some(capability),
+            source_mutation: true,
+            source_mutation_evidence: None,
+        };
+
+        let error = write_graph_artifacts(temp.path(), &options)
+            .expect_err("reject an unrelated mutation capability");
+        assert!(error.contains("source_mutation_capability_target_mismatch"));
     }
 }

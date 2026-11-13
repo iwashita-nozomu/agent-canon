@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests post-run numerical performance routing and the non-numerical C++ boundary.
-# upstream implementation ../../tools/agent/orchestration/route.py owns prompt-derived skill routing
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs owns native prompt-derived skill routing
 # upstream design ../../agents/skills/computational-optimization.md owns convergence-first numerical performance diagnosis
 # upstream design ../../agents/skills/cpp-review.md owns the native performance handoff boundary
 # upstream design ../../documents/experiments/experiment-critical-review.md owns post-run experiment review
@@ -12,17 +12,19 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
-import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-ROUTE = PROJECT_ROOT / "tools" / "agent" / "orchestration" / "route.py"
+AGENT_CANON_CLI = Path(
+    os.environ.get("AGENT_CANON_CLI", str(PROJECT_ROOT / "tools/bin/agent-canon"))
+)
 
 
 def _route(prompt: str) -> dict[str, object]:
     result = subprocess.run(
-        [sys.executable, str(ROUTE), "--prompt", prompt, "--format", "json"],
+        [str(AGENT_CANON_CLI), "route", "--prompt", prompt, "--format", "json"],
         cwd=PROJECT_ROOT,
         capture_output=True,
         check=False,
@@ -45,7 +47,9 @@ def test_changed_iterations_routes_math_before_jit() -> None:
     assert "environment-maintenance" not in skills
 
 
-def test_same_trajectory_compile_cost_keeps_math_as_gate_and_forbids_math_edit() -> None:
+def test_same_trajectory_compile_cost_keeps_math_as_gate_and_forbids_math_edit() -> (
+    None
+):
     """An isolated compile cost is a sibling handoff after math evidence."""
     skills = _active_skills(
         "修正して。solver residual performance は same trajectory same iterations。"
@@ -84,9 +88,9 @@ def test_nonnumeric_cpp_performance_keeps_existing_route() -> None:
 
 def test_diagnosis_docs_bind_cost_decomposition_and_post_run_order() -> None:
     """The three owners expose one consistent post-run decomposition and order."""
-    optimization = (PROJECT_ROOT / "agents/skills/computational-optimization.md").read_text(
-        encoding="utf-8"
-    )
+    optimization = (
+        PROJECT_ROOT / "agents/skills/computational-optimization.md"
+    ).read_text(encoding="utf-8")
     cpp = (PROJECT_ROOT / "agents/skills/cpp-review.md").read_text(encoding="utf-8")
     experiment = (
         PROJECT_ROOT / "documents/experiments/experiment-critical-review.md"
@@ -137,10 +141,13 @@ def test_catalog_exposes_only_narrow_numeric_performance_route() -> None:
     assert '["iterative", "algorithm", "performance"]' in computational
     assert '["performance"]' not in computational
 
-    optimization = (PROJECT_ROOT / "agents/skills/computational-optimization.md").read_text(
-        encoding="utf-8"
+    optimization = (
+        PROJECT_ROOT / "agents/skills/computational-optimization.md"
+    ).read_text(encoding="utf-8")
+    assert (
+        "tools/bin/agent-canon numeric-performance --input <post-run-observations.json>"
+        in optimization
     )
-    assert "tools/bin/agent-canon numeric-performance --input <post-run-observations.json>" in optimization
 
 
 def test_numeric_solver_performance_trigger_is_not_generic() -> None:

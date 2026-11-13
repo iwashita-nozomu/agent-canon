@@ -14,7 +14,7 @@
       "path": "../outside.rs"
     },
     {
-      "command": "python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py && python3 -m pytest tests/agent_tools/test_codex_hooks.py -q",
+      "command": "tools/bin/agent-canon check-agent-runtime-alignment && python3 -m pytest tests/agent_tools/test_codex_hooks.py -q",
       "gate": "codex_hook_runtime_alignment",
       "handoff": "include hook wiring, quiet-pass behavior, and runtime alignment evidence",
       "path": ".codex/hooks.json"
@@ -28,7 +28,7 @@
     {
       "command": "tools/bin/agent-canon responsibility-scope --root . --format json",
       "gate": "responsibility_scope",
-      "handoff": "scope:runtime-entrypoints owner:agent-canon class:shared_runtime protecting_tools:tools/validation/semantic/runtime/check_agent_runtime_alignment.py",
+      "handoff": "scope:runtime-entrypoints owner:agent-canon class:shared_runtime protecting_tools:tools/runtime/dispatch/agent-canon/src/runtime_alignment.rs",
       "path": ".codex/hooks.json"
     },
     {
@@ -38,7 +38,7 @@
       "path": ".codex/hooks/hook_dispatcher.py"
     },
     {
-      "command": "python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py && python3 -m pytest tests/agent_tools/test_codex_hooks.py -q",
+      "command": "tools/bin/agent-canon check-agent-runtime-alignment && python3 -m pytest tests/agent_tools/test_codex_hooks.py -q",
       "gate": "codex_hook_runtime_alignment",
       "handoff": "include hook wiring, quiet-pass behavior, and runtime alignment evidence",
       "path": ".codex/hooks/hook_dispatcher.py"
@@ -58,7 +58,7 @@
     {
       "command": "tools/bin/agent-canon responsibility-scope --root . --format json",
       "gate": "responsibility_scope",
-      "handoff": "scope:runtime-entrypoints owner:agent-canon class:shared_runtime protecting_tools:tools/validation/semantic/runtime/check_agent_runtime_alignment.py",
+      "handoff": "scope:runtime-entrypoints owner:agent-canon class:shared_runtime protecting_tools:tools/runtime/dispatch/agent-canon/src/runtime_alignment.rs",
       "path": ".codex/hooks/hook_dispatcher.py"
     },
     {
@@ -82,7 +82,7 @@
     {
       "command": "tools/bin/agent-canon responsibility-scope --root . --format json",
       "gate": "responsibility_scope",
-      "handoff": "scope:runtime-entrypoints owner:agent-canon class:shared_runtime protecting_tools:tools/validation/semantic/runtime/check_agent_runtime_alignment.py",
+      "handoff": "scope:runtime-entrypoints owner:agent-canon class:shared_runtime protecting_tools:tools/runtime/dispatch/agent-canon/src/runtime_alignment.rs",
       "path": ".codex/personal/skills/subagent-bootstrap/SKILL.md"
     },
     {
@@ -124,7 +124,7 @@
     {
       "command": "tools/bin/agent-canon responsibility-scope --root . --format json",
       "gate": "responsibility_scope",
-      "handoff": "scope:runtime-entrypoints owner:agent-canon class:shared_runtime protecting_tools:tools/validation/semantic/runtime/check_agent_runtime_alignment.py",
+      "handoff": "scope:runtime-entrypoints owner:agent-canon class:shared_runtime protecting_tools:tools/runtime/dispatch/agent-canon/src/runtime_alignment.rs",
       "path": "agents/COMMUNICATION_PROTOCOL.md"
     },
     {

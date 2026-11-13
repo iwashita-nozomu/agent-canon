@@ -5,7 +5,7 @@
 # responsibility Tests integrated CI shell wiring that is too expensive to execute wholesale.
 # upstream implementation ../../tools/validation/ci/runners/run_all_checks.sh runs repository and AgentCanon CI gates
 # upstream implementation ../../tests/bootstrap/docker.sh provides the full-check image runtime environment
-# upstream implementation ../../eval/producers/run_accumulated_agent_evals.py writes accumulated eval reports
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/eval_accumulation.rs writes accumulated eval reports
 # upstream implementation ../../tools/runtime/dispatch/agent-canon/src/eval_accumulation_check.rs validates accumulated eval reports
 # upstream implementation ../../tools/runtime/archive/runtime_log_paths.py resolves mounted log archive paths
 # @dependency-end
@@ -47,7 +47,7 @@ class RunAllChecksScriptTest(unittest.TestCase):
         runtime_marker = 'AGENT_CANON_RUNTIME_ROOT="${AGENT_CANON_CI_RUNTIME_ROOT}"'
         eval_runtime_marker = '--runtime-root "${AGENT_CANON_CI_RUNTIME_ROOT}"'
         producer_marker = (
-            'run_accumulated_agent_evals.py" "${accumulated_eval_args[@]}"'
+            'run_agent_canon run-accumulated-agent-evals "${accumulated_eval_args[@]}"'
         )
         checker_marker = "run_agent_canon eval-accumulation-check"
         command_env_marker = (
@@ -73,9 +73,7 @@ class RunAllChecksScriptTest(unittest.TestCase):
         text = SCRIPT.read_text(encoding="utf-8")
 
         standalone_marker = "accumulated_eval_args=("
-        standalone_eval_run = (
-            'run_accumulated_agent_evals.py" "${accumulated_eval_args[@]}" 2>&1; then'
-        )
+        standalone_eval_run = 'run_agent_canon run-accumulated-agent-evals "${accumulated_eval_args[@]}" 2>&1; then'
 
         self.assertIn(standalone_marker, text)
         self.assertIn(standalone_eval_run, text)

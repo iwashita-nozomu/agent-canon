@@ -2,7 +2,7 @@
 @dependency-start
 contract reference
 responsibility Documents route tool usage.
-upstream implementation ../../tools/agent/orchestration/route.py selects short tool and skill routes
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs owns the native route selector
 upstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs owns explicit capability selection
 upstream design ../../agents/skills/code-visualization.md owns visualization selection and native renderer delegation
 upstream design ../design/tool-skill-routing-refactor.md defines short naming policy
@@ -11,9 +11,9 @@ downstream implementation ../../tests/agent_tools/test_route.py validates route 
 @dependency-end
 -->
 
-# route.py
+# `agent-canon route`
 
-`route.py` is the short AgentCanon entrypoint for task routing decisions that
+`tools/bin/agent-canon route` is the short AgentCanon entrypoint for task routing decisions that
 would otherwise become many long one-off tools. It maps long proposal names
 such as `profile_surface_resolver.py` or `$runtime-capability-routing` to one
 small command surface:
@@ -22,11 +22,11 @@ Explicit `--capability` selection delegates preflight and decision-making to
 the native `agent-canon capability-route` command.
 
 ```bash
-python3 tools/agent/orchestration/route.py --area checks --changed README.md
-python3 tools/agent/orchestration/route.py --name profile_surface_resolver.py
-python3 tools/agent/orchestration/route.py --name repo_refactor_skill.py
-python3 tools/agent/orchestration/route.py --prompt "fix skill routing with multi-agent evidence" --mode repo-changing --format json
-python3 tools/agent/orchestration/route.py --list --format markdown
+tools/bin/agent-canon route --area checks --changed README.md
+tools/bin/agent-canon route --name profile_surface_resolver.py
+tools/bin/agent-canon route --name repo_refactor_skill.py
+tools/bin/agent-canon route --prompt "fix skill routing with multi-agent evidence" --mode repo-changing --format json
+tools/bin/agent-canon route --list --format markdown
 ```
 
 Text output is machine-readable and compact:
@@ -34,14 +34,14 @@ Text output is machine-readable and compact:
 ```text
 ROUTE=task-routing
 AREA=checks
-TOOL=route.py
+TOOL=tools/bin/agent-canon route
 SKILL=task-routing
 NEXT_ACTION=run_selected_checks
 COMMANDS=make check-matrix
 ```
 
-Prompt skill routing is owned by the Python fast path
-`route.py --prompt`. It returns the full selected `SKILLS` list plus
+Prompt skill routing is owned by the native route
+`tools/bin/agent-canon route --prompt`. It returns the full selected `SKILLS` list plus
 `ACTIVE_SKILLS` for the current stage and `DEFERRED_SKILLS` for dynamic wave
 triggers. It also returns `RELATED_SKILL_CANDIDATES` and `RELATED_SKILLS` from
 the public skill catalog; use those as next-stage candidates after matching
@@ -67,7 +67,7 @@ Pass already established owner/topology facts as JSON, or use `-` to read JSON
 from stdin without creating an artifact:
 
 ```bash
-python3 tools/agent/orchestration/route.py --area closeout --format json \
+tools/bin/agent-canon route --area closeout --format json \
   --execution-context '{"roots":1,"owners":1,"writers":1,"scope_resolved":true,"contract_resolved":true,"validation":"git diff --check","coordination":[]}'
 ```
 
@@ -101,13 +101,13 @@ Capability mode is the explicit, fail-closed route for a single catalog
 capability. The success command is:
 
 ```bash
-python3 tools/agent/orchestration/route.py --capability oop_type_design --mode routing-only --format json
+tools/bin/agent-canon route --capability oop_type_design --mode routing-only --format json
 ```
 
 An unknown capability is also explicit and fail-closed:
 
 ```bash
-python3 tools/agent/orchestration/route.py --capability unknown_capability --mode routing-only --format json
+tools/bin/agent-canon route --capability unknown_capability --mode routing-only --format json
 ```
 
 This command returns exit status 2. Capability mode accepts one exact catalog
@@ -142,14 +142,14 @@ Repository-refactor and structure-review aliases such as
 `repo_refactor_skill.py`, `repo/refactor`, and `structure-review`, plus personal
 Codex runtime boundary prompts involving `~/.codex`, route to the `structure`
 area and `$structure-refactor`. Do not add a parallel public repo-refactor or
-structure-review skill unless `route.py --name <candidate>` returns
+structure-review skill unless `tools/bin/agent-canon route --name <candidate>` returns
 `STATUS=unknown` after the structure route has been considered.
 
 Routing miss, selection gap, ToolCall, SkillCall, or coverage prompts are
-log-analysis tasks. `route.py --prompt ... --mode routing-only --format json` should include
+log-analysis tasks. `tools/bin/agent-canon route --prompt ... --mode routing-only --format json` should include
 `$agent-log-analysis` for those requests so the agent reads compact runtime
 dashboard evidence before editing prompt, hook, skill, or workflow surfaces.
 
 Use this tool when a task needs a short answer to "which profile, check,
 runtime, skill, or closeout path applies?" Use the specialized checker or
-runner only after `route.py` points to it.
+runner only after the native route points to it.

@@ -83,11 +83,13 @@ pub mod github_status_lifecycle;
 pub mod historical_skill_usage;
 pub mod server_readiness;
 pub mod skill_frontmatter;
+pub mod skill_shim_evaluation;
 // This shared source module also serves the CLI's AST tools; the reusable LSP
 // API uses only the newline and source-offset helpers from this owner.
 pub mod agent_canon_source_root;
 pub mod behavior_event_assembly;
 pub mod environment_dependencies;
+pub mod eval_accumulation;
 pub mod eval_accumulation_check;
 pub mod eval_archive_paths;
 pub mod eval_manifest_paths;
@@ -121,6 +123,7 @@ pub mod reference_materializer;
 pub mod repo_structure_contract;
 pub mod report_artifact_checks;
 pub mod run_evaluation;
+pub mod runtime_alignment;
 pub mod runtime_boundary;
 pub mod scip_index;
 pub mod skill_lane_detector;
