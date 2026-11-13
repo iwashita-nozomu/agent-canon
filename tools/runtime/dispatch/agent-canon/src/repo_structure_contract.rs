@@ -8,8 +8,6 @@
 
 use crate::path_resolution::{python_fnmatch_case, resolve_non_strict};
 use crate::python_cli_options::{resolve_long_option_prefix, LongOptionError};
-#[cfg(windows)]
-use crate::python_text::python_lower;
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
@@ -163,9 +161,12 @@ fn ignored(path: &str, rules: &IgnoreRules) -> bool {
 fn platform_fnmatch(value: &str, pattern: &str) -> bool {
     #[cfg(windows)]
     {
+        let lower = |value: &str| {
+            icu_casemap::CaseMapper::new().lowercase_to_string(value, &Default::default())
+        };
         python_fnmatch_case(
-            &python_lower(&value.replace('/', "\\")),
-            &python_lower(&pattern.replace('/', "\\")),
+            &lower(&value.replace('/', "\\")),
+            &lower(&pattern.replace('/', "\\")),
         )
     }
     #[cfg(not(windows))]
