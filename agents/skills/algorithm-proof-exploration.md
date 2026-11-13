@@ -7,7 +7,7 @@ responsibility Documents theorem-driven algorithm exploration before final forma
 upstream design lean-algorithm-design.md Lean-first algorithm design workflow.
 upstream design formal-proof-workflow.md checker-backed formal proof workflow.
 upstream design computational-optimization.md numerical optimization contract workflow.
-upstream implementation ../../tools/analysis/proof/jit_canonical_ir.py builds JIT-canonical IR.
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/jit_canonical_ir.rs builds JIT-canonical IR.
 upstream implementation ../../tools/runtime/dispatch/agent-canon/src/jit_ir_to_lean.rs lowers JIT-canonical IR into Lean evidence modules.
 upstream design ../../documents/tools/lean_capability_matrix.md routes Lean/Mathlib/Aesop capabilities by frontier shape.
 downstream implementation ../../.codex/personal/skills/algorithm-proof-exploration/SKILL.md exposes the skill to Codex.
@@ -71,7 +71,7 @@ termination, and certificate soundness remain conclusions to establish.
 
 Use IR, backend traces, theorem graphs, or flowcharts only when they answer a
 concrete question about the selected implementation. For compatible JIT Python
-paths, the existing [JIT-canonical extractor](../../tools/analysis/proof/jit_canonical_ir.py)
+paths, the existing [JIT-canonical extractor](../../documents/tools/jit_canonical_ir.md)
 and [Lean lowering](../../tools/runtime/dispatch/agent-canon/src/jit_ir_to_lean.rs)
 provide that route. An abstract proof, simple algorithm choice, or direct
 mathematical counterexample does not require those artifacts. A visualization

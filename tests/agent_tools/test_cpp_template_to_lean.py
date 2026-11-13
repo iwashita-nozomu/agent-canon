@@ -1,9 +1,9 @@
 # @dependency-start
 # contract test
 # responsibility Tests the single full-expansion C++ template source to Lean evidence tool.
-# upstream implementation ../../tools/analysis/proof/cpp_template_to_lean.py expands C++ roots.
-# upstream implementation ../../tools/analysis/code/cpp_source_canonical_ir.py extracts C++ IR.
-# upstream implementation ../../tools/analysis/proof/operational_ir_to_lean.py renders Lean.
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/cpp_template_to_lean.rs expands C++ roots.
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/cpp_source_canonical_ir.rs extracts C++ IR.
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/operational_ir_to_lean.rs renders Lean.
 # upstream design ../../documents/tools/cpp_template_to_lean.md documents the canonical route.
 # @dependency-end
 """Tests for the C++ template to Lean full-expansion tool."""
@@ -11,19 +11,21 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
-import sys
 import textwrap
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "analysis" / "proof" / "cpp_template_to_lean.py"
+AGENT_CANON_CLI = os.environ.get(
+    "AGENT_CANON_CLI", str(PROJECT_ROOT / "tools" / "bin" / "agent-canon")
+)
 
 
 def run_tool(*args: str) -> subprocess.CompletedProcess[str]:
     """Run the full C++ template to Lean tool."""
     return subprocess.run(
-        [sys.executable, str(SCRIPT), *args],
+        [AGENT_CANON_CLI, "cpp-template-to-lean", *args],
         cwd=PROJECT_ROOT,
         check=False,
         capture_output=True,

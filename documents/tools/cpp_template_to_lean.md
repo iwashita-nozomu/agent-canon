@@ -2,23 +2,23 @@
 @dependency-start
 contract reference
 responsibility Documents the canonical full-expansion C++ template source to Lean evidence route.
-upstream implementation ../../tools/analysis/proof/cpp_template_to_lean.py expands C++ source roots into Lean.
-upstream implementation ../../tools/analysis/code/cpp_source_canonical_ir.py extracts the C++ source envelope.
-upstream implementation ../../tools/analysis/proof/operational_ir_to_lean.py renders complete operational IR.
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/cpp_template_to_lean.rs expands C++ source roots into Lean.
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/cpp_source_canonical_ir.rs extracts the C++ source envelope.
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/operational_ir_to_lean.rs renders complete operational IR.
 downstream implementation ../../tests/agent_tools/test_cpp_template_to_lean.py validates the single CLI route.
 downstream design ../../tools/README.md lists proof and algorithm tool routes.
 @dependency-end
 -->
 
-# cpp_template_to_lean.py
+# cpp-template-to-lean
 
-`tools/analysis/proof/cpp_template_to_lean.py` is the canonical C++ template
+`tools/bin/agent-canon cpp-template-to-lean` is the canonical C++ template
 algorithm to Lean evidence route. It takes one C++ source root, fully expands
 the reachable parsed source implementation into the shared thin operational IR,
 enumerates static branch / loop / switch path classes, checks complete
 coverage, and writes Lean evidence definitions in one command.
 
-The lower-level `cpp_source_canonical_ir.py` and `operational_ir_to_lean.py`
+The lower-level `cpp-source-canonical-ir` and `operational-ir-to-lean`
 tools remain implementation components and diagnostic helpers. Formal proof
 workflows should call this tool for C++ template source roots instead of
 manually chaining the lower-level tools.
@@ -35,7 +35,7 @@ manually chaining the lower-level tools.
 ## Command
 
 ```bash
-python3 tools/analysis/proof/cpp_template_to_lean.py \
+tools/bin/agent-canon cpp-template-to-lean \
   --root . \
   --cpp-symbol include/algorithm.hpp::solve \
   --namespace Generated.CppSolve \
@@ -94,7 +94,7 @@ The generated Lean module contains evidence definitions for:
 - `coverageComplete`, a Boolean coverage fact.
 
 The optional JSON record contains the same C++ source envelope documented by
-`cpp_source_canonical_ir.py`.
+`cpp-source-canonical-ir`.
 
 ## Boundary
 
