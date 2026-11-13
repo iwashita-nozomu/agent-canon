@@ -8,7 +8,7 @@ upstream design ../../documents/parent-repository-audit/README.md owns the canon
 upstream design ../../responsibility-scope.toml owns the tracked-path owner/class relation
 upstream design ../skills/catalog.yaml owns public capability and command metadata
 upstream design ../skills/skill-dependencies.yaml owns prerequisite and routing relations
-upstream implementation ../../tools/analysis/code/parent_repository_audit.py owns deterministic unit selection and evidence receipts
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/parent_repository_audit.rs owns deterministic unit selection and evidence receipts
 downstream implementation ../../.codex/personal/skills/parent-repository-audit/SKILL.md exposes this source skill as a generated runtime adapter
 @dependency-end
 -->
@@ -59,9 +59,9 @@ summary、inventory、runtime shim は再生成可能な projection であり un
 親 root から resolver が返す owner command を実行します。
 
 ```bash
-python3 -m tools.analysis.code.parent_repository_audit list \
+agent-canon parent-repository-audit list \
   --root <parent-root> --format text
-python3 -m tools.analysis.code.parent_repository_audit list \
+agent-canon parent-repository-audit list \
   --root <parent-root> --surface <stable-surface> \
   --scope <tracked-evidence-path> --format text
 ```
@@ -78,7 +78,7 @@ unknown surface、invalid unit、source/root path escape、missing evidence scop
 check packet は unit receipt の全体状態を集約します。
 
 ```bash
-python3 -m tools.analysis.code.parent_repository_audit check \
+agent-canon parent-repository-audit check \
   --root <parent-root> \
   --unit-status <pass|closed|failed|deferred|blocked> \
   --format text

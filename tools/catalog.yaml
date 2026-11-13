@@ -53,6 +53,9 @@ runtime_schema:
   # one-file catalog entry below. Keeping this inventory here prevents the
   # dispatcher from silently dropping a first-class Rust route.
   rust_public_commands:
+    - id: rust-parent-repository-audit
+      selector: parent-repository-audit
+      path: tools/runtime/dispatch/agent-canon/src/parent_repository_audit.rs
     - id: rust-workflow-selection-manifest
       selector: workflow-selection-manifest
       path: tools/runtime/dispatch/agent-canon/src/workflow_selection_eval.rs
