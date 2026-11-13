@@ -204,16 +204,17 @@ fn source_capability_atomically_replaces_only_the_approved_file() {
     assert_eq!(fs::read_to_string(&approved).unwrap(), "after\n");
     assert_eq!(fs::read_to_string(&untouched).unwrap(), "untouched\n");
     assert_eq!(
-        fs::read_dir(approved.parent().unwrap())
-            .unwrap()
-            .count(),
+        fs::read_dir(approved.parent().unwrap()).unwrap().count(),
         2,
         "the same-directory temporary file is removed after publication"
     );
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        assert_eq!(approved.metadata().unwrap().permissions().mode() & 0o777, 0o644);
+        assert_eq!(
+            approved.metadata().unwrap().permissions().mode() & 0o777,
+            0o644
+        );
     }
     assert!(capability
         .atomic_write_text(&untouched, "must remain denied\n", 0o644)
