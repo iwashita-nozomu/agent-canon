@@ -105,14 +105,14 @@ Canonical helper commands:
 ```bash
 tools/bin/agent-canon jsonl-to-md <input.jsonl> <output.md>
 tools/bin/agent-canon summarize-hlo-jsonl <hlo.jsonl> > summary.json
-python3 tools/experiments/artifacts/html_artifact_access.py <report.html>
+agent-canon html-artifact-access <report.html>
 git annex add <archive-path>
 python3 -m tools.experiments.artifacts.update_latest_result experiments/<topic>/result --variant <variant>
 dot -V
 ```
 
 When an HTML report is produced on an SSH-reached HPC host or inside a container
-on that host, use `tools/experiments/artifacts/html_artifact_access.py` to record the
+on that host, use `tools/runtime/dispatch/agent-canon/src/html_artifact_access.rs` to record the
 `python3 -m http.server` command, SSH tunnel command, and local browser URL. The
 default bind address is `127.0.0.1`; use `--use-container-ip` when serving
 directly from inside a container and tunneling to the container IP.
