@@ -15,12 +15,6 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "validation" / "ci" / "runners" / "pre_review.sh"
-BOUNDARY = (
-    PROJECT_ROOT / "tools" / "repository" / "workspace" / "parent_root_side_effects.py"
-)
-RUNTIME_ARTIFACTS = (
-    PROJECT_ROOT / "tools" / "runtime" / "artifacts" / "runtime_artifacts.py"
-)
 PATH_ENV_KEYS = {
     "AGENT_CANON_ACTIVE_REPOSITORY_ROOT",
     "AGENT_CANON_CHILD_HANDOFF",
@@ -49,13 +43,6 @@ def test_pre_review_uses_boundary_report_and_parent_local_child_env(
     (parent / "tools" / "runtime" / "artifacts").mkdir(parents=True)
     shutil.copy2(
         SCRIPT, parent / "tools" / "validation" / "ci" / "runners" / SCRIPT.name
-    )
-    shutil.copy2(
-        BOUNDARY, parent / "tools" / "repository" / "workspace" / BOUNDARY.name
-    )
-    shutil.copy2(
-        RUNTIME_ARTIFACTS,
-        parent / "tools" / "runtime" / "artifacts" / RUNTIME_ARTIFACTS.name,
     )
     quality = (
         parent
@@ -115,13 +102,6 @@ def test_pre_review_accepts_external_report_dir_without_source_side_effect(
     (parent / "tools" / "runtime" / "artifacts").mkdir(parents=True)
     shutil.copy2(
         SCRIPT, parent / "tools" / "validation" / "ci" / "runners" / SCRIPT.name
-    )
-    shutil.copy2(
-        BOUNDARY, parent / "tools" / "repository" / "workspace" / BOUNDARY.name
-    )
-    shutil.copy2(
-        RUNTIME_ARTIFACTS,
-        parent / "tools" / "runtime" / "artifacts" / RUNTIME_ARTIFACTS.name,
     )
     quality = (
         parent

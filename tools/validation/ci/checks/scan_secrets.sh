@@ -3,7 +3,7 @@
 # contract tool
 # responsibility Runs dedicated secret scanners against current tree and git history.
 # upstream design ../../../../CONTAINER_OPERATIONS.md shared tool-runtime security policy
-# upstream implementation ../../../repository/workspace/parent_root_side_effects.py owns scanner scratch allocation and exact cleanup
+# upstream implementation ../../../runtime/dispatch/agent-canon/src/runtime_boundary.rs owns scanner scratch allocation and exact cleanup
 # downstream environment ../../../../bootstrap.sh invokes the shared scanner setup
 # downstream design ../../../README.md documents the command surface
 # downstream design ../../../../documents/tools/README.md documents operator usage
@@ -13,7 +13,6 @@
 set -euo pipefail
 
 root="."
-original_args=("$@")
 scan_history=1
 scan_current=1
 trufflehog_results="${AGENT_CANON_TRUFFLEHOG_RESULTS:-verified,unknown}"
@@ -22,13 +21,14 @@ invocation_root="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || true)"
 parent_root="${AGENT_CANON_CONTROL_PARENT_ROOT:-${AGENT_CANON_PARENT_ROOT:-}}"
 runtime_root="${AGENT_CANON_RUNTIME_ROOT:-}"
 script_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd -P)"
-boundary_script="${script_root}/tools/repository/workspace/parent_root_side_effects.py"
+boundary_cli="${AGENT_CANON_NATIVE_BIN:-${AGENT_CANON_CLI:-${script_root}/tools/bin/agent-canon}}"
 parent_temp_paths=()
 created_parent_temp_dir=""
 
 run_boundary() {
-  PYTHONPATH="${script_root}${PYTHONPATH:+:${PYTHONPATH}}" \
-    python3 "$boundary_script" "$@"
+  local action="$1"
+  shift
+  "$boundary_cli" runtime-paths "$action" --source-root "$root" --runtime-root "$runtime_root" "$@"
 }
 
 usage() {
@@ -96,24 +96,27 @@ case "$runtime_root/" in
     ;;
 esac
 cd "$root"
-if [[ "${AGENT_CANON_CHILD_PURPOSE:-}" == "secret-scan-script" ]]; then
-  run_boundary verify-child \
-    --root "$parent_root" \
-    --purpose secret-scan-script \
-    --consume >/dev/null
-else
-  # The control repo and scanned checkout can be distinct.  Bind runtime
-  # artifacts to the scanned project while parent_root_side_effects still
-  # authenticates the control repository.
-  export AGENT_CANON_SOURCE_ROOT="$root"
-  PYTHONPATH="${script_root}${PYTHONPATH:+:${PYTHONPATH}}" \
-    exec python3 "$boundary_script" exec-parent-bound \
-    --root "$parent_root" \
-    --purpose secret-scan-script \
-    --issue-handoff \
-    -- bash "${BASH_SOURCE[0]}" "${original_args[@]}"
-fi
+export AGENT_CANON_SOURCE_ROOT="$root"
 unset AGENT_CANON_CHILD_HANDOFF AGENT_CANON_HANDOFF_AUDIENCE AGENT_CANON_CHILD_PURPOSE
+
+# Scanner scratch and tool caches remain inside the caller's runtime.
+# Validate every caller override before creating any of these directories.
+scanner_environment_names=(TMPDIR TEMP TMP XDG_CACHE_HOME PYTHONPYCACHEPREFIX AGENT_CANON_TOOLS_HOME CARGO_HOME CARGO_TARGET_DIR AGENT_CANON_CLI_TARGET_DIR)
+scanner_environment_defaults=(tmp tmp tmp cache cache/pycache tools cache/cargo-home cache/cargo-target cache/cargo-target)
+scanner_environment_paths=()
+for index in "${!scanner_environment_names[@]}"; do
+  name="${scanner_environment_names[$index]}"
+  candidate="${!name:-${runtime_root}/${scanner_environment_defaults[$index]}}"
+  scanner_environment_paths+=("$(run_boundary path --candidate "$candidate")")
+done
+if [[ "${scanner_environment_paths[7]}" != "${scanner_environment_paths[8]}" ]]; then
+  echo "SECRET_SCAN=target_alias_mismatch" >&2
+  exit 2
+fi
+for index in "${!scanner_environment_names[@]}"; do
+  run_boundary ensure-dir --candidate "${scanner_environment_paths[$index]}" >/dev/null
+  export "${scanner_environment_names[$index]}=${scanner_environment_paths[$index]}"
+done
 
 require_command() {
   local command_name="$1"
@@ -137,10 +140,8 @@ create_parent_temp_dir() {
   local prefix="$1"
   created_parent_temp_dir="$(
     run_boundary temp-dir \
-      --root "$parent_root" \
       --candidate "$runtime_root/secret-scan/tmp" \
-      --prefix "$prefix" \
-      --purpose secret-scan
+      --prefix "$prefix"
   )"
   parent_temp_paths+=("$created_parent_temp_dir")
 }
@@ -152,9 +153,7 @@ cleanup_parent_temps() {
   trap - EXIT
   for ((index=${#parent_temp_paths[@]} - 1; index >= 0; index--)); do
     run_boundary remove-tree \
-      --root "$parent_root" \
-      --candidate "${parent_temp_paths[$index]}" \
-      --purpose secret-scan-cleanup >/dev/null || cleanup_status=$?
+      --candidate "${parent_temp_paths[$index]}" >/dev/null || cleanup_status=$?
   done
   if [ "$status" -eq 0 ] && [ "$cleanup_status" -ne 0 ]; then
     status=$cleanup_status
@@ -179,10 +178,8 @@ make_current_tree_snapshot() {
 
   while IFS= read -r -d '' path; do
     run_boundary copy-read-only \
-      --root "$parent_root" \
       --source "${root}/${path}" \
-      --candidate "${snapshot_root}/${path}" \
-      --purpose secret-scan-current-snapshot >/dev/null
+      --candidate "${snapshot_root}/${path}" >/dev/null
   done < <(collect_current_scan_files)
 }
 
@@ -241,30 +238,14 @@ run_detect_secrets() {
   report_path="$created_parent_temp_dir/report.json"
   echo "SECRET_SCAN_TOOL=detect-secrets mode=current-tracked-tree only_verified=${detect_secrets_only_verified}"
   run_boundary capture-subprocess \
-    --root "$parent_root" \
     --candidate "$report_path" \
-    --purpose secret-scan-detect-secrets-report \
     -- detect-secrets "${detect_args[@]}" "${files[@]}" >/dev/null
-  python3 - "$report_path" <<'PY'
-import json
-import sys
-from pathlib import Path
-
-report = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-results = report.get("results", {})
-count = sum(len(items) for items in results.values())
-if count:
-    print(f"SECRET_SCAN_DETECT_SECRETS_FINDINGS={count}")
-    for path, items in sorted(results.items()):
-        print(f"SECRET_SCAN_DETECT_SECRETS_PATH={path} findings={len(items)}")
-    raise SystemExit(1)
-print("SECRET_SCAN_DETECT_SECRETS_FINDINGS=0")
-PY
+  "$boundary_cli" runtime-paths detect-secrets-report --input "$report_path"
 }
 
 require_git_repo
-if [ ! -f "$boundary_script" ]; then
-  echo "SECRET_SCAN=missing_boundary path=${boundary_script}" >&2
+if [ ! -x "$boundary_cli" ]; then
+  echo "SECRET_SCAN=missing_boundary path=${boundary_cli}" >&2
   exit 2
 fi
 trap cleanup_parent_temps EXIT

@@ -50,21 +50,6 @@ agent_canon_receipt_matches_identity() {
   local receipt_path="$1"
   local expected_identity="$2"
 
-  python3 - "$receipt_path" "$expected_identity" <<'PY'
-import json
-import sys
-
-receipt_path, expected_identity = sys.argv[1:]
-try:
-    with open(receipt_path, encoding="utf-8") as stream:
-        payload = json.load(stream)
-except (OSError, json.JSONDecodeError) as exc:
-    raise SystemExit(f"AgentCanon source identity receipt is unavailable: {receipt_path}: {exc}")
-observed_identity = payload.get("source_identity")
-if observed_identity != expected_identity:
-    raise SystemExit(
-        "AgentCanon receipt source identity mismatch: "
-        f"{observed_identity}!={expected_identity}"
-    )
-PY
+  "${AGENT_CANON_NATIVE_BIN:-${AGENT_CANON_CLI:-agent-canon}}" runtime-paths receipt-identity \
+    --input "$receipt_path" --expected-identity "$expected_identity" || return 1
 }
