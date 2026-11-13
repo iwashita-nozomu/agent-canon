@@ -52,6 +52,16 @@ fn absolute(root: &Path, value: impl AsRef<Path>) -> Result<PathBuf, String> {
     })
 }
 
+fn container_relative(root: &Path, path: &Path) -> Result<String, String> {
+    Ok(path
+        .strip_prefix(root)
+        .map_err(|error| error.to_string())?
+        .iter()
+        .map(|component| component.to_string_lossy())
+        .collect::<Vec<_>>()
+        .join("/"))
+}
+
 fn text(section: &Value, key: &str, default: Option<&str>) -> Result<String, String> {
     match section.get(key) {
         Some(Value::String(value)) => Ok(value.clone()),
@@ -769,10 +779,7 @@ fn run_inner(mode: &str, args: &[String]) -> Result<i32, String> {
                     Some(Value::Array(rows)) => rows.as_slice(),
                     _ => return Err("[[rule]] entries must form a list".into()),
                 };
-                let relative = selected
-                    .strip_prefix(&root)
-                    .map_err(|error| error.to_string())?
-                    .to_string_lossy();
+                let relative = container_relative(&root, &selected)?;
                 for row in rows {
                     if !row.is_object() {
                         return Err("rule entries must be tables".into());
@@ -830,9 +837,7 @@ fn run_inner(mode: &str, args: &[String]) -> Result<i32, String> {
             format!(
                 "{}/{}",
                 pack.workspace_mount.trim_end_matches('/'),
-                path.strip_prefix(&root)
-                    .map_err(|error| error.to_string())?
-                    .to_string_lossy()
+                container_relative(&root, path)?
             )
         } else {
             program
