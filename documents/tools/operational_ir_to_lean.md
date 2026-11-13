@@ -1,21 +1,21 @@
 <!--
 @dependency-start
 contract reference
-responsibility Documents tools/analysis/proof/operational_ir_to_lean.py usage and output contract.
-upstream implementation ../../tools/analysis/proof/operational_ir_to_lean.py renders Lean evidence definitions.
+responsibility Documents the native operational-ir-to-lean CLI and output contract.
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/operational_ir_to_lean.rs renders Lean evidence definitions.
 upstream design cpp_source_canonical_ir.md defines the C++ source envelope.
 upstream design jit_canonical_ir.md defines the shared thin operational IR shape.
-downstream implementation ../../tools/analysis/proof/cpp_template_to_lean.py owns the canonical C++ template source route.
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/cpp_template_to_lean.rs owns the canonical C++ template source route.
 downstream implementation ../../tests/agent_tools/test_operational_ir_to_lean.py validates the renderer.
 @dependency-end
 -->
 
-# operational_ir_to_lean.py
+# operational-ir-to-lean
 
-`tools/analysis/proof/operational_ir_to_lean.py` renders shared
+`tools/bin/agent-canon operational-ir-to-lean` renders shared
 `agent-canon.thin-operational-ir.v2` records into dependency-free Lean evidence
 definitions. It is the generic renderer for already-expanded operational
-records. For C++ template source roots, use `cpp_template_to_lean.py`, which
+records. For C++ template source roots, use `cpp-template-to-lean`, which
 runs source expansion, complete-coverage checking, and Lean rendering as one
 canonical tool operation.
 
@@ -25,13 +25,13 @@ canonical tool operation.
   to Lean evidence definitions.
 - Main path: Command, Output Contract, and Boundary.
 - Read this when rendering an existing operational IR record into Lean.
-- Boundary: C++ template source roots should use `cpp_template_to_lean.py`
+- Boundary: C++ template source roots should use `cpp-template-to-lean`
   rather than manually chaining lower-level tools.
 
 ## Command
 
 ```bash
-python3 tools/analysis/proof/operational_ir_to_lean.py \
+tools/bin/agent-canon operational-ir-to-lean \
   --ir reports/cpp-source-ir/solve.json \
   --namespace Generated.CppSolve \
   --module-name SolveOperationalIr \

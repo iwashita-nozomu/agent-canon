@@ -402,9 +402,7 @@ fn python_delegation(path: &str, text: &str) -> Option<&'static str> {
 }
 
 fn contract_work(path: &str, family: &str) -> Option<&'static str> {
-    if path.ends_with("/jit_canonical_ir.py") {
-        Some("preserve dynamic CPython/JAX API through a reviewed native provider connection")
-    } else if family == "ast-analysis" {
+    if family == "ast-analysis" {
         Some(
             "select native parser and preserve Python AST/output semantics without embedded Python",
         )
@@ -482,13 +480,13 @@ fn external_providers(root: &Path, external: &mut Vec<ExternalRuntime>) -> Resul
             });
         }
     }
-    let path = "tools/analysis/proof/jit_canonical_ir.py";
+    let path = "tools/runtime/python-provider/src/jit_runtime.rs";
     if root.join(path).is_file() {
         external.push(ExternalRuntime {
             owner: path.to_string(),
             source: path.to_string(),
             contract:
-                "dynamic CPython/JAX runtime; AgentCanon implementation remains in migration scope"
+                "selected consumer functions use the existing external CPython/JAX runtime; extraction and orchestration are native"
                     .to_string(),
         });
     }

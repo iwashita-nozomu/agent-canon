@@ -1,7 +1,7 @@
 // @dependency-start
 // contract tool
 // responsibility Traces scoped StableHLO SSA value dependencies from JIT-canonical operational IR.
-// upstream implementation ../../../../../tools/analysis/proof/jit_canonical_ir.py emits operational_ir functions, regions, and ops.
+// upstream implementation jit_canonical_ir.rs emits operational_ir functions, regions, and ops.
 // upstream implementation jit_ir_to_lean.rs consumes the matching Lean operational op fields.
 // downstream implementation theorem_graph_circularity_check.rs consumes closure frontiers when theorem graph leaves are audited.
 // downstream test ../../../../../tests/agent_tools/test_stablehlo_value_closure.py preserves the scoped closure oracles.

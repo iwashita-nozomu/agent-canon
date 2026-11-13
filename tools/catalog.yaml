@@ -708,14 +708,27 @@ entries:
   - id: jit-canonical-ir
     public: true
     summary: Extracts StableHLO-derived JIT-canonical IR records and backend traces from a JIT root.
-    path: tools/analysis/proof/jit_canonical_ir.py
+    path: tools/runtime/dispatch/agent-canon/src/jit_canonical_ir.rs
     family: agent_tools
     role: helper
     status: canonical
     audience: skill
     placement: skill_helper
-    command: python3 tools/analysis/proof/jit_canonical_ir.py
-    dispatch: {argv: ["python3", "tools/analysis/proof/jit_canonical_ir.py"]}
+    command: tools/bin/agent-canon jit-canonical-ir
+    dispatch:
+      runtime: rust
+      argv: [tools/bin/agent-canon, jit-canonical-ir]
+      execution_plane: tool-container
+      cwd: target-root
+      env: allowlisted
+      stdin: inherited
+      stdout: captured
+      stderr: captured
+      exit: propagate
+      signal: propagate
+      side_effect: explicit-target-write
+      output_root: explicit-target
+      written_paths: []
     writes: true
     default_wiring:
       ci: false
@@ -775,14 +788,27 @@ entries:
 
   - id: cpp-source-canonical-ir
     summary: Extracts source-only C++ records into the shared thin operational IR.
-    path: tools/analysis/code/cpp_source_canonical_ir.py
+    path: tools/runtime/dispatch/agent-canon/src/cpp_source_canonical_ir.rs
     family: agent_tools
     role: helper
     status: canonical
     audience: internal
     placement: support_library
-    command: python3 tools/analysis/code/cpp_source_canonical_ir.py
-    dispatch: {argv: ["python3", "tools/analysis/code/cpp_source_canonical_ir.py"]}
+    command: tools/bin/agent-canon cpp-source-canonical-ir
+    dispatch:
+      runtime: rust
+      argv: [tools/bin/agent-canon, cpp-source-canonical-ir]
+      execution_plane: tool-container
+      cwd: target-root
+      env: allowlisted
+      stdin: inherited
+      stdout: captured
+      stderr: captured
+      exit: propagate
+      signal: propagate
+      side_effect: explicit-target-write
+      output_root: explicit-target
+      written_paths: []
     writes: true
     default_wiring:
       ci: false
@@ -798,14 +824,27 @@ entries:
   - id: cpp-template-to-lean
     public: true
     summary: Fully expands C++ template source roots into complete Lean evidence definitions.
-    path: tools/analysis/proof/cpp_template_to_lean.py
+    path: tools/runtime/dispatch/agent-canon/src/cpp_template_to_lean.rs
     family: agent_tools
     role: helper
     status: canonical
     audience: skill
     placement: skill_helper
-    command: python3 tools/analysis/proof/cpp_template_to_lean.py
-    dispatch: {argv: ["python3", "tools/analysis/proof/cpp_template_to_lean.py"]}
+    command: tools/bin/agent-canon cpp-template-to-lean
+    dispatch:
+      runtime: rust
+      argv: [tools/bin/agent-canon, cpp-template-to-lean]
+      execution_plane: tool-container
+      cwd: target-root
+      env: allowlisted
+      stdin: inherited
+      stdout: captured
+      stderr: captured
+      exit: propagate
+      signal: propagate
+      side_effect: explicit-target-write
+      output_root: explicit-target
+      written_paths: []
     writes: true
     default_wiring:
       ci: false
@@ -822,14 +861,27 @@ entries:
 
   - id: operational-ir-to-lean
     summary: Renders shared thin operational IR records into Lean evidence definitions.
-    path: tools/analysis/proof/operational_ir_to_lean.py
+    path: tools/runtime/dispatch/agent-canon/src/operational_ir_to_lean.rs
     family: agent_tools
     role: helper
     status: canonical
     audience: internal
     placement: support_library
-    command: python3 tools/analysis/proof/operational_ir_to_lean.py
-    dispatch: {argv: ["python3", "tools/analysis/proof/operational_ir_to_lean.py"]}
+    command: tools/bin/agent-canon operational-ir-to-lean
+    dispatch:
+      runtime: rust
+      argv: [tools/bin/agent-canon, operational-ir-to-lean]
+      execution_plane: tool-container
+      cwd: target-root
+      env: allowlisted
+      stdin: inherited
+      stdout: captured
+      stderr: captured
+      exit: propagate
+      signal: propagate
+      side_effect: explicit-target-write
+      output_root: explicit-target
+      written_paths: []
     writes: true
     default_wiring:
       ci: false

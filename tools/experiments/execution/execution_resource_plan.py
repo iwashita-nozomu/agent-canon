@@ -12,7 +12,7 @@
 # downstream implementation ./run_managed_experiment.py managed experiment adapter
 # downstream implementation ./gpu_command_admission.py provider-independent direct GPU admission adapter
 # downstream implementation ../../runtime/dispatch/agent-canon/src/execution_resource_projection.rs validates exact coarse PostToolUse projection constants
-# downstream implementation ../../analysis/proof/jit_canonical_ir.py GPU requests must route here or fail typed preflight
+# downstream implementation ../../runtime/dispatch/agent-canon/src/jit_canonical_ir.rs GPU requests must route here or fail typed preflight
 # downstream implementation ../../../templates/experiments/_template/run.py direct GPU launch is statically prohibited
 # downstream implementation ../../../bootstrap/host/manifest.toml selects the shared tool runtime limits
 # @dependency-end
@@ -100,7 +100,7 @@ PARENT_LINEAGE_ARTIFACT = (
     "reports/agents/w1-tool-env-routing-20260716/control_topology_ledger.md"
 )
 ALTERNATE_GPU_ROUTE_STATIC_CONTRACT = (
-    "tools/analysis/proof/jit_canonical_ir.py",
+    "tools/runtime/dispatch/agent-canon/src/jit_canonical_ir.rs",
     "templates/experiments/_template/run.py",
     MANAGED_RUN_ADAPTER_PATH,
 )
