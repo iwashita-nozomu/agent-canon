@@ -109,6 +109,12 @@ pub mod log_policy;
 pub mod log_repository_identity;
 pub mod lsp_code_analysis;
 pub mod native_release;
+#[path = "oop/cpp/readability.rs"]
+mod oop_cpp;
+#[path = "oop/python/readability.rs"]
+mod oop_python;
+#[path = "oop/readability.rs"]
+pub mod oop_readability;
 pub mod orphan_lifecycle;
 pub mod owner_guarantee;
 pub mod parent_repository_audit;

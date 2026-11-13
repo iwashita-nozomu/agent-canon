@@ -4,7 +4,7 @@
 # contract test
 # responsibility Tests SOLID-sensitive Python evidence coverage checks.
 # upstream implementation ../../tools/runtime/dispatch/agent-canon/src/check_solid_evidence.rs evidence coverage checker
-# upstream implementation ../../tools/validation/code/oop/shared/readability_core.py emits scanned_paths in OOP reports
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/oop/readability.rs emits scanned_paths in OOP reports
 # upstream design ../../documents/conventions/coding-conventions-python.md SOLID evidence route policy
 # @dependency-end
 
@@ -13,7 +13,6 @@ from __future__ import annotations
 import json
 import os
 import subprocess
-import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -21,9 +20,6 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 AGENT_CANON_CLI = os.environ.get("AGENT_CANON_CLI")
 CHECKER_SELECTOR = "check-solid-evidence"
-OOP_ANALYZER = (
-    PROJECT_ROOT / "tools" / "validation" / "code" / "oop" / "python" / "readability.py"
-)
 
 
 class CheckSolidEvidenceTest(unittest.TestCase):
@@ -142,8 +138,8 @@ class CheckSolidEvidenceTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(OOP_ANALYZER),
+                    AGENT_CANON_CLI,
+                    "oop-python-readability",
                     "--root",
                     str(root),
                     "--format",

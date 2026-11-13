@@ -3,9 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests OOP readability analyzer behavior.
-# upstream implementation ../../tools/validation/code/oop/python/readability.py Python analyzer
-# upstream implementation ../../tools/validation/code/oop/cpp/readability.py C++ analyzer
-# upstream implementation ../../tools/validation/code/oop/shared/readability_core.py shared analyzer report fields
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/oop/readability.rs shared analyzer report fields
 # upstream design ../../documents/conventions/object-oriented-design.md OOP boundary policy
 # upstream design ../../agents/skills/oop-readability-check.md OOP gate
 # @dependency-end
@@ -15,7 +13,6 @@ from __future__ import annotations
 import json
 import os
 import subprocess
-import sys
 import tempfile
 import unittest
 from collections.abc import Mapping
@@ -23,12 +20,7 @@ from pathlib import Path
 from types import MappingProxyType
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-PYTHON_ANALYZER = (
-    PROJECT_ROOT / "tools" / "validation" / "code" / "oop" / "python" / "readability.py"
-)
-CPP_ANALYZER = (
-    PROJECT_ROOT / "tools" / "validation" / "code" / "oop" / "cpp" / "readability.py"
-)
+NATIVE_CLI = os.environ.get("AGENT_CANON_NATIVE_BIN") or os.environ.get("AGENT_CANON_CLI") or str(PROJECT_ROOT / "tools/bin/agent-canon")
 EMPTY_ENV: Mapping[str, str] = MappingProxyType({})
 
 
@@ -43,7 +35,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
     ) -> subprocess.CompletedProcess[str]:
         """Run the analyzer against a temporary root."""
         return subprocess.run(
-            [sys.executable, str(PYTHON_ANALYZER), "--root", str(root), *args],
+            [NATIVE_CLI, "oop-python-readability", "--root", str(root), *args],
             cwd=PROJECT_ROOT,
             check=False,
             capture_output=True,
@@ -56,7 +48,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
     ) -> subprocess.CompletedProcess[str]:
         """Run the C++ analyzer against a temporary root."""
         return subprocess.run(
-            [sys.executable, str(CPP_ANALYZER), "--root", str(root), *args],
+            [NATIVE_CLI, "oop-cpp-readability", "--root", str(root), *args],
             cwd=PROJECT_ROOT,
             check=False,
             capture_output=True,
@@ -1252,6 +1244,9 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertNotIn("redundant_class_boundary:Port", result.stdout)
+
+            self.assertIn("OOP_READABILITY=fail", result.stdout)
+            self.assertEqual(result.stderr, "")
 
     def test_cpp_redundant_class_uses_dependency_sources(self) -> None:
         """C++ class redundancy should use construction and type-boundary facts."""
