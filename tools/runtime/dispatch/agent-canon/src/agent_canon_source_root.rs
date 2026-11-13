@@ -23,6 +23,80 @@ pub struct HookSourceRootResolution {
     pub layout: String,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SourceRoots {
+    pub current_repository_root: PathBuf,
+    pub source_root: PathBuf,
+    pub canon_root: PathBuf,
+    pub layout: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SourceRootFailure {
+    pub code: &'static str,
+    pub detail: String,
+}
+
+pub fn resolve_source_roots(
+    raw_root: &Path,
+    environment: &BTreeMap<String, String>,
+) -> Result<SourceRoots, SourceRootFailure> {
+    let current_repository_root =
+        find_current_repository_root(raw_root).map_err(|detail| SourceRootFailure {
+            code: "agent_canon_source_root_missing",
+            detail,
+        })?;
+    let source = env_value(environment, SOURCE_ROOT_OVERRIDE_ENV);
+    let canon = env_value(environment, CANON_ROOT_OVERRIDE_ENV);
+    if source.is_empty() && canon.is_empty() {
+        if !has_catalog(&current_repository_root) {
+            return Err(SourceRootFailure {
+                code: "agent_canon_source_root_missing",
+                detail: format!("No AgentCanon catalog found at current_repository_root={}; select an external checkout with AGENT_CANON_SOURCE_ROOT", current_repository_root.display()),
+            });
+        }
+        return Ok(SourceRoots {
+            source_root: current_repository_root.clone(),
+            canon_root: current_repository_root.clone(),
+            current_repository_root,
+            layout: LAYOUT_STANDALONE.into(),
+        });
+    }
+    let resolve = |value: &str, kind: &str| -> Result<PathBuf, SourceRootFailure> {
+        let (invalid, missing) = if kind == "source" {
+            (
+                "agent_canon_source_root_override_invalid",
+                "agent_canon_source_root_override_missing",
+            )
+        } else {
+            (
+                "agent_canon_canon_root_override_invalid",
+                "agent_canon_canon_root_override_missing",
+            )
+        };
+        let root = resolve_override(value).map_err(|detail| SourceRootFailure {
+            code: invalid,
+            detail,
+        })?;
+        if !has_catalog(&root) {
+            return Err(SourceRootFailure {
+                code: missing,
+                detail: format!(
+                    "Override {kind} root has no AgentCanon catalog: {}",
+                    root.display()
+                ),
+            });
+        }
+        Ok(root)
+    };
+    Ok(SourceRoots {
+        current_repository_root,
+        source_root: resolve(if source.is_empty() { &canon } else { &source }, "source")?,
+        canon_root: resolve(if canon.is_empty() { &source } else { &canon }, "canon")?,
+        layout: LAYOUT_EXTERNAL.into(),
+    })
+}
+
 /// Preserve the shared resolver's repository-root and standalone/external result.
 /// The hook caller supplies its known environment and entry directory.
 pub fn resolve_agent_canon_source_root(
