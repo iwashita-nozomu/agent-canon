@@ -132,6 +132,11 @@ def main() -> int:
     return 0
 
 
+def test_jax_export_stack() -> None:
+    """Exercise the existing fixed-input provider smoke through pytest."""
+    assert main() == 0
+
+
 if __name__ == "__main__":
     try:
         raise SystemExit(main())
