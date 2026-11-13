@@ -663,6 +663,7 @@ mod source_root_tests {
         std::fs::create_dir_all(source.join(".git")).unwrap();
         std::fs::create_dir_all(&canon).unwrap();
         std::fs::create_dir_all(&runtime).unwrap();
+        let runtime = runtime.canonicalize().unwrap();
         std::fs::write(
             source.join(".git/config"),
             "[remote \"origin\"]\nurl = https://github.com/example/consumer.git\n",
@@ -679,7 +680,7 @@ mod source_root_tests {
             .unwrap()
         );
         let archive = mounted_log_archive_root(&canon, Some(&runtime)).unwrap();
-        assert_eq!(archive, runtime.join("archive/agent-canon-log"));
+        assert_eq!(archive, runtime.join("archive").join("agent-canon-log"));
         assert_eq!(
             hook_result_search_dirs(&source, &canon, Some(&runtime)).unwrap(),
             vec![
