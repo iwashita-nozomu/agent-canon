@@ -6,7 +6,7 @@
 # upstream design ../../../documents/design/dependency-manifest-design.md dependency graph semantics
 # upstream implementation ../../runtime/dispatch/agent-canon/src/source_dependency_graph.rs owns source parsing, canonical binding, and review export
 # upstream implementation ../../runtime/dispatch/agent-canon/src/runtime_boundary.rs owns external graph scratch and TSV publication
-# downstream implementation ./render_dependency_manifest_graph.py renders exported dependency TSV
+# downstream implementation ../../runtime/dispatch/agent-canon/src/dependency_manifest_graph.rs renders exported dependency TSV
 # downstream implementation ../../../tests/agent_tools/test_dependency_manifest_tools.py verifies source-derived graph review
 # downstream implementation ../../../tests/agent_tools/test_dependency_graph_cycles.py verifies normalized full-topology SCC scope
 # @dependency-end
@@ -301,68 +301,9 @@ while IFS=$'\t' read -r direction kind source target; do
 done < <(awk -F '\t' '$1 != "" && $2 != "" && $3 != "" && $4 != ""' "$edges_file")
 
 check_cycles() {
-  python3 - "$all_edges" "$selected_file" "$scoped" <<'PYTHON'
-import sys
-from collections import defaultdict
-from pathlib import Path
-
-edges_path, selected_path, scoped = sys.argv[1:]
-selected = set(Path(selected_path).read_text().splitlines()) if scoped == "1" else None
-adjacency = defaultdict(set)
-reverse = defaultdict(set)
-for row in Path(edges_path).read_text().splitlines():
-    direction, kind, source, target = row.split("\t")
-    if not all((direction, kind, source, target)):
-        continue  # The projection check above already records incomplete rows.
-    # Reference edges document evidence, not prerequisite ordering.
-    if kind == "reference":
-        continue
-    prerequisite, consumer = (target, source) if direction == "upstream" else (source, target)
-    adjacency[prerequisite].add(consumer)
-    reverse[consumer].add(prerequisite)
-nodes = sorted(adjacency.keys() | reverse.keys())
-
-# Iterative Kosaraju: finish the full topology before applying report scope.
-visited = set()
-finished = []
-for node in nodes:
-    if node in visited:
-        continue
-    visited.add(node)
-    stack = [(node, iter(sorted(adjacency[node])))]
-    while stack:
-        current, neighbors = stack[-1]
-        neighbor = next(neighbors, None)
-        if neighbor is None:
-            finished.append(current)
-            stack.pop()
-        elif neighbor not in visited:
-            visited.add(neighbor)
-            stack.append((neighbor, iter(sorted(adjacency[neighbor]))))
-
-visited.clear()
-cycles = []
-for node in reversed(finished):
-    if node in visited:
-        continue
-    component = set()
-    pending = [node]
-    visited.add(node)
-    while pending:
-        current = pending.pop()
-        component.add(current)
-        for neighbor in reverse[current]:
-            if neighbor not in visited:
-                visited.add(neighbor)
-                pending.append(neighbor)
-    if len(component) > 1 or node in adjacency[node]:
-        if selected is None or not component.isdisjoint(selected):
-            cycles.append(tuple(sorted(component)))
-for component in sorted(cycles):
-    print("dependency cycle includes " + ", ".join(component))
-# Keep interpreter/I/O failures distinct from report-only cycle findings.
-sys.exit(3 if cycles else 0)
-PYTHON
+  local -a cycle_args=(source-dependency-graph cycles --edges "$all_edges" --selected "$selected_file")
+  [[ "$scoped" -eq 1 ]] && cycle_args+=(--scoped)
+  "$NATIVE_CLI" "${cycle_args[@]}"
 }
 
 cycle_status=0

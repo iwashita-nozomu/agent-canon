@@ -145,9 +145,9 @@ summary = "Deterministic AgentCanon wiki publication to repo.wiki.git with defau
 [[tool]]
 id = "render-dependency-manifest-graph"
 classification = "public"
-tool = "tools/analysis/dependencies/render_dependency_manifest_graph.py"
+tool = "tools/runtime/dispatch/agent-canon/src/dependency_manifest_graph.rs"
 doc = "documents/tools/render_dependency_manifest_graph.md"
-language = "python"
+language = "rust"
 summary = "Dependency manifest graph Markdown, DOT, and HTML renderer documentation."
 
 [[tool]]

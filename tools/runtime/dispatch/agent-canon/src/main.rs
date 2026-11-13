@@ -121,6 +121,7 @@ const HELP: &str = "AgentCanon's native command line interface.
 Usage: agent-canon <command> [arguments]
   github-publish [--root ROOT] <push|pr|publish-pr|checks> --user-task TASK [options]
   run-gpu-command [options] -- COMMAND ...
+  render-dependency-manifest-graph [--root ROOT] [--scope full|changed] [--bundle-dir DIR | --ir-out PATH] [--markdown-out PATH] [--dot-out PATH] [--html-out PATH]
   run-managed-experiment [options] -- COMMAND ...
   experiment-registry [--repo-root ROOT] [--registry PATH]
 
@@ -134,7 +135,7 @@ Commands:
   feedback|f <add|status|sync|capture>
   graph <build|status|query|context> [options]
   graph-client <status|query|context> --root <repo-root> [options] [--format json]
-  source-dependency-graph [--root <repo-root> --edges-out PATH --manifests-out PATH] | resolve-targets --root ROOT --source FILE --target PATH
+  source-dependency-graph [--root <repo-root> --edges-out PATH --manifests-out PATH] | resolve-targets --root ROOT --source FILE --target PATH | cycles --edges PATH --selected PATH [--scoped]
   agent-search [search options]
   check-github-workflows [--root <repo-root>]\n  check-dependency-headers [--root <repo-root>] [--changed] [--surface <glob>]... [paths...]
   classify-path-risk [--path PATH]... [--paths-file PATH] [--format text|json|github-output] [--full-confidence]
@@ -512,6 +513,9 @@ fn main() {
     }
     if args.len() >= 2 && args[1] == "run-gpu-command" {
         std::process::exit(agent_canon::gpu_command_admission::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == agent_canon::dependency_manifest_graph::SELECTOR {
+        std::process::exit(agent_canon::dependency_manifest_graph::run(&args[2..]));
     }
     if args.len() >= 2 && args[1] == agent_canon::managed_experiment::SELECTOR {
         std::process::exit(agent_canon::managed_experiment::run(&args[2..]));
