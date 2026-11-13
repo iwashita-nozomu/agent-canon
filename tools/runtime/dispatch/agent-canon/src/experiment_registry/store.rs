@@ -44,6 +44,7 @@ pub(crate) fn load(path: &Path) -> Result<RegistryValue, String> {
     parse_registry(&text)
 }
 
+#[cfg(target_os = "linux")]
 pub(crate) fn json_value(value: &RegistryValue) -> Result<JsonValue, String> {
     use crate::python_json::{JsonArray, JsonNumber, JsonObject};
     Ok(match value {
