@@ -113,6 +113,7 @@ pub mod python_json;
 pub mod python_sequence_matcher;
 pub mod python_text;
 pub mod report_artifact_checks;
+pub mod repo_structure_contract;
 pub mod run_evaluation;
 pub mod runtime_boundary;
 pub mod scip_index;
