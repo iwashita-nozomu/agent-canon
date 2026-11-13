@@ -169,6 +169,7 @@ Commands:
   check-semantic-responsibility-contract [paths...] [--root ROOT] [--template TEMPLATE] [--instance INSTANCE] [--artifact-root ARTIFACT_ROOT] [--format text|json]
   check-solid-evidence [paths...] [--root ROOT] [--changed] [--base-ref BASE_REF] [--evidence EVIDENCE] [--exclude EXCLUDE] [--verbose] [--format text|json]
   rust-migration-audit --root <repo-root>
+  parent-repository-audit <list|check> --root ROOT [options]
   html-artifact-access REPORT_PATH [options]
   sync-experiment-registry-context --topic TOPIC [options]
   create-experiment-topic <topic> [options]
@@ -271,6 +272,9 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "tool-catalog" {
         std::process::exit(catalog::tool_catalog::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "parent-repository-audit" {
+        std::process::exit(agent_canon::parent_repository_audit::run(&args[2..]));
     }
     if args.len() >= 2 && args[1] == "html-artifact-access" {
         std::process::exit(agent_canon::html_artifact_access::run(&args[2..]));
