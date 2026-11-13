@@ -56,6 +56,9 @@ runtime_schema:
     - id: rust-skill-dependency-map
       selector: skill-dependency-map
       path: tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs
+    - id: rust-parent-repository-audit
+      selector: parent-repository-audit
+      path: tools/runtime/dispatch/agent-canon/src/parent_repository_audit.rs
     - id: rust-workflow-selection-manifest
       selector: workflow-selection-manifest
       path: tools/runtime/dispatch/agent-canon/src/workflow_selection_eval.rs
@@ -2502,12 +2505,12 @@ entries:
   - id: html-artifact-access
     public: true
     summary: Prints SSH tunnel and static-server commands for remote HTML artifacts.
-    path: tools/experiments/artifacts/html_artifact_access.py
+    path: tools/runtime/dispatch/agent-canon/src/html_artifact_access.rs
     family: experiments
     role: helper
     status: canonical
-    command: python3 tools/experiments/artifacts/html_artifact_access.py
-    dispatch: {argv: ["python3", "tools/experiments/artifacts/html_artifact_access.py"]}
+    command: tools/bin/agent-canon html-artifact-access
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "html-artifact-access"]}
     writes: false
     default_wiring:
       ci: false
