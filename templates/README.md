@@ -11,7 +11,7 @@ downstream implementation ./code/README.md materializable code and Docstring tem
 downstream implementation ./experiments/_template/run.py runnable experiment scaffold source
 downstream implementation ./experiments/_cpp_template C++-first experiment package source
 downstream implementation ../tools/runtime/dispatch/agent-canon/src/template_bundle.rs produces the exact default-consumer seed
-downstream implementation ../tools/agent/templates/code_template_rendering.py renders AgentCanon-internal code templates
+downstream implementation ../tools/runtime/dispatch/agent-canon/src/code_template_rendering.rs renders AgentCanon-internal code templates through the native CLI
 downstream implementation ../tools/runtime/dispatch/agent-canon/src/experiment_registry/create_experiment_topic.rs copies AgentCanon-internal experiment templates
 @dependency-end
 -->

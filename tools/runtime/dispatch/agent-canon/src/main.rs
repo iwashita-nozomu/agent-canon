@@ -119,8 +119,10 @@ Usage: agent-canon <command> [arguments]
 
 Commands:
   evaluate-codex-agent-roles [--root ROOT] [--runtime-root PATH] [--accumulate] [--format text|json]
+  check-agent-runtime-alignment [--root ROOT] [--format text|json]
   evaluate-workflow-selection [--root ROOT] [--manifest PATH] [--accumulate] [--runtime-root PATH]
   check-skill-tool-invocation-graph [--root ROOT]
+  skill-dependency-map <check|graph> [options]
   knowledge|k <search|read|add|status|sync|capture>
   feedback|f <add|status|sync|capture>
   graph <build|status|query|context> [options]
@@ -152,6 +154,7 @@ Commands:
   tool-catalog [--root <repo-root>] [--format text|json|markdown]
   tool <run|inventory|rust-cli> [options]
   capability-route [--capability ID] [--mode routing-only|repo-changing] [--format text|json|markdown] [--root PATH]
+  route [--area AREA] [--prompt TEXT|--prompt-file PATH] [options]
   tool-drift [--root <repo-root>] [--contract NAME]... [--format text|json]
   tool-proof-coverage [--root <repo-root>] [--format text|json|markdown] [--tool-id ID]... [--require-lean-verified]
   theorem-graph-board --graph <path> [--out <path>] [--format json|markdown] [--fail-on-open] [--fail-on-unknown]
@@ -169,6 +172,21 @@ Commands:
   check-semantic-responsibility-contract [paths...] [--root ROOT] [--template TEMPLATE] [--instance INSTANCE] [--artifact-root ARTIFACT_ROOT] [--format text|json]
   check-solid-evidence [paths...] [--root ROOT] [--changed] [--base-ref BASE_REF] [--evidence EVIDENCE] [--exclude EXCLUDE] [--verbose] [--format text|json]
   rust-migration-audit --root <repo-root>
+  github-status-lifecycle --repo OWNER/REPO --issue NUMBER --facts-json PATH [options]
+  semantic-provider-html-report --compare-json PATH --output PATH [options]
+  check-proof-trace-alignment --trace-module PATH [options]
+  reference-materializer --url URL [--input PATH|--fetch] [options]
+  repo-structure-contract [--root ROOT] [--contract PATH] [options]
+  check-agent-canon-log-policy [--input PATH|--remote URL] [--commit SHA]
+  wiki-publish --wiki-root PATH --source-root PATH --source-commit SHA [options]
+  orphan-lifecycle <inventory|authorize-cleanup> [options]
+  render-code-template [--root SOURCE_ROOT] TEMPLATE
+  skill-shim-materializer <check|materialize|readback> [options]
+  skill-shim-evaluation [options]
+  run-accumulated-agent-evals [options]
+  update-latest-result RESULT_ROOT --variant VARIANT [--result-dir PATH]
+  parent-repository-audit <list|check> --root ROOT [options]
+  html-artifact-access REPORT_PATH [options]
   sync-experiment-registry-context --topic TOPIC [options]
   create-experiment-topic <topic> [options]
   server-readiness [--layout <layout.toml>]
@@ -270,17 +288,41 @@ fn main() {
         std::process::exit(theorem_graph_circularity_check::run(&args[2..]));
     }
 
+    if args.len() >= 2 && args[1] == "bootstrap-runtime" {
+        std::process::exit(agent_canon::bootstrap_runtime::run(&args[2..]));
+    }
     if args.len() >= 2 && args[1] == "tool-catalog" {
         std::process::exit(catalog::tool_catalog::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "render-code-template" {
+        std::process::exit(agent_canon::code_template_rendering::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "skill-shim-materializer" {
+        std::process::exit(catalog::skill_materialization::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "skill-shim-evaluation" {
+        std::process::exit(agent_canon::skill_shim_evaluation::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "run-accumulated-agent-evals" {
+        std::process::exit(agent_canon::eval_accumulation::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "update-latest-result" {
+        std::process::exit(agent_canon::latest_result::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "parent-repository-audit" {
+        std::process::exit(agent_canon::parent_repository_audit::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "html-artifact-access" {
+        std::process::exit(agent_canon::html_artifact_access::run(&args[2..]));
     }
     if args.len() >= 2 && args[1] == "environment-dependencies" {
         std::process::exit(agent_canon::environment_dependencies::run_cli(&args[2..]));
     }
-    if args.len() >= 2 && args[1] == "bootstrap-runtime" {
-        std::process::exit(agent_canon::bootstrap_runtime::run(&args[2..]));
-    }
     if args.len() >= 2 && args[1] == "check-skill-tool-invocation-graph" {
         std::process::exit(catalog::skill_dependency_graph::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "skill-dependency-map" {
+        std::process::exit(catalog::skill_dependency_graph::run_graph_cli(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "tool" {
@@ -289,6 +331,9 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "capability-route" {
         std::process::exit(catalog::skill_routes::run_capability_route(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "route" {
+        std::process::exit(catalog::skill_routes::run_task_route(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "check-github-workflows" {
@@ -391,8 +436,37 @@ fn main() {
     if args.len() >= 2 && args[1] == "rust-migration-audit" {
         std::process::exit(migration_audit::run(&args[2..]));
     }
+    if args.len() >= 2 && args[1] == "github-status-lifecycle" {
+        std::process::exit(agent_canon::github_status_lifecycle::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "semantic-provider-html-report" {
+        std::process::exit(semantic_index::semantic_provider_html_report::run(
+            &args[2..],
+        ));
+    }
+    if args.len() >= 2 && args[1] == "check-proof-trace-alignment" {
+        std::process::exit(agent_canon::check_proof_trace_alignment::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "reference-materializer" {
+        std::process::exit(agent_canon::reference_materializer::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "repo-structure-contract" {
+        std::process::exit(agent_canon::repo_structure_contract::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "check-agent-canon-log-policy" {
+        std::process::exit(agent_canon::log_policy::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "wiki-publish" {
+        std::process::exit(agent_canon::wiki_publish::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "orphan-lifecycle" {
+        std::process::exit(agent_canon::orphan_lifecycle::run(&args[2..]));
+    }
     if args.len() >= 2 && args[1] == agent_canon::codex_agent_role_eval::SELECTOR {
         std::process::exit(agent_canon::codex_agent_role_eval::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "check-agent-runtime-alignment" {
+        std::process::exit(agent_canon::runtime_alignment::run(&args[2..]));
     }
     if args.len() >= 2 && args[1] == agent_canon::server_readiness::SELECTOR {
         std::process::exit(agent_canon::server_readiness::run(&args[2..]));

@@ -189,7 +189,7 @@ caller は generic URL/repo identity を補って同じ requested operation を�
 ```bash
 python3 -m pytest tests/agent_tools/test_dependency_module_change.py -q
 python3 -m pytest tests/agent_tools/test_repository_topic_clone.py -q
-python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py
+tools/bin/agent-canon check-agent-runtime-alignment
 ```
 
 pin / projection を持つ依存では、source PR publication 後に親 repository の exact pin と

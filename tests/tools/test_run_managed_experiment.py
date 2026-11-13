@@ -379,10 +379,6 @@ def test_rollback_rejects_replaced_report_parent_inode(tmp_path: Path) -> None:
             "tools/experiments/artifacts/save_experiment_result_annex.py",
             "tools.experiments.artifacts.save_experiment_result_annex",
         ),
-        (
-            "tools/experiments/artifacts/update_latest_result.py",
-            "tools.experiments.artifacts.update_latest_result",
-        ),
     ),
 )
 def test_public_experiment_entrypoints_support_direct_and_module_forms(

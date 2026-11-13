@@ -191,6 +191,108 @@ fn source_capability_writes_only_the_approved_file() {
 }
 
 #[test]
+fn external_copy_keeps_explicit_read_and_write_roots() {
+    let source = TempRoot::new();
+    let target = TempRoot::new();
+    let input = source.write("input.md", "copy bytes\n");
+    let output = target.0.join("assets/output.md");
+    let capability = capability(&target.0, &["assets/output.md"]);
+    capability
+        .copy_file_from_root_with_metadata(&source.0, &input, &output)
+        .unwrap();
+    assert_eq!(fs::read(&output).unwrap(), b"copy bytes\n");
+    let outsider = TempRoot::new();
+    let outside_input = outsider.write("private.md", "keep\n");
+    assert!(capability
+        .copy_file_from_root_with_metadata(&source.0, &outside_input, &output)
+        .is_err());
+    assert!(capability
+        .copy_file_from_root_with_metadata(&source.0, &input, &target.0.join("unapproved.md"))
+        .is_err());
+    assert_eq!(fs::read(&output).unwrap(), b"copy bytes\n");
+}
+
+#[cfg(unix)]
+#[test]
+fn explicit_output_parent_creation_rejects_symlink_components() {
+    use agent_canon::source_mutation::ensure_file_parent_nofollow;
+    use std::os::unix::fs::symlink;
+    let root = TempRoot::new();
+    let outside = TempRoot::new();
+    let output = root.0.join("nested/assets/result.html");
+    assert_eq!(
+        ensure_file_parent_nofollow(&output).unwrap(),
+        output.parent().unwrap()
+    );
+    symlink(&outside.0, root.0.join("alias")).unwrap();
+    assert!(ensure_file_parent_nofollow(&root.0.join("alias/created/result.html")).is_err());
+    assert!(!outside.0.join("created").exists());
+}
+
+#[test]
+fn atomic_source_write_can_create_only_the_approved_target_parents() {
+    let root = TempRoot::new();
+    let relative = Path::new(".codex/personal/skills/example/SKILL.md");
+    let target = root.0.join(relative);
+    let capability = capability(&root.0, &[".codex/personal/skills/example/SKILL.md"]);
+
+    capability
+        .atomic_write_text_with_parents(relative, "generated\n", 0o644, true)
+        .expect("atomic writer creates missing parents beneath the exact grant");
+
+    assert_eq!(fs::read(&target).unwrap(), b"generated\n");
+    assert!(target.parent().unwrap().is_dir());
+    assert!(capability
+        .atomic_write_text_with_parents(
+            Path::new(".codex/personal/skills/other/SKILL.md"),
+            "deny\n",
+            0o644,
+            true
+        )
+        .is_err());
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        assert_eq!(
+            fs::metadata(&target).unwrap().permissions().mode() & 0o777,
+            0o644
+        );
+    }
+}
+
+#[test]
+fn source_capability_atomically_replaces_only_the_approved_file() {
+    let root = TempRoot::new();
+    let approved = root.write("documents/runtime/graph.md", "before\n");
+    let untouched = root.write("documents/runtime/untouched.md", "untouched\n");
+    let capability = capability(&root.0, &["documents/runtime/graph.md"]);
+
+    capability
+        .atomic_write_text(&approved, "after\n", 0o644)
+        .expect("approved source file is atomically replaced");
+
+    assert_eq!(fs::read_to_string(&approved).unwrap(), "after\n");
+    assert_eq!(fs::read_to_string(&untouched).unwrap(), "untouched\n");
+    assert_eq!(
+        fs::read_dir(approved.parent().unwrap()).unwrap().count(),
+        2,
+        "the same-directory temporary file is removed after publication"
+    );
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        assert_eq!(
+            approved.metadata().unwrap().permissions().mode() & 0o777,
+            0o644
+        );
+    }
+    assert!(capability
+        .atomic_write_text(&untouched, "must remain denied\n", 0o644)
+        .is_err());
+    assert_eq!(fs::read_to_string(&untouched).unwrap(), "untouched\n");
+}
+
+#[test]
 fn source_capability_removes_only_the_approved_file() {
     let root = TempRoot::new();
     let approved = root.write("docs/approved.md", "remove me\n");
@@ -459,6 +561,9 @@ fn source_capability_rechecks_symlink_components_before_write_or_remove() {
     symlink(&outside, &guide).expect("replacement symlink is created");
     assert!(capability
         .write_text(&guide, "must not follow link\n")
+        .is_err());
+    assert!(capability
+        .atomic_write_text(&guide, "must not replace link\n", 0o644)
         .is_err());
     assert!(capability.remove_file(&guide).is_err());
     assert!(fs::symlink_metadata(&guide)

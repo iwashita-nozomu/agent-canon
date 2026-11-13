@@ -1427,8 +1427,8 @@ def main(argv: list[str]) -> int:
             print("route output: " + " ".join(command[3:]))
             return 0
         if command[:2] == [
-            "python3",
-            "/opt/agent-canon/source/eval/producers/run_accumulated_agent_evals.py",
+            "/var/lib/agent-canon/cache/bin/agent-canon",
+            "run-accumulated-agent-evals",
         ]:
             runtime_arg = command[command.index("--runtime-root") + 1]
             run_id = command[command.index("--run-id") + 1]

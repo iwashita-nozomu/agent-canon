@@ -12,7 +12,7 @@ upstream design ../internal-routines/design-implementation-correspondence.md uni
 upstream design ../canonical/ROOT_IMPLEMENTATION.md necessary design conditions and implementation choice boundary
 downstream implementation ../../.codex/personal/skills/oop-type-design/SKILL.md runtime discovery shim
 downstream implementation ../../agents/skills/catalog.yaml public skill and capability metadata
-downstream implementation ../../tools/agent/orchestration/route.py explicit capability route
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs explicit capability route
 @dependency-end
 -->
 
@@ -29,7 +29,7 @@ This is the pre-implementation OOP/type-design route. Invoke it explicitly with
 the capability ID `oop_type_design`:
 
 ```bash
-python3 tools/agent/orchestration/route.py --capability oop_type_design
+tools/bin/agent-canon route --capability oop_type_design
 ```
 
 The `--capability` route selects the owner

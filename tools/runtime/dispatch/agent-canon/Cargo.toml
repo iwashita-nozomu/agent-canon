@@ -45,7 +45,7 @@ cap-fs-ext = "=4.0.3"
 regex = "=1.12.2"
 num-rational = "=0.4.2"
 num-traits = "=0.2.19"
-time = { version = "=0.3.47", features = ["formatting", "local-offset"] }
+time = { version = "=0.3.47", features = ["formatting", "parsing", "local-offset"] }
 rustpython-ast = { version = "0.4.0", default-features = false, features = ["location", "num-bigint", "unparse", "visitor"] }
 rustpython-literal = "=0.4.0"
 rustpython-parser = { version = "0.4.0", default-features = false, features = ["location", "num-bigint"] }

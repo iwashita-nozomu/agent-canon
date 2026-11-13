@@ -8,7 +8,7 @@ upstream design README.md canonical workflow index
 upstream design ../skills/README.md public skill surface contract
 upstream design ../internal-routines/README.md internal routine registry
 upstream design ./CLI_ENTRYPOINTS.md logical command execution boundary
-downstream implementation ../../tools/validation/semantic/runtime/check_agent_runtime_alignment.py validates official system skill delegation
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/runtime_alignment.rs validates official system skill delegation
 @dependency-end
 -->
 

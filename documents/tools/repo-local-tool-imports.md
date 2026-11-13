@@ -54,8 +54,8 @@ legacy subtree wording is unrelated to tool import disposition.
 
 | Source | Canonical Path | Disposition |
 | ------ | -------------- | ----------- |
-| `scripts/audit/audit_log_schema.py` | `tools/audit/logging/audit_log_schema.py` | Promoted as portable audit schema support. |
-| `scripts/audit/audit_logger.py` | `tools/audit/logging/audit_logger.py` | Promoted as portable audit JSONL writer. |
+| `scripts/audit/audit_log_schema.py` | retired | Removed with the unused standalone audit logger; active hook/Eval logs retain their native owners. |
+| `scripts/audit/audit_logger.py` | retired | Removed after confirming that only its own tests and catalog referred to it. |
 | `scripts/jsonl_to_md.sh` | `tools/analysis/documents/formatting/jsonl_to_md.py` | Reimplemented as Python CLI for testability. |
 | `scripts/hlo/summarize_hlo_jsonl.py` | `tools/analysis/hlo/summarization/summarize_hlo_jsonl.py` | Promoted as HLO JSONL summary helper. |
 | `scripts/tools/create_design_template.py` | `tools/validation/documentation/authoring/create_design_template.py` | Retired as superseded by the canonical [design document template](../../templates/documents/design-document.template.md). |
@@ -64,10 +64,10 @@ legacy subtree wording is unrelated to tool import disposition.
 | `scripts/tools/organize_designs.py` | `tools/bin/agent-canon docs organize-designs` | Reimplemented in the native docs owner; apply uses the shared source-mutation capability and reports remain external. |
 | `scripts/read_conventions.sh` and `scripts/view_conventions.sh` | `tools/bin/agent-canon oop-python-rule-inventory`, `tools/bin/agent-canon oop-cpp-rule-inventory` | Reimplemented as repo-neutral, language-specific OOP rule inventories instead of project-root convention viewers. |
 | `scripts/restructure_code_review_skill.py` | Source repository only | Not promoted because it rewrites one historical skill layout. AgentCanon legacy tool storage is retired. |
-| `vendor/agent-canon/tools/experiments/artifacts/update_latest_result.py` | `tools/experiments/artifacts/update_latest_result.py` | Promoted from jax_solver_util submodule diff as a latest-result pointer helper. |
+| `vendor/agent-canon/tools/experiments/artifacts/update_latest_result.py` | `tools/runtime/dispatch/agent-canon/src/latest_result.rs` | Promoted from jax_solver_util submodule diff as a latest-result pointer helper. |
 | OOP readability local diff | `tools/validation/code/oop/shared/readability_core.py` with `tools/validation/code/oop/python/readability.py` and `tools/validation/code/oop/cpp/readability.py` entrypoints | Promoted algorithm-protocol contract-class exemption so intentional value contracts are not reported as thin classes. |
 | OOP readability follow-up local diff | `tools/validation/code/oop/shared/readability_core.py` with `tools/validation/code/oop/python/readability.py` and `tools/validation/code/oop/cpp/readability.py` entrypoints | Promoted public-boundary filtering and algorithm config factory exemptions. |
-| `vendor/agent-canon/tools/experiments/artifacts/update_latest_result.py` follow-up local diff | `tools/experiments/artifacts/update_latest_result.py` | Promoted deterministic nanosecond timestamp tie-break for latest-result selection. |
+| `vendor/agent-canon/tools/experiments/artifacts/update_latest_result.py` follow-up local diff | `tools/runtime/dispatch/agent-canon/src/latest_result.rs` | Promoted deterministic nanosecond timestamp tie-break for latest-result selection. |
 | `vendor/agent-canon/tools/__init__.py` and `tools/experiments/__init__.py` | `tools/__init__.py`, `tools/experiments/__init__.py` | Promoted package markers used by shared tool tests. |
 
 ## Retired Legacy Imports

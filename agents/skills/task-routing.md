@@ -7,11 +7,11 @@ upstream design ../canonical/skills.md skill canon registry
 upstream design ../../documents/design/tool-skill-routing-refactor.md short tool and skill naming policy
 upstream design ../../documents/design/responsibility-rationale.md routing-state rationale
 upstream design ./agent-orchestration.md owns later Decision Sufficiency and write-safety policy
-downstream implementation ../../tools/agent/orchestration/route.py selects short routing areas
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs owns the native route selector
 downstream implementation ../../tests/agent_tools/test_task_routing_fast_path.py validates packet-free ordinary routing
 upstream design ./skill-dependencies.yaml owns typed skill prerequisites, successors, order, and parallel relations
-downstream implementation ../../tools/agent/skills/skill_route_catalog.py derives invocation order
-downstream implementation ../../tools/agent/skills/skill_dependency_map.py validates and generates dependency graph
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs derives typed route and invocation order
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs owns graph validation and projection
 @dependency-end
 -->
 
@@ -43,7 +43,7 @@ AgentCanon members; host names remain owned by the registered host rather than
 being added to the public catalog. Reuse settled selection instead of probing
 built-in availability or rerouting a known owner.
 
-Use `python3 tools/agent/orchestration/route.py --prompt ... --mode routing-only` or the canonical changed-path route. The caller must pass `--mode repo-changing` for an explicitly authorized edit; omitted mode remains non-write. Select the smallest owner set whose responsibilities are reachable from the request. Add a candidate only with a concrete activation condition; do not execute candidates preemptively or replace routing with another classifier/handoff schema.
+Use `tools/bin/agent-canon route --prompt ... --mode routing-only` or the canonical changed-path route. The caller must pass `--mode repo-changing` for an explicitly authorized edit; omitted mode remains non-write. Select the smallest owner set whose responsibilities are reachable from the request. Add a candidate only with a concrete activation condition; do not execute candidates preemptively or replace routing with another classifier/handoff schema.
 
 作業途中で新しい観測や要求変更が生じたら、変わった判断に必要な owner
 guidance を読み直します。最初に解決した選択は、影響する前提が変わらない限り

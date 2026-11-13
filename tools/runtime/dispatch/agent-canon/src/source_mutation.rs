@@ -163,9 +163,158 @@ impl SourceMutationCapability {
         })
     }
 
+    /// Atomically replace one approved UTF-8 source file without following a path symlink.
+    pub fn atomic_write_text(&self, path: &Path, text: &str, mode: u32) -> Result<()> {
+        self.atomic_write_text_with_parents(path, text, mode, false)
+    }
+
+    /// Atomically replace one approved UTF-8 source file, creating only missing parent directories beneath the same exact capability.
+    pub fn atomic_write_text_with_parents(
+        &self,
+        path: &Path,
+        text: &str,
+        mode: u32,
+        create_parents: bool,
+    ) -> Result<()> {
+        use std::sync::atomic::{AtomicU64, Ordering};
+
+        static NEXT_TEMP: AtomicU64 = AtomicU64::new(0);
+
+        let resolved = self.assert_allowed(path)?;
+        let relative = resolved.strip_prefix(&self.source_root).map_err(|_| {
+            SourceMutationError::new(format!(
+                "mutation target is outside source: {}",
+                path.display()
+            ))
+        })?;
+        let components = relative.components().collect::<Vec<_>>();
+        let Some(Component::Normal(name)) = components.last() else {
+            return Err(SourceMutationError::new(format!(
+                "mutation target must name a source file: {}",
+                path.display()
+            )));
+        };
+        let (directory, target_name) =
+            open_file_parent_nofollow(&self.source_root, relative, create_parents).map_err(
+                |error| {
+                    SourceMutationError::new(format!(
+                        "cannot open mutation parent for {}: {error}",
+                        path.display()
+                    ))
+                },
+            )?;
+        match directory.symlink_metadata(name) {
+            Ok(metadata) if metadata.is_file() => {}
+            Ok(metadata) if metadata.is_symlink() => {
+                return Err(SourceMutationError::new(format!(
+                    "mutation target contains symlink component: {}",
+                    path.display()
+                )))
+            }
+            Ok(_) => {
+                return Err(SourceMutationError::new(format!(
+                    "mutation target is not a regular file: {}",
+                    path.display()
+                )))
+            }
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(error) => {
+                return Err(SourceMutationError::new(format!(
+                    "cannot inspect mutation target {}: {error}",
+                    path.display()
+                )))
+            }
+        }
+
+        for _ in 0..32 {
+            let sequence = NEXT_TEMP.fetch_add(1, Ordering::Relaxed);
+            let temporary_name = OsString::from(format!(
+                ".agent-canon-source-{}-{sequence}.tmp",
+                std::process::id()
+            ));
+            let mut options = cap_std::fs::OpenOptions::new();
+            options.write(true).create_new(true);
+            options.follow(FollowSymlinks::No);
+            #[cfg(unix)]
+            {
+                use cap_std::fs::OpenOptionsExt;
+                options.mode(0o600);
+            }
+            let mut file = match directory.open_with(&temporary_name, &options) {
+                Ok(file) => file,
+                Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
+                Err(error) => {
+                    return Err(SourceMutationError::new(format!(
+                        "cannot create mutation target temporary file {}: {error}",
+                        path.display()
+                    )))
+                }
+            };
+            let result = (|| {
+                file.write_all(text.as_bytes()).map_err(|error| {
+                    SourceMutationError::new(format!(
+                        "cannot write mutation target {}: {error}",
+                        path.display()
+                    ))
+                })?;
+                file.flush().map_err(|error| {
+                    SourceMutationError::new(format!(
+                        "cannot flush mutation target {}: {error}",
+                        path.display()
+                    ))
+                })?;
+                file.sync_all().map_err(|error| {
+                    SourceMutationError::new(format!(
+                        "cannot sync mutation target {}: {error}",
+                        path.display()
+                    ))
+                })?;
+                #[cfg(unix)]
+                {
+                    use cap_std::fs::PermissionsExt;
+                    file.set_permissions(cap_std::fs::Permissions::from_mode(mode))
+                        .map_err(|error| {
+                            SourceMutationError::new(format!(
+                                "cannot set mutation target permissions {}: {error}",
+                                path.display()
+                            ))
+                        })?;
+                }
+                #[cfg(not(unix))]
+                let _ = mode;
+                drop(file);
+                directory
+                    .rename(&temporary_name, &directory, &target_name)
+                    .map_err(|error| {
+                        SourceMutationError::new(format!(
+                            "cannot publish mutation target {}: {error}",
+                            path.display()
+                        ))
+                    })
+            })();
+            if result.is_err() {
+                let _ = directory.remove_file(&temporary_name);
+            }
+            return result;
+        }
+        Err(SourceMutationError::new(
+            "could not allocate a unique mutation temporary file",
+        ))
+    }
+
     /// Copy one approved regular file or source symlink with copy2-style
     /// content, permission, timestamp, and available extended-attribute data.
     pub fn copy_file_with_metadata(&self, source: &Path, target: &Path) -> Result<()> {
+        self.copy_file_from_root_with_metadata(&self.source_root, source, target)
+    }
+
+    /// Copy from an explicitly selected read root into an approved target.
+    pub fn copy_file_from_root_with_metadata(
+        &self,
+        read_root: &Path,
+        source: &Path,
+        target: &Path,
+    ) -> Result<()> {
         let resolved_target = self.assert_allowed(target)?;
         let target_relative = resolved_target
             .strip_prefix(&self.source_root)
@@ -205,25 +354,21 @@ impl SourceMutationCapability {
         let source_candidate = if source.is_absolute() {
             source.to_path_buf()
         } else {
-            self.source_root.join(source)
+            read_root.join(source)
         };
-        let source_relative = source_candidate
-            .strip_prefix(&self.source_root)
-            .map_err(|_| {
+        let source_relative = source_candidate.strip_prefix(read_root).map_err(|_| {
+            SourceMutationError::new(format!(
+                "copy source is outside source root: {}",
+                source.display()
+            ))
+        })?;
+        let (source_directory, source_name) =
+            open_file_parent_nofollow(read_root, source_relative, false).map_err(|error| {
                 SourceMutationError::new(format!(
-                    "copy source is outside source root: {}",
+                    "cannot open copy source parent for {}: {error}",
                     source.display()
                 ))
             })?;
-        let (source_directory, source_name) =
-            open_file_parent_nofollow(&self.source_root, source_relative, false).map_err(
-                |error| {
-                    SourceMutationError::new(format!(
-                        "cannot open copy source parent for {}: {error}",
-                        source.display()
-                    ))
-                },
-            )?;
         let source_entry = source_directory
             .symlink_metadata(&source_name)
             .map_err(|error| {
@@ -935,6 +1080,35 @@ fn ignored_xattr_attribute_error(error: rustix::io::Errno) -> bool {
     ignored_xattr_list_error(error) || error == Errno::PERM || error == Errno::ACCESS
 }
 
+/// Create the parent of an explicit absolute file path through no-follow handles.
+pub fn ensure_file_parent_nofollow(path: &Path) -> io::Result<PathBuf> {
+    if !path.is_absolute() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "absolute output path required",
+        ));
+    }
+    let mut root = PathBuf::new();
+    let mut relative = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::Prefix(prefix) => root.push(prefix.as_os_str()),
+            Component::RootDir => root.push(std::path::MAIN_SEPARATOR.to_string()),
+            Component::Normal(name) => relative.push(name),
+            _ => {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "canonical output path required",
+                ))
+            }
+        }
+    }
+    let (_directory, _name) = open_file_parent_nofollow(&root, &relative, true)?;
+    path.parent()
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "output parent is missing"))?
+        .canonicalize()
+}
+
 fn open_file_parent_nofollow(
     root: &Path,
     relative: &Path,
@@ -1215,7 +1389,7 @@ fn resolve_with_missing(path: &Path) -> Result<PathBuf> {
 }
 
 #[cfg(windows)]
-fn open_root_nofollow(root: &Path) -> io::Result<cap_std::fs::Dir> {
+pub(crate) fn open_root_nofollow(root: &Path) -> io::Result<cap_std::fs::Dir> {
     open_root_nofollow_chain(root)?
         .pop()
         .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "empty source root chain"))
@@ -1267,7 +1441,7 @@ fn open_root_nofollow_chain(root: &Path) -> io::Result<Vec<cap_std::fs::Dir>> {
 }
 
 #[cfg(not(windows))]
-fn open_root_nofollow(root: &Path) -> io::Result<cap_std::fs::Dir> {
+pub(crate) fn open_root_nofollow(root: &Path) -> io::Result<cap_std::fs::Dir> {
     let mut components = root.components();
     if !matches!(components.next(), Some(Component::RootDir)) {
         return Err(io::Error::new(

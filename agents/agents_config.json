@@ -4077,7 +4077,7 @@
   ],
   "generated_profile_projection": {
     "schema_id": "generated_role_profile_projection_v1",
-    "materializer": "tools/agent/orchestration/model_profile_registry.py",
+    "materializer": "tools/bin/agent-canon evaluate-codex-agent-roles --generate-role-views",
     "registry_ref": "agents/model_profiles.toml",
     "role_count": 37,
     "projection_digest": "6a4ad303424291957edaf8f8ee8b291eba3d4fa8a98620f81ca0a882edfdfcc7"

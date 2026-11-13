@@ -4030,7 +4030,7 @@ struct DependencyCliArgs {
 
 enum ParsedDependencyCli {
     Help,
-    Arguments(DependencyCliArgs),
+    Arguments(Box<DependencyCliArgs>),
 }
 
 const DEPENDENCY_USAGE: &str = "usage: agent-canon environment-dependencies [-h] [--workspace WORKSPACE] [--manifest MANIFEST] [--receipts RECEIPTS] [--final-binary-dir FINAL_BINARY_DIR] [--extras EXTRAS] [--records RECORDS [RECORDS ...]] [--format {text,json}] {validate,dry-run,install,boundary,project-install,image-install,image-verify}";
@@ -4134,7 +4134,7 @@ fn parse_dependency_cli(args: &[String]) -> std::result::Result<ParsedDependency
     }
     parsed.command =
         command.ok_or_else(|| "the following arguments are required: command".to_string())?;
-    Ok(ParsedDependencyCli::Arguments(parsed))
+    Ok(ParsedDependencyCli::Arguments(Box::new(parsed)))
 }
 
 fn dependency_cli_help() -> String {
@@ -4631,14 +4631,16 @@ fn assert_frozen_image_node(
             path.display()
         )));
     }
-    let expected_mode = if directory {
-        IMAGE_DIRECTORY_MODE
-    } else {
-        IMAGE_FILE_MODE
-    };
+    #[cfg(not(unix))]
+    let _ = owner;
     #[cfg(unix)]
     {
         use std::os::unix::fs::MetadataExt;
+        let expected_mode = if directory {
+            IMAGE_DIRECTORY_MODE
+        } else {
+            IMAGE_FILE_MODE
+        };
         if metadata.uid() != owner.0
             || metadata.gid() != owner.1
             || metadata.mode() & 0o7777 != expected_mode
@@ -8561,7 +8563,7 @@ pub fn run_cli(args: &[String]) -> i32 {
 mod tests {
     use super::*;
     use std::io::Write;
-    #[cfg(unix)]
+    #[cfg(target_os = "linux")]
     use std::os::unix::fs::PermissionsExt;
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -8582,7 +8584,7 @@ mod tests {
                 std::process::id()
             ));
             fs::create_dir_all(&path).expect("temporary root is created");
-            Self(path)
+            Self(path.canonicalize().expect("temporary root is canonical"))
         }
 
         fn write_manifest(&self, relative: &str, text: &str) -> PathBuf {
@@ -8600,7 +8602,7 @@ mod tests {
         }
     }
 
-    #[cfg(unix)]
+    #[cfg(target_os = "linux")]
     fn initialize_git_checkout(path: &Path) {
         fs::create_dir_all(path).expect("Git checkout directory is created");
         let init = Command::new("git")
@@ -9978,7 +9980,7 @@ output_contains = "1.0.0"
         .contains("duplicate Python extra"));
     }
 
-    #[cfg(unix)]
+    #[cfg(target_os = "linux")]
     #[test]
     fn parent_owned_install_receipt_round_trips_and_is_removed_through_authority() {
         let root = TempRoot::new();
@@ -10651,7 +10653,8 @@ failure_policy = "fail"
         assert_fake_responses_consumed(&installer.probe);
     }
 
-    #[cfg(unix)]
+    // The Ubuntu image contract freezes the tree before its atomic publication.
+    #[cfg(target_os = "linux")]
     #[test]
     fn image_install_and_verify_use_frozen_plan_receipts_and_live_executable_output() {
         let root = TempRoot::new();
