@@ -6,7 +6,7 @@ responsibility Defines the canonical semantic orphan inventory, finite classific
 upstream design ../design/request-intent-and-update-relation.md defines lifecycle flow and existing cleanup-executor delegation.
 upstream design worktree-lifecycle.md defines stale worktree handling and user-owned state protection.
 upstream design ../../agents/skills/agent-canon-update.md defines the existing PR lifecycle and publication owner.
-downstream implementation ../../tools/repository/git/orphan_lifecycle.py produces the canonical read-only inventory and cleanup admission.
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/orphan_lifecycle.rs produces the canonical read-only inventory and cleanup admission.
 downstream implementation ../../tests/agent_tools/test_orphan_lifecycle.py verifies semantic equivalence and refusal behavior.
 @dependency-end
 -->
@@ -18,7 +18,7 @@ branch registry、cleanup database、Issue state machine を作りません。
 
 ## 責務境界
 
-`tools/repository/git/orphan_lifecycle.py inventory` が canonical read-only inventory を生成し、
+`agent-canon orphan-lifecycle inventory` が canonical read-only inventory を生成し、
 同じ tool の `authorize-cleanup` が explicit selection を inventory digest に束縛して認可します。
 どちらも ref、PR、worktree、ファイルを削除しません。
 
@@ -87,10 +87,10 @@ caller は先に remote を通常の Git owner で更新し、どの commit を�
 
 ```bash
 git fetch --prune origin main
-python3 tools/repository/git/orphan_lifecycle.py inventory \
+agent-canon orphan-lifecycle inventory \
   --root . \
   --main-ref refs/remotes/origin/main \
-  --trace reports/orphan-trace.json \
+  --trace "$AGENT_CANON_RUNTIME_ROOT/reports/orphan-trace.json" \
   --output reports/orphan-inventory.json
 ```
 
@@ -135,11 +135,11 @@ PR head commit が local object database にない場合も semantic comparison 
 cleanup 前に、inventory が出した exact digest と candidate identity を明示します。
 
 ```bash
-python3 tools/repository/git/orphan_lifecycle.py authorize-cleanup \
-  --inventory reports/orphan-inventory.json \
+agent-canon orphan-lifecycle authorize-cleanup \
+  --inventory "$AGENT_CANON_RUNTIME_ROOT/reports/orphan-inventory.json" \
   --inventory-digest 'sha256:<inventory-digest>' \
   --root . \
-  --trace reports/orphan-trace.json \
+  --trace "$AGENT_CANON_RUNTIME_ROOT/reports/orphan-trace.json" \
   --select 'branch:remote:origin/example'
 ```
 
@@ -172,9 +172,7 @@ readback、Issue/PR trace を残した後に元 candidate を再 inventory し�
 
 ```bash
 python3 -m unittest tests.agent_tools.test_orphan_lifecycle -v
-python3 -m py_compile \
-  tools/repository/git/orphan_lifecycle.py \
-  tests/agent_tools/test_orphan_lifecycle.py
+cargo clippy --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --all-targets -- -D warnings
 ```
 
 regression は squash/tree equivalence、cherry-pick/patch equivalence、superseded、unique delta、dirty
