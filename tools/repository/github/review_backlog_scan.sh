@@ -39,74 +39,21 @@ require_runtime_boundary() {
   [[ -n "$RUNTIME_ROOT" ]] || fail_runtime_boundary "runtime_root_required"
   [[ -n "$CONTROL_ROOT" ]] || fail_runtime_boundary "control_root_required"
   [[ -d "$CONTROL_ROOT" ]] || fail_runtime_boundary "control_root_missing"
-  python3 - "$AGENT_CANON_SOURCE_ROOT" "$ROOT_DIR" "$CONTROL_ROOT" "$RUNTIME_ROOT" <<'PY'
-from pathlib import Path
-import sys
-
-source, root, control, runtime = map(Path, sys.argv[1:])
-sys.path.insert(0, str(source))
-from tools.runtime.artifacts.runtime_artifacts import (
-    RuntimeArtifactBoundary,
-    RuntimeArtifactError,
-)
-
-try:
-    source = source.resolve(strict=True)
-    root = root.resolve(strict=True)
-    control = control.resolve(strict=True)
-    # This is a preflight only.  Do not create the runtime root until every
-    # caller-controlled output override has been validated below.
-    boundary = RuntimeArtifactBoundary.for_source(source, runtime, create=False)
-    runtime_resolved = boundary.root
-    if runtime_resolved == root or root in runtime_resolved.parents:
-        raise RuntimeArtifactError("runtime root must be outside target repository")
-    try:
-        root.relative_to(control)
-    except ValueError as exc:
-        raise RuntimeArtifactError("target repository is outside control root") from exc
-except (OSError, RuntimeArtifactError, ValueError) as exc:
-    print(f"runtime boundary invalid: {exc}", file=sys.stderr)
-    raise SystemExit(2)
-print(runtime_resolved)
-PY
+  "${AGENT_CANON_NATIVE_BIN:-${AGENT_CANON_CLI:-${AGENT_CANON_SOURCE_ROOT}/tools/bin/agent-canon}}" \
+    runtime-paths root --source-root "$AGENT_CANON_SOURCE_ROOT" --target-root "$ROOT_DIR" \
+    --control-parent-root "$CONTROL_ROOT" --runtime-root "$RUNTIME_ROOT" --create false
 }
 
 runtime_path() {
   local candidate="$1"
-  python3 - "$AGENT_CANON_SOURCE_ROOT" "$ROOT_DIR" "$RUNTIME_ROOT" "$candidate" <<'PY'
-from pathlib import Path
-import sys
-
-source, root, runtime, candidate = map(Path, sys.argv[1:])
-sys.path.insert(0, str(source))
-from tools.runtime.artifacts.runtime_artifacts import RuntimeArtifactBoundary, RuntimeArtifactError
-
-try:
-    # Path validation must be side-effect free.  In particular, an invalid
-    # report/target/CLI override must not create the runtime root first.
-    boundary = RuntimeArtifactBoundary.for_source(source, runtime, create=False)
-    resolved_root = root.resolve(strict=True)
-    target = boundary.resolve(candidate)
-    if target == resolved_root or resolved_root in target.parents:
-        raise RuntimeArtifactError("runtime artifact must not be inside target repository")
-except (OSError, RuntimeArtifactError, ValueError) as exc:
-    print(f"runtime path invalid: {exc}", file=sys.stderr)
-    raise SystemExit(2)
-print(target)
-PY
+  "${AGENT_CANON_NATIVE_BIN:-${AGENT_CANON_CLI:-${AGENT_CANON_SOURCE_ROOT}/tools/bin/agent-canon}}" \
+    runtime-paths path --source-root "$AGENT_CANON_SOURCE_ROOT" --target-root "$ROOT_DIR" \
+    --runtime-root "$RUNTIME_ROOT" --candidate "$candidate" --create false
 }
 
 materialize_runtime_boundary() {
-  python3 - "$AGENT_CANON_SOURCE_ROOT" "$RUNTIME_ROOT" <<'PY'
-from pathlib import Path
-import sys
-
-source, runtime = map(Path, sys.argv[1:])
-sys.path.insert(0, str(source))
-from tools.runtime.artifacts.runtime_artifacts import RuntimeArtifactBoundary
-
-RuntimeArtifactBoundary.for_source(source, runtime, create=True)
-PY
+  "${AGENT_CANON_NATIVE_BIN:-${AGENT_CANON_CLI:-${AGENT_CANON_SOURCE_ROOT}/tools/bin/agent-canon}}" \
+    runtime-paths root --source-root "$AGENT_CANON_SOURCE_ROOT" --runtime-root "$RUNTIME_ROOT" >/dev/null
 }
 
 usage() {
