@@ -53,6 +53,9 @@ runtime_schema:
   # one-file catalog entry below. Keeping this inventory here prevents the
   # dispatcher from silently dropping a first-class Rust route.
   rust_public_commands:
+    - id: rust-bootstrap-runtime
+      selector: bootstrap-runtime
+      path: tools/runtime/dispatch/agent-canon/src/bootstrap_runtime.rs
     - id: rust-github-status-lifecycle
       selector: github-status-lifecycle
       path: tools/runtime/dispatch/agent-canon/src/github_status_lifecycle.rs

@@ -5,7 +5,7 @@
 # responsibility Verifies Git-only skill updates and fixed discovery links.
 # upstream design ../../documents/design/skill-runtime-shim-materialization.md Git delivery contract
 # upstream implementation ../../bootstrap/host/lifecycle/entrypoint.sh global link installation
-# upstream implementation ../../tools/runtime/container/bootstrap_runtime.py isolated directory registration
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/bootstrap_runtime.rs isolated directory registration
 # @dependency-end
 
 from __future__ import annotations
@@ -18,22 +18,9 @@ from pathlib import Path
 import pytest
 import yaml
 
-import tools.runtime.container.bootstrap_runtime as bootstrap_runtime_module
-from tools.runtime.container.bootstrap_runtime import BootstrapError, BootstrapRuntime
-
 ROOT = Path(__file__).resolve().parents[2]
 ADAPTER = ROOT / "bootstrap/host/lifecycle/entrypoint.sh"
 SKILLS = Path(".codex/personal/skills")
-
-
-@pytest.fixture(autouse=True)
-def resident_private_log_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Provide the private-log mount required by resident controller calls."""
-    private_log = tmp_path / "private-log"
-    private_log.mkdir()
-    monkeypatch.setattr(
-        bootstrap_runtime_module, "PRIVATE_LOG_DESTINATION", str(private_log)
-    )
 
 
 def git(root: Path, *args: str) -> str:
@@ -102,7 +89,7 @@ def test_every_public_skill_is_tracked_and_matches_catalog() -> None:
 def test_git_pull_updates_adds_and_removes_skills_without_relinking(
     tmp_path: Path,
 ) -> None:
-    """A fixed global and isolated directory link see the same Git update."""
+    """The fixed global directory link sees additions and removals from Git."""
     publisher = tmp_path / "publisher"
     publisher.mkdir()
     git(publisher, "init", "-b", "main")
@@ -115,21 +102,13 @@ def test_git_pull_updates_adds_and_removes_skills_without_relinking(
     git(publisher, "commit", "-m", "Initial distribution")
     home = tmp_path / "home"
     home.mkdir()
+    container_runtime = home / ".runtime" / "container-runtime"
     git(home, "clone", "--no-hardlinks", str(publisher), "agent-canon")
     checkout = home / "agent-canon"
     installed = install_links(home, checkout)
     assert installed.returncode == 0, installed.stderr
     global_link = home / ".agents/skills"
     global_identity = global_link.lstat()
-    manager = BootstrapRuntime(
-        home,
-        home / "runtime",
-        repository_root=checkout,
-        manifest_path=ROOT / "bootstrap/host/manifest.toml",
-    )
-    manager.codex_prepare()
-    isolated_link = manager.paths.codex_home / "skills/agent-canon"
-    isolated_identity = isolated_link.lstat()
     # The user config is not part of the distribution and survives source pulls.
     personal = checkout / ".codex/personal/config.toml"
     personal.write_text("# personal configuration\n")
@@ -145,24 +124,18 @@ def test_git_pull_updates_adds_and_removes_skills_without_relinking(
     git(publisher, "commit", "-m", "Change, add and remove skills")
     git(checkout, "pull", "--ff-only")
     # No bootstrap command or generator runs between pull and these readbacks.
-    for link in (global_link, isolated_link):
-        assert (link / "integration/SKILL.md").read_bytes() == integration.read_bytes()
-        assert (link / "new-skill/SKILL.md").read_bytes() == added.read_bytes()
-        assert not (link / "devcontainer-exec/SKILL.md").exists()
+    assert (global_link / "integration/SKILL.md").read_bytes() == integration.read_bytes()
+    assert (global_link / "new-skill/SKILL.md").read_bytes() == added.read_bytes()
+    assert not (global_link / "devcontainer-exec/SKILL.md").exists()
     assert personal.read_text() == "# personal configuration\n"
     repeated = install_links(home, checkout)
     assert repeated.returncode == 0, repeated.stderr
-    manager.codex_prepare()
-    for link, before in (
-        (global_link, global_identity),
-        (isolated_link, isolated_identity),
-    ):
-        assert (link.lstat().st_ino, link.lstat().st_mtime_ns) == (
-            before.st_ino,
-            before.st_mtime_ns,
-        )
+    assert (global_link.lstat().st_ino, global_link.lstat().st_mtime_ns) == (
+        global_identity.st_ino,
+        global_identity.st_mtime_ns,
+    )
     assert git(checkout, "status", "--porcelain") == ""
-    assert not (manager.paths.container_runtime / "skill-projection").exists()
+    assert not (container_runtime / "skill-projection").exists()
 
 
 @pytest.mark.parametrize("dangling", [False, True])
@@ -198,19 +171,11 @@ def test_missing_distribution_fails_without_creating_an_empty_view(
     assert "skill_source_missing" in result.stderr
     assert not (checkout / SKILLS).exists()
     assert not (home / ".agents/skills").is_symlink()
-    manager = BootstrapRuntime(
-        home,
-        home / "runtime",
-        repository_root=checkout,
-        manifest_path=ROOT / "bootstrap/host/manifest.toml",
-    )
-    with pytest.raises(BootstrapError, match="skill_source_missing"):
-        manager.codex_prepare()
 
 
 def test_runtime_has_no_skill_writer_or_transfer() -> None:
     """Only the explicit source-authoring owner can write distribution bytes."""
-    controller = (ROOT / "tools/runtime/container/bootstrap_runtime.py").read_text()
+    controller = (ROOT / "tools/runtime/dispatch/agent-canon/src/bootstrap_runtime.rs").read_text()
     shell = ADAPTER.read_text()
     assert "skill_shim_materializer" not in controller
     assert "_materialize_skill_view" not in controller
@@ -255,43 +220,3 @@ def test_pull_migrates_ignored_adapters_without_removing_personal_config(
         before.st_mtime_ns,
     )
     assert git(checkout, "status", "--porcelain") == ""
-
-
-def test_isolated_prepare_retires_only_previous_managed_file_links(
-    tmp_path: Path,
-) -> None:
-    """The prior per-file manifest converges to the fixed public directory link."""
-    import json
-
-    home = tmp_path / "home"
-    home.mkdir()
-    checkout = tmp_path / "checkout"
-    shutil.copytree(ROOT / SKILLS, checkout / SKILLS)
-    manager = BootstrapRuntime(
-        home,
-        home / "runtime",
-        repository_root=checkout,
-        manifest_path=ROOT / "bootstrap/host/manifest.toml",
-    )
-    manager.codex_prepare()
-    codex_home = manager.paths.codex_home
-    directory_link = codex_home / "skills/agent-canon"
-    directory_link.unlink()
-    old_target = codex_home / "skills/integration/SKILL.md"
-    old_target.parent.mkdir(parents=True)
-    source = checkout / SKILLS / "integration/SKILL.md"
-    old_target.symlink_to(source)
-    foreign = codex_home / "skills/foreign/SKILL.md"
-    foreign.parent.mkdir(parents=True)
-    foreign.write_text("user-owned skill\n")
-    manifest = codex_home / "manifest.json"
-    payload = json.loads(manifest.read_text())
-    payload["links"] = [
-        entry for entry in payload["links"] if entry["surface"] != "skills"
-    ] + [{"target": str(old_target), "source": str(source), "managed": True}]
-    manifest.write_text(json.dumps(payload))
-    manager.codex_prepare()
-    assert directory_link.resolve() == checkout / SKILLS
-    assert not old_target.is_symlink()
-    assert foreign.read_text() == "user-owned skill\n"
-    assert (directory_link / "integration/SKILL.md").read_bytes() == source.read_bytes()

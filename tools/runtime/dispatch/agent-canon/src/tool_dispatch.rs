@@ -650,7 +650,10 @@ fn nonempty_env(key: &str) -> Option<std::ffi::OsString> {
     env::var_os(key).filter(|value| !value.is_empty())
 }
 
-fn registered_roots(runtime: &Path) -> Result<Vec<PathBuf>, DispatchError> {
+fn registered_roots(
+    runtime: &Path,
+    target_namespace: Option<&crate::bootstrap_runtime::TargetNamespace>,
+) -> Result<Vec<PathBuf>, DispatchError> {
     if let Some(registry_value) = nonempty_env("AGENT_CANON_MOUNT_REGISTRY") {
         let registry = PathBuf::from(registry_value);
         let metadata = fs::symlink_metadata(&registry).map_err(|_| {
@@ -701,7 +704,10 @@ fn registered_roots(runtime: &Path) -> Result<Vec<PathBuf>, DispatchError> {
                     "target digest",
                 ));
             }
-            roots.push(PathBuf::from(format!("/targets/{digest}")));
+            let root = PathBuf::from(format!("/targets/{digest}"));
+            roots.push(target_namespace.map_or(root.clone(), |namespace| {
+                PathBuf::from(namespace.map_process_path(&root.display().to_string()))
+            }));
         }
         return Ok(roots);
     }
@@ -760,7 +766,12 @@ fn write_accessible(path: &Path, metadata: &fs::Metadata) -> bool {
     OpenOptions::new().write(true).open(path).is_ok()
 }
 
-fn cwd_for(root: &Path, spec: &ToolSpec, runtime: &Path) -> Result<PathBuf, DispatchError> {
+fn cwd_for(
+    root: &Path,
+    spec: &ToolSpec,
+    runtime: &Path,
+    target_namespace: Option<&crate::bootstrap_runtime::TargetNamespace>,
+) -> Result<PathBuf, DispatchError> {
     let value = match spec.cwd_policy.as_str() {
         "source-root" => {
             let cwd = resolve_non_strict(root)
@@ -779,7 +790,7 @@ fn cwd_for(root: &Path, spec: &ToolSpec, runtime: &Path) -> Result<PathBuf, Disp
     };
     let cwd = resolve_non_strict(Path::new(&value))
         .map_err(|error| DispatchError::new("invalid-cwd", error))?;
-    let registered = registered_roots(runtime)?;
+    let registered = registered_roots(runtime, target_namespace)?;
     let tasks = runtime.join("tasks");
     if !registered.iter().any(|target| under(&cwd, target)) && !under(&cwd, &tasks) {
         return Err(DispatchError::new(
@@ -1002,7 +1013,9 @@ fn resolve_container_argv(
                 .join("agent-canon")
                 .display()
                 .to_string();
-        } else if value.starts_with("tools/") && root.join(&*value).is_file() {
+        } else if (value.starts_with("tools/") || value.starts_with("eval/"))
+            && root.join(&*value).is_file()
+        {
             *value = root.join(&*value).display().to_string();
         }
     }
@@ -1142,6 +1155,7 @@ fn bootstrap_command(
     args: &[String],
     cwd: &Path,
     output: Option<&Path>,
+    target_namespace: Option<&crate::bootstrap_runtime::TargetNamespace>,
 ) -> Result<(Vec<String>, BTreeMap<String, String>), DispatchError> {
     let bootstrap = root.join("bootstrap.sh");
     if !is_executable_file(&bootstrap) {
@@ -1155,7 +1169,7 @@ fn bootstrap_command(
     })?;
     let control = resolve_non_strict(Path::new(&control_value))
         .map_err(|error| DispatchError::new("runtime-root-missing", error))?;
-    let registered = registered_roots(runtime)?;
+    let registered = registered_roots(runtime, target_namespace)?;
     let target_root = if let Some(target_value) = nonempty_env("AGENT_CANON_TARGET_ROOT") {
         let target = resolve_non_strict(Path::new(&target_value))
             .map_err(|error| DispatchError::new("target-root-unregistered", error))?;
@@ -1336,14 +1350,19 @@ fn status_code(status: ExitStatus) -> i32 {
     }
 }
 
-fn run_container_spec(root: &Path, spec: &ToolSpec, args: &[String]) -> Result<i32, DispatchError> {
+fn run_container_spec(
+    root: &Path,
+    spec: &ToolSpec,
+    args: &[String],
+    target_namespace: Option<&crate::bootstrap_runtime::TargetNamespace>,
+) -> Result<i32, DispatchError> {
     validate_container_context(root)?;
     let runtime_value = nonempty_env("AGENT_CANON_RUNTIME_ROOT")
         .ok_or_else(|| DispatchError::new("runtime-root-required", "AGENT_CANON_RUNTIME_ROOT"))?;
     let runtime = resolve_non_strict(Path::new(&runtime_value))
         .map_err(|error| DispatchError::new("runtime-root-required", error))?;
-    let registered = registered_roots(&runtime)?;
-    let cwd = cwd_for(root, spec, &runtime)?;
+    let registered = registered_roots(&runtime, target_namespace)?;
+    let cwd = cwd_for(root, spec, &runtime, target_namespace)?;
     let output = output_root(spec, root, &runtime, &registered)?;
     if let Some(output) = output
         .as_ref()
@@ -1390,20 +1409,28 @@ fn run_spec(
     spec: &ToolSpec,
     args: &[String],
     container_exec: bool,
+    target_namespace: Option<&crate::bootstrap_runtime::TargetNamespace>,
 ) -> Result<i32, DispatchError> {
     validate_child_route(spec, args)?;
     if container_exec {
-        return run_container_spec(root, spec, args);
+        return run_container_spec(root, spec, args, target_namespace);
     }
     let runtime_value = nonempty_env("AGENT_CANON_RUNTIME_ROOT")
         .ok_or_else(|| DispatchError::new("runtime-root-required", "AGENT_CANON_RUNTIME_ROOT"))?;
     let runtime = resolve_non_strict(Path::new(&runtime_value))
         .map_err(|error| DispatchError::new("runtime-root-required", error))?;
-    let registered = registered_roots(&runtime)?;
-    let cwd = cwd_for(root, spec, &runtime)?;
+    let registered = registered_roots(&runtime, target_namespace)?;
+    let cwd = cwd_for(root, spec, &runtime, target_namespace)?;
     let output = output_root(spec, root, &runtime, &registered)?;
-    let (command, child_environment) =
-        bootstrap_command(root, &runtime, spec, args, &cwd, output.as_deref())?;
+    let (command, child_environment) = bootstrap_command(
+        root,
+        &runtime,
+        spec,
+        args,
+        &cwd,
+        output.as_deref(),
+        target_namespace,
+    )?;
     run_process(
         &command,
         root,
@@ -1416,7 +1443,7 @@ fn run_spec(
 
 /// Ask bootstrap to execute one typed catalog entry.
 pub fn run_tool(root: &Path, spec: &ToolSpec, args: &[String]) -> Result<i32, DispatchError> {
-    run_spec(root, spec, args, false)
+    run_spec(root, spec, args, false, None)
 }
 
 /// Run one typed catalog entry inside the authenticated tool container.
@@ -1425,10 +1452,14 @@ pub fn run_container_tool(
     spec: &ToolSpec,
     args: &[String],
 ) -> Result<i32, DispatchError> {
-    run_spec(root, spec, args, true)
+    run_spec(root, spec, args, true, None)
 }
 
-fn run_rust_cli(root: &Path, args: &[String]) -> Result<i32, DispatchError> {
+fn run_rust_cli(
+    root: &Path,
+    args: &[String],
+    target_namespace: Option<&crate::bootstrap_runtime::TargetNamespace>,
+) -> Result<i32, DispatchError> {
     let runtime_value = nonempty_env("AGENT_CANON_RUNTIME_ROOT")
         .ok_or_else(|| DispatchError::new("runtime-root-required", "AGENT_CANON_RUNTIME_ROOT"))?;
     let control_value = nonempty_env("AGENT_CANON_CONTROL_PARENT_ROOT").ok_or_else(|| {
@@ -1438,7 +1469,7 @@ fn run_rust_cli(root: &Path, args: &[String]) -> Result<i32, DispatchError> {
         .map_err(|error| DispatchError::new("runtime-root-required", error))?;
     let control = resolve_non_strict(Path::new(&control_value))
         .map_err(|error| DispatchError::new("runtime-root-required", error))?;
-    let registered = registered_roots(&runtime)?;
+    let registered = registered_roots(&runtime, target_namespace)?;
     let target = if let Some(target_value) = nonempty_env("AGENT_CANON_TARGET_ROOT") {
         let target = resolve_non_strict(Path::new(&target_value))
             .map_err(|error| DispatchError::new("target-root-unregistered", error))?;
@@ -1557,6 +1588,21 @@ fn print_error(error: DispatchError) -> i32 {
 
 /// Execute the stable `agent-canon tool` CLI route.
 pub fn run_cli(args: &[String]) -> i32 {
+    run_cli_with_target_namespace(args, None)
+}
+
+#[cfg(feature = "controller-test-driver")]
+pub fn run_cli_in_test_namespace(
+    args: &[String],
+    target_namespace: &crate::bootstrap_runtime::TargetNamespace,
+) -> i32 {
+    run_cli_with_target_namespace(args, Some(target_namespace))
+}
+
+fn run_cli_with_target_namespace(
+    args: &[String],
+    target_namespace: Option<&crate::bootstrap_runtime::TargetNamespace>,
+) -> i32 {
     if args.is_empty() {
         eprintln!("usage: agent-canon tool <run|inventory|rust-cli> [options]");
         return 2;
@@ -1657,7 +1703,7 @@ pub fn run_cli(args: &[String]) -> i32 {
                     "rust-cli",
                 ));
             }
-            run_rust_cli(&root, &arguments[index + 1..])
+            run_rust_cli(&root, &arguments[index + 1..], target_namespace)
         })();
         return result.unwrap_or_else(print_error);
     }
@@ -1678,9 +1724,9 @@ pub fn run_cli(args: &[String]) -> i32 {
         let root = resolve_non_strict(&root)
             .map_err(|error| DispatchError::new("invalid-catalog", error))?;
         if container_exec {
-            run_container_tool(&root, spec, &child_args)
+            run_spec(&root, spec, &child_args, true, target_namespace)
         } else {
-            run_tool(&root, spec, &child_args)
+            run_spec(&root, spec, &child_args, false, target_namespace)
         }
     })();
     match result {
@@ -1713,6 +1759,45 @@ mod tests {
         assert_eq!(RUNTIME_MARKER, b"agent-canon-runtime/v1\n");
         assert_eq!(CONTAINER_MARKER_NAME, ".agent-canon-tool-container");
         assert_eq!(RUNTIME_MARKER_NAME, ".agent-canon-runtime");
+    }
+
+    #[test]
+    fn container_argv_resolves_eval_sources_without_rewriting_child_arguments() {
+        let directory = temporary_directory();
+        let script = directory.join("eval/producers/generate_agent_improvement_guide.py");
+        fs::create_dir_all(script.parent().expect("producer directory"))
+            .expect("create producer directory");
+        fs::write(&script, "# fixture\n").expect("write producer fixture");
+        let spec = ToolSpec {
+            tool_id: "generate-agent-improvement-guide".to_owned(),
+            path: "eval/producers/generate_agent_improvement_guide.py".to_owned(),
+            runtime: "python".to_owned(),
+            argv: vec![
+                "python3".to_owned(),
+                "eval/producers/generate_agent_improvement_guide.py".to_owned(),
+            ],
+            execution_plane: "tool-container".to_owned(),
+            cwd_policy: "target-root".to_owned(),
+            env_policy: "allowlisted".to_owned(),
+            stdin_policy: "inherited".to_owned(),
+            stdout_policy: "inherited".to_owned(),
+            stderr_policy: "inherited".to_owned(),
+            exit_policy: "propagate".to_owned(),
+            signal_policy: "propagate".to_owned(),
+            side_effect_policy: "external-artifact".to_owned(),
+            output_root: "external-runtime".to_owned(),
+            written_paths: Vec::new(),
+        };
+        let command = resolve_container_argv(
+            &directory,
+            &spec,
+            &["--help".to_owned(), "eval/argument.py".to_owned()],
+        )
+        .expect("resolve argv");
+        assert_eq!(command[1], script.display().to_string());
+        assert_eq!(command[2], "--help");
+        assert_eq!(command[3], "eval/argument.py");
+        fs::remove_dir_all(directory).expect("remove argv fixture");
     }
 
     #[test]

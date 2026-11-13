@@ -198,6 +198,7 @@ Commands:
   create-experiment-topic <topic> [options]
   server-readiness [--layout <layout.toml>]
   environment-dependencies <validate|dry-run|install|boundary|project-install|image-install|image-verify> [options]
+  bootstrap-runtime --repository-root ROOT --control-parent-root ROOT --runtime-root ROOT <command> [options]
   check-skill-frontmatter [--root ROOT] [--format text|json]
   chatgpt-codex-route --input <packet.json|->
   rust-migration-plan --root <repo-root> [--limit N] [--format text|json]
@@ -294,6 +295,9 @@ fn main() {
         std::process::exit(theorem_graph_circularity_check::run(&args[2..]));
     }
 
+    if args.len() >= 2 && args[1] == "bootstrap-runtime" {
+        std::process::exit(agent_canon::bootstrap_runtime::run(&args[2..]));
+    }
     if args.len() >= 2
         && ["oop-python-readability", "oop-cpp-readability"].contains(&args[1].as_str())
     {

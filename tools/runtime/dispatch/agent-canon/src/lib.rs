@@ -93,6 +93,7 @@ pub mod skill_shim_evaluation;
 pub mod agent_canon_source_root;
 pub mod annex_retention;
 pub mod behavior_event_assembly;
+pub mod bootstrap_runtime;
 pub mod environment_dependencies;
 pub mod eval_accumulation;
 pub mod eval_accumulation_check;
