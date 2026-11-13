@@ -38,7 +38,7 @@ checkout の clean / dirty、差分、conflict risk、authority drift、carry-ov
 - [documents/notes/guardrails/README.md](../../documents/notes/guardrails/README.md)
 - [documents/notes/failures/README.md](../../documents/notes/failures/README.md)
 - [documents/notes/worktrees/README.md](../../documents/notes/worktrees/README.md)
-- `tools/runtime/authority/hook_safety.py`
+- `tools/runtime/dispatch/agent-canon/src/hook_safety.rs`
 
 ## Expected Outcome
 
@@ -101,5 +101,5 @@ managed child の除去後、他成果物のない topic container も同じ cle
 
 - 未保存・未知・他者の差分を保持し、dirty だけで不整合と判断しません。自分の Git 操作を未完了のまま放置せず、修復不能な対象と次の対応を引き継ぎます。記録だけを修復済みと扱いません。
 - 最新 main の取込み、必要な競合解消、公開前の最終差分確認は省略しません。branch / commit / publication は [Branch Scope](../../documents/operations/BRANCH_SCOPE.md) に従います。
-- checkout の初期化・branch/worktree 作成は [repository-topic-clone](repository-topic-clone.md)、[CODEX_INTAKE / Branch Reuse Default](../canonical/CODEX_INTAKE.md)、`tools/runtime/authority/hook_safety.py` に委譲します。この skill では選択済み checkout-mode と作成時の `branch_creation_reason=<reason>` / `worktree_creation_reason=<reason>` を確認し、手動作成しません。
+- checkout の初期化・branch/worktree 作成は [repository-topic-clone](repository-topic-clone.md)、[CODEX_INTAKE / Branch Reuse Default](../canonical/CODEX_INTAKE.md)、`tools/runtime/dispatch/agent-canon/src/hook_safety.rs` に委譲します。この skill では選択済み checkout-mode と作成時の `branch_creation_reason=<reason>` / `worktree_creation_reason=<reason>` を確認し、手動作成しません。
 - repo 全体レビューや再編は、依頼の scope に含まれる場合だけ [comprehensive-development](comprehensive-development.md) を使います。
