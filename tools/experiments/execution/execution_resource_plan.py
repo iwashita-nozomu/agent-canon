@@ -10,7 +10,7 @@
 # upstream design ../../../documents/runtime/runtime-profiles-and-check-matrix.md validation failure reader projection
 # upstream design ../../../documents/experiments/gpu-admission-r5-nvidia-visibility.md official nvidia-smi C/G/M/O/C+G/M+C process visibility, PID/start/container mapping, MIG UUID mapping
 # downstream implementation ./run_managed_experiment.py managed experiment adapter
-# downstream implementation ./gpu_command_admission.py provider-independent direct GPU admission adapter
+# downstream implementation ../../runtime/dispatch/agent-canon/src/gpu_command_admission.rs provider-independent direct GPU admission adapter
 # downstream implementation ../../runtime/dispatch/agent-canon/src/execution_resource_projection.rs validates exact coarse PostToolUse projection constants
 # downstream implementation ../../runtime/dispatch/agent-canon/src/jit_canonical_ir.rs GPU requests must route here or fail typed preflight
 # downstream implementation ../../../templates/experiments/_template/run.py direct GPU launch is statically prohibited
@@ -18,7 +18,7 @@
 # @dependency-end
 
 # Static consumer closure: run_managed_experiment.py is the managed-run
-# consumer; gpu_command_admission.py reuses only admission primitives for the
+# consumer; gpu_command_admission.rs reuses only admission primitives for the
 # provider-independent direct-command route.
 
 """Canonical execution resource planning for admitted managed runs.

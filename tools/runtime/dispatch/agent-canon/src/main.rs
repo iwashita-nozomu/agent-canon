@@ -116,6 +116,7 @@ use std::env;
 const HELP: &str = "AgentCanon's native command line interface.
 
 Usage: agent-canon <command> [arguments]
+  run-gpu-command [options] -- COMMAND ...
   experiment-registry [--repo-root ROOT] [--registry PATH]
 
 Commands:
@@ -482,6 +483,9 @@ fn main() {
                 std::process::exit(2);
             }
         }
+    }
+    if args.len() >= 2 && args[1] == "run-gpu-command" {
+        std::process::exit(agent_canon::gpu_command_admission::run(&args[2..]));
     }
     if args.len() >= 2 && args[1] == "sync-experiment-registry-context" {
         std::process::exit(agent_canon::experiment_registry::context::run(&args[2..]));
