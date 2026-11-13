@@ -8,6 +8,7 @@
 
 # Match rustfmt's LF policy on every host without changing global Git settings.
 tools/runtime/dispatch/agent-canon/**/*.rs text eol=lf
+tools/runtime/python-provider/**/*.rs text eol=lf
 
 # The native docs CLI embeds these provider defaults for source-free targets.
 .markdownlint-cli2.jsonc text eol=lf
