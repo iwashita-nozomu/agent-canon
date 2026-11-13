@@ -25,9 +25,9 @@ summary = "Short task-routing tool documentation."
 [[tool]]
 id = "html-artifact-access"
 classification = "public"
-tool = "tools/experiments/artifacts/html_artifact_access.py"
+tool = "tools/runtime/dispatch/agent-canon/src/html_artifact_access.rs"
 doc = "documents/tools/html_artifact_access.md"
-language = "python"
+language = "rust"
 summary = "Remote HTML artifact browser-access command documentation."
 
 [[tool]]

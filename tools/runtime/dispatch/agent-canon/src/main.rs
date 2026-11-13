@@ -170,6 +170,7 @@ Commands:
   check-solid-evidence [paths...] [--root ROOT] [--changed] [--base-ref BASE_REF] [--evidence EVIDENCE] [--exclude EXCLUDE] [--verbose] [--format text|json]
   rust-migration-audit --root <repo-root>
   update-latest-result RESULT_ROOT --variant VARIANT [--result-dir PATH]
+  html-artifact-access REPORT_PATH [options]
   sync-experiment-registry-context --topic TOPIC [options]
   create-experiment-topic <topic> [options]
   server-readiness [--layout <layout.toml>]
@@ -274,6 +275,9 @@ fn main() {
     }
     if args.len() >= 2 && args[1] == "update-latest-result" {
         std::process::exit(agent_canon::latest_result::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "html-artifact-access" {
+        std::process::exit(agent_canon::html_artifact_access::run(&args[2..]));
     }
     if args.len() >= 2 && args[1] == "check-skill-tool-invocation-graph" {
         std::process::exit(catalog::skill_dependency_graph::run(&args[2..]));
