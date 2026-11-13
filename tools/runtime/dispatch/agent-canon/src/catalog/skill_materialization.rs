@@ -1035,7 +1035,7 @@ fn read_target_nofollow(
     if !file_metadata.is_file() {
         return Err(SkillMaterializationError::new(format!(
             "target is not a regular file: {}",
-            path.display()
+            relative.display()
         )));
     }
     let mut bytes = Vec::new();
