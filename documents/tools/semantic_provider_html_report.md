@@ -1,4 +1,4 @@
-# semantic_provider_html_report.py
+# semantic-provider-html-report
 <!--
 @dependency-start
 contract reference
@@ -7,12 +7,12 @@ upstream design ./semantic_index.md defines semantic provider comparison and can
 upstream design ../../agents/skills/html-output.md owns HTML artifact generation and validation
 upstream environment ../../bootstrap/container/image/dependencies.toml supplies Quarto, embedded Pandoc, and the offline link checker
 upstream design ../prose-reasoning-graph/dsl-spec.md defines shared graph visualization projection and adapter contract
-upstream implementation ../../tools/analysis/search/reporting/semantic_provider_html_report.py renders provider comparison HTML
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/semantic_index/semantic_provider_html_report.rs renders provider comparison HTML
 downstream implementation ../../tests/agent_tools/test_semantic_provider_html_report.py tests renderer behavior
 @dependency-end
 -->
 
-`tools/analysis/search/reporting/semantic_provider_html_report.py` renders
+`agent-canon semantic-provider-html-report` renders
 `agent-canon semantic-index compare-providers` JSON as a static HTML report
 through the installed Quarto CLI and its embedded Pandoc. Quarto owns general
 document layout, HTML serialization, and local-resource handling; the report
@@ -38,7 +38,7 @@ provided by the provider comparison review packet.
 Use it after a provider comparison artifact already exists:
 
 ```bash
-python3 tools/analysis/search/reporting/semantic_provider_html_report.py \
+tools/bin/agent-canon semantic-provider-html-report \
   --compare-json reports/agents/<run-id>/semantic_provider_compare.json \
   --output reports/agents/<run-id>/semantic_provider_compare.html
 ```
