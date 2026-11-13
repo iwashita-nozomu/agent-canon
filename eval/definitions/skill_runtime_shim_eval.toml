@@ -2,7 +2,7 @@
 # contract data
 # responsibility Defines answer-free fresh skill runtime shim evaluation packets.
 # upstream design ../../documents/design/skill-runtime-shim-materialization.md packet and measurement contract
-# downstream implementation ../../eval/producers/skill_shim_evaluation.py packet producer
+# downstream implementation ../../tools/runtime/dispatch/agent-canon/src/skill_shim_evaluation.rs native packet producer
 # downstream implementation ../../tests/agent_tools/test_skill_shim_evaluation.py producer tests
 # @dependency-end
 
@@ -24,7 +24,7 @@ prompt_dependency_files = ["agents/skills/catalog.yaml", "agents/skills/skill-de
 method = "one fresh read-only gpt-5.4-mini evaluator"
 requirements = ["discovery", "canonical-owner", "no-shim-route"]
 report_grammar = "documents/codex/prompt-skill-evaluation-checklist.md#Observed-Report-Grammar"
-packet_digest = "7c168f4dda09be391eefcacda599d4e1e5eb98ea78aa150c824aa341c80fb8c1"
+packet_digest = "e63e78101b378abd5cebd69edf88049a3c6a30ccd62038ba9ea4b061f60ee083"
 
 [[packet]]
 id = "shim-boundary-and-negative-v1"
@@ -40,7 +40,7 @@ prompt_dependency_files = ["agents/skills/catalog.yaml", "documents/codex/prompt
 method = "one fresh read-only gpt-5.4-mini evaluator"
 requirements = ["no-false-activation", "host-delegation", "no-duplicate-policy"]
 report_grammar = "documents/codex/prompt-skill-evaluation-checklist.md#Observed-Report-Grammar"
-packet_digest = "217c27d4e0e09147d33adfa267394155767aaf6dfe2893d3c4e3c8583108c3be"
+packet_digest = "fe0205da5fa7dadc4eab66f185f71cfdcfc597a6a55e0afcf9c3529ad6731c9f"
 
 [[packet]]
 id = "shim-toolcall-route-v1"
@@ -56,7 +56,7 @@ prompt_dependency_files = ["agents/skills/catalog.yaml", "agents/skills/skill-de
 method = "one fresh read-only gpt-5.4-mini evaluator"
 requirements = ["owner-command-packet", "typed-toolcall", "failure-semantics"]
 report_grammar = "documents/codex/prompt-skill-evaluation-checklist.md#Observed-Report-Grammar"
-packet_digest = "afac4cdd4b1ea8fd6bd0f134bc754699e06d9c0fc0024d70c40c92e2a7e5d181"
+packet_digest = "890279052b3ea2b9a8f12143ee0d178e75eb4c8f240260952bbce6bcca6840b9"
 
 [[packet]]
 id = "shim-dependent-skill-ordering-v1"
@@ -72,7 +72,7 @@ prompt_dependency_files = ["agents/skills/catalog.yaml", "agents/skills/skill-de
 method = "one fresh read-only gpt-5.4-mini evaluator"
 requirements = ["dependency-order", "canonical-owner", "no-shim-route"]
 report_grammar = "documents/codex/prompt-skill-evaluation-checklist.md#Observed-Report-Grammar"
-packet_digest = "5f3bcea8e0842b20662b656a8b8236448672fc3e752a37d4d539f45048eedf57"
+packet_digest = "b155c19af278020be03360cec006ced37974c3c9b16258dc9c2e2da6fb088d2c"
 
 [[packet]]
 id = "shim-parent-subagent-instruction-v1"
@@ -88,7 +88,7 @@ prompt_dependency_files = ["agents/skills/catalog.yaml", "agents/canonical/CODEX
 method = "one fresh read-only gpt-5.4-mini evaluator"
 requirements = ["parent-owner", "subagent-boundary", "canonical-instruction"]
 report_grammar = "documents/codex/prompt-skill-evaluation-checklist.md#Observed-Report-Grammar"
-packet_digest = "128074b96c863421b6fa13df1527c2d47ee0b3e2f2949eea3393f9be085edc39"
+packet_digest = "9498e12b81ade7a548fdd77ee70330a6a1af5fee7a89f5ad33b4e90ee7906fd5"
 
 [[packet]]
 id = "shim-failure-argparse-normalization-v1"
@@ -100,8 +100,8 @@ iteration_ids = { current = "fresh-current-01", generated = "fresh-generated-01"
 prompt_digest = "a82826d53ee43e0096ea312f9d36f9864ab8b10ed1a84cf51059d20565771365"
 prompt_path = "eval/fixtures/skill-runtime-shim/packets/changed/shim-failure-argparse-normalization-v1.md"
 canonical_target_files = [".codex/personal/skills/agent-orchestration/SKILL.md", "agents/skills/agent-orchestration.md"]
-prompt_dependency_files = ["tools/agent/orchestration/route.py", "eval/producers/skill_shim_evaluation.py"]
+prompt_dependency_files = ["tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs", "tools/runtime/dispatch/agent-canon/src/skill_shim_evaluation.rs"]
 method = "one fresh read-only gpt-5.4-mini evaluator"
 requirements = ["argument-error", "failure-normalization", "no-invented-command"]
 report_grammar = "documents/codex/prompt-skill-evaluation-checklist.md#Observed-Report-Grammar"
-packet_digest = "a7981ba48e1ee146742055c8eacf4c0c3f5ec6a4674010bbf13795eb0a35af43"
+packet_digest = "30572c1e62a4f9efebafa9ee3a33e998eb237585e9720dbc7c748abdd78f92b7"
