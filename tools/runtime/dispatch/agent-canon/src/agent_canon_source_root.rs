@@ -256,6 +256,24 @@ mod tests {
         assert_eq!(failure.code, "agent_canon_source_root_override_missing");
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn explicit_alias_selects_the_same_physical_source_catalog() {
+        let temporary = tempfile::tempdir().expect("temporary root");
+        let source = temporary.path().join("source");
+        let alias = temporary.path().join("alias");
+        catalog(&source);
+        std::os::unix::fs::symlink(&source, &alias).expect("source alias");
+        let environment = BTreeMap::from([(
+            SOURCE_ROOT_OVERRIDE_ENV.to_owned(),
+            alias.display().to_string(),
+        )]);
+        let roots = resolve_source_roots(&source, &environment).expect("read-only source alias");
+        assert_eq!(roots.source_root, source.canonicalize().unwrap());
+        assert_eq!(roots.canon_root, source.canonicalize().unwrap());
+        assert_eq!(roots.layout, LAYOUT_EXTERNAL);
+    }
+
     #[test]
     fn unregistered_current_root_fails_closed_without_override() {
         let temporary = tempfile::tempdir().expect("temporary root");
