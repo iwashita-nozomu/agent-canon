@@ -4,15 +4,15 @@ contract reference
 responsibility Documents the repository-topic clone lifecycle command.
 upstream design ../rule/repository-topic-clone.md generic repository-topic clone policy
 upstream design ../contracts/github-first-module-and-devcontainer-policy.md canonical topic workspace boundary
-upstream implementation ../../tools/repository/workspace/repository_topic_clone.py lifecycle implementation
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/repository_topic_clone.rs lifecycle implementation
 downstream implementation ../../tests/agent_tools/test_repository_topic_clone.py validates cleanup and merge gates
 @dependency-end
 -->
 
-# repository_topic_clone.py
+# repository-topic-clone
 
-`tools/repository/workspace/repository_topic_clone.py` は、`repository-topic` checkout の
-`workspace/<topic>/<repo>` 形 lifecycle を管理する tool です。詳細責務と
+`tools/bin/agent-canon repository-topic-clone` は、`repository-topic` checkout の
+`workspace/<topic>/<repo>` 形 lifecycle を管理する native command です。詳細責務と
 clause は
 [`documents/rule/repository-topic-clone.md`](../rule/repository-topic-clone.md)
 を参照します。
@@ -20,16 +20,21 @@ clause は
 ## 基本操作
 
 ```bash
-python3 tools/repository/workspace/repository_topic_clone.py prepare \
-  --url <remote-url> --repo-name <repo-name> --workspace-root <parent-root> \
-  --topic <topic> --branch <task-branch> --checkout-mode <linked-worktree|independent-clone> \
-  [--allowed-path <relative-path>]...
-
-python3 tools/repository/workspace/repository_topic_clone.py merge-main \
+tools/bin/agent-canon repository-topic-clone prepare \
   --url <remote-url> --repo-name <repo-name> --workspace-root <parent-root> \
   --topic <topic> --branch <task-branch> --checkout-mode <linked-worktree|independent-clone>
 
-python3 tools/repository/workspace/repository_topic_clone.py cleanup \
+tools/bin/agent-canon repository-topic-clone merge-main \
+  --url <remote-url> --repo-name <repo-name> --workspace-root <parent-root> \
+  --topic <topic> --branch <task-branch> --checkout-mode <linked-worktree|independent-clone>
+
+tools/bin/agent-canon repository-topic-clone verify-publication \
+  --url <remote-url> --repo-name <repo-name> --workspace-root <parent-root> \
+  --topic <topic> --branch <task-branch> --checkout-mode <linked-worktree|independent-clone> \
+  --candidate-cas <candidate-cas.json> --pr-lifecycle <pr-lifecycle.json> \
+  [--publication-readback <publication-readback.json>]
+
+tools/bin/agent-canon repository-topic-clone cleanup \
   --url <remote-url> --repo-name <repo-name> --workspace-root <parent-root> \
   --topic <topic> --branch <task-branch> --checkout-mode <linked-worktree|independent-clone> \
   [--candidate-cas <candidate-cas.json> --pr-lifecycle <pr-lifecycle.json> \
@@ -38,14 +43,10 @@ python3 tools/repository/workspace/repository_topic_clone.py cleanup \
 
 `<parent-root>` は [事前条件](../rule/repository-topic-clone.md#事前条件) で照合する Git toplevel です。
 `--checkout-mode` の選択は [Checkout mode](../rule/repository-topic-clone.md#checkout-mode) に従います。
-container 側に checkout-mode の別 flag はなく、exact target metadata から自動判定します。
-write-capable handoff の各 allowed path は repeated `--allowed-path <relative-path>` で渡します。
-`prepare` の scope 更新・省略時の扱い・metadata-only refresh は
-[clone ライフサイクル](../rule/repository-topic-clone.md#clone-ライフサイクル) に従います。
-dirty 状態を保った場合は出力に `REQUEST_CHECKOUT_STATUS=dirty-preserved` を含み、
-merge / cleanup の clean-state 条件を満たしたという意味ではありません。
+command は selected checkout の exact path、URL、branch、Git marker と actual Git facts を確認します。
+dirty/staged/untracked state はそのまま保持し、prepare/merge/cleanup を拒否します。
 
-作成・再利用・writer packet・merge の authority は
+作成・再利用・merge の authority は
 [clone ライフサイクル](../rule/repository-topic-clone.md#clone-ライフサイクル)、
 復元可能性・marker・任意 publication evidence・削除可否は
 [クリーンアップ](../rule/repository-topic-clone.md#クリーンアップ) を確認してから操作します。
@@ -57,7 +58,8 @@ CLI の clean-status proof はこの利用終了や ignored content・submodule 
 linked cleanup は local topic branch を保持します。成功時は exact path の不存在と
 `git worktree list` からの消失を確認し、branch 削除は既存 owner の別 operation として扱います。
 `merge-main` の成功結果は ancestor proof を返します。
-adapter の `status` と `projected_clone_path` は directory を作らない read-only projection です。
+dependency adapter の `status` は [dependency-module-change](dependency_module_change.md) の
+read-only path projection であり、directory を作りません。
 
 ## 競合の再開
 
@@ -66,7 +68,7 @@ integration executor が source owner と実競合をレビュー・解消した
 [規約の競合の再開](../rule/repository-topic-clone.md#競合の再開) に従って確定します。
 
 ```bash
-python3 tools/repository/workspace/repository_topic_clone.py finalize-merge \
+tools/bin/agent-canon repository-topic-clone finalize-merge \
   --url <remote-url> --repo-name <repo-name> --workspace-root <parent-root> \
   --topic <topic> --branch <task-branch> \
   --checkout-mode <linked-worktree|independent-clone>

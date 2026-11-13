@@ -26,15 +26,8 @@ const STATIC_FORBIDDEN_PREFIXES: &[&str] = &[
 ];
 
 const CHECKOUT_IDENTITY_PROMPT: &str = "Carry one checkout_identity block with cwd, git_root, branch (or detached), head, and normalized remote owner/repository at bounded workflow transitions; do not repeat it for ordinary commands.";
-const WRITER_TARGET_PROMPT: &str = "Write-capable handoffs must carry writer_target with an absolute checkout_root, fixed branch, normalized remote owner/repository, and allowed_paths. The checkout is prepared by repository-topic-clone before handoff; start with cwd equal to checkout_root and branch equal to the target branch. Do not use git switch, git checkout, branch rename, or git worktree operations; a target mismatch is a hard stop before mutation.";
 const CANONICAL_SPAWN_PROMPT: &str = "Spawn only through the canonical AgentTeam dispatch and ToolCall route; raw spawn_agent is not an admission path.";
 
-const WRITER_TARGET_ROLE_IDS: &[&str] = &[
-    "worker",
-    "spark_worker",
-    "implementer",
-    "integration_executor",
-];
 const CANONICAL_SPAWN_ROLE_IDS: &[&str] = &["sol_parent", "manager", "manager_reviewer"];
 
 const STATIC_OBLIGATIONS: &[(&str, &str)] = &[
@@ -1199,9 +1192,7 @@ fn role_projection_digest(
 }
 
 fn role_boundary_prompt(role_id: &str) -> String {
-    if WRITER_TARGET_ROLE_IDS.contains(&role_id) {
-        format!("{CHECKOUT_IDENTITY_PROMPT} {WRITER_TARGET_PROMPT} {CANONICAL_SPAWN_PROMPT}")
-    } else if CANONICAL_SPAWN_ROLE_IDS.contains(&role_id) {
+    if CANONICAL_SPAWN_ROLE_IDS.contains(&role_id) {
         format!("{CHECKOUT_IDENTITY_PROMPT} {CANONICAL_SPAWN_PROMPT}")
     } else {
         CHECKOUT_IDENTITY_PROMPT.to_owned()

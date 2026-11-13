@@ -10,7 +10,7 @@
 # upstream implementation ../../repository/github/github_publish.py provides the authoritative G3 owner API consumed through SourceProjectionGateOwnerApis.
 # downstream implementation ../../runtime/dispatch/agent-canon/src/agent_tool_calls.rs composes native close-agent ToolCalls.
 # downstream implementation ../../repository/github/github_publish.py consumes immutable pull-request lifecycle and gate evidence.
-# downstream implementation ../../repository/workspace/repository_topic_clone.py consumes source branch receipts.
+# downstream implementation ../../runtime/dispatch/agent-canon/src/repository_topic_clone.rs consumes source branch receipts.
 # downstream implementation ../../../tests/agent_tools/test_bootstrap_and_close.py validates terminal cleanup guards.
 # @dependency-end
 """Canonical mechanics for resumable AgentCanon update transactions.
@@ -195,6 +195,8 @@ GATE_CONTRACTS: dict[str, dict[str, object]] = {
     "G4": {
         "invariant": "standalone_source_branch_integrity",
         "owners": (
+            "tools/runtime/dispatch/agent-canon/src/repository_topic_clone.rs#ensure_independent_branch",
+            # Existing publication receipts may still name the retired owner.
             "tools/repository/workspace/repository_topic_clone.py#_ensure_branch",
             "agents/skills/agent-canon-update.md",
         ),
@@ -2168,7 +2170,7 @@ def materialize_fresh_clone_source_projection_packet(
         "pr_essence": {
             "problem": "exercise standalone source publication from a fresh clone",
             "intent": "queue the observed AgentCanon source branch update",
-            "canonical_owner": "tools/repository/workspace/repository_topic_clone.py",
+            "canonical_owner": "tools/runtime/dispatch/agent-canon/src/repository_topic_clone.rs",
             "contract_delta": "fresh-clone source PR",
             "evidence_refs": [evidence("fresh-clone-pr-essence", identity)],
         },

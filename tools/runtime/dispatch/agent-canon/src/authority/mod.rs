@@ -514,6 +514,43 @@ pub struct ParentOwnedPathReceipt {
     lexical_snapshot: Option<LexicalSnapshot>,
 }
 
+/// A descriptor-held, newly reserved directory beneath an attested parent.
+///
+/// The path receipt binds the directory entry and its parent components; the
+/// open handle lets a child process address the exact directory through
+/// `/proc/self/fd/<n>` while Git creates a checkout there.
+pub struct ParentOwnedDirectoryTarget {
+    receipt: ParentOwnedPathReceipt,
+    #[cfg(target_os = "linux")]
+    directory: Dir,
+}
+
+impl ParentOwnedDirectoryTarget {
+    pub fn receipt(&self) -> &ParentOwnedPathReceipt {
+        &self.receipt
+    }
+
+    pub fn physical_path(&self) -> &Path {
+        self.receipt.physical_path()
+    }
+
+    #[cfg(target_os = "linux")]
+    pub fn raw_fd(&self) -> std::os::fd::RawFd {
+        use std::os::fd::AsRawFd;
+        self.directory.as_raw_fd()
+    }
+
+    #[cfg(target_os = "linux")]
+    pub fn child_process_path(&self) -> PathBuf {
+        PathBuf::from(format!("/proc/self/fd/{}", self.raw_fd()))
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    pub fn child_process_path(&self) -> PathBuf {
+        self.receipt.physical_path().to_path_buf()
+    }
+}
+
 /// Result of publishing bytes without replacing an existing parent-owned file.
 #[derive(Clone, Debug)]
 pub enum ParentOwnedNoReplaceOutcome {
@@ -532,6 +569,29 @@ impl ParentOwnedPathReceipt {
 
     pub fn physical_path(&self) -> &Path {
         &self.physical_path
+    }
+
+    pub fn target_is_directory(&self) -> bool {
+        #[cfg(target_os = "linux")]
+        {
+            self.target
+                .is_some_and(|target| target.kind == EntryKind::Directory)
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            false
+        }
+    }
+
+    pub fn target_exists(&self) -> bool {
+        #[cfg(target_os = "linux")]
+        {
+            self.target.is_some()
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            false
+        }
     }
 }
 
@@ -655,6 +715,70 @@ impl AttestedParent {
         platform::resolve_parent_owned_path(self, candidate, purpose)
     }
 
+    /// Create or reopen a directory beneath the attested parent without
+    /// following symlinks, returning the directory's exact identity receipt.
+    pub fn ensure_parent_owned_directory(
+        &self,
+        candidate: &Path,
+        purpose: NonEmptyTrimmedString,
+    ) -> Result<ParentOwnedPathReceipt, AuthorityError> {
+        platform::ensure_parent_owned_directory(self, candidate, purpose)
+    }
+
+    /// Set permissions on one receipt-bound directory without following links.
+    pub fn set_parent_owned_directory_mode(
+        &self,
+        receipt: &ParentOwnedPathReceipt,
+        mode: u32,
+    ) -> Result<(), AuthorityError> {
+        platform::set_parent_owned_directory_mode(self, receipt, mode)
+    }
+
+    /// Reserve one absent directory and keep its descriptor open for a child
+    /// Git operation. Existing entries are collisions and remain untouched.
+    pub fn reserve_parent_owned_directory_target(
+        &self,
+        candidate: &Path,
+        purpose: NonEmptyTrimmedString,
+    ) -> Result<ParentOwnedDirectoryTarget, AuthorityError> {
+        platform::reserve_parent_owned_directory_target(self, candidate, purpose)
+    }
+
+    /// Verify that a reserved directory is still the same entry at its exact
+    /// parent-owned path.
+    pub fn verify_parent_owned_directory_target(
+        &self,
+        target: &ParentOwnedDirectoryTarget,
+    ) -> Result<(), AuthorityError> {
+        platform::verify_parent_owned_directory_target(self, target)
+    }
+
+    /// Abort only the exact directory reserved by `target`, including a
+    /// partially created checkout.
+    pub fn abort_parent_owned_directory_target(
+        &self,
+        target: &ParentOwnedDirectoryTarget,
+    ) -> Result<(), AuthorityError> {
+        platform::abort_parent_owned_directory_target(self, target)
+    }
+
+    /// Remove a receipt-bound parent-owned directory tree through no-follow
+    /// descriptor-relative traversal.
+    pub fn remove_parent_owned_tree(
+        &self,
+        receipt: &ParentOwnedPathReceipt,
+    ) -> Result<(), AuthorityError> {
+        platform::remove_parent_owned_tree(self, receipt)
+    }
+
+    /// Remove an owned directory only if the receipt-bound directory is empty.
+    pub fn remove_empty_parent_owned_directory(
+        &self,
+        receipt: &ParentOwnedPathReceipt,
+    ) -> Result<bool, AuthorityError> {
+        platform::remove_empty_parent_owned_directory(self, receipt)
+    }
+
     pub fn read_parent_owned_file(
         &self,
         receipt: &ParentOwnedPathReceipt,
@@ -776,18 +900,24 @@ impl ParentRootAttestor {
 #[cfg(target_os = "linux")]
 mod platform {
     pub(crate) use super::linux::{
-        atomic_replace_parent_owned_file, attest, issue_child_handoff,
-        publish_parent_owned_file_noreplace, read_parent_owned_file, remove_parent_owned_file,
-        resolve_parent_owned_path, verify_live_identity, write_parent_owned_file,
+        abort_parent_owned_directory_target, atomic_replace_parent_owned_file, attest,
+        ensure_parent_owned_directory, issue_child_handoff, publish_parent_owned_file_noreplace,
+        read_parent_owned_file, remove_empty_parent_owned_directory, remove_parent_owned_file,
+        remove_parent_owned_tree, reserve_parent_owned_directory_target, resolve_parent_owned_path,
+        set_parent_owned_directory_mode, verify_live_identity,
+        verify_parent_owned_directory_target, write_parent_owned_file,
     };
 }
 
 #[cfg(not(target_os = "linux"))]
 mod platform {
     pub(crate) use super::unsupported::{
-        atomic_replace_parent_owned_file, attest, issue_child_handoff,
-        publish_parent_owned_file_noreplace, read_parent_owned_file, remove_parent_owned_file,
-        resolve_parent_owned_path, verify_live_identity, write_parent_owned_file,
+        abort_parent_owned_directory_target, atomic_replace_parent_owned_file, attest,
+        ensure_parent_owned_directory, issue_child_handoff, publish_parent_owned_file_noreplace,
+        read_parent_owned_file, remove_empty_parent_owned_directory, remove_parent_owned_file,
+        remove_parent_owned_tree, reserve_parent_owned_directory_target, resolve_parent_owned_path,
+        set_parent_owned_directory_mode, verify_live_identity,
+        verify_parent_owned_directory_target, write_parent_owned_file,
     };
 }
 
