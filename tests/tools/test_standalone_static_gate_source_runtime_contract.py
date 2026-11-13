@@ -6,7 +6,7 @@
 # upstream implementation ../../tools/validation/ci/runners/run_standalone_static_gate_unit.sh owns contract and eval unit commands
 # upstream implementation ../../tools/runtime/dispatch/agent-canon/src/eval_accumulation_check.rs owns the native eval checker command
 # upstream implementation ../../tools/runtime/dispatch/agent-canon/src/eval_accumulation.rs runs the selected eval producer collection
-# upstream implementation ../../tools/runtime/archive/runtime_log_paths.py defines canonical eval result paths
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/eval_archive_paths.rs defines canonical eval result paths
 # upstream design ../../documents/design/source-owned-dependency-validation.md source and persisted graph authority split
 # downstream implementation ../../.github/workflows/agent-canon-static-gates.yml runs selected unit owners
 # @dependency-end
@@ -20,9 +20,8 @@ from pathlib import Path
 
 import pytest
 
-from tools.runtime.archive.runtime_log_paths import LOG_ARCHIVE_PARENT
-
 ROOT = Path(__file__).resolve().parents[2]
+LOG_ARCHIVE_PARENT = Path("archive/agent-canon-log")
 RUNNER = (
     ROOT
     / "tools"

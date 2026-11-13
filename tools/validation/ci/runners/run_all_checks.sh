@@ -15,7 +15,7 @@
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/responsibility_scope.rs validates responsibility-scope coverage
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/eval_accumulation.rs writes required eval family reports before accumulation validation
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/eval_accumulation_check.rs validates eval result accumulation
-# upstream implementation ../../../runtime/archive/runtime_log_archive_git.py manages mounted hook/eval log archive branches
+# upstream implementation ../../../runtime/dispatch/agent-canon/src/runtime_log_archive.rs manages mounted hook/eval log archive branches
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/skill_frontmatter.rs validates runtime skill YAML frontmatter
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/workflow_selection_eval.rs validates workflow selection routing cases
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/github_workflow_check.rs validates GitHub workflow and PR checklist contracts

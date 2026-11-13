@@ -5,8 +5,8 @@
 contract design
 responsibility Records the reviewed GPU admission and managed-run handshake.
 upstream design ../runtime/runtime-profiles-and-check-matrix.md validation routing
-downstream implementation ../../tools/experiments/execution/execution_resource_plan.py admission owner
-downstream implementation ../../tools/experiments/execution/run_managed_experiment.py managed-run composition root
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/execution_resource_plan.rs admission owner
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/managed_experiment.rs managed-run composition root
 @dependency-end
 -->
 

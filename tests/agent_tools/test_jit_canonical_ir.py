@@ -3,38 +3,23 @@
 # @dependency-start
 # contract test
 # responsibility Tests JIT-canonical IR extraction and backend trace capture.
-# upstream implementation ../../tools/analysis/proof/jit_canonical_ir.py extracts StableHLO-derived IR.
-# upstream implementation ../../tools/experiments/execution/execution_resource_plan.py owns GPU discovery/reservation.
-# upstream implementation ../../tools/experiments/execution/run_managed_experiment.py owns the only managed GPU launch route.
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/jit_canonical_ir.rs extracts StableHLO-derived IR.
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/execution_resource_plan.rs owns GPU discovery/reservation.
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/managed_experiment.rs owns the only managed GPU launch route.
 # upstream design ../../documents/tools/jit_canonical_ir.md defines the extraction contract.
 # upstream design ../../documents/tools/jit_ir_to_lean.md defines the Lean evidence boundary.
 # @dependency-end
 
 from __future__ import annotations
 
-import importlib.util
 import json
 import os
 import shutil
 import subprocess
-import sys
-import types
 from pathlib import Path
-from typing import Protocol, cast
+from typing import cast
 
 import pytest
-
-
-class _JitToolModule(Protocol):
-    subprocess: types.ModuleType
-
-    def resolve_runtime_backend_config(
-        self,
-        *,
-        include_backend_trace: bool,
-    ) -> object: ...
-
-    def resolve_cuda_visible_devices(self, requested: str | None) -> str: ...
 
 
 PROOF_TOOL_HANDOFF_FIXTURE: dict[str, object] = {
@@ -48,7 +33,7 @@ PROOF_TOOL_HANDOFF_FIXTURE: dict[str, object] = {
     },
     "failure": {
         "kind": "ir_extractor_or_lowering",
-        "producer_surface": "tools/analysis/proof/jit_canonical_ir.py",
+        "producer_surface": "tools/runtime/dispatch/agent-canon/src/jit_canonical_ir.rs",
         "consumer_surface": "generated Lean return projection",
     },
     "math_writer": {
@@ -59,7 +44,7 @@ PROOF_TOOL_HANDOFF_FIXTURE: dict[str, object] = {
             "tests/numerical_oracle.py",
         ],
         "forbidden_paths": [
-            "tools/analysis/proof/jit_canonical_ir.py",
+            "tools/runtime/dispatch/agent-canon/src/jit_canonical_ir.rs",
             "tools/runtime/dispatch/agent-canon/src/jit_ir_to_lean.rs",
             "lean/",
             "JIT/backend/runtime architecture",
@@ -79,7 +64,7 @@ PROOF_TOOL_HANDOFF_FIXTURE: dict[str, object] = {
     "proof_tool_worker": {
         "owner": "IR extractor and generated-proof mechanism owner",
         "allowed_paths": [
-            "tools/analysis/proof/jit_canonical_ir.py",
+            "tools/runtime/dispatch/agent-canon/src/jit_canonical_ir.rs",
             "tools/runtime/dispatch/agent-canon/src/jit_ir_to_lean.rs",
             "lean/",
         ],
@@ -96,7 +81,7 @@ PROOF_TOOL_HANDOFF_FIXTURE: dict[str, object] = {
         "evidence": {
             "status": "awaiting_native_receipt",
             "paths": [
-                "tools/analysis/proof/jit_canonical_ir.py",
+                "tools/runtime/dispatch/agent-canon/src/jit_canonical_ir.rs",
                 "generated Lean return projection",
             ],
         },
@@ -130,21 +115,15 @@ def _repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
+AGENT_CANON_CLI = os.environ.get(
+    "AGENT_CANON_CLI", str(_repo_root() / "tools" / "bin" / "agent-canon")
+)
+
+
 def _jit_env(**overrides: str) -> dict[str, str]:
     env = os.environ.copy()
     env.update(overrides)
     return env
-
-
-def _load_jit_tool_module() -> _JitToolModule:
-    tool_path = Path(__file__).resolve().parents[2] / "tools/analysis/proof/jit_canonical_ir.py"
-    spec = importlib.util.spec_from_file_location("_agent_canon_test_jit_tool", tool_path)
-    assert spec is not None
-    assert spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return cast(_JitToolModule, module)
 
 
 def test_ir_producer_uses_the_consumer_handoff_role_shape() -> None:
@@ -184,8 +163,8 @@ def test_jit_canonical_ir_extracts_stablehlo_and_backend_trace(tmp_path: Path) -
     backend_dir = tmp_path / "backend"
     subprocess.run(
         [
-            sys.executable,
-            "tools/analysis/proof/jit_canonical_ir.py",
+                    AGENT_CANON_CLI,
+                    "jit-canonical-ir",
             "--python-symbol",
             f"{root}::main",
             "--input-factory",
@@ -250,6 +229,43 @@ def test_jit_canonical_ir_extracts_stablehlo_and_backend_trace(tmp_path: Path) -
         )
 
 
+def test_jit_canonical_ir_lowers_abstract_shape_inputs(tmp_path: Path) -> None:
+    """ShapeDtypeStruct inputs should retain the native abstract-lowering route."""
+    root = tmp_path / "abstract_root.py"
+    root.write_text(
+        "import jax\n"
+        "import jax.numpy as jnp\n\n"
+        "def main(x):\n"
+        "    return x + jnp.asarray(1.0, dtype=x.dtype)\n\n"
+        "def example_inputs():\n"
+        "    return (jax.ShapeDtypeStruct((3,), jnp.float32),), {}\n",
+        encoding="utf-8",
+    )
+    out = tmp_path / "abstract.json"
+    result = subprocess.run(
+        [
+            AGENT_CANON_CLI,
+            "jit-canonical-ir",
+            "--python-symbol",
+            f"{root}::main",
+            "--input-factory",
+            f"{root}::example_inputs",
+            "--no-backend-trace",
+            "--out",
+            str(out),
+        ],
+        cwd=_repo_root(),
+        env=_jit_env(AGENT_CANON_JIT_JAX_PLATFORM="cpu"),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    record = json.loads(out.read_text(encoding="utf-8"))
+    assert record["stablehlo"]["text"].count("tensor<3xf32>") >= 1
+    assert record["public_interface"]["argument_leaves"][0]["shape"] == "(3,)"
+
+
 def test_jit_canonical_ir_records_recursive_control_regions(tmp_path: Path) -> None:
     """Control-flow lowering records recursive region and expansion edges."""
     root = tmp_path / "while_root.py"
@@ -284,8 +300,8 @@ def test_jit_canonical_ir_records_recursive_control_regions(tmp_path: Path) -> N
     out = tmp_path / "ir.json"
     subprocess.run(
         [
-            sys.executable,
-            "tools/analysis/proof/jit_canonical_ir.py",
+            AGENT_CANON_CLI,
+            "jit-canonical-ir",
             "--python-symbol",
             f"{root}::main",
             "--input-factory",
@@ -379,8 +395,8 @@ def test_jit_canonical_ir_extracts_answer_state_info_public_return(tmp_path: Pat
     out = tmp_path / "ir.json"
     subprocess.run(
         [
-            sys.executable,
-            "tools/analysis/proof/jit_canonical_ir.py",
+            AGENT_CANON_CLI,
+            "jit-canonical-ir",
             "--python-symbol",
             f"{root}::main",
             "--input-factory",
@@ -419,19 +435,49 @@ def test_jit_canonical_ir_extracts_answer_state_info_public_return(tmp_path: Pat
 
 
 def test_jit_runtime_backend_config_requires_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Backend config resolution requires the explicit JIT platform env var."""
-    tool = _load_jit_tool_module()
+    """The native CLI requires the explicit JIT platform environment variable."""
     monkeypatch.delenv("AGENT_CANON_JIT_JAX_PLATFORM", raising=False)
-
-    with pytest.raises(SystemExit, match="backend_env_missing=AGENT_CANON_JIT_JAX_PLATFORM"):
-        tool.resolve_runtime_backend_config(include_backend_trace=False)
+    result = subprocess.run(
+        [
+            AGENT_CANON_CLI,
+            "jit-canonical-ir",
+            "--python-symbol",
+            "missing.py::main",
+            "--input-factory",
+            "missing.py::example_inputs",
+            "--no-backend-trace",
+            "--out",
+            str(Path("/tmp") / f"jit-missing-platform-{os.getpid()}.json"),
+        ],
+        cwd=_repo_root(),
+        env=_jit_env(),
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 1
+    assert "backend_env_missing=AGENT_CANON_JIT_JAX_PLATFORM" in result.stderr
 
 
 def test_jit_gpu_platform_requires_managed_runner() -> None:
     """Direct JIT GPU selection fails closed at the alternate route boundary."""
-    tool = _load_jit_tool_module()
-    with pytest.raises(
-        SystemExit,
-        match="gpu_route_blocked=canonical_managed_experiment_runner_required",
-    ):
-        tool.resolve_cuda_visible_devices(None)
+    result = subprocess.run(
+        [
+            AGENT_CANON_CLI,
+            "jit-canonical-ir",
+            "--python-symbol",
+            "missing.py::main",
+            "--input-factory",
+            "missing.py::example_inputs",
+            "--out",
+            str(Path("/tmp") / f"jit-gpu-blocked-{os.getpid()}.json"),
+        ],
+        cwd=_repo_root(),
+        env=_jit_env(
+            AGENT_CANON_JIT_JAX_PLATFORM="gpu",
+            AGENT_CANON_JIT_BACKEND_TARGET="cuda",
+        ),
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 1
+    assert "gpu_route_blocked=canonical_managed_experiment_runner_required" in result.stderr

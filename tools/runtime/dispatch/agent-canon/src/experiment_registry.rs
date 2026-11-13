@@ -862,7 +862,8 @@ fn validate_topic_commands(
                         .unwrap_or(runner)
                         .replace('/', ".")
                 });
-        if managed_runner.is_some_and(|runner| command_text.contains(runner))
+        if command_text.contains("run-managed-experiment")
+            || managed_runner.is_some_and(|runner| command_text.contains(runner))
             || managed_runner_module
                 .as_ref()
                 .is_some_and(|runner| command_text.contains(runner))

@@ -1,17 +1,17 @@
 <!--
 @dependency-start
 contract reference
-responsibility Documents tools/analysis/proof/jit_canonical_ir.py usage and output contract.
-downstream implementation ../../tools/analysis/proof/jit_canonical_ir.py extracts StableHLO-derived JIT-canonical IR and backend traces.
+responsibility Documents the native jit-canonical-ir CLI and output contract.
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/jit_canonical_ir.rs extracts StableHLO-derived JIT-canonical IR and backend traces.
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/jit_ir_to_lean.rs consumes the generated JIT-canonical IR JSON.
 @dependency-end
 -->
 
-# jit_canonical_ir.py
+# jit-canonical-ir
 
-`tools/analysis/proof/jit_canonical_ir.py` lowers a JIT-capable Python root and
-writes machine evidence for proof themes. It is an AgentCanon tool. Topic-local
-proof directories may call it, but they do not own the tool contract.
+`agent-canon jit-canonical-ir` lowers a caller-selected Python/JAX root and
+writes machine evidence for proof themes. AgentCanon owns the extractor and its
+record contract; the selected Python root and input factory remain consumer code.
 
 ## Reader Map
 
@@ -25,11 +25,10 @@ proof directories may call it, but they do not own the tool contract.
 ## Command
 
 ```bash
-export AGENT_CANON_JIT_JAX_PLATFORM=gpu
-export AGENT_CANON_JIT_BACKEND_TARGET=cuda
-export AGENT_CANON_JIT_IREE_CUDA_TARGET=sm_89
+export AGENT_CANON_JIT_JAX_PLATFORM=cpu
+export AGENT_CANON_JIT_BACKEND_TARGET=llvm-cpu
 
-python3 tools/analysis/proof/jit_canonical_ir.py \
+tools/bin/agent-canon jit-canonical-ir \
   --python-symbol lean/<topic>/main.py::main \
   --input-factory lean/<topic>/main.py::example_inputs \
   --xla-dump-dir reports/<topic>/xla-dump \
@@ -39,15 +38,15 @@ python3 tools/analysis/proof/jit_canonical_ir.py \
   --backend-trace-out lean/<topic>/<root>_backend_trace.json
 ```
 
-Backend and runtime target selection is supplied through environment variables.
-The tool reads `AGENT_CANON_JIT_JAX_PLATFORM`,
+Backend and runtime selection is supplied through environment variables. The
+tool reads `AGENT_CANON_JIT_JAX_PLATFORM`,
 `AGENT_CANON_JIT_BACKEND_TARGET`, `AGENT_CANON_JIT_INPUT_DEVICE`,
 `AGENT_CANON_JIT_CUDA_VISIBLE_DEVICES`, and
-`AGENT_CANON_JIT_IREE_CUDA_TARGET` before importing JAX. When the JAX platform is
-GPU/CUDA and no CUDA device env is already fixed, the tool probes `nvidia-smi`
-for an available GPU slot and sets `CUDA_VISIBLE_DEVICES` for that child
-process. When slot selection fails, it exits with `gpu_slot_blocker=...`; CPU
-lowering is selected through an explicit JIT env profile.
+`AGENT_CANON_JIT_IREE_CUDA_TARGET` before the safe provider imports JAX. A direct
+GPU/CUDA request is rejected; GPU execution must use the managed
+`run-managed-experiment` route, which owns admission and environment
+materialization. The extractor does not discover, reserve, or select a GPU.
+CPU lowering uses an explicit JIT environment profile.
 
 For a proof theme whose root is the lowered `main` StableHLO, omit
 `--backend-trace-dir` / `--backend-trace-out` and pass both
@@ -74,8 +73,8 @@ When backend trace collection is enabled, the tool also writes:
 - backend trace coverage, including compiler availability, phase traces,
   executable source dumps, LLVM IR summaries when available, and explicit
   coverage status when lowering stops early;
-- optional XLA CUDA compile evidence when `--xla-dump-dir` is supplied. The
-  tool sets `XLA_FLAGS` before importing JAX, compiles the lowered root, and
+- optional XLA compile evidence when `--xla-dump-dir` is supplied. The
+  native CLI sets `XLA_FLAGS` before the safe provider imports JAX, compiles the lowered root, and
   copies final `.ll`, `.bc`, `.ptx`, and assembly artifacts from the XLA dump
   into the backend trace directory.
 

@@ -13,7 +13,7 @@ downstream design ../../tools/runtime/dispatch/agent-canon/src/prose_reasoning_g
 downstream design ../../tools/README.md documents graph visualization tool routing from the documentation hub
 downstream design ../../tools/analysis/dependencies/render_dependency_manifest_graph.py documents dependency graph visualization adapter
 downstream design ../tools/semantic_provider_html_report.md documents semantic provider visualization adapter
-downstream design ../../tools/analysis/proof/jit_canonical_ir.py documents JIT-canonical source facts available to future graph visualization adapters
+downstream design ../../documents/tools/jit_canonical_ir.md documents JIT-canonical source facts available to future graph visualization adapters
 downstream design ../../tools/README.md documents graph visualization tool routing from the execution hub
 downstream design ../../agents/skills/prose-reasoning-graph.md documents skill handoff workflow
 downstream implementation ../../.codex/personal/skills/prose-reasoning-graph/SKILL.md runtime skill entrypoint
