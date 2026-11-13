@@ -5,7 +5,7 @@ responsibility Defines dependency-module identity, pin, and projection policy ov
 upstream design ./repository-topic-clone.md generic repository topic clone lifecycle
 upstream design ../design/dependency-manifest-design.md dependency ownership and header graph model
 upstream design ../operations/BRANCH_SCOPE.md workspace dependency checkout and actual input readback
-downstream implementation ../../tools/repository/workspace/dependency_module_change.py applies the dependency policy decorator
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/dependency_module_change.rs applies the dependency policy decorator
 downstream design ../agent-canon/agent-canon-update-route.md routes standalone AgentCanon source updates
 downstream design ../../agents/skills/dependency-module-change.md exposes the short skill route
 @dependency-end
@@ -24,9 +24,9 @@ checkout path、branch reuse、`origin/main` merge、publication evidence、clea
 
 - 親 repository の `.gitmodules` が module path と URL を所有する。topic branch は
   `--branch` で明示し、generic clone owner がその branch lifecycle を扱う。
-- `dependency_module_change.py` は構造化 manifest から URL と repository name を解決し、
+- `dependency-module-change` は構造化 manifest から URL と repository name を解決し、
   generic `RepositoryTopicCloneRequest` を構成する。
-- `repository_topic_clone.py` が唯一の `workspace/<topic-slug>/<repo-name>` path、checkout mode、branch、
+- `repository-topic-clone` が唯一の `workspace/<topic-slug>/<repo-name>` path、checkout mode、branch、
   merge、publication readback、cleanup authority を決定する。
 - dependency decorator は prepare/merge 後に gitlink、pin、projection、親側 validation を
   接続し、generic lifecycle の path/base/branch/merge/cleanup を変更しない。
@@ -129,9 +129,8 @@ cleanup hold を返します。plan detail は stage-0、remote、tracking、mat
 ### Prepare
 
 ```bash
-python3 tools/repository/workspace/dependency_module_change.py --root <parent-root> prepare \
-  --topic <topic> --module <module-path> --branch <branch> \
-  [--allowed-path <relative-path> ...]
+tools/bin/agent-canon dependency-module-change --root <parent-root> prepare \
+  --topic <topic> --module <module-path> --branch <branch>
 ```
 
 manifest identity を generic request へ写像し、exact independent checkout/branch を再利用するか、
@@ -145,9 +144,8 @@ manifest identity、computed path が一致する canonical prepare は operatio
 ### Merge main
 
 ```bash
-python3 tools/repository/workspace/dependency_module_change.py --root <parent-root> merge-main \
-  --topic <topic> --module <module-path> --branch <branch> \
-  [--allowed-path <relative-path> ...]
+tools/bin/agent-canon dependency-module-change --root <parent-root> merge-main \
+  --topic <topic> --module <module-path> --branch <branch>
 ```
 
 generic owner が `fetch origin main` と通常の `git merge --no-edit origin/main` を実行し、
@@ -157,9 +155,8 @@ dirty state と conflict は破棄せず typed evidence として保持します
 ### Cleanup
 
 ```bash
-python3 tools/repository/workspace/dependency_module_change.py --root <parent-root> cleanup \
+tools/bin/agent-canon dependency-module-change --root <parent-root> cleanup \
   --topic <topic> --module <module-path> --branch <branch> \
-  [--allowed-path <relative-path> ...] \
   [--candidate-cas <candidate-cas.json> --pr-lifecycle <pr-lifecycle.json> \
   [--publication-readback <publication-readback.json>]] [--apply]
 ```

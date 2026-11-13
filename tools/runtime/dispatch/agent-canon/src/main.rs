@@ -56,6 +56,7 @@
 // downstream implementation catalog/skill_routes.rs routes explicit skill capabilities
 // upstream implementation lib.rs exposes native SCIP index and Git dependency summary APIs
 // downstream implementation extract_docx.rs routes the native DOCX extraction command
+// downstream implementation lib.rs exports checkout-identity and native workspace lifecycle APIs
 // @dependency-end
 
 mod agent_search;
@@ -180,6 +181,9 @@ Commands:
   generate-agent-improvement-guide [--root ROOT] [--runtime-root ROOT] [--out PATH] [--output-mode 600|644]
   generate-agent-runtime-dashboard [--root ROOT] [--runtime-root ROOT] [--out PATH] [--compact-out PATH] [--api-out PATH] [--recent-days DAYS]
   issue-sync [--repo OWNER/REPO] [--issue-url URL] [options]
+  checkout-identity [--cwd PATH] [--format json|lines]
+  repository-topic-clone <prepare|merge-main|finalize-merge|verify-publication|cleanup> [options]
+  dependency-module-change [--root ROOT] <prepare|merge-main|status|cleanup> [options]
   eval-accumulation-check [--root ROOT] [--runtime-root ROOT] [--family-registry PATH] [--format text|json] [--compact-out PATH]
   oop-python-rule-inventory|oop-cpp-rule-inventory [--root <repo-root>] [--format text|json|markdown]
   oop-python-readability|oop-cpp-readability [paths...] [--root ROOT] [options]
@@ -353,6 +357,15 @@ fn main() {
     }
     if args.len() >= 2 && args[1] == "issue-sync" {
         std::process::exit(agent_canon::issue_sync::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "checkout-identity" {
+        std::process::exit(agent_canon::checkout_identity::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "repository-topic-clone" {
+        std::process::exit(agent_canon::repository_topic_clone::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "dependency-module-change" {
+        std::process::exit(agent_canon::dependency_module_change::run(&args[2..]));
     }
     if args.len() >= 2 && args[1] == "tool-catalog" {
         std::process::exit(catalog::tool_catalog::run(&args[2..]));
@@ -644,6 +657,10 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "test-design" {
         std::process::exit(test_design::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "check-convention-compliance" {
+        std::process::exit(agent_canon::convention_compliance::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "runtime-paths" {

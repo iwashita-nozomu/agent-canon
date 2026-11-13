@@ -65,7 +65,6 @@ roots = [
   "tools/runtime/dispatch/agent-canon/src/runtime_boundary.rs",
   "tools/runtime/authority/__init__.py",
   "tools/runtime/dispatch/agent-canon/src/hook_safety.rs",
-  "tools/runtime/authority/writer_target.py",
   "tools/runtime/container/__init__.py",
   "tools/runtime/dispatch/agent-canon/src/bootstrap_runtime.rs",
   "tools/runtime/dispatch/agent-canon/src/execution_resource_projection.rs",

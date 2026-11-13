@@ -8,7 +8,7 @@ upstream design ../canonical/skills.md skill canon registry
 upstream design ../internal-routines/design-implementation-correspondence.md design read/fingerprint/handoff route
 upstream design ../../documents/rule/repository-topic-clone.md repository-topic clone policy
 upstream design ../../documents/contracts/github-first-module-and-devcontainer-policy.md topic workspace boundary
-downstream implementation ../../tools/repository/workspace/repository_topic_clone.py lifecycle tool
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/repository_topic_clone.rs native lifecycle command
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/runtime_alignment.rs validates skill registration
 @dependency-end
 -->
@@ -28,20 +28,16 @@ repository-topic checkout の操作を選び、
 
 ## 使う command
 
-共通入口は `python3 tools/repository/workspace/repository_topic_clone.py` です。
+共通入口は `tools/bin/agent-canon repository-topic-clone` です。
 選択した操作だけを実行し、引数は [CLI 参照](../../documents/tools/repository_topic_clone.md#基本操作)
-から組み立てます。handoff の identity を引き継ぎ、write-capable な `prepare` には
-current allowed paths を渡します。
-computed path と actual Git identity が一致する checkout の task marker / writer packet は
-`prepare` で current metadata へ更新できます。
-この metadata-only operation は source と Git index を変更せず、dirty status を clean 扱いしません。
-source discovery の `prepare` は writer scope 確定前でも可能で、その場合 packet は作られません。
-scope 確定後は同じ exact Git identity で再prepareし、current allowed paths を packet にします。
+から組み立てます。対象 checkout の branch、HEAD、remote と current Git state を確認し、
+未知または dirty な state を保持します。操作は current request に示された repository、branch、責務の
+範囲で行います。
 `cleanup` は current Git identity と、必要に応じて復元可能性の proof を確認します。
 
 | 操作 | 実行前に読む正本 |
 | --- | --- |
-| `prepare` | [事前条件と Checkout mode](../../documents/rule/repository-topic-clone.md#事前条件)、[作成・再利用と writer packet](../../documents/rule/repository-topic-clone.md#clone-ライフサイクル) |
+| `prepare` | [事前条件と Checkout mode](../../documents/rule/repository-topic-clone.md#事前条件)、[作成・再利用](../../documents/rule/repository-topic-clone.md#clone-ライフサイクル) |
 | `merge-main` | [事前条件](../../documents/rule/repository-topic-clone.md#事前条件)、[merge と authority](../../documents/rule/repository-topic-clone.md#clone-ライフサイクル) |
 | `finalize-merge` | [競合の再開条件](../../documents/rule/repository-topic-clone.md#競合の再開) と [確定コマンド](../../documents/tools/repository_topic_clone.md#競合の再開) |
 | `cleanup`（不要になった時点） | [起動・保持判断と復元可能性・削除条件](../../documents/rule/repository-topic-clone.md#クリーンアップ) |

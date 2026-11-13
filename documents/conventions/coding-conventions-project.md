@@ -4,7 +4,7 @@ contract policy
 responsibility Documents プロジェクト全体の運用規約 for this repository.
 upstream design ../contracts/github-first-module-and-devcontainer-policy.md GitHub-first module and devcontainer boundary policy
 upstream design ../../CONTAINER_OPERATIONS.md canonical container and devcontainer ownership boundary
-downstream implementation ../../tools/validation/semantic/convention/check_convention_compliance.py validates legacy forwarder warning policy
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/convention_compliance.rs validates legacy forwarder warning policy
 downstream implementation ../../tools/validation/semantic/convention/convention_compliance_contracts.toml declares convention marker contracts
 @dependency-end
 -->
@@ -140,7 +140,7 @@ configure/build/test/install command は、選択した profile の project CMak
   その consumer だけを configure します。production source tree に test fallback は作りません。
 - 仕上げ前に `make ci-quick`、必要に応じて `make ci` を流します。
 - 文書変更ではリンク切れと記述の入口整合を確認します。
-- legacy forwarder / migration wrapper の warning policy は `python3 tools/validation/semantic/convention/check_convention_compliance.py` で確認します。
+- legacy forwarder / migration wrapper の warning policy は `agent-canon check-convention-compliance` で確認します。
 
 ## 6. 実験運用
 

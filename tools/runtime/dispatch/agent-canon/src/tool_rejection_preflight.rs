@@ -156,7 +156,7 @@ const HOOK_RUNTIME_GATE_TEMPLATES: &[GateTemplate] = &[GateTemplate {
 }];
 const AGENT_PROTOCOL_GATE_TEMPLATES: &[GateTemplate] = &[GateTemplate {
     gate: "agent_protocol_convention",
-    command_template: "python3 tools/validation/semantic/convention/check_convention_compliance.py",
+    command_template: "agent-canon check-convention-compliance",
     handoff:
         "include whether workflow, skill-routing, and hook/tool feedback protocol checks still pass",
 }];

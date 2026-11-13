@@ -4,37 +4,32 @@ contract reference
 responsibility Documents the dependency policy adapter command.
 upstream design ../rule/dependency-module-changes.md dependency identity, pin, and projection policy
 upstream design ../rule/repository-topic-clone.md generic checkout lifecycle
-upstream implementation ../../tools/repository/workspace/dependency_module_change.py dependency adapter
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/dependency_module_change.rs dependency adapter
 downstream implementation ../../tests/agent_tools/test_dependency_module_change.py validates command behavior
 @dependency-end
 -->
 
-# dependency_module_change.py
+# dependency-module-change
 
-`tools/repository/workspace/dependency_module_change.py` は `.gitmodules` から dependency URL と
-repository name を解決し、generic `repository_topic_clone.py` を呼ぶ policy adapter です。
+`tools/bin/agent-canon dependency-module-change` は `.gitmodules` から dependency URL と
+repository name を解決し、generic `repository-topic-clone` native owner を呼ぶ policy adapter です。
 checkout implementation、path alias、fresh/continuation の別 route は持ちません。
-public entry はこの direct executable だけです。同じ `agent_tools/` directory の
-`repository_topic_clone.py` をlibrary ownerとして解決するため、standalone sourceと
-derived `tools/agent-canon` viewのどちらでもpackage contextや`PYTHONPATH`を要求しません。
+public entry は AgentCanon native CLI です。
 
 ## Commands
 
 ```bash
-python3 tools/repository/workspace/dependency_module_change.py --root <parent-root> status \
+tools/bin/agent-canon dependency-module-change --root <parent-root> status \
   --topic <topic> [--module <module-path>]
 
-python3 tools/repository/workspace/dependency_module_change.py --root <parent-root> prepare \
-  --topic <topic> --module <module-path> --branch <branch> \
-  [--allowed-path <relative-path> ...]
+tools/bin/agent-canon dependency-module-change --root <parent-root> prepare \
+  --topic <topic> --module <module-path> --branch <branch>
 
-python3 tools/repository/workspace/dependency_module_change.py --root <parent-root> merge-main \
-  --topic <topic> --module <module-path> --branch <branch> \
-  [--allowed-path <relative-path> ...]
+tools/bin/agent-canon dependency-module-change --root <parent-root> merge-main \
+  --topic <topic> --module <module-path> --branch <branch>
 
-python3 tools/repository/workspace/dependency_module_change.py --root <parent-root> cleanup \
+tools/bin/agent-canon dependency-module-change --root <parent-root> cleanup \
   --topic <topic> --module <module-path> --branch <branch> \
-  [--allowed-path <relative-path> ...] \
   [--candidate-cas <candidate-cas.json> --pr-lifecycle <pr-lifecycle.json> \
   [--publication-readback <publication-readback.json>]] [--apply]
 ```
@@ -53,8 +48,6 @@ PR lifecycle を一組で指定し、merged state では strict publication read
 全 command は dependency 固有の module identity と generic receipt を出力し、specialized
 mismatch 時も user-requested operation 自体は拒否しません。
 
-`prepare`、`merge-main`、`cleanup` は write-capable generic lifecycle に対して
-`allowed_paths` を明示的に渡します。`--allowed-path` を省略した canonical dependency
- operation は dependency checkout 全体を所有するため `.` を明示値として使い、狭い責務を
-持つ caller はこの option を一つ以上指定してその範囲を forward します。adapter や generic
-lifecycle 側で scope を暗黙補完しません。
+`prepare`、`merge-main`、`cleanup` は manifest から計算した exact checkout path と current Git
+identity を確認します。caller は conversation 上で task scope を確認し、Git diff を読み戻して
+担当範囲からの逸脱がないことを確認します。

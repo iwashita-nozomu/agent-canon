@@ -36,7 +36,7 @@ this protocol's active context, write-scope, and handoff. Deltas attach to exist
 capsules/packets, compatible context is reused, and only disjoint scope receives a separate
 handoff. Transport schema and context ownership remain here.
 Approved request effects travel through the existing goal/artifact/order/handoff delta fields;
-write authority remains with the existing owner/write-scope packet.
+write authority remains with the selected owner and the scope in the current request/handoff.
 
 An evidence-read operation reaches an answer-complete state and returns an evidence-backed
 answer/read-scope receipt. An explicit write-clause operation reaches an owner-handoff state and
@@ -273,7 +273,7 @@ contract, assigned scope, or authority.
 Every agent and work unit that can inspect or change repository state carries
 one observational `checkout_identity` block at bounded lifecycle transitions.
 The block is produced by
-`python3 tools/runtime/authority/checkout_identity.py --format lines` and contains
+`tools/bin/agent-canon checkout-identity --format lines` and contains
 exactly these fields:
 
 - `cwd`: absolute directory in which the operation is acting
@@ -300,9 +300,8 @@ instruction governs conflicts while compatible earlier requirements remain
 active. Keep evidence local unless needed for the next decision; link to this
 section instead of restating capsule fields.
 
-For write-capable work, carry the prepared `writer_target` and assigned
-`allowed_paths` under [Parallel Write Safety](canonical/CODEX_SUBAGENTS.md#parallel-write-safety).
-Carry the selected route's validation command or review gate when applicable;
+For write-capable work, carry the selected checkout identity and assigned
+repository/path scope in the active conversation or handoff. Carry the selected route's validation command or review gate when applicable;
 include route evidence only when the task needs it. Include a
 `pre_handoff_gate_status` only for a gate selected by the current route. Active
 gate evidence follows the rules in Handoff Packet; advisory data and unrelated
@@ -395,19 +394,13 @@ and a successful tool call do not establish a review decision.
 - `evidence`
 - `status`
 
-## Write Scope Packet
+## Git Write Scope
 
-- `role`
-- `workspace`
-- `allowed_paths`
-- `forbidden_paths`
-- `owned_files`
-- `integration_owner`
-- `merge_strategy`
-
-write-capable role を複数使う場合は、handoff の前に write scope packet を残します。
-同じ file を 2 つの writer に同時に割り当てません。
-同じディレクトリを複数 writer が触る場合は、`owned_files` を file 単位で disjoint にします。
+The active task handoff identifies the selected repository, branch, and owned
+paths. Before mutation, read the checkout's branch and current Git state, keep
+changes within the assigned responsibility, and preserve unknown changes.
+Serialize changes that share a file, directory owner, Git index, or public
+surface. Do not create a separate write-scope packet or agent identity record.
 file 境界を切れない場合は、同一 workspace の並列 write をやめ、別 worktree へ分けるか parent が直列化します。
 
 ## Escalation

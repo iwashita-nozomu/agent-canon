@@ -1665,6 +1665,7 @@ pub fn materialize_fresh_clone_source_projection_packet<G2Error, G3Error>(
         "pr_essence": {
             "problem": "exercise standalone source publication from a fresh clone",
             "intent": "queue the observed AgentCanon source branch update",
+            // Retain the v1 acceptance fixture identity and its callback/hash bindings.
             "canonical_owner": "tools/repository/workspace/repository_topic_clone.py",
             "contract_delta": "fresh-clone source PR",
             "evidence_refs": [fresh_clone_projection_evidence(
@@ -5329,6 +5330,8 @@ fn gate_contract(gate_id: &str) -> Option<(&'static str, &'static [&'static str]
         "G4" => Some((
             "standalone_source_branch_integrity",
             &[
+                "repository_topic_clone.rs#ensure_independent_branch",
+                // Accept existing receipts produced before the Rust owner migration.
                 "repository_topic_clone.py#_ensure_branch",
                 "agents/skills/agent-canon-update.md",
             ],
