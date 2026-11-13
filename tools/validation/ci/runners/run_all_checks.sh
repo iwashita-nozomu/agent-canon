@@ -2,7 +2,7 @@
 # @dependency-start
 # contract tool
 # responsibility Runs all checks CI automation.
-# upstream implementation ../../../runtime/dispatch/agent-canon/src/runtime_boundary.rs owns explicit control authentication and child execution
+# upstream implementation ../../../runtime/dispatch/agent-canon/src/runtime_paths.rs validates explicit control/runtime paths
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/runtime_boundary.rs owns external CI state and exact cleanup
 # upstream implementation ../checks/run_python_quality_checks.sh owns Python static quality checks
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/notebook_quality.rs validates notebooks as readable runnable demos
