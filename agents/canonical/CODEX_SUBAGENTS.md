@@ -602,7 +602,7 @@ runtime は再生成後に restart し、readback で反映を確認します。
 Role inventory and selected review-pack changes use the existing alignment checker:
 
 ```bash
-python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py
+tools/bin/agent-canon check-agent-runtime-alignment
 ```
 
 This validates role references and model/profile projections independently of task progress files.

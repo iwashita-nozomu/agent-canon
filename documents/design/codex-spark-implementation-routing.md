@@ -7,7 +7,7 @@ upstream design ../../agents/model_profiles.toml owns model/profile values and r
 upstream design ../../agents/canonical/CODEX_SUBAGENTS.md owns role descriptions and selection guidance
 upstream design ../../agents/skills/agent-orchestration.md owns workflow and capability selection
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/codex_agent_role_eval/model_profiles.rs materializes role profile views
-downstream implementation ../../tools/validation/semantic/runtime/check_agent_runtime_alignment.py checks role/profile projections
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/runtime_alignment.rs checks role/profile projections
 downstream design ../../agents/skills/computational-optimization.md owns mathematical-intent review
 downstream design ../../agents/skills/formal-proof-workflow.md owns formal proof work
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/hook_dispatcher.rs owns the native hook route
@@ -29,7 +29,7 @@ registry or a task execution protocol.
 | Model, reasoning effort, and role/profile bindings | [`agents/model_profiles.toml`](../../agents/model_profiles.toml) | Supplies the configured model profile for each role. |
 | Role descriptions and selection guidance | [`CODEX_SUBAGENTS.md`](../../agents/canonical/CODEX_SUBAGENTS.md) | Explains how the configured roles fit current workflows. |
 | Generated role views | [`evaluate-codex-agent-roles`](../../documents/tools/agent-canon.md) | Materializes `.codex/agents/*.toml` from the canonical configuration. |
-| Generated-view consistency | [`check_agent_runtime_alignment.py`](../../tools/validation/semantic/runtime/check_agent_runtime_alignment.py) | Checks current role and profile projections. |
+| Generated-view consistency | [`check-agent-runtime-alignment`](../../documents/tools/agent-canon.md) | Checks current role and profile projections. |
 
 Update the owning source when a persistent role or model selection changes.
 Treat generated views as readback. Do not copy model values or role instructions

@@ -104,5 +104,5 @@ monitor row alone. A route difference alone is not an Eval failure.
 
 ## Validation
 
-- `python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py`
+- `tools/bin/agent-canon check-agent-runtime-alignment`
 - `python3 tools/validation/semantic/convention/check_convention_compliance.py`

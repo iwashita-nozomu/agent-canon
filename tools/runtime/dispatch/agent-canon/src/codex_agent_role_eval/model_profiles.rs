@@ -536,7 +536,7 @@ fn write_role_views(
     Ok(views.len())
 }
 
-fn check_role_views(
+pub(super) fn check_role_views(
     registry: &ModelProfileRegistry,
     root: &Path,
     projection: &str,
@@ -662,7 +662,7 @@ fn render_role_view(view: &GeneratedRoleView, consumer_static: bool) -> String {
             format!("# responsibility Projects the canonical {} model profile into executable Codex settings.", view.role_id),
             "# upstream implementation ../../agents/model_profiles.toml owns model/profile authority".to_owned(),
             "# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/codex_agent_role_eval/model_profiles.rs materializes this view".to_owned(),
-            "# downstream implementation ../../tools/validation/semantic/runtime/check_agent_runtime_alignment.py validates projection parity".to_owned(),
+            "# downstream implementation ../../tools/runtime/dispatch/agent-canon/src/runtime_alignment.rs validates projection parity".to_owned(),
             "# @dependency-end".to_owned(),
             "# generated role view: generated_role_view_v1".to_owned(),
             "# generated from agents/model_profiles.toml plus canonical team/runtime role metadata".to_owned(),

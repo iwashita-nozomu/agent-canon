@@ -23,6 +23,21 @@ use std::path::PathBuf;
 
 pub const SELECTOR: &str = "evaluate-codex-agent-roles";
 
+pub(crate) fn check_alignment(root: &Path) -> Result<Vec<Finding>, String> {
+    let configs = load_configs(root)?;
+    let mut findings = configuration::evaluate(root, &configs)?;
+    findings.extend(routing::evaluate(root)?);
+    let registry = model_profiles::ModelProfileRegistry::load(root)?;
+    if let Err(error) = model_profiles::check_role_views(&registry, root, "consumer-static") {
+        findings.push(Finding::new(
+            "generated-view",
+            "agents/agents_config.json",
+            error,
+        ));
+    }
+    Ok(findings)
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Finding {
     pub check: String,

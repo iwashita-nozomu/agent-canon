@@ -9,7 +9,7 @@ upstream design ./catalog.yaml enumerates public skill families
 upstream design ./skill-dependencies.yaml owns the typed public-skill dependency dictionary
 upstream design ../../documents/design/responsibility-cleanup.md skill maintenance delegation rationale
 downstream design ../canonical/CODEX_WORKFLOW.md consumes the shared skill canon during task routing
-downstream implementation ../../tools/validation/semantic/runtime/check_agent_runtime_alignment.py validates public and official skill boundaries
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/runtime_alignment.rs validates public and official skill boundaries
 upstream design code-visualization.md visualization selection and native renderer delegation
 downstream implementation ../../tools/agent/skills/skill_route_catalog.py validates public skill routing
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs validates the dependency dictionary and generates its graph projections
@@ -84,7 +84,7 @@ source checkout の `documents/runtime/` を暗黙に更新しません。tracke
 
 | 目的 | 入口 |
 | --- | --- |
-| public skill / shim / doc / config の整合 | `python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py` |
+| public skill / shim / doc / config の整合 | `tools/bin/agent-canon check-agent-runtime-alignment` |
 | prompt に対する skill 選択 | `tools/bin/agent-canon route --prompt "<user request>" --mode routing-only --format json` |
 | 選択した tool の実行 | 既存 CLI / API / script を native argv で呼び、実行と検証は各 owner に委譲します。 |
 | 依存辞書の静的検査 | `tools/bin/agent-canon skill-dependency-map check --root .` |

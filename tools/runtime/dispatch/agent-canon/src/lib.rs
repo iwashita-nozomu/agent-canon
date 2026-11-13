@@ -117,6 +117,7 @@ pub mod python_sequence_matcher;
 pub mod python_text;
 pub mod report_artifact_checks;
 pub mod run_evaluation;
+pub mod runtime_alignment;
 pub mod runtime_boundary;
 pub mod scip_index;
 pub mod skill_lane_detector;

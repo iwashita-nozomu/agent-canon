@@ -10,7 +10,7 @@ downstream implementation ../../tools/runtime/archive/log_repository_identity.py
 downstream implementation ../../tools/runtime/source/agent_canon_source_root.py source-root resolution
 downstream implementation ../../tools/runtime/archive/runtime_log_paths.py logical archive paths
 downstream implementation ../../tools/runtime/archive/runtime_log_archive_git.py archive transaction, snapshot, publication, legacy import, and readback
-downstream implementation ../../tools/validation/semantic/runtime/check_agent_runtime_alignment.py runtime alignment validation
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/runtime_alignment.rs runtime alignment validation
 downstream implementation ../../tests/agent_tools/test_log_repository_lifecycle.py lifecycle evidence
 @dependency-end
 -->
