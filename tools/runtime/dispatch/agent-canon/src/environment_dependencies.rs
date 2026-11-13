@@ -8603,6 +8603,7 @@ mod tests {
     }
 
     #[cfg(unix)]
+    #[cfg(target_os = "linux")]
     fn initialize_git_checkout(path: &Path) {
         fs::create_dir_all(path).expect("Git checkout directory is created");
         let init = Command::new("git")
