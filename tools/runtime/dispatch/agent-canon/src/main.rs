@@ -171,6 +171,7 @@ Commands:
   issue-sync [--repo OWNER/REPO] [--issue-url URL] [options]
   eval-accumulation-check [--root ROOT] [--runtime-root ROOT] [--family-registry PATH] [--format text|json] [--compact-out PATH]
   oop-python-rule-inventory|oop-cpp-rule-inventory [--root <repo-root>] [--format text|json|markdown]
+  oop-python-readability|oop-cpp-readability [paths...] [--root ROOT] [options]
   lean-proof-env <init|smoke|agent-smoke|counterexample-smoke|all-smoke|check-file> [options]
   check-semantic-responsibility-contract [paths...] [--root ROOT] [--template TEMPLATE] [--instance INSTANCE] [--artifact-root ARTIFACT_ROOT] [--format text|json]
   check-solid-evidence [paths...] [--root ROOT] [--changed] [--base-ref BASE_REF] [--evidence EVIDENCE] [--exclude EXCLUDE] [--verbose] [--format text|json]
@@ -291,6 +292,18 @@ fn main() {
         std::process::exit(theorem_graph_circularity_check::run(&args[2..]));
     }
 
+    if args.len() >= 2
+        && ["oop-python-readability", "oop-cpp-readability"].contains(&args[1].as_str())
+    {
+        std::process::exit(agent_canon::oop_readability::run(
+            &args[2..],
+            if args[1] == "oop-python-readability" {
+                "python"
+            } else {
+                "cpp"
+            },
+        ));
+    }
     if args.len() >= 2 && args[1] == agent_canon::agent_runtime_dashboard::GUIDE_SELECTOR {
         std::process::exit(agent_canon::agent_runtime_dashboard::run_guide_cli(
             &args[2..],

@@ -463,8 +463,8 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
                     "commands": [
                         {
                             "command": [
-                                "python3",
-                                "tools/validation/code/oop/python/readability.py",
+                                "tools/bin/agent-canon",
+                                "oop-python-readability",
                                 "--root",
                                 str(root),
                                 "tools/runtime/lifecycle/bootstrap_agent_run.py",

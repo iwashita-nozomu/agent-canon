@@ -20,7 +20,7 @@ AgentCanon-owned shared docs は standalone AgentCanon source checkout の正本
 
 - [documents/conventions/object-oriented-design.md](../../../conventions/object-oriented-design.md) が存在すること。
 - [documents/conventions/coding-conventions-python.md](../../../conventions/coding-conventions-python.md) が存在すること。
-- `tools/validation/code/oop/python/readability.py` が存在すること。
+- `tools/runtime/dispatch/agent-canon/src/oop/python/readability.rs` が存在すること。
 - `tools/runtime/dispatch/agent-canon/src/rule_inventory.rs` が存在すること。
 - [documents/tools/oop/python/readability.md](readability.md) が存在すること。
 - [documents/tools/oop/python/rule_inventory.md](rule_inventory.md) が存在すること。

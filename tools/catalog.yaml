@@ -2088,12 +2088,12 @@ entries:
   - id: oop-python-readability
     public: true
     summary: Scores Python OOP readability risks.
-    path: tools/validation/code/oop/python/readability.py
+    path: tools/runtime/dispatch/agent-canon/src/oop/python/readability.rs
     family: oop_python
     role: checker
     status: canonical
-    command: python3 tools/validation/code/oop/python/readability.py
-    dispatch: {argv: ["python3", "tools/validation/code/oop/python/readability.py"]}
+    command: tools/bin/agent-canon oop-python-readability
+    dispatch: {runtime: rust, argv: [tools/bin/agent-canon, oop-python-readability]}
     writes: false
     default_wiring:
       ci: false
@@ -2126,12 +2126,12 @@ entries:
   - id: oop-cpp-readability
     public: true
     summary: Scores C++ OOP readability risks.
-    path: tools/validation/code/oop/cpp/readability.py
+    path: tools/runtime/dispatch/agent-canon/src/oop/cpp/readability.rs
     family: oop_cpp
     role: checker
     status: canonical
-    command: python3 tools/validation/code/oop/cpp/readability.py
-    dispatch: {argv: ["python3", "tools/validation/code/oop/cpp/readability.py"]}
+    command: tools/bin/agent-canon oop-cpp-readability
+    dispatch: {runtime: rust, argv: [tools/bin/agent-canon, oop-cpp-readability]}
     writes: false
     default_wiring:
       ci: false

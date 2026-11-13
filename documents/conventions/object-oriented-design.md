@@ -9,8 +9,8 @@ upstream design ./coding-conventions-python.md Python convention entrypoint
 upstream design ./coding-conventions-cpp.md C++ source/header ownership and target boundary
 upstream design ../design/protocols.md Protocol and type-boundary placement contract
 upstream design ../design/semantic-responsibility-contract.md semantic responsibility allocation and hard-edge grouping
-downstream implementation ../../tools/validation/code/oop/python/readability.py Python OOP typed-boundary evidence
-downstream implementation ../../tools/validation/code/oop/cpp/readability.py C++ OOP typed-boundary evidence
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/oop/readability.rs Python OOP typed-boundary evidence
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/oop/readability.rs C++ OOP typed-boundary evidence
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/rule_inventory.rs inventories Python and C++ OOP rule surfaces
 downstream implementation ../../tools/catalog.yaml records OOP tool catalog status
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/tool_catalog.rs validates OOP catalog entries
@@ -83,7 +83,7 @@ SOLID は、この文書の責務、状態、契約、公開面の規約をレ�
 [software-engineering-principles.md](software-engineering-principles.md) が所有します。この section は object model が material に
 変わる場合の specialization であり、全 change へ一律適用しません。
 機械 checker は finding kind を SOLID principle signal へ投影し、Markdown / JSON report に集計を出します。
-投影の正本は `tools/validation/code/oop/shared/readability_core.py` の `SOLID_PRINCIPLES_BY_KIND` です。
+投影の正本は `tools/runtime/dispatch/agent-canon/src/oop/readability.rs` の `SOLID_PRINCIPLES_BY_KIND` です。
 
 - Single responsibility: 曖昧名、state 過多、副作用混在、不要 wrapper、責務語彙の広がりを同じ責務境界の risk として読む。
 - Open/closed: `Optional` / `None` / `nullptr` routing や深い分岐を、現在の variant 契約と既存の拡張点に照らして確認する。signal だけで variant や entrypoint の増設を要求しない。
@@ -215,11 +215,11 @@ OOP 的な可読性は reviewer の判断を必要としますが、危険な形
 Python surface では次を baseline として使います。
 
 ```bash
-python3 tools/validation/code/oop/python/readability.py python tools tests
+tools/bin/agent-canon oop-python-readability python tools tests
 agent-canon oop-python-rule-inventory
 ```
 
-C++ surface では `tools/validation/code/oop/cpp/readability.py` に selected profile の native
+C++ surface では `tools/runtime/dispatch/agent-canon/src/oop/readability.rs` に selected profile の native
 source/consumer paths を渡します。この command は選択された path を読むだけで、CMake profile
 は選択しません。C++ rule inventory は `agent-canon oop-cpp-rule-inventory` です。
 
@@ -255,7 +255,7 @@ state ownership、既存責務語彙、または周辺 source shape から安定
 重要な変更では、機械 report の status、count、path、line を正本にします。
 
 ```bash
-python3 tools/validation/code/oop/python/readability.py \
+tools/bin/agent-canon oop-python-readability \
   --format markdown \
   --include-snippets \
   --exclude vendor \

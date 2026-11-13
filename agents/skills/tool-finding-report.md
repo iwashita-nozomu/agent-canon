@@ -125,7 +125,7 @@ stages every tool run must complete.
    - Before / after diff: `python-structure-hash-impact`。比較が明示されたときだけ使う
    - Algorithm modules: `python-algorithm-contract-check`
    - Module groups: `python-module-groups-check`
-   - OOP readability: `tools/oop/<language>/readability.py --format json`
+   - OOP readability: `tools/bin/agent-canon oop-<language>-readability --format json`
    - Dependency surface: `run_repo_dependency_review.sh` and related manifest tools
 1. When priority order is requested or needed to choose repair work, rank the
    selected findings using the relevant available signals and retain the ranking
