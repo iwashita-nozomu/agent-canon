@@ -29,7 +29,7 @@ docker run --rm --gpus "device=$GPU" "$IMAGE" "$@"
 成功したら経路の再確認は不要です。GPU指定を手動で選び直したり、任意設定の未確認を
 理由に止めたりしません。必要なdevice選択と資源保護は既存entrypointに任せます。
 
-通常経路に`run_gpu_command.py`、`run_gpu_container.sh`、XML解析、PIDの名前空間照合、
+通常経路に`agent-canon run-gpu-command`、`run_gpu_container.sh`、XML解析、PIDの名前空間照合、
 UUID lock、post-lock再観測、plan/fingerprint/receiptを要求しません。
 最小空きメモリ値の手入力や、JAXを使わないcommandへのJAX/XLA設定も不要です。
 必要な設定、mount、資源上限はプロジェクトの既存Docker実行設定を使います。

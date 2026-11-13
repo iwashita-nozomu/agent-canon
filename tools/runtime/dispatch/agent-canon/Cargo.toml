@@ -61,4 +61,4 @@ protobuf = "=3.7.2"
 expat = { version = "=0.1.0-beta.1", features = ["internal-api"] }
 
 [target.'cfg(unix)'.dependencies]
-nix = { version = "=0.30.1", default-features = false, features = ["fs", "user"] }
+nix = { version = "=0.30.1", default-features = false, features = ["fs", "user", "process"] }

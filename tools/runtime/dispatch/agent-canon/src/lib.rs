@@ -74,6 +74,8 @@ pub mod docs;
 pub mod entrypoint_composer;
 pub(crate) mod entrypoint_owner_map;
 pub mod execution_resource_projection;
+pub mod execution_resource_plan;
+pub mod gpu_command_admission;
 pub mod experiment_identity;
 pub mod experiment_registry;
 pub mod extract_docx;
