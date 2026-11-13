@@ -11,7 +11,7 @@
 # upstream design ../../../documents/experiments/gpu-admission-r5-nvidia-visibility.md official nvidia-smi C/G/M/O/C+G/M+C process visibility, PID/start/container mapping, MIG UUID mapping
 # downstream implementation ./run_managed_experiment.py managed experiment adapter
 # downstream implementation ../../runtime/dispatch/agent-canon/src/gpu_command_admission.rs provider-independent direct GPU admission adapter
-# downstream implementation ../../runtime/container/execution_resource_projection.py validates exact coarse PostToolUse projection constants
+# downstream implementation ../../runtime/dispatch/agent-canon/src/execution_resource_projection.rs validates exact coarse PostToolUse projection constants
 # downstream implementation ../../analysis/proof/jit_canonical_ir.py GPU requests must route here or fail typed preflight
 # downstream implementation ../../../templates/experiments/_template/run.py direct GPU launch is statically prohibited
 # downstream implementation ../../../bootstrap/host/manifest.toml selects the shared tool runtime limits

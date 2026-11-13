@@ -8,7 +8,7 @@ upstream design ../../agents/COMMUNICATION_PROTOCOL.md native collaboration
 upstream design rust-agent-tool-migration.md retained tool migration
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/codex_agent_role_eval/routing.rs owns native task/role consistency
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/active_design_packet.rs owns persisted active-design packet normalization
-downstream implementation ../../tools/agent/orchestration/tool_calls.py retains the IssueSync receipt command adapter
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/issue_sync.rs owns IssueSync resident receipt commands
 @dependency-end
 -->
 
@@ -28,9 +28,9 @@ and task-close command are retired. Retained tools do not recreate this workflow
   Mathematical correction routing remains in `task_catalog.yaml` and the
   computational-optimization skill. The unused Python run-bundle packet
   materializer is retired; this does not add a new run-bundle workflow.
-- `tool_calls.py` retains only the IssueSync receipt-stage command builder while
-  IssueSync consumes it. Native collaboration and close-agent behavior remain
-  with the existing host and Rust owners.
+- `issue_sync.rs` builds the existing bootstrap commands for resident receipt
+  staging. Native collaboration and close-agent behavior remain with the
+  existing host and Rust owners.
 - Hook event publication and Eval accumulation retain their existing runtime
   and archive owners. Historical report readers may read existing artifacts;
   they do not require new task files or create active-run pointers.

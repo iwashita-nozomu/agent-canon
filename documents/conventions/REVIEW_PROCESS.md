@@ -226,7 +226,7 @@ Issue を唯一の durable authority とします。
 
 Durable operational defect は GitHub Issue を正本にします。オフライン時は
 private `agent-canon-log/feedback/issue-packets/pending/` にlocator/digestだけを置き、
-host adapterが `python3 tools/repository/github/issue_sync.py --sync-pending --repo <owner>/<repo>`
+host adapterが `agent-canon issue-sync --sync-pending --repo <owner>/<repo>`
 で公開し、URL/number/title/body/stateをreadbackしてpacketを解決します。
 
 ## 関連正本

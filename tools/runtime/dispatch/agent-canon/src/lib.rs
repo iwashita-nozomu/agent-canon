@@ -60,6 +60,7 @@
 // @dependency-end
 
 pub mod active_design_packet;
+pub mod agent_runtime_dashboard;
 pub mod agent_tool_calls;
 pub mod artifacts;
 pub mod authority;
@@ -70,6 +71,8 @@ pub mod code_template_rendering;
 pub mod codex_agent_role_eval;
 pub mod codex_runtime_summary;
 pub mod compare_agent_run_paths;
+mod dashboard_render;
+mod dashboard_token_usage;
 pub mod docs;
 pub mod entrypoint_composer;
 pub(crate) mod entrypoint_owner_map;
@@ -101,12 +104,19 @@ pub mod hook_dispatcher;
 pub mod hook_event_log;
 pub mod hook_safety;
 pub mod html_artifact_access;
+pub mod issue_sync;
 pub mod latest_result;
 pub mod lean_proof_env;
 pub mod log_policy;
 pub mod log_repository_identity;
 pub mod lsp_code_analysis;
 pub mod native_release;
+#[path = "oop/cpp/readability.rs"]
+mod oop_cpp;
+#[path = "oop/python/readability.rs"]
+mod oop_python;
+#[path = "oop/readability.rs"]
+pub mod oop_readability;
 pub mod orphan_lifecycle;
 pub mod owner_guarantee;
 pub mod parent_repository_audit;

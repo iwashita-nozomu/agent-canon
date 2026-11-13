@@ -1,11 +1,12 @@
 # @dependency-start
 # contract test
-# responsibility Tests AgentCanon runtime dashboard generation.
-# upstream implementation ../../eval/producers/generate_agent_runtime_dashboard.py generates dashboard reports
-# upstream design ../../documents/runtime/runtime-log-archive.md documents result families shown by dashboard
+# responsibility Tests the native AgentCanon runtime dashboard CLI and API.
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/agent_runtime_dashboard.rs owns dashboard collection
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/dashboard_render.rs owns full and compact Markdown output
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/dashboard_token_usage.rs owns token evidence scanning
 # @dependency-end
 
-"""Tests for generated AgentCanon runtime dashboards."""
+"""Black-box tests for AgentCanon runtime dashboards."""
 
 from __future__ import annotations
 
@@ -17,30 +18,17 @@ import tempfile
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
-from types import SimpleNamespace
+from typing import Any
 from unittest.mock import patch
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "eval" / "producers" / "generate_agent_runtime_dashboard.py"
+SCRIPT = "generate-agent-runtime-dashboard"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-from eval.producers.generate_agent_runtime_dashboard import (  # noqa: E402
-    AgentRuntimeDashboard,
-    HookWorkflowBreakdownReader,
-    TokenUsageBreakdownReader,
-    durable_issue_next_action,
-    issue_worker_candidate_records,
-    read_issue_publication_receipts,
-    read_issue_worker_handoffs,
-    render_dashboard,
-    SOURCE_SYNC_STATE_PATH,
-    token_usage_lines,
-    token_usage_next_action,
-    tool_source_path_candidates,
-)
 from tools.runtime.archive.runtime_log_paths import (
+    HOOK_ARCHIVE_DIR_ENV,
     mounted_log_archive_root,
     repo_log_key,
-)  # noqa: E402
+)
 
 DASHBOARD_PROMPT_CHAR_COUNT = 27
 
@@ -49,9 +37,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
     def setUp(self) -> None:
         self._runtime_temp = tempfile.TemporaryDirectory()
         self._previous_runtime = os.environ.get("AGENT_CANON_RUNTIME_ROOT")
-        self._previous_archive_dir = os.environ.pop(
-            "AGENT_CANON_HOOK_ARCHIVE_DIR", None
-        )
+        self._previous_archive_dir = os.environ.pop(HOOK_ARCHIVE_DIR_ENV, None)
         self._previous_log_root = os.environ.pop("AGENT_CANON_LOG_ROOT", None)
         self.runtime_root = Path(self._runtime_temp.name) / "runtime"
         self.runtime_root.mkdir()
@@ -62,304 +48,453 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             os.environ.pop("AGENT_CANON_RUNTIME_ROOT", None)
         else:
             os.environ["AGENT_CANON_RUNTIME_ROOT"] = self._previous_runtime
-        if self._previous_archive_dir is not None:
-            os.environ["AGENT_CANON_HOOK_ARCHIVE_DIR"] = self._previous_archive_dir
-        if self._previous_log_root is not None:
+        if self._previous_archive_dir is None:
+            os.environ.pop(HOOK_ARCHIVE_DIR_ENV, None)
+        else:
+            os.environ[HOOK_ARCHIVE_DIR_ENV] = self._previous_archive_dir
+        if self._previous_log_root is None:
+            os.environ.pop("AGENT_CANON_LOG_ROOT", None)
+        else:
             os.environ["AGENT_CANON_LOG_ROOT"] = self._previous_log_root
         self._runtime_temp.cleanup()
 
-    def test_dashboard_default_source_sync_path_is_nested_mount(self) -> None:
-        """The default reader names the directory-mounted source-sync file."""
-        self.assertEqual(
-            SOURCE_SYNC_STATE_PATH,
-            Path("/var/lib/agent-canon/source-sync/source-sync.json"),
+    def run_cli(
+        self, command: list[str], **kwargs: Any
+    ) -> subprocess.CompletedProcess[str]:
+        """Translate the old producer-shaped test argv to the native selector."""
+        command = list(command)
+        if command[:2] == [sys.executable, SCRIPT]:
+            native = os.environ.get("AGENT_CANON_NATIVE_BIN") or os.environ.get(
+                "AGENT_CANON_CLI"
+            )
+            if not native:
+                self.fail(
+                    "AGENT_CANON_NATIVE_BIN or AGENT_CANON_CLI must select the native executable"
+                )
+            command = [native, SCRIPT, *command[2:]]
+            if "--runtime-root" not in command:
+                command.extend(["--runtime-root", str(self.runtime_root)])
+            environment = os.environ.copy()
+            environment["AGENT_CANON_RUNTIME_ROOT"] = str(self.runtime_root)
+            environment.setdefault(
+                "AGENT_CANON_LOG_ROOT", str(self.runtime_root / "agent-canon-log")
+            )
+            kwargs["env"] = environment
+            kwargs.setdefault("check", False)
+            kwargs.setdefault("capture_output", True)
+            kwargs.setdefault("text", True)
+        return subprocess.run(command, check=kwargs.pop("check", False), **kwargs)
+
+    def write_hook(
+        self, root: Path, name: str, records: list[dict[str, object]]
+    ) -> Path:
+        """Write JSONL fixture rows through the mounted archive layout."""
+        path = (
+            mounted_log_archive_root(root)
+            / "hook-runs"
+            / "legacy-import"
+            / "test-container"
+            / name
+        )
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            "".join(json.dumps(row) + "\n" for row in records), encoding="utf-8"
+        )
+        return path
+
+    def run_dashboard(
+        self,
+        root: Path,
+        *,
+        out: Path | None = None,
+        compact: Path | None = None,
+        api: Path | None = None,
+        extra: tuple[str, ...] = (),
+        cwd: Path | None = None,
+    ) -> subprocess.CompletedProcess[str]:
+        """Invoke the native dashboard against an isolated source and runtime root."""
+        out = out or self.runtime_root / "reports" / "dashboard.md"
+        command = [
+            sys.executable,
+            SCRIPT,
+            "--root",
+            str(root),
+            "--runtime-root",
+            str(self.runtime_root),
+            "--out",
+            str(out),
+        ]
+        if compact is not None:
+            command.extend(["--compact-out", str(compact)])
+        if api is not None:
+            command.extend(["--api-out", str(api)])
+        command.extend(extra)
+        return self.run_cli(
+            command, cwd=cwd, check=False, capture_output=True, text=True
         )
 
-    def test_issue_worker_reads_only_explicit_candidates(self) -> None:
-        """Counts and selection misses do not synthesize Issue candidates."""
-        self.assertEqual(
-            issue_worker_candidate_records(
-                {"selection_misses": 35, "workflow_attribution_missing": 6882}
-            ),
-            (),
-        )
-        candidate = {
-            "repository": "owner/repo",
-            "owner": "issue-owner",
-            "fix": "repair the missing route",
-        }
-        self.assertEqual(
-            issue_worker_candidate_records({"issue_worker_candidate": candidate}),
-            (candidate,),
-        )
+    def test_dashboard_api_schema_and_no_candidate_inference(self) -> None:
+        """Counts and selection misses alone do not create IssueWorker candidates."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_hook(
+                root,
+                "skill_usage.jsonl",
+                [
+                    {
+                        "hook_run_id": "counts-only",
+                        "hook_log_namespace": "test-container",
+                        "event": "UserPromptSubmit",
+                        "status": "pass",
+                        "candidate_skills": ["agent-log-analysis"],
+                    }
+                ],
+            )
+            output = self.runtime_root / "reports" / "candidate-api.json"
+            result = self.run_dashboard(root, api=output)
+            payload = json.loads(output.read_text(encoding="utf-8"))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(payload["schema"], "agent_runtime_dashboard.v1")
+        self.assertEqual(payload["issue_worker"]["qualified"], 0)
+        self.assertEqual(payload["issue_worker"]["handoff"], 0)
 
-    def test_issue_worker_uses_checkout_readback_and_routes_flagless_candidate(
+    def test_issue_candidate_uses_checkout_identity_and_creates_read_only_action(
         self,
     ) -> None:
-        """The #938 checkout identity is the sole repository routing input."""
+        """Only explicit candidates qualify, and the dashboard only recommends publication."""
         with tempfile.TemporaryDirectory() as temp_dir:
-            hook = Path(temp_dir) / "events.jsonl"
-            hook.write_text(
-                json.dumps(
+            root = Path(temp_dir)
+            self.write_hook(
+                root,
+                "behavior_events.jsonl",
+                [
                     {
-                        "checkout_identity": {"remote": "owner/repo"},
+                        "hook_run_id": "candidate",
+                        "hook_log_namespace": "test-container",
+                        "event": "PostToolUse",
+                        "status": "pass",
+                        "checkout_identity": {
+                            "remote": "git@github.com:owner/repo.git"
+                        },
                         "issue_worker_candidate": {
                             "repository": "owner/repo",
                             "owner": "issue-owner",
-                            "fix": "repair the missing route",
+                            "fix": "repair the route",
+                            "status": "open",
+                            "finding_kind": "recurrent-failure",
+                            "durable_follow_up": True,
+                            "occurrence_locations": ["src/module.rs::route"],
                         },
                     }
-                )
-                + "\n",
-                encoding="utf-8",
+                ],
             )
-            handoffs = read_issue_worker_handoffs((hook,))
+            output = self.runtime_root / "reports" / "candidate-api.json"
+            full = self.runtime_root / "reports" / "candidate.md"
+            result = self.run_dashboard(root, api=output, out=full)
+            payload = json.loads(output.read_text(encoding="utf-8"))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(payload["issue_worker"]["qualified"], 1)
+        self.assertEqual(payload["issue_worker"]["routeable"], 1)
+        self.assertEqual(payload["issue_worker"]["handoff"], 0)
+        issue_action = next(
+            action
+            for action in payload["priority_next_actions"]
+            if action["action"] == "publish explicit IssueWorker candidates"
+        )
+        self.assertIn("dashboard remains read-only", issue_action["command"])
+        self.assertIn("owner/repo", full.read_text(encoding="utf-8"))
 
-        self.assertEqual(len(handoffs), 1)
-        self.assertTrue(handoffs[0].qualifies)
-        self.assertEqual(handoffs[0].reason, "user-owned-candidate")
-
-    def test_issue_worker_does_not_use_authenticated_repository_log_fallback(
+    def test_candidate_without_checkout_identity_is_handoff_not_authenticated_fallback(
         self,
     ) -> None:
-        """A self-claimed log field cannot replace checkout identity readback."""
+        """A self-claimed repository cannot substitute for checkout identity."""
         with tempfile.TemporaryDirectory() as temp_dir:
-            hook = Path(temp_dir) / "events.jsonl"
-            hook.write_text(
-                json.dumps(
+            root = Path(temp_dir)
+            self.write_hook(
+                root,
+                "behavior_events.jsonl",
+                [
                     {
+                        "hook_run_id": "candidate",
+                        "hook_log_namespace": "test-container",
+                        "event": "PostToolUse",
+                        "status": "pass",
                         "authenticated_repository": "owner/repo",
                         "issue_worker_candidate": {
                             "repository": "owner/repo",
                             "owner": "issue-owner",
-                            "fix": "repair the missing route",
+                            "fix": "repair route",
                         },
+                    }
+                ],
+            )
+            output = self.runtime_root / "reports" / "candidate-api.json"
+            result = self.run_dashboard(root, api=output)
+            payload = json.loads(output.read_text(encoding="utf-8"))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(payload["issue_worker"]["handoff"], 1)
+        self.assertEqual(payload["issue_worker"]["routeable"], 0)
+        self.assertEqual(
+            payload["issue_worker"]["reasons"], {"checkout-identity-unresolved": 1}
+        )
+
+    def test_published_receipts_are_identity_checked_and_separate_from_candidates(
+        self,
+    ) -> None:
+        """Receipt path and body identity must agree before refs/actions are counted."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_hook(
+                root,
+                "behavior_events.jsonl",
+                [
+                    {
+                        "hook_run_id": "candidate",
+                        "hook_log_namespace": "test-container",
+                        "event": "PostToolUse",
+                        "status": "pass",
+                        "checkout_identity": {"remote": "owner/repo"},
+                        "issue_worker_candidate": {
+                            "repository": "owner/repo",
+                            "owner": "issue-owner",
+                            "fix": "repair route",
+                        },
+                    }
+                ],
+            )
+            published = (
+                mounted_log_archive_root(root)
+                / "feedback"
+                / "issue-packets"
+                / "published"
+            )
+            valid_dir = published / "owner" / "repo"
+            invalid_dir = published / "other" / "repo"
+            valid_dir.mkdir(parents=True)
+            invalid_dir.mkdir(parents=True)
+            receipt = {
+                "repository": "owner/repo",
+                "number": "42",
+                "url": "https://github.com/owner/repo/issues/42",
+                "state": "OPEN",
+                "action": "update",
+                "responsibility": ["issue-owner"],
+                "occurrence_locations": ["src/module.rs::route"],
+                "source_finding_kind": "recurrent-failure",
+                "timestamp": "2026-11-12T10:00:00Z",
+            }
+            (valid_dir / "42.json").write_text(
+                json.dumps(receipt) + "\n", encoding="utf-8"
+            )
+            (invalid_dir / "43.json").write_text(
+                json.dumps(
+                    {
+                        **receipt,
+                        "number": "43",
+                        "url": "https://github.com/owner/repo/issues/43",
                     }
                 )
                 + "\n",
                 encoding="utf-8",
             )
-            handoffs = read_issue_worker_handoffs((hook,))
-
-        assert len(handoffs) == 1
-        assert handoffs[0].reason == "checkout-identity-unresolved"
-
-    def test_issue_worker_candidate_creates_host_publisher_action(self) -> None:
-        """A qualified candidate creates a host action, not a dashboard mutation."""
-        handoff = SimpleNamespace(
-            qualifies=True,
-            repository="owner/repo",
-            status="qualified",
-        )
-        summary = SimpleNamespace(
-            issue_worker_handoffs=(handoff,),
-            evidence=SimpleNamespace(github_issue_refs=()),
-        )
-        actions = durable_issue_next_action(summary)
-        self.assertEqual(len(actions), 1)
-        self.assertEqual(actions[0].automation, "host-publisher")
-        self.assertIn("read-only", actions[0].command)
-
-    def test_published_issue_receipt_feeds_refs_and_action_counts(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            root = Path(temp_dir)
-            published = (
-                mounted_log_archive_root(root)
-                / "feedback"
-                / "issue-packets"
-                / "published"
-                / "owner"
-                / "repo"
-            )
-            published.mkdir(parents=True)
-            (published / "42.json").write_text(
+            external_receipt = root / "external-receipt.json"
+            external_receipt.write_text(
                 json.dumps(
                     {
-                        "repository": "owner/repo",
-                        "number": "42",
-                        "url": "https://github.com/owner/repo/issues/42",
-                        "state": "OPEN",
-                        "action": "create",
-                        "responsibility": ["issue-owner"],
-                        "occurrence_locations": ["tools/route.py::route"],
-                        "source_finding_kind": "recurrent-failure",
-                        "timestamp": "2026-08-27T00:00:00Z",
-                    },
-                    sort_keys=True,
+                        **receipt,
+                        "number": "44",
+                        "url": "https://github.com/owner/repo/issues/44",
+                    }
                 )
                 + "\n",
                 encoding="utf-8",
             )
-            receipts = read_issue_publication_receipts(root, self.runtime_root)
+            (valid_dir / "44.json").symlink_to(external_receipt)
+            (published / "linked-owner").symlink_to(valid_dir.parent)
+            output = self.runtime_root / "reports" / "receipt-api.json"
+            compact = self.runtime_root / "reports" / "receipt-compact.md"
+            result = self.run_dashboard(root, api=output, compact=compact)
+            payload = json.loads(output.read_text(encoding="utf-8"))
+            compact_text = compact.read_text(encoding="utf-8")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(payload["github_issue_refs"], [receipt["url"]])
+        self.assertEqual(payload["issue_publication_action_counts"], {"update": 1})
+        self.assertEqual(payload["issue_worker"]["qualified"], 1)
+        self.assertEqual(payload["issue_worker"]["published_receipts"], 1)
+        self.assertIn(
+            "AGENT_RUNTIME_DASHBOARD_ISSUE_PUBLICATION_RECEIPTS=1", compact_text
+        )
 
-        self.assertEqual(len(receipts), 1)
-        self.assertEqual(receipts[0].url, "https://github.com/owner/repo/issues/42")
-        self.assertEqual(receipts[0].action, "create")
-
-    def test_dashboard_ignores_noncanonical_receipt_path_or_identity(self) -> None:
+    def test_candidate_only_workflow_stays_unattributed(self) -> None:
+        """Candidate workflow suggestions do not become observed attribution."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            published = (
-                mounted_log_archive_root(root)
-                / "feedback"
-                / "issue-packets"
-                / "published"
-                / "owner"
-                / "repo"
-            )
-            published.mkdir(parents=True)
-            value = {
-                "repository": "owner/repo",
-                "number": "42",
-                "url": "https://github.com/owner/repo/issues/42",
-                "state": "OPEN",
-                "action": "create",
-                "responsibility": [],
-                "occurrence_locations": [],
-                "source_finding_kind": "",
-                "timestamp": "2026-08-27T00:00:00Z",
-            }
-            (published / "43.json").write_text(
-                json.dumps(value) + "\n", encoding="utf-8"
-            )
-            value["number"] = "44"
-            value["url"] = "https://github.com/owner/repo/issues/44"
-            value["state"] = "pending"
-            (published / "44.json").write_text(
-                json.dumps(value) + "\n", encoding="utf-8"
-            )
-            receipts = read_issue_publication_receipts(root, self.runtime_root)
-
-        self.assertEqual(receipts, ())
-
-    """Verify dashboard output from accumulated runtime evidence."""
-
-    def test_iter_entries_tolerates_disappeared_log_file(self) -> None:
-        """Log archive readers should tolerate hook files removed after discovery."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            missing_log = Path(temp_dir) / "removed.jsonl"
-
-            entries = HookWorkflowBreakdownReader.iter_entries(missing_log)
-
-        self.assertEqual(entries, ())
-
-    def test_canonical_candidate_only_workflow_stays_missing(self) -> None:
-        """Candidate fields must not become owner attribution in canonical rows."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            root = Path(temp_dir)
-            hook = root / "behavior_events.jsonl"
-            hook.write_text(
-                json.dumps(
+            self.write_hook(
+                root,
+                "skill_usage.jsonl",
+                [
                     {
-                        "schema": "agent-canon.behavior-event.v1",
-                        "event_id": "a" * 64,
-                        "hook_invocation_id": "candidate-only",
-                        "hook_event_name": "UserPromptSubmit",
-                        "event_kind": "behavior_snapshot",
-                        "timestamp": "2026-05-17T00:00:00Z",
-                        "hook_log_namespace": "test",
-                        "workflow_attribution_kind": "missing",
-                        "candidate_workflows": ["scoped-change"],
-                        "selected_workflows": [],
-                        "workflow_owner_workflows": [],
-                        "workflow_context_workflows": [],
-                        "status": "pass",
-                    },
-                    sort_keys=True,
-                    separators=(",", ":"),
-                )
-                + "\n",
-                encoding="utf-8",
-            )
-
-            breakdown = HookWorkflowBreakdownReader.read((hook,), root)
-
-        self.assertEqual(breakdown.entries_with_workflow, 0)
-        self.assertEqual(breakdown.entries_without_workflow, 1)
-        self.assertEqual(breakdown.workflow_attribution["missing"], 1)
-
-    def test_legacy_candidate_only_workflow_stays_missing(self) -> None:
-        """Legacy candidate fields must not become owner attribution either."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            root = Path(temp_dir)
-            hook = root / "legacy.jsonl"
-            hook.write_text(
-                json.dumps(
-                    {
-                        "hook_run_id": "legacy-candidate-only",
-                        "hook_log_namespace": "test",
+                        "hook_run_id": "candidate-only",
+                        "hook_log_namespace": "test-container",
                         "event": "UserPromptSubmit",
-                        "timestamp": "2026-05-17T00:00:00Z",
                         "status": "pass",
-                        "candidate_workflows": ["scoped-change"],
-                    },
-                    sort_keys=True,
-                    separators=(",", ":"),
-                )
-                + "\n",
-                encoding="utf-8",
+                        "candidate_workflows": ["environment-maintenance"],
+                    }
+                ],
             )
-
-            breakdown = HookWorkflowBreakdownReader.read((hook,), root)
-
-        self.assertEqual(breakdown.entries_with_workflow, 0)
-        self.assertEqual(breakdown.entries_without_workflow, 1)
-        self.assertEqual(breakdown.workflow_attribution["missing"], 1)
-
-    def test_token_objective_selected_without_evidence_is_missing(self) -> None:
-        """A selected token objective reports missing evidence and an action."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            root = Path(temp_dir)
-            report = (
-                self.runtime_root
-                / "reports"
-                / "agents"
-                / "run"
-                / "workflow_monitoring.md"
-            )
-            report.parent.mkdir(parents=True)
-            report.write_text("token_reduction_objective=selected\n", encoding="utf-8")
-
-            breakdown = TokenUsageBreakdownReader.read(
-                root, runtime_root=self.runtime_root
-            )
-
-        self.assertTrue(breakdown.objective_selected)
-        self.assertEqual(breakdown.comparison_count, 0)
-        summary = SimpleNamespace(
-            token_usage_breakdown=breakdown,
-            evidence=SimpleNamespace(open_issues=(), closed_issues=()),
-            root=root,
+            output = self.runtime_root / "reports" / "workflow.md"
+            compact = self.runtime_root / "reports" / "workflow-compact.md"
+            result = self.run_dashboard(root, out=output, compact=compact)
+            full_text = output.read_text(encoding="utf-8")
+            compact_text = compact.read_text(encoding="utf-8")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("hook_entries_missing_workflow_attribution: `1`", full_text)
+        self.assertIn("entries_missing_workflow", compact_text)
+        self.assertNotIn(
+            "| `workflow` | `environment-maintenance` | `1` | `1` | `0`", full_text
         )
-        lines = token_usage_lines(summary)
-        self.assertIn("- token_comparison_status: `missing`", lines)
-        self.assertTrue(token_usage_next_action(summary))
 
-    def test_token_objective_not_selected_has_no_action(self) -> None:
-        """An explicit opt-out is truthful and does not invent a global gap."""
+    def test_token_objective_requires_evidence_and_explicit_opt_out_has_no_token_action(
+        self,
+    ) -> None:
+        """Token evidence is required only when a token-reduction objective was selected."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            report = (
+            monitor = (
                 self.runtime_root
                 / "reports"
                 / "agents"
                 / "run"
                 / "workflow_monitoring.md"
             )
-            report.parent.mkdir(parents=True)
-            report.write_text(
+            monitor.parent.mkdir(parents=True)
+            output = self.runtime_root / "reports" / "token.md"
+            api = self.runtime_root / "reports" / "token-api.json"
+            monitor.write_text("token_reduction_objective=selected\n", encoding="utf-8")
+            result = self.run_dashboard(root, out=output, api=api)
+            selected = json.loads(api.read_text(encoding="utf-8"))
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn(
+                "token_comparison_status: `missing`", output.read_text(encoding="utf-8")
+            )
+            self.assertTrue(
+                any(
+                    action["action"] == "add token consumption moving-average evidence"
+                    for action in selected["priority_next_actions"]
+                )
+            )
+            monitor.write_text(
                 "token_efficiency_not_required reason=single-route\n", encoding="utf-8"
             )
-
-            breakdown = TokenUsageBreakdownReader.read(root)
-
-        self.assertFalse(breakdown.objective_selected)
-        summary = SimpleNamespace(
-            token_usage_breakdown=breakdown,
-            evidence=SimpleNamespace(open_issues=(), closed_issues=()),
-            root=root,
+            result = self.run_dashboard(root, out=output, api=api)
+            opted_out = json.loads(api.read_text(encoding="utf-8"))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(
+            "token_comparison_status: `not-selected`",
+            output.read_text(encoding="utf-8"),
         )
-        self.assertFalse(token_usage_next_action(summary))
+        self.assertFalse(
+            any(
+                action["action"] == "add token consumption moving-average evidence"
+                for action in opted_out["priority_next_actions"]
+            )
+        )
+
+    def test_recent_cutoff_filters_hook_rows_and_writes_all_outputs_externally(
+        self,
+    ) -> None:
+        """Recent mode filters timestamps and all artifacts stay in the external runtime."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            recent = (
+                datetime.now(timezone.utc)
+                .replace(microsecond=0)
+                .isoformat()
+                .replace("+00:00", "Z")
+            )
+            self.write_hook(
+                root,
+                "skill_usage.jsonl",
+                [
+                    {
+                        "hook_run_id": "old",
+                        "hook_log_namespace": "old",
+                        "event": "UserPromptSubmit",
+                        "status": "pass",
+                        "timestamp": "2000-01-01T00:00:00Z",
+                        "skills": ["old-skill"],
+                    },
+                    {
+                        "hook_run_id": "recent",
+                        "hook_log_namespace": "recent",
+                        "event": "UserPromptSubmit",
+                        "status": "pass",
+                        "timestamp": recent,
+                        "skills": ["agent-log-analysis"],
+                        "prompt_capture_status": "present",
+                        "prompt_char_count": 10,
+                        "prompt_excerpt_redacted": "current",
+                    },
+                ],
+            )
+            out = self.runtime_root / "reports" / "dashboard.md"
+            compact = self.runtime_root / "reports" / "compact.md"
+            api = self.runtime_root / "reports" / "dashboard.json"
+            result = self.run_dashboard(
+                root, out=out, compact=compact, api=api, extra=("--recent-days", "5")
+            )
+            full_text = out.read_text(encoding="utf-8")
+            compact_text = compact.read_text(encoding="utf-8")
+            payload = json.loads(api.read_text(encoding="utf-8"))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(payload["hook_entries"], 1)
+        self.assertEqual(payload["hook_files"], 1)
+        self.assertIn("AGENT_RUNTIME_DASHBOARD_HOOK_ENTRIES=1", compact_text)
+        self.assertNotIn("old-skill", full_text)
+        self.assertNotIn("old-skill", compact_text)
+        self.assertFalse((root / "reports").exists())
+
+    def test_issue_worker_candidate_has_no_authentication_fallback(self) -> None:
+        """Candidate authentication uses only checkout readback, not a self-claimed field."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_hook(
+                root,
+                "behavior_events.jsonl",
+                [
+                    {
+                        "hook_run_id": "candidate",
+                        "hook_log_namespace": "test-container",
+                        "event": "PostToolUse",
+                        "status": "pass",
+                        "authenticated_repository": "owner/repo",
+                        "issue_worker_candidate": {
+                            "repository": "owner/repo",
+                            "owner": "issue-owner",
+                            "fix": "repair route",
+                        },
+                    }
+                ],
+            )
+            api = self.runtime_root / "reports" / "issue-api.json"
+            result = self.run_dashboard(root, api=api)
+            payload = json.loads(api.read_text(encoding="utf-8"))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(
+            payload["issue_worker"]["reasons"], {"checkout-identity-unresolved": 1}
+        )
+        self.assertEqual(payload["issue_worker"]["routeable"], 0)
+
+    def test_dashboard_source_sync_projection_is_part_of_api(self) -> None:
+        """The API always includes the host-owned source-sync projection slot."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            api = self.runtime_root / "reports" / "source-sync-api.json"
+            result = self.run_dashboard(root, api=api)
+            payload = json.loads(api.read_text(encoding="utf-8"))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("source_sync_state", payload)
+        self.assertEqual(payload["schema"], "agent_runtime_dashboard.v1")
 
     def test_generates_log_location_dashboard(self) -> None:
         """The dashboard should show canonical paths and accumulated counts."""
@@ -369,7 +504,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             output = self.runtime_root / "reports" / "dashboard.md"
             compact_output = self.runtime_root / "reports" / "compact-dashboard.md"
 
-            result = subprocess.run(
+            result = self.run_cli(
                 [
                     sys.executable,
                     str(SCRIPT),
@@ -397,88 +532,6 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         self.assert_selection_and_prompt_sections(dashboard)
         self.assert_reference_and_log_sections(dashboard)
 
-    def test_dashboard_reads_current_mounted_source_sync_state(self) -> None:
-        """Dashboard uses the mounted source-sync record, not container state."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            root = Path(temp_dir)
-            self.write_fixture(root)
-            source_sync = root / "source-sync" / "source-sync.json"
-            source_sync.parent.mkdir(parents=True)
-            source_sync.write_text(
-                json.dumps(
-                    {
-                        "schema": "agent-canon.source-sync.v1",
-                        "status": "failed",
-                        "code": "source_sync_candidate_failed",
-                        "source_root": "/home/niwashita/agent-canon",
-                        "source_head": "1" * 40,
-                        "source_tree": "2" * 40,
-                        "remote": "origin",
-                        "remote_url": "git@github.com:owner/repo.git",
-                        "branch": "main",
-                        "updated_at": "2026-08-27T00:00:00Z",
-                        "failure": "source_sync_candidate_failed",
-                    }
-                )
-                + "\n",
-                encoding="utf-8",
-            )
-            dashboard_reader = AgentRuntimeDashboard(
-                root,
-                runtime_root=self.runtime_root,
-                source_sync_path=source_sync,
-            )
-            summary = dashboard_reader.collect()
-            dashboard = render_dashboard(summary)
-            source_sync.write_text(
-                json.dumps(
-                    {
-                        "schema": "agent-canon.source-sync.v1",
-                        "status": "success",
-                        "code": "up_to_date",
-                        "source_root": "/home/niwashita/agent-canon",
-                        "source_head": "3" * 40,
-                        "source_tree": "4" * 40,
-                        "remote": "origin",
-                        "remote_url": "git@github.com:owner/repo.git",
-                        "branch": "main",
-                        "updated_at": "2026-08-27T00:00:01Z",
-                    }
-                )
-                + "\n",
-                encoding="utf-8",
-            )
-            replaced = dashboard_reader.collect()
-            replaced_dashboard = render_dashboard(replaced)
-            for invalid_state in (
-                {
-                    "failure": "old",
-                    "schema": "agent-canon.source-sync.v1",
-                    "status": "failed",
-                    "updated_at": "2026-08-26T00:00:00Z",
-                },
-                {"schema": "agent-canon.source-sync.v1", "status": 7},
-                {
-                    "schema": "agent-canon.source-sync.v1",
-                    "status": "success",
-                    "code": "up_to_date",
-                },
-            ):
-                source_sync.write_text(
-                    json.dumps(invalid_state) + "\n", encoding="utf-8"
-                )
-                rejected = dashboard_reader.collect()
-                self.assertIsNone(rejected.source_sync_state)
-
-        assert summary.source_sync_state is not None
-        self.assertEqual(summary.source_sync_state["status"], "failed")
-        self.assertIn("source_sync_candidate_failed", dashboard)
-        self.assertIn("2026-08-27T00:00:00Z", dashboard)
-        assert replaced.source_sync_state is not None
-        self.assertEqual(replaced.source_sync_state["status"], "success")
-        self.assertEqual(replaced.source_sync_state["code"], "up_to_date")
-        self.assertNotIn("source_sync_candidate_failed", replaced_dashboard)
-
     def test_live_like_api_and_compact_route_writes_only_external_runtime(self) -> None:
         """Container-style relative outputs stay outside the analyzed checkout."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -498,7 +551,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
                 },
             ):
                 self.write_fixture(root)
-                result = subprocess.run(
+                result = self.run_cli(
                     [
                         sys.executable,
                         str(SCRIPT),
@@ -540,7 +593,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         self.assertIn("# Agent Runtime Compact Summary", compact_dashboard)
         self.assertIn("## Evidence Drilldown", compact_dashboard)
         self.assertNotIn(
-            "python3 eval/producers/generate_agent_runtime_dashboard.py",
+            "eval/producers/",
             compact_dashboard,
         )
 
@@ -584,14 +637,18 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         required = (
             "## Problem Components",
             "AGENT_RUNTIME_DASHBOARD_PROBLEM_COMPONENTS=4",
-            "| `workflow` | `_unattributed_hook_entries` | `attention` | "
-            "`6 hook entries lack workflow attribution` | "
-            "`compact report Workflow Attribution Drilldown` | "
-            "`repair workflow attribution logging` |",
-            "| `hook` | `reference_capture_guard` | `attention` | "
-            "`1 referenced URLs are unregistered` | "
-            "`compact report Reference Capture Drilldown` | "
-            "`materialize references or repair hook logging` |",
+            (
+                "| `workflow` | `_unattributed_hook_entries` | `attention` | "
+                "`6 hook entries lack workflow attribution` | "
+                "`compact report Workflow Attribution Drilldown` | "
+                "`repair workflow attribution logging` |"
+            ),
+            (
+                "| `hook` | `reference_capture_guard` | `attention` | "
+                "`1 referenced URLs are unregistered` | "
+                "`compact report Reference Capture Drilldown` | "
+                "`materialize references or repair hook logging` |"
+            ),
         )
         for expected in required:
             self.assertIn(expected, dashboard)
@@ -659,14 +716,22 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
     def assert_selection_rows(self, dashboard: str) -> None:
         """Verify selection table rows for each responsibility."""
         rows = (
-            "| `skill` | `md-style-check` | `0` | `1` | `1` | "
-            "`100.0%` | `untracked-or-unknown` |",
-            "| `skill` | `oop-readability-check` | `1` | `1` | `0` | "
-            "`0.0%` | `untracked-or-unknown` |",
-            "| `workflow` | `environment-maintenance` | `0` | `1` | `1` | "
-            "`100.0%` | `untracked-or-unknown` |",
-            "| `tool` | `agent-canon-cli` | `1` | `1` | `0` | "
-            "`0.0%` | `untracked-or-unknown` |",
+            (
+                "| `skill` | `md-style-check` | `0` | `1` | `1` | "
+                "`100.0%` | `untracked-or-unknown` |"
+            ),
+            (
+                "| `skill` | `oop-readability-check` | `1` | `1` | `0` | "
+                "`0.0%` | `untracked-or-unknown` |"
+            ),
+            (
+                "| `workflow` | `environment-maintenance` | `0` | `1` | `1` | "
+                "`100.0%` | `untracked-or-unknown` |"
+            ),
+            (
+                "| `tool` | `agent-canon-cli` | `1` | `1` | `0` | "
+                "`0.0%` | `untracked-or-unknown` |"
+            ),
         )
         for row in rows:
             self.assertIn(row, dashboard)
@@ -701,7 +766,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             self.write_fixture(canon_root)
             output = self.runtime_root / "reports" / "dashboard.md"
 
-            result = subprocess.run(
+            result = self.run_cli(
                 [
                     sys.executable,
                     str(SCRIPT),
@@ -731,7 +796,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             self.write_out_of_order_trend_fixture(root)
             compact_output = self.runtime_root / "reports" / "compact-dashboard.md"
 
-            result = subprocess.run(
+            result = self.run_cli(
                 [
                     sys.executable,
                     str(SCRIPT),
@@ -763,7 +828,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             self.write_recent_filter_fixture(root)
             compact_output = self.runtime_root / "reports" / "compact-dashboard.md"
 
-            result = subprocess.run(
+            result = self.run_cli(
                 [
                     sys.executable,
                     str(SCRIPT),
@@ -800,7 +865,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             api_output = self.runtime_root / "reports" / "dashboard-api.json"
             compact_output = self.runtime_root / "reports" / "compact-dashboard.md"
 
-            result = subprocess.run(
+            result = self.run_cli(
                 [
                     sys.executable,
                     str(SCRIPT),
@@ -903,7 +968,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             )
             api_output = self.runtime_root / "reports" / "dashboard-api.json"
             compact_output = self.runtime_root / "reports" / "compact-dashboard.md"
-            result = subprocess.run(
+            result = self.run_cli(
                 [
                     sys.executable,
                     str(SCRIPT),
@@ -944,7 +1009,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             self.append_selection_normalization_fixture(root)
             output = self.runtime_root / "reports" / "dashboard.md"
 
-            result = subprocess.run(
+            result = self.run_cli(
                 [
                     sys.executable,
                     str(SCRIPT),
@@ -975,7 +1040,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             self.append_run_bundle_workflow_selection_fixture(root)
             output = self.runtime_root / "reports" / "dashboard.md"
 
-            result = subprocess.run(
+            result = self.run_cli(
                 [
                     sys.executable,
                     str(SCRIPT),
@@ -1005,7 +1070,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             self.append_tool_alias_fixture(root)
             output = self.runtime_root / "reports" / "dashboard.md"
 
-            result = subprocess.run(
+            result = self.run_cli(
                 [
                     sys.executable,
                     str(SCRIPT),
@@ -1057,8 +1122,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
                 )
             output = self.runtime_root / "reports" / "dashboard.md"
 
-            self.assertEqual(tool_source_path_candidates(invalid_tool), ())
-            result = subprocess.run(
+            result = self.run_cli(
                 [
                     sys.executable,
                     str(SCRIPT),
@@ -1075,7 +1139,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn(
-            "| `tool` | `pattern='INVALID_TOOL_LABEL|...'` | `0` | `1` | `1` |",
+            "| `tool` | `pattern='INVALID_TOOL_LABEL/...'` | `0` | `1` | `1` |",
             dashboard,
         )
 
@@ -1109,7 +1173,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
                 )
             output = self.runtime_root / "reports" / "dashboard.md"
 
-            result = subprocess.run(
+            result = self.run_cli(
                 [
                     sys.executable,
                     str(SCRIPT),
@@ -1156,7 +1220,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
                 )
             output = self.runtime_root / "reports" / "dashboard.md"
 
-            result = subprocess.run(
+            result = self.run_cli(
                 [
                     sys.executable,
                     str(SCRIPT),
@@ -1470,17 +1534,12 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         catalog = root / "agents" / "task_catalog.yaml"
         catalog.parent.mkdir(parents=True, exist_ok=True)
         catalog.write_text(
-            "\n".join(
-                [
-                    "workflow_families:",
-                    "  - id: platform_and_environment",
-                    "    name: Platform And Environment",
-                    "tasks:",
-                    "  - id: T1",
-                    "    family: platform_and_environment",
-                    "",
-                ]
-            ),
+            "workflow_families:\n"
+            "  - id: platform_and_environment\n"
+            "    name: Platform And Environment\n"
+            "tasks:\n"
+            "  - id: T1\n"
+            "    family: platform_and_environment\n",
             encoding="utf-8",
         )
 

@@ -540,6 +540,19 @@ impl RuntimeDirectory {
         match parent.directory.symlink_metadata(name){Ok(_)=>Ok(true),Err(error) if error.kind()==std::io::ErrorKind::NotFound=>Ok(false),Err(error)=>Err(error)}
     }
 
+    pub(crate) fn remove_file(&self, relative: &Path) -> std::io::Result<()> {
+        let (parent, name) = self.parent(relative, false)?;
+        let metadata = parent.directory.symlink_metadata(&name)?;
+        if !metadata.is_file() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "runtime target is not a regular file",
+            ));
+        }
+        parent.directory.remove_file(name)?;
+        parent.sync_directory()
+    }
+
     pub(crate) fn read_stable(
         &self,
         relative: &Path,

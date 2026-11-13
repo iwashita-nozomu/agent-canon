@@ -115,7 +115,7 @@ const CAUSE_INVESTIGATION_GATE_TEMPLATES: &[GateTemplate] = &[GateTemplate {
 const PYTHON_GATE_TEMPLATES: &[GateTemplate] = &[
     GateTemplate {
         gate: "oop_readability_guard",
-        command_template: "python3 tools/validation/code/oop/python/readability.py --root . {path}",
+        command_template: "tools/bin/agent-canon oop-python-readability --root . {path}",
         handoff: "include OOP readability risk, repair plan, and the non-blocking review_oop_boundary_signal / OOP_READABILITY_REVIEW_SIGNAL_FINDINGS disposition before implementation edits",
     },
     GateTemplate {
@@ -126,7 +126,7 @@ const PYTHON_GATE_TEMPLATES: &[GateTemplate] = &[
 ];
 const CPP_GATE_TEMPLATES: &[GateTemplate] = &[GateTemplate {
     gate: "oop_readability_guard",
-    command_template: "python3 tools/validation/code/oop/cpp/readability.py --root . {path}",
+    command_template: "tools/bin/agent-canon oop-cpp-readability --root . {path}",
     handoff: "include C/C++ OOP readability risk before edits",
 }];
 const STYLE_CHECK_GATE_TEMPLATES: &[GateTemplate] = &[GateTemplate {

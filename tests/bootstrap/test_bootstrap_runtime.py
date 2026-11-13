@@ -739,7 +739,7 @@ def test_container_control_maps_structured_tool_request_to_registered_mounts(
         "AGENT_CANON_SOURCE_ROOT": str(REPOSITORY_ROOT),
         "AGENT_CANON_ROOT": str(REPOSITORY_ROOT),
         "AGENT_CANON_DISPATCH_ENTRY_ID": "generate-agent-runtime-dashboard",
-        "AGENT_CANON_DISPATCH_RUNTIME": "python",
+        "AGENT_CANON_DISPATCH_RUNTIME": "rust",
         "AGENT_CANON_RUNTIME_ROOT": str(runtime_root),
         "AGENT_CANON_CONTROL_PARENT_ROOT": str(control),
         "AGENT_CANON_TARGET_ROOT": str(target),
@@ -750,7 +750,7 @@ def test_container_control_maps_structured_tool_request_to_registered_mounts(
     request = {
         "schema": "agent-canon.tool-exec-request.v1",
         "tool_id": "generate-agent-runtime-dashboard",
-        "argv": ["python3", "eval/producers/generate_agent_runtime_dashboard.py"],
+        "argv": ["tools/bin/agent-canon", "generate-agent-runtime-dashboard"],
         "child_args": ["--root", ".", "--api-out", "reports/api.json"],
         "source_root": str(REPOSITORY_ROOT),
         "cwd": str(target),

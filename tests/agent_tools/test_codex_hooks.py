@@ -5,7 +5,7 @@
 # responsibility Tests active codex hook behavior and retired-route contract.
 # upstream implementation ../../.codex/config.toml enables hooks
 # upstream implementation ../../.codex/hooks.json declares the three active hooks
-# upstream implementation ../../tools/runtime/authority/hook_safety.py owns active safety leaves
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/hook_safety.rs owns active safety leaves
 # upstream implementation ../../tools/runtime/dispatch/agent-canon/src/hook_dispatcher.rs owns the native typed event contract
 # downstream implementation ../../tests/agent_tools/test_hook_event_log.py validates hook telemetry
 # @dependency-end

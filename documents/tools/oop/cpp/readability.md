@@ -3,15 +3,14 @@
 @dependency-start
 contract reference
 responsibility Documents C++ OOP readability checker behavior in Japanese.
-upstream implementation ../../../../tools/validation/code/oop/cpp/readability.py C++ OOP readability checker
-upstream implementation ../../../../tools/validation/code/oop/shared/readability_core.py shared typed-boundary evidence
+upstream implementation ../../../../tools/runtime/dispatch/agent-canon/src/oop/cpp/readability.rs C++ OOP readability checker
+upstream implementation ../../../../tools/runtime/dispatch/agent-canon/src/oop/readability.rs shared typed-boundary evidence
 upstream design ../../../conventions/object-oriented-design.md OOP policy source
 downstream design ../../tool-docs.toml one-to-one tool/document manifest
 @dependency-end
 -->
 
-この文書は `tools/validation/code/oop/cpp/readability.py` と一対一で対応します。
-同名の `readability.py` が tool、同名の [readability.md](readability.md) が説明文書です。
+共有Rust実装の `readability.rs` が解析を担当し、この [readability.md](readability.md) が言語ごとのCLIを説明します。
 
 ## 何をチェックするか
 
@@ -32,7 +31,7 @@ C / C++ source に対して、class / struct / function が責務と所有境界
 
 Markdown / JSON report は、finding kind を SOLID principle signal へ投影した
 `solid_counts` と finding ごとの `solid_principles` を含みます。
-対応表の正本は `tools/validation/code/oop/shared/readability_core.py` の
+対応表の正本は `tools/runtime/dispatch/agent-canon/src/oop/cpp/readability.rs` の
 `SOLID_PRINCIPLES_BY_KIND` です。C++ checker では、public surface、base class、
 public field、`nullptr` routing、mixed effect、不要 wrapper を SOLID の見出しで
 review できるようにします。
@@ -65,14 +64,14 @@ struct、domain contract のない pass-through wrapper、`nullptr` runtime rout
 ## 実行例
 
 ```bash
-python3 tools/validation/code/oop/cpp/readability.py --format markdown --include-snippets cpp/include cpp/src tests/cpp cpp/experiments
+tools/bin/agent-canon oop-cpp-readability --format markdown --include-snippets cpp/include cpp/src tests/cpp cpp/experiments
 ```
 
 混在 source を 1 回で見たい場合は、shared Python entrypoint に `--language all` を渡します。
 この場合、file suffix で Python / C++ を自動選択します。
 
 ```bash
-python3 tools/validation/code/oop/python/readability.py --language all --format markdown python tools cpp tests
+tools/bin/agent-canon oop-python-readability --language all --format markdown python tools cpp tests
 ```
 
 この checker は build evidence ではありません。C++ 変更では project-native configure / build / test と併せて、OOP readability report を review 補助として扱います。
