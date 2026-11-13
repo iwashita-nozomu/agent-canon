@@ -117,6 +117,7 @@ use std::env;
 const HELP: &str = "AgentCanon's native command line interface.
 
 Usage: agent-canon <command> [arguments]
+  github-publish [--root ROOT] <push|pr|publish-pr|checks> --user-task TASK [options]
   run-gpu-command [options] -- COMMAND ...
   experiment-registry [--repo-root ROOT] [--registry PATH]
 
@@ -319,6 +320,9 @@ fn main() {
         std::process::exit(theorem_graph_circularity_check::run(&args[2..]));
     }
 
+    if args.len() >= 2 && args[1] == "github-publish" {
+        std::process::exit(agent_canon::github_publish::run(&args[2..]));
+    }
     if args.len() >= 2 && args[1] == "bootstrap-runtime" {
         std::process::exit(agent_canon::bootstrap_runtime::run(&args[2..]));
     }
