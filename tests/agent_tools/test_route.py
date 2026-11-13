@@ -707,7 +707,7 @@ class RouteToolTest(unittest.TestCase):
         ).read_text(encoding="utf-8")
         direct_start = canonical_text.index("## Source Evidence Routes")
         direct_text = canonical_text[direct_start:]
-        self.assertIn("render_dependency_manifest_graph.py", direct_text)
+        self.assertIn("render-dependency-manifest-graph", direct_text)
         self.assertIn("`--graph-tsv`", direct_text)
         self.assertIn("existing checker TSV", direct_text)
         self.assertIn("default checker input", direct_text)

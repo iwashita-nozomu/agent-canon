@@ -92,7 +92,7 @@ For an embedded diagram, identify the section claim, the reader's next decision,
 
 ## Source Evidence Routes
 
-For repository dependency diagrams, use the existing native `render_dependency_manifest_graph.py` route. Supply `--graph-tsv` when using an existing checker TSV; otherwise preserve the tool's default checker input. Choose the requested full or changed scope and output flags, and retain the existing `--fail-on-broken` and nonzero checker behavior. The renderer documentation describes its native inputs, GraphIR, manifest, and output formats.
+For repository dependency diagrams, use the existing native `render-dependency-manifest-graph` route. Supply `--graph-tsv` when using an existing checker TSV; otherwise preserve the tool's default checker input. Choose the requested full or changed scope and output flags, and retain the existing `--fail-on-broken` and nonzero checker behavior. The renderer documentation describes its native inputs, GraphIR, manifest, and output formats.
 
 For other diagrams, route source extraction through its owner: `dependency-analysis` for dependency and call relations, `structure-refactor` for architecture and responsibility maps, `algorithm-flowchart` for algorithm/proof views, and `prose-reasoning-graph` for prose graphs. Use `html-output` for browser-readable large graphs and `md-style-check` for embedded Markdown diagrams.
 

@@ -73,6 +73,7 @@ pub mod codex_runtime_summary;
 pub mod compare_agent_run_paths;
 mod dashboard_render;
 mod dashboard_token_usage;
+pub mod dependency_manifest_graph;
 pub mod docs;
 pub mod entrypoint_composer;
 pub(crate) mod entrypoint_owner_map;
