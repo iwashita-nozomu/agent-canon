@@ -8,7 +8,7 @@ downstream design database-design.md SQLite materialization
 downstream design ../prose-reasoning-graph/README.md documents prose adapter ownership
 downstream design ../prose-reasoning-graph/dsl-spec.md prose adapter/profile over the core
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/structured_analysis.rs graph contract implementation
-downstream design ../../tools/analysis/documents/prose_reasoning_graph.py documents the prose graph adapter command surface
+downstream design ../../tools/runtime/dispatch/agent-canon/src/prose_reasoning_graph.rs documents the prose graph adapter command surface
 downstream design ../../tools/runtime/dispatch/agent-canon/src/dependency_manifest_graph.rs documents dependency graph projection rendering
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/graph.rs materializes canonical repository graph facts into this schema
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/graph_client.rs supplies typed read-only graph projections

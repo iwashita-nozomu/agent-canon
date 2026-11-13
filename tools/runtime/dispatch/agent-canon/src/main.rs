@@ -79,6 +79,7 @@ mod numeric_performance;
 mod python_algorithm_contract;
 mod python_ast;
 use agent_canon::python_cli_integer;
+mod prose_reasoning_graph;
 mod python_cli_options;
 mod python_helper_function_inventory;
 mod python_module_groups;
@@ -223,6 +224,7 @@ Commands:
   extract-docx <input.docx> --output-dir <directory>
   semantic-index <operation>
   structured-analysis <operation>
+  prose-reasoning-graph <ingest|ingest-set|analyze|lint|project|outline|explain|integrate|rewrite-packet|skill-handoff|check-document> [options]
   python-structure-hash --root <repo-root> [paths...]
   python-structure-hash-report --input <path> [--output <path>]
   python-structure-hash-impact --before <path> --after <path> [--output <path>]
@@ -657,6 +659,10 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "structured-analysis" {
         std::process::exit(structured_analysis::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == prose_reasoning_graph::SELECTOR {
+        std::process::exit(prose_reasoning_graph::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "test-design" {

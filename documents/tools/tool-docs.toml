@@ -81,9 +81,9 @@ summary = "HTML renderer for semantic-index provider comparison evidence."
 [[tool]]
 id = "prose-reasoning-graph"
 classification = "public"
-tool = "tools/analysis/documents/prose_reasoning_graph.py"
+tool = "tools/runtime/dispatch/agent-canon/src/prose_reasoning_graph.rs"
 doc = "documents/tools/prose_reasoning_graph.md"
-language = "python"
+language = "rust"
 summary = "SQLite-backed prose structure graph and external-runtime artifact boundary, diagnostics, explanation, and skill handoff documentation."
 
 [[tool]]
