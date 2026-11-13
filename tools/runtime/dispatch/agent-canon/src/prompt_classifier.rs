@@ -85,7 +85,7 @@ const SKILL_KEYWORDS: &[SkillKeywordRule] = &[
         &[
             &["routing miss"],
             &["selection gap"],
-            &["generate_agent_runtime_dashboard.py"],
+            &["generate-agent-runtime-dashboard"],
             &["runtime dashboard"],
             &["生ログ", "要約"],
             &["routing", "coverage"],
@@ -544,7 +544,7 @@ const WORKFLOW_KEYWORDS: &[SimpleKeywordRule] = &[
             "agent-canon docs",
             "docs check",
             "docs format",
-            "generate_agent_runtime_dashboard.py",
+            "generate-agent-runtime-dashboard",
             "run_repo_dependency_review.sh",
             "runtime_log_archive_git.py",
             "oop-readability-check",
@@ -707,13 +707,13 @@ const TOOL_KEYWORDS: &[SimpleKeywordRule] = &[
         ],
     ),
     (
-        "generate_agent_improvement_guide.py",
+        "generate-agent-improvement-guide",
         &["improvement guide", "改善指南", "githubaction"],
     ),
     (
-        "generate_agent_runtime_dashboard.py",
+        "generate-agent-runtime-dashboard",
         &[
-            "generate_agent_runtime_dashboard.py",
+            "generate-agent-runtime-dashboard",
             "runtime dashboard",
             "agent dashboard",
             "dashboard",

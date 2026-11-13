@@ -5,7 +5,7 @@
 // upstream implementation python_json.rs parses accepted UTF-8 JSON records with Python semantics
 // upstream implementation python_text.rs owns Python bytes.splitlines line boundaries
 // downstream implementation main.rs exposes the read-only historical JSON command
-// downstream implementation ../../../../../eval/producers/generate_agent_improvement_guide.py consumes the readback records
+// downstream implementation ./agent_runtime_dashboard.rs consumes the readback records
 // downstream implementation ../../../../../tests/agent_tools/test_historical_skill_usage_reader.py validates the native read boundary
 // @dependency-end
 
@@ -121,6 +121,19 @@ fn read_skill_usage_history(path: &Path) -> HistoricalSkillUsageReadback {
         malformed_by_reason: Some(malformed_by_reason),
         status,
     }
+}
+
+/// Return accepted archived skill-usage records to another native evidence reader.
+pub(crate) fn read_skill_usage_records(path: &Path) -> Result<Vec<serde_json::Value>, String> {
+    let readback = read_skill_usage_history(path);
+    readback
+        .raw_records
+        .iter()
+        .map(|record| {
+            serde_json::from_str(record)
+                .map_err(|error| format!("decode accepted historical skill record: {error}"))
+        })
+        .collect()
 }
 
 fn readback_json(readback: &HistoricalSkillUsageReadback) -> Result<String, String> {
