@@ -11,7 +11,7 @@ upstream design ./responsibility-cleanup.md responsibility and boundary units
 upstream design ./pr-processing.md repository-qualified Issue identity and publication
 upstream design ../../documents/runtime/private-feedback-knowledge.md private pending-Issue route
 upstream implementation ../../tools/runtime/archive/runtime_log_archive_git.py runtime archive state
-upstream implementation ../../tools/repository/github/issue_sync.py Issue clause projection
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/issue_sync.rs Issue clause projection
 downstream design ../../.codex/personal/skills/issue-finding-report/SKILL.md runtime discovery adapter
 @dependency-end
 -->

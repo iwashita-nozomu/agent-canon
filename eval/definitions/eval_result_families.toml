@@ -4,7 +4,7 @@
 # upstream design README.md eval directory and accumulation contract
 # upstream design ../../documents/runtime/runtime-log-archive.md runtime archive contract
 # downstream implementation ../../tools/runtime/dispatch/agent-canon/src/eval_accumulation_check.rs validates these families
-# downstream implementation ../../eval/producers/generate_agent_runtime_dashboard.py summarizes these families
+# downstream implementation ../../tools/runtime/dispatch/agent-canon/src/agent_runtime_dashboard.rs summarizes these families
 # @dependency-end
 
 [[families]]

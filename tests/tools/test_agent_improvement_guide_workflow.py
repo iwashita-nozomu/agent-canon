@@ -32,7 +32,7 @@ class AgentImprovementGuideWorkflowTest(unittest.TestCase):
             triggers["pull_request"]["paths"],
             [
                 ".github/workflows/agent-improvement-guide.yml",
-                "eval/producers/generate_agent_improvement_guide.py",
+                "tools/runtime/dispatch/agent-canon/src/agent_runtime_dashboard.rs",
                 "tests/agent_tools/test_generate_agent_improvement_guide.py",
             ],
         )

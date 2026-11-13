@@ -872,7 +872,7 @@
     {
       "name": "skill-keyword/agent-log-analysis/2",
       "input": {
-        "prompt": "generate_agent_runtime_dashboard.py",
+        "prompt": "generate-agent-runtime-dashboard",
         "catalog": {},
         "routing_rules": {},
         "structural_lane_evidence": [],
@@ -896,7 +896,7 @@
           "codex-task-workflow"
         ],
         "candidate_tools": [
-          "generate_agent_runtime_dashboard.py"
+          "generate-agent-runtime-dashboard"
         ],
         "feedback_labels": [],
         "feedback_action": "",
@@ -929,7 +929,7 @@
         ],
         "candidate_workflows": [],
         "candidate_tools": [
-          "generate_agent_runtime_dashboard.py"
+          "generate-agent-runtime-dashboard"
         ],
         "feedback_labels": [],
         "feedback_action": "",
@@ -6140,7 +6140,7 @@
         ],
         "candidate_workflows": [],
         "candidate_tools": [
-          "generate_agent_runtime_dashboard.py"
+          "generate-agent-runtime-dashboard"
         ],
         "feedback_labels": [],
         "feedback_action": "",
@@ -9614,7 +9614,7 @@
     {
       "name": "workflow-keyword/codex-task-workflow/12",
       "input": {
-        "prompt": "generate_agent_runtime_dashboard.py",
+        "prompt": "generate-agent-runtime-dashboard",
         "catalog": {},
         "routing_rules": {},
         "structural_lane_evidence": [],
@@ -9638,7 +9638,7 @@
           "codex-task-workflow"
         ],
         "candidate_tools": [
-          "generate_agent_runtime_dashboard.py"
+          "generate-agent-runtime-dashboard"
         ],
         "feedback_labels": [],
         "feedback_action": "",
@@ -12797,7 +12797,7 @@
       }
     },
     {
-      "name": "tool-keyword/generate_agent_improvement_guide.py/0",
+      "name": "tool-keyword/generate-agent-improvement-guide/0",
       "input": {
         "prompt": "improvement guide",
         "catalog": {},
@@ -12815,7 +12815,7 @@
         "candidate_skill_reasons": [],
         "candidate_workflows": [],
         "candidate_tools": [
-          "generate_agent_improvement_guide.py"
+          "generate-agent-improvement-guide"
         ],
         "feedback_labels": [],
         "feedback_action": "",
@@ -12824,7 +12824,7 @@
       }
     },
     {
-      "name": "tool-keyword/generate_agent_improvement_guide.py/1",
+      "name": "tool-keyword/generate-agent-improvement-guide/1",
       "input": {
         "prompt": "\u6539\u5584\u6307\u5357",
         "catalog": {},
@@ -12842,7 +12842,7 @@
         "candidate_skill_reasons": [],
         "candidate_workflows": [],
         "candidate_tools": [
-          "generate_agent_improvement_guide.py"
+          "generate-agent-improvement-guide"
         ],
         "feedback_labels": [],
         "feedback_action": "",
@@ -12851,7 +12851,7 @@
       }
     },
     {
-      "name": "tool-keyword/generate_agent_improvement_guide.py/2",
+      "name": "tool-keyword/generate-agent-improvement-guide/2",
       "input": {
         "prompt": "githubaction",
         "catalog": {},
@@ -12869,7 +12869,7 @@
         "candidate_skill_reasons": [],
         "candidate_workflows": [],
         "candidate_tools": [
-          "generate_agent_improvement_guide.py"
+          "generate-agent-improvement-guide"
         ],
         "feedback_labels": [],
         "feedback_action": "",
@@ -12878,9 +12878,9 @@
       }
     },
     {
-      "name": "tool-keyword/generate_agent_runtime_dashboard.py/0",
+      "name": "tool-keyword/generate-agent-runtime-dashboard/0",
       "input": {
-        "prompt": "generate_agent_runtime_dashboard.py",
+        "prompt": "generate-agent-runtime-dashboard",
         "catalog": {},
         "routing_rules": {},
         "structural_lane_evidence": [],
@@ -12904,7 +12904,7 @@
           "codex-task-workflow"
         ],
         "candidate_tools": [
-          "generate_agent_runtime_dashboard.py"
+          "generate-agent-runtime-dashboard"
         ],
         "feedback_labels": [],
         "feedback_action": "",
@@ -12913,7 +12913,7 @@
       }
     },
     {
-      "name": "tool-keyword/generate_agent_runtime_dashboard.py/1",
+      "name": "tool-keyword/generate-agent-runtime-dashboard/1",
       "input": {
         "prompt": "runtime dashboard",
         "catalog": {},
@@ -12937,7 +12937,7 @@
         ],
         "candidate_workflows": [],
         "candidate_tools": [
-          "generate_agent_runtime_dashboard.py"
+          "generate-agent-runtime-dashboard"
         ],
         "feedback_labels": [],
         "feedback_action": "",
@@ -12946,7 +12946,7 @@
       }
     },
     {
-      "name": "tool-keyword/generate_agent_runtime_dashboard.py/2",
+      "name": "tool-keyword/generate-agent-runtime-dashboard/2",
       "input": {
         "prompt": "agent dashboard",
         "catalog": {},
@@ -12968,7 +12968,7 @@
         ],
         "candidate_workflows": [],
         "candidate_tools": [
-          "generate_agent_runtime_dashboard.py"
+          "generate-agent-runtime-dashboard"
         ],
         "feedback_labels": [],
         "feedback_action": "",
@@ -12977,7 +12977,7 @@
       }
     },
     {
-      "name": "tool-keyword/generate_agent_runtime_dashboard.py/3",
+      "name": "tool-keyword/generate-agent-runtime-dashboard/3",
       "input": {
         "prompt": "dashboard",
         "catalog": {},
@@ -12999,7 +12999,7 @@
         ],
         "candidate_workflows": [],
         "candidate_tools": [
-          "generate_agent_runtime_dashboard.py"
+          "generate-agent-runtime-dashboard"
         ],
         "feedback_labels": [],
         "feedback_action": "",

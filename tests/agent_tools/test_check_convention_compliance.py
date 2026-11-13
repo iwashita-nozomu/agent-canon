@@ -41,8 +41,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     "tools/catalog.yaml": """
 path: tools/analysis/dependencies/run_repo_dependency_review.sh
 path: tools/runtime/dispatch/agent-canon/src/notebook_quality.rs
-path: tools/validation/code/oop/python/readability.py
-path: tools/validation/code/oop/cpp/readability.py
+path: tools/runtime/dispatch/agent-canon/src/oop/python/readability.rs
+path: tools/runtime/dispatch/agent-canon/src/oop/cpp/readability.rs
 path: tools/runtime/dispatch/agent-canon/src/run_evaluation.rs
 path: tools/runtime/dispatch/agent-canon/src/skill_frontmatter.rs
 path: tools/validation/semantic/convention/check_convention_compliance.py
@@ -96,7 +96,7 @@ path: tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs
     "documents/conventions/object-oriented-design.md": "object-oriented design\n",
     "documents/experiments/experiment-registry.md": "experiment registry\n",
     "documents/conventions/REVIEW_PROCESS.md": (
-        "Review Finding Issue Routing issue_route github_issue issue_sync.py private packet\n"
+        "Review Finding Issue Routing issue_route github_issue agent-canon issue-sync private packet\n"
     ),
     "documents/runtime/runtime-profiles-and-check-matrix.md": (
         "Static analysis and reading evidence primary validation evidence "
@@ -293,7 +293,7 @@ path: tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs
         "validate_projection_bytes record_hook_invocation HookLogContext "
         "\n"
     ),
-    "tools/runtime/authority/hook_safety.py": (
+    "tools/runtime/dispatch/agent-canon/src/hook_safety.rs": (
         "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY "
         "AGENT_CANON_BRANCH_WORKTREE_REASON AGENT_CANON_DESTRUCTIVE_GIT_REASON "
         "explicit_user_approval user_request agent_canon_workflow same-segment "
@@ -634,7 +634,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            (root / "tools" / "runtime" / "authority" / "hook_safety.py").write_text(
+            (root / "tools" / "runtime" / "dispatch" / "agent-canon" / "src" / "hook_safety.rs").write_text(
                 "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY "
                 "explicit_user_approval\n",
                 encoding="utf-8",
@@ -644,7 +644,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn(
-                "hook_guardrail_policy:tools/runtime/authority/hook_safety.py",
+                "hook_guardrail_policy:tools/runtime/dispatch/agent-canon/src/hook_safety.rs",
                 result.stdout,
             )
             self.assertIn("missing-marker:operation", result.stdout)
@@ -880,7 +880,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("review_issue_routing", result.stdout)
-            self.assertIn("missing-marker:issue_sync.py", result.stdout)
+            self.assertIn("missing-marker:agent-canon issue-sync", result.stdout)
 
     def test_minimal_fixture_covers_review_issue_routing_surfaces(self) -> None:
         """The minimal test fixture includes every review issue route surface."""

@@ -119,7 +119,7 @@ path has exactly one owner.
 GitHub Issues are the sole durable Issue authority, and every reference uses a
 repository-qualified URL or number. Responsibility-scope validation checks that
 identity. Online/offline publication and readback behavior belong to
-[issue_sync.py](../../tools/repository/github/issue_sync.py).
+[issue_sync.rs](../../tools/runtime/dispatch/agent-canon/src/issue_sync.rs).
 
 ## Eval Evidence
 

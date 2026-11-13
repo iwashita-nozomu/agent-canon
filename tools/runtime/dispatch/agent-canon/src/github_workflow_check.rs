@@ -50,12 +50,12 @@ const PR_FORBIDDEN: &[&str] = &[
     "GitHub Mirror / Submodule Evidence",
     "template submodule SHA:",
 ];
-const GUIDE_REQUIRED: &[&str] = &["generate_agent_improvement_guide.py"];
+const GUIDE_REQUIRED: &[&str] = &["generate-agent-improvement-guide"];
 const DASHBOARD_REQUIRED: &[&str] = &[
     "pull_request:",
     "workflow_dispatch:",
     "schedule:",
-    "generate_agent_runtime_dashboard.py",
+    "generate-agent-runtime-dashboard",
 ];
 const STATIC_GATES_REQUIRED: &[&str] = &[
     "pull_request:",

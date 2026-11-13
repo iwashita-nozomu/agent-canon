@@ -5,8 +5,7 @@
 # upstream implementation ../../runtime/dispatch/agent-canon/src/file_surface_inventory.rs writes inventory reports
 # upstream implementation ../../analysis/dependencies/run_repo_dependency_review.sh validates dependency manifests
 # upstream implementation ../../runtime/dispatch/agent-canon/src/scip_index.rs projects native SCIP impact evidence
-# upstream implementation ../../validation/code/oop/python/readability.py writes Python OOP readability reports
-# upstream implementation ../../validation/code/oop/cpp/readability.py writes C++ OOP readability reports
+# upstream implementation ../../runtime/dispatch/agent-canon/src/oop/readability.rs writes Python and C++ OOP readability reports
 # downstream design ../../README.md documents the review backlog scan entrypoint
 # @dependency-end
 set -euo pipefail
@@ -400,7 +399,7 @@ run_scope_checks() {
       record_command \
         "oop-python:${scope_name}" \
         "$REPORT_DIR/oop_python_readability_${scope_name}.md" \
-        python3 "$AGENT_CANON_SOURCE_ROOT/tools/validation/code/oop/python/readability.py" \
+        "$AGENT_CANON_SOURCE_ROOT/tools/bin/agent-canon" oop-python-readability \
           --root "$scope_root" \
           --format markdown \
           --include-snippets \
@@ -410,7 +409,7 @@ run_scope_checks() {
       record_command \
         "oop-cpp:${scope_name}" \
         "$REPORT_DIR/oop_cpp_readability_${scope_name}.md" \
-        python3 "$AGENT_CANON_SOURCE_ROOT/tools/validation/code/oop/cpp/readability.py" \
+        "$AGENT_CANON_SOURCE_ROOT/tools/bin/agent-canon" oop-cpp-readability \
           --root "$scope_root" \
           --format markdown \
           --include-snippets \

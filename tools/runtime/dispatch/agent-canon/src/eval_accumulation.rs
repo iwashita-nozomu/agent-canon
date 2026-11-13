@@ -223,8 +223,17 @@ fn run_with(
     })?;
     boundary.ensure_directory(relative_log_dir)?;
     let target_root = options.target_root.as_deref().unwrap_or(&options.root);
-    let child_environment =
+    let mut child_environment =
         root_capability_environment(&options.root, boundary.root(), None, Some(target_root))?;
+    let native_executable = match std::env::var_os("AGENT_CANON_NATIVE_BIN") {
+        Some(path) => PathBuf::from(path),
+        None => std::env::current_exe()
+            .map_err(|error| format!("resolve native Eval executable: {error}"))?,
+    };
+    child_environment.insert(
+        "AGENT_CANON_NATIVE_BIN".into(),
+        native_executable.to_string_lossy().into_owned(),
+    );
     let producers = build_producers(&options.root, &options.run_id, boundary.root());
     let mut results = Vec::with_capacity(producers.len());
     for (index, producer) in producers.iter().enumerate() {

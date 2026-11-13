@@ -706,7 +706,6 @@ const IMPLEMENTATION_TRACE_PATHS: &[&str] = &[
     "tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs",
     "tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs",
     "tools/runtime/dispatch/agent-canon/src/source_mutation.rs",
-    "tools/agent/skills/skill_route_catalog.py",
 ];
 const DESIGN_CLAUSE_IDS: &[&str] = &[
     "SG-001", "SG-002", "SG-003", "SG-004", "SG-005", "SG-006", "SG-007", "SG-008", "SG-009",

@@ -57,7 +57,7 @@ class OopRuleInventoryTest(unittest.TestCase):
         )
         self.assertIn("OOP_PYTHON_RULE_INVENTORY=pass", python_result.stdout)
         self.assertIn(
-            "tools/validation/code/oop/python/readability.py", python_result.stdout
+            "tools/runtime/dispatch/agent-canon/src/oop/python/readability.rs", python_result.stdout
         )
         self.assertIn("documents/tools/oop/python/readability.md", python_result.stdout)
         self.assertIn(
@@ -65,7 +65,7 @@ class OopRuleInventoryTest(unittest.TestCase):
             python_result.stdout,
         )
         self.assertIn("OOP_CPP_RULE_INVENTORY=pass", cpp_result.stdout)
-        self.assertIn("tools/validation/code/oop/cpp/readability.py", cpp_result.stdout)
+        self.assertIn("tools/runtime/dispatch/agent-canon/src/oop/cpp/readability.rs", cpp_result.stdout)
         self.assertIn("documents/tools/oop/cpp/readability.md", cpp_result.stdout)
         self.assertIn(
             "tools/runtime/dispatch/agent-canon/src/rule_inventory.rs",

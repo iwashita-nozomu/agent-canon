@@ -1917,15 +1917,15 @@ entries:
 
   - id: issue-sync
     summary: Runs the body-free Issue publication receipt preflight and staging adapter in the resident AgentCanon tool container.
-    path: tools/repository/github/issue_sync.py
+    path: tools/runtime/dispatch/agent-canon/src/issue_sync.rs
     family: agent_tools
     role: sync
     status: canonical
     command: bootstrap.sh --control-parent-root <control-parent-root> tool run --root <registered-target-root> issue-sync -- --receipt-preflight
     writes: true
     dispatch:
-      runtime: python
-      argv: [python3, tools/repository/github/issue_sync.py]
+      runtime: rust
+      argv: [tools/bin/agent-canon, issue-sync]
       execution_plane: tool-container
       cwd: target-root
       env: allowlisted
@@ -1946,8 +1946,7 @@ entries:
       - agents/skills/issue-finding-report.md
       - documents/runtime/runtime-log-archive.md
     tests:
-      - tests/agent_tools/test_issue_sync.py
-      - tests/agent_tools/test_tool_calls.py
+      - tools/runtime/dispatch/agent-canon/tests/issue_sync_native.rs
       - tests/agent_tools/test_tool_dispatch.py
 
   - id: reference-materializer
@@ -2089,12 +2088,12 @@ entries:
   - id: oop-python-readability
     public: true
     summary: Scores Python OOP readability risks.
-    path: tools/validation/code/oop/python/readability.py
+    path: tools/runtime/dispatch/agent-canon/src/oop/python/readability.rs
     family: oop_python
     role: checker
     status: canonical
-    command: python3 tools/validation/code/oop/python/readability.py
-    dispatch: {argv: ["python3", "tools/validation/code/oop/python/readability.py"]}
+    command: tools/bin/agent-canon oop-python-readability
+    dispatch: {runtime: rust, argv: [tools/bin/agent-canon, oop-python-readability]}
     writes: false
     default_wiring:
       ci: false
@@ -2127,12 +2126,12 @@ entries:
   - id: oop-cpp-readability
     public: true
     summary: Scores C++ OOP readability risks.
-    path: tools/validation/code/oop/cpp/readability.py
+    path: tools/runtime/dispatch/agent-canon/src/oop/cpp/readability.rs
     family: oop_cpp
     role: checker
     status: canonical
-    command: python3 tools/validation/code/oop/cpp/readability.py
-    dispatch: {argv: ["python3", "tools/validation/code/oop/cpp/readability.py"]}
+    command: tools/bin/agent-canon oop-cpp-readability
+    dispatch: {runtime: rust, argv: [tools/bin/agent-canon, oop-cpp-readability]}
     writes: false
     default_wiring:
       ci: false
@@ -2307,15 +2306,15 @@ entries:
 
   - id: generate-agent-improvement-guide
     summary: Generates PR and push-time guidance from memory, eval, hook, and issue evidence.
-    path: eval/producers/generate_agent_improvement_guide.py
+    path: tools/runtime/dispatch/agent-canon/src/agent_runtime_dashboard.rs
     family: agent_tools
     role: docs
     status: canonical
-    command: python3 eval/producers/generate_agent_improvement_guide.py
+    command: tools/bin/agent-canon generate-agent-improvement-guide
     writes: true
     dispatch:
-      runtime: python
-      argv: [python3, eval/producers/generate_agent_improvement_guide.py]
+      runtime: rust
+      argv: [tools/bin/agent-canon, generate-agent-improvement-guide]
       execution_plane: tool-container
       cwd: target-root
       env: allowlisted
@@ -2340,15 +2339,15 @@ entries:
 
   - id: generate-agent-runtime-dashboard
     summary: Generates read-only dashboards and compact token-light summaries for AgentCanon runtime logs and eval results.
-    path: eval/producers/generate_agent_runtime_dashboard.py
+    path: tools/runtime/dispatch/agent-canon/src/agent_runtime_dashboard.rs
     family: agent_tools
     role: docs
     status: canonical
-    command: python3 eval/producers/generate_agent_runtime_dashboard.py
+    command: tools/bin/agent-canon generate-agent-runtime-dashboard
     writes: true
     dispatch:
-      runtime: python
-      argv: [python3, eval/producers/generate_agent_runtime_dashboard.py]
+      runtime: rust
+      argv: [tools/bin/agent-canon, generate-agent-runtime-dashboard]
       execution_plane: tool-container
       cwd: target-root
       env: allowlisted
@@ -2520,12 +2519,12 @@ entries:
 
   - id: save-experiment-result-annex
     summary: Saves one experiment result as one deterministic git-annex archive.
-    path: tools/experiments/artifacts/save_experiment_result_annex.py
+    path: tools/runtime/dispatch/agent-canon/src/annex_retention.rs
     family: experiments
     role: experiment
     status: canonical
-    command: python3 -m tools.experiments.artifacts.save_experiment_result_annex
-    dispatch: {argv: ["python3", "-m", "tools.experiments.artifacts.save_experiment_result_annex"]}
+    command: tools/bin/agent-canon save-experiment-result-annex
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "save-experiment-result-annex"]}
     writes: true
     default_wiring:
       ci: false
