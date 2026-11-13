@@ -168,6 +168,7 @@ Commands:
   historical-skill-usage-read --path <skill_usage.jsonl>
   eval-accumulation-check [--root ROOT] [--runtime-root ROOT] [--family-registry PATH] [--format text|json] [--compact-out PATH]
   oop-python-rule-inventory|oop-cpp-rule-inventory [--root <repo-root>] [--format text|json|markdown]
+  oop-python-readability|oop-cpp-readability [paths...] [--root ROOT] [options]
   lean-proof-env <init|smoke|agent-smoke|counterexample-smoke|all-smoke|check-file> [options]
   check-semantic-responsibility-contract [paths...] [--root ROOT] [--template TEMPLATE] [--instance INSTANCE] [--artifact-root ARTIFACT_ROOT] [--format text|json]
   check-solid-evidence [paths...] [--root ROOT] [--changed] [--base-ref BASE_REF] [--evidence EVIDENCE] [--exclude EXCLUDE] [--verbose] [--format text|json]
@@ -286,6 +287,18 @@ fn main() {
         std::process::exit(theorem_graph_circularity_check::run(&args[2..]));
     }
 
+    if args.len() >= 2
+        && ["oop-python-readability", "oop-cpp-readability"].contains(&args[1].as_str())
+    {
+        std::process::exit(agent_canon::oop_readability::run(
+            &args[2..],
+            if args[1] == "oop-python-readability" {
+                "python"
+            } else {
+                "cpp"
+            },
+        ));
+    }
     if args.len() >= 2 && args[1] == "tool-catalog" {
         std::process::exit(catalog::tool_catalog::run(&args[2..]));
     }

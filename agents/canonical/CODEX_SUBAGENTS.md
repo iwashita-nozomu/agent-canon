@@ -430,7 +430,7 @@ role / Skills / authority を `$direct-luna-communication` packet に載せま�
 - `cpp_reviewer`
   - C / C++ diff を build、header、ownership、native test 前提で洗う
 - `oop_readability_reviewer`
-  - `tools/oop/*/readability.py` の機械 report を読み、判定値を変えずに reader-facing な文書化、false positive 候補、優先度整理を行う
+  - `tools/bin/agent-canon oop-<language>-readability` の機械 report を読み、判定値を変えずに reader-facing な文書化、false positive 候補、優先度整理を行う
 - `worker`
   - bounded な実装変更を切り出し、approved design と local precedent の naming に従う。commit/push を含む実装・統合境界の実行は可能だが、PR create/merge/close、admin override、base integration 判断、最終統合評価は parent が保持する。
 - `terra`

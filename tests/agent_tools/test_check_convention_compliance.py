@@ -41,8 +41,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     "tools/catalog.yaml": """
 path: tools/analysis/dependencies/run_repo_dependency_review.sh
 path: tools/runtime/dispatch/agent-canon/src/notebook_quality.rs
-path: tools/validation/code/oop/python/readability.py
-path: tools/validation/code/oop/cpp/readability.py
+path: tools/runtime/dispatch/agent-canon/src/oop/python/readability.rs
+path: tools/runtime/dispatch/agent-canon/src/oop/cpp/readability.rs
 path: tools/runtime/dispatch/agent-canon/src/run_evaluation.rs
 path: tools/runtime/dispatch/agent-canon/src/skill_frontmatter.rs
 path: tools/validation/semantic/convention/check_convention_compliance.py
