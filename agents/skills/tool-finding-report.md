@@ -58,7 +58,7 @@ priority order、reader-facing report、before / after impact は依頼または
 ## Finding Packet
 
 Normalize findings through the host GitHub adapter
-`tools/repository/github/issue_sync.py` when an Issue handoff requires it. Use
+`agent-canon issue-sync` when an Issue handoff requires it. Use
 the request, changed paths, or current owner boundary to select scope; use
 `repo-wide` only when requested or authorized by the parent scope and needed to
 answer the question. Preserve every result within the selected scope. Group identical
