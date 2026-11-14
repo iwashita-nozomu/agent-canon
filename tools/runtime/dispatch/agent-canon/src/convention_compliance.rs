@@ -219,7 +219,7 @@ fn convention_assertions(
     findings: &mut Vec<Finding>,
 ) -> Result<(), String> {
     let normative=Regex::new(r"(?im)^\s*[-*]\s+.*(?:禁止|必須|しなければなりません|してはいけません|must|must not|required|forbidden)").map_err(|error|error.to_string())?;
-    let verification=Regex::new(r"(?:tools/|check_|pyright|pytest|ruff|make ci|make agent-checks|CONVENTION_COMPLIANCE|EVAL_STATUS|AGENT_EVALUATION_STATUS)").map_err(|error|error.to_string())?;
+    let verification=Regex::new(r"(?:tools/|check_|check-convention-compliance|pyright|pytest|ruff|make ci|make agent-checks|CONVENTION_COMPLIANCE|EVAL_STATUS|AGENT_EVALUATION_STATUS)").map_err(|error|error.to_string())?;
     for path in &config.convention_sources {
         if let Some(text) = read(root, path)? {
             if normative.is_match(&text) && !verification.is_match(&text) {
