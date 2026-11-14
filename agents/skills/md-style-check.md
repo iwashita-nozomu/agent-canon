@@ -6,7 +6,6 @@ contract skill
 responsibility Documents md-style-check for this repository.
 upstream design ../canonical/skills.md skill canon registry
 upstream design ../../ROOT_AGENTS.md shared post-edit formatting boundary
-upstream design agent-canon-bootstrap.md shared runtime and registered target execution
 upstream design ../../documents/design/formatting.md final edited and validated content correspondence
 upstream design code-visualization.md sole public visualization owner and typed projection contract
 upstream design report-writing.md report evidence and optional structure boundary
@@ -30,17 +29,14 @@ downstream implementation ../../tests/tools/test_fix_mermaid.py tests native Mer
 1. Identify the changed Markdown paths and content owner. This binds the
    operation and returned findings to the requested scope.
 2. Follow the
-   [formatter execution procedure](../../documents/design/formatting.md#markdown-through-the-shared-runtime)
-   through the [shared runtime route](agent-canon-bootstrap.md#command-shape).
-   Registered targets are read-only: run AgentCanon's native
-   `agent-canon docs format --root <snapshot> <changed Markdown paths...>` on
-   a writable source snapshot in the runtime task directory, then inspect and
-   copy back only the selected files.
-   This entrypoint applies the configured formatter and checks together on the
-   selected files. Read help only when an option remains unresolved. The docs
-   command owns temporary provider output; bootstrap supplies its task-local
-   `TMPDIR`. Generated state follows the
-   [shared runtime boundary](agent-canon-bootstrap.md#command-shape).
+   [formatter execution procedure](../../documents/design/formatting.md#markdown-execution).
+   Run the installed native `agent-canon docs format --root . <changed paths...>`
+   in the writable checkout and inspect its diff. This operation needs no Docker
+   image or external provider. Use a writable task snapshot only when the
+   selected environment exposes source read-only.
+   Select `docs check` separately for the changed guarantee using available
+   standard providers. Missing validation is reported with its reason while
+   the remaining authorized work continues. Read help only for an unresolved option.
 3. Inspect the formatter's changes and diagnostics, then repair relevant
    formatting, link, heading, math, or Mermaid findings. The formatter
    normalizes line endings, trailing whitespace, and repeated blank lines; it
@@ -54,7 +50,7 @@ downstream implementation ../../tests/tools/test_fix_mermaid.py tests native Mer
    [edited, validated, and submitted content](../../documents/design/formatting.md#engineering-rationale)
    aligned.
 
-The AgentCanon docs route invokes the configured `markdownlint-cli2` and offline
+The selected AgentCanon `docs check` route invokes `markdownlint-cli2` and offline
 `lychee` providers directly, then uses Quarto's embedded Pandoc AST for
 workspace-absolute local-target policy and Mermaid-block selection. `mmdc`
 validates Mermaid syntax in a temporary output directory without rewriting the

@@ -109,9 +109,12 @@ property/metamorphic candidates. Its detailed contract lives in
 current stage, and `DEFERRED_SKILLS` for dynamic wave triggers. Use it before
 broad skill-selection prose or subagent fan-out.
 
-`format` normalizes line endings, trailing whitespace, and repeated blank lines,
-then runs the same adjacent `check` path. Math and Mermaid content is not
-rewritten by the checker; edit source deliberately and validate it with `check`.
+`format` normalizes line endings, trailing whitespace, and repeated blank lines
+using only the native executable. Run it directly in a writable checkout;
+Docker and external document providers are unnecessary for this operation.
+Select `check` separately when its validation is required. Missing providers
+leave those checks unverified while formatting and other authorized work proceed.
+Math and Mermaid content is preserved by formatting and checked by `check`.
 
 `check-entrypoints` validates the finite root entrypoint owner-map grammar,
 required owner rows and destinations, and marker ownership. It uses the same
