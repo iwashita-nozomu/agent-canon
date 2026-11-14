@@ -8,6 +8,7 @@
 
 # Match rustfmt's LF policy on every host without changing global Git settings.
 tools/runtime/dispatch/agent-canon/**/*.rs text eol=lf
+tools/runtime/python-provider/**/*.rs text eol=lf
 
 # The native docs CLI embeds these provider defaults for source-free targets.
 .markdownlint-cli2.jsonc text eol=lf
@@ -40,5 +41,5 @@ tools/validation/ci/config/actionlint.yaml text eol=lf
 
 # NVIDIA parser fixtures intentionally retain invalid whitespace/CRLF bytes as
 # raw evidence; do not run Git's text whitespace diff oracle over these files.
-tests/fixtures/nvidia/*.txt -diff
-tests/fixtures/nvidia/*.xml -diff
+tests/fixtures/nvidia/*.txt -text -diff
+tests/fixtures/nvidia/*.xml -text -diff

@@ -41,7 +41,8 @@ const PYTHON_SUFFIXES: &[&str] = &[".py", ".pyi"];
 const CONTAINER_PREFIXES: &[&str] = &["docker/", "bootstrap/", "tests/bootstrap/"];
 const CONTAINER_PATHS: &[&str] = &[
     "bootstrap.sh",
-    "tools/runtime/container/bootstrap_runtime.py",
+    "tools/runtime/dispatch/agent-canon/src/bootstrap_runtime.rs",
+    "tools/runtime/dispatch/agent-canon/tests/bootstrap_runtime_native.rs",
     "tools/runtime/container/compile.sh",
     "tests/tools/test_bootstrap_container_contract.py",
     "tests/tools/test_compile_cache.py",
@@ -65,9 +66,14 @@ const EVAL_PATHS: &[&str] = &[
     "bootstrap.sh",
     "bootstrap/host/manifest.toml",
     "bootstrap/host/lifecycle/entrypoint.sh",
-    "tools/runtime/container/bootstrap_runtime.py",
-    "tools/runtime/archive/runtime_log_archive_git.py",
-    "tools/runtime/archive/github_eval_delivery.py",
+    "tools/runtime/dispatch/agent-canon/src/bootstrap_runtime.rs",
+    "tools/runtime/dispatch/agent-canon/src/runtime_log_archive.rs",
+    "tools/runtime/dispatch/agent-canon/src/runtime_log_archive/github_eval_delivery.rs",
+    "tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs",
+    "tools/runtime/dispatch/agent-canon/src/catalog/skill_materialization.rs",
+    "tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs",
+    "tools/runtime/dispatch/agent-canon/src/eval_accumulation.rs",
+    "tools/runtime/dispatch/agent-canon/src/skill_shim_evaluation.rs",
 ];
 const EVAL_TEST_PATHS: &[&str] = &["tests/agent_tools/test_eval_accumulation_check.py"];
 const RUST_PREFIXES: &[&str] = &["tools/runtime/dispatch/agent-canon/"];
@@ -185,7 +191,7 @@ pub fn classify(paths: &[String]) -> Vec<PathRisk> {
             reason: "container_runtime_surface_changed",
             checks: &[
                 "python3 -m pytest -q tests/tools/test_bootstrap_container_contract.py",
-                "python3 -m pytest -q tests/bootstrap/test_bootstrap_runtime.py",
+                "cargo test --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --test bootstrap_runtime_native",
             ],
         });
     }
@@ -205,7 +211,7 @@ pub fn classify(paths: &[String]) -> Vec<PathRisk> {
         active.push(PathRisk {
             profile: "agent-eval",
             reason: "eval_surface_changed",
-            checks: &["python3 eval/producers/run_accumulated_agent_evals.py"],
+            checks: &["tools/bin/agent-canon run-accumulated-agent-evals"],
         });
     }
     if paths.iter().any(|path| has_prefix(path, RUST_PREFIXES)) {
@@ -257,6 +263,9 @@ pub fn select_static_gate_units(paths: &[String], full_confidence: bool) -> Vec<
     }
     if has_profile("python-tooling")
         || has_profile("dependency")
+        || paths
+            .iter()
+            .any(|path| EVAL_PATHS.contains(&path.as_str()) && has_prefix(path, RUST_PREFIXES))
         || paths.iter().any(|path| needs_contracts_fallback(path))
     {
         selected.push("contracts");

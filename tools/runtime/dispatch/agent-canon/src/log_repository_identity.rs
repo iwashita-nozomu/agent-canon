@@ -176,27 +176,45 @@ fn runtime_environment_value<'a>(
     environment.get(name).map(|value| value.as_str())
 }
 
+/// Return the configured raw source remote, falling back to the selected Git
+/// remote in the supplied source root.
+pub fn source_remote_from_runtime_env(
+    root: Option<&Path>,
+    environment: &std::collections::BTreeMap<String, String>,
+) -> Result<String, SourceRepositoryIdentityError> {
+    let remote = runtime_environment_value(environment, SOURCE_REMOTE_ENV)
+        .map(python_strip)
+        .unwrap_or_default();
+    if !remote.is_empty() {
+        return Ok(remote.to_owned());
+    }
+    let Some(root) = root else {
+        return Ok(String::new());
+    };
+    let remote_name = runtime_environment_value(environment, SOURCE_REMOTE_NAME_ENV)
+        .map(python_strip)
+        .unwrap_or("origin");
+    remote_from_git_config(
+        root,
+        if remote_name.is_empty() {
+            "origin"
+        } else {
+            remote_name
+        },
+    )
+}
+
+/// Resolve the raw source remote from process environment and local Git config.
+pub fn source_remote(root: &Path) -> Result<String, SourceRepositoryIdentityError> {
+    let environment = std::env::vars().collect::<std::collections::BTreeMap<_, _>>();
+    source_remote_from_runtime_env(Some(root), &environment)
+}
+
 pub fn stable_source_id_from_runtime_env(
     root: Option<&Path>,
     environment: &std::collections::BTreeMap<String, String>,
 ) -> Result<String, SourceRepositoryIdentityError> {
-    let mut remote = runtime_environment_value(environment, SOURCE_REMOTE_ENV)
-        .map(python_strip)
-        .unwrap_or_default()
-        .to_owned();
-    if remote.is_empty() {
-        if let Some(root) = root {
-            let remote_name = runtime_environment_value(environment, SOURCE_REMOTE_NAME_ENV)
-                .map(python_strip)
-                .unwrap_or("origin");
-            let remote_name = if remote_name.is_empty() {
-                "origin"
-            } else {
-                remote_name
-            };
-            remote = remote_from_git_config(root, remote_name)?;
-        }
-    }
+    let remote = source_remote_from_runtime_env(root, environment)?;
     if remote.is_empty() {
         return Ok(UNIDENTIFIED_SOURCE.to_owned());
     }
@@ -298,4 +316,87 @@ fn remote_from_git_config(
         }
     }
     Ok(String::new())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::BTreeMap;
+    use std::fs;
+
+    #[test]
+    fn remote_normalization_collapses_transport_credentials_and_git_suffix() {
+        let cases = [
+            (
+                "git@github.com:iwashita-nozomu/agent-canon.git",
+                "github.com/iwashita-nozomu/agent-canon",
+            ),
+            (
+                "ssh://git@github.com/iwashita-nozomu/agent-canon.git",
+                "github.com/iwashita-nozomu/agent-canon",
+            ),
+            (
+                "https://reader:credential@example.com:8443/owner/repo.git",
+                "example.com/owner/repo",
+            ),
+            (
+                "https://github.com/iwashita-nozomu/agent-canon.GIT",
+                "github.com/iwashita-nozomu/agent-canon",
+            ),
+        ];
+        for (remote, expected) in cases {
+            assert_eq!(normalize_remote(remote).unwrap(), expected);
+        }
+    }
+
+    #[test]
+    fn remote_identity_rejects_local_and_empty_values() {
+        for remote in ["", " /tmp/repo ", "file:///tmp/repo", "owner/repo"] {
+            assert!(normalize_remote(remote).is_err(), "remote={remote:?}");
+        }
+    }
+
+    #[test]
+    fn runtime_remote_override_wins_and_stable_id_override_must_match() {
+        let remote = "https://example.com/owner/repo.git";
+        let derived = stable_source_repository_id(remote).unwrap();
+        let mut environment = BTreeMap::from([(SOURCE_REMOTE_ENV.to_owned(), remote.to_owned())]);
+        assert_eq!(
+            stable_source_id_from_runtime_env(None, &environment).unwrap(),
+            derived
+        );
+        environment.insert(STABLE_ID_ENV.to_owned(), derived.clone());
+        assert_eq!(
+            stable_source_id_from_runtime_env(None, &environment).unwrap(),
+            derived
+        );
+        environment.insert(STABLE_ID_ENV.to_owned(), "different-id".to_owned());
+        assert!(matches!(
+            stable_source_id_from_runtime_env(None, &environment),
+            Err(SourceRepositoryIdentityError::Identity(
+                "source_repository_id_mismatch"
+            ))
+        ));
+    }
+
+    #[test]
+    fn git_remote_lookup_uses_the_selected_remote_name_without_git_processes() {
+        let temporary = tempfile::tempdir().unwrap();
+        fs::create_dir_all(temporary.path().join(".git")).unwrap();
+        fs::write(
+            temporary.path().join(".git/config"),
+            "[remote \"upstream\"]\nurl = ssh://git@example.com/Owner/Repo.git\n",
+        )
+        .unwrap();
+        let environment =
+            BTreeMap::from([(SOURCE_REMOTE_NAME_ENV.to_owned(), "upstream".to_owned())]);
+        assert_eq!(
+            source_remote_from_runtime_env(Some(temporary.path()), &environment).unwrap(),
+            "ssh://git@example.com/Owner/Repo.git"
+        );
+        assert_eq!(
+            stable_source_id_from_runtime_env(Some(temporary.path()), &environment).unwrap(),
+            stable_source_repository_id("ssh://git@example.com/Owner/Repo.git").unwrap()
+        );
+    }
 }

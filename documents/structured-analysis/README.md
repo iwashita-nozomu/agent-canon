@@ -10,8 +10,8 @@ downstream design code-analysis.md defines code dependency graph adapter scope
 downstream design document-canon-analysis.md defines document duplicate and non-canonical document adapter scope
 downstream design ../prose-reasoning-graph/dsl-spec.md defines prose reasoning graph DSL
 downstream design ../design/dependency-manifest-design.md defines dependency manifest DSL and validation model
-downstream design ../../tools/analysis/documents/prose_reasoning_graph.py documents prose graph CLI usage
-downstream design ../../tools/analysis/dependencies/render_dependency_manifest_graph.py documents dependency graph report rendering
+downstream design ../../tools/runtime/dispatch/agent-canon/src/prose_reasoning_graph.rs documents prose graph CLI usage
+downstream design ../../tools/runtime/dispatch/agent-canon/src/dependency_manifest_graph.rs documents dependency graph report rendering
 @dependency-end
 -->
 
@@ -57,8 +57,8 @@ AgentCanon から将来切り離す場合の集約先である。既存の正本
 | [document-canon-analysis.md](document-canon-analysis.md) | duplicate heading、runtime mirror、generated report、stale name を取り込む adapter 設計。 |
 | [Prose Reasoning Graph DSL](../prose-reasoning-graph/dsl-spec.md) | Graph DSL Core 上の prose adapter/profile。 |
 | [Dependency Manifest Design](../design/dependency-manifest-design.md) | dependency header manifest の正本文法と graph validation。 |
-| [prose_reasoning_graph.py](../tools/prose_reasoning_graph.md) | prose graph CLI の operator flow。 |
-| [render_dependency_manifest_graph.py](../tools/render_dependency_manifest_graph.md) | dependency manifest graph report renderer。 |
+| [prose-reasoning-graph](../tools/prose_reasoning_graph.md) | prose graph CLI の operator flow。 |
+| [render-dependency-manifest-graph](../tools/render_dependency_manifest_graph.md) | dependency manifest graph report renderer。 |
 
 ## Boundary
 

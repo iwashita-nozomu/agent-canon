@@ -5,7 +5,7 @@ responsibility Places dependencies under the canonical Dockerfile-image-test str
 upstream design ../../CONTAINER_OPERATIONS.md container ownership boundary
 upstream design ./environment-maintenance.md expected environment structure owner
 downstream implementation environment-maintenance.md consumes the dependency placement decision
-downstream implementation ../../tools/runtime/container/devcontainer_dependencies.py optional typed build-input manifest validator
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/environment_dependencies.rs native typed build-input manifest validator and installer
 downstream implementation ../../tools/validation/dependencies/docker_dependency_validator.sh validates dependency placement
 downstream implementation ../../tests/agent_tools/test_environment_skill_expected_structure.py expected-structure contract
 @dependency-end
@@ -74,8 +74,8 @@ used; image build and full-test execution apply when the canonical image or
 command changes. These commands are not a fixed sequence for every decision.
 
 ```bash
-python3 tools/runtime/container/devcontainer_dependencies.py validate --workspace . --vendor-root . --format text
-python3 tools/runtime/container/devcontainer_dependencies.py dry-run --workspace . --vendor-root . --format json
+./tools/bin/agent-canon environment-dependencies validate --workspace . --manifest bootstrap/container/image/dependencies.toml --format text
+./tools/bin/agent-canon environment-dependencies dry-run --workspace . --manifest bootstrap/container/image/dependencies.toml --format json
 bash tools/validation/dependencies/docker_dependency_validator.sh
 docker build -f <Dockerfile> --target <canonical-target> -t <image> .
 docker run --rm <runtime-wiring> <image> <canonical-full-test-command>

@@ -546,12 +546,12 @@ Template-specific hook behavior:
   `bootstrap.sh` from the current Git worktree, so it also works when the hook
   runs from a repository subdirectory. The host adapter hands the original
   event to the existing shared resident and its canonical
-  `hook_dispatcher.py`; the dispatcher performs one bounded parse and stays
+  `hook_dispatcher.rs`; the dispatcher performs one bounded parse and stays
   in-process, without child processes, Git, or network access.
 - `HOOK_EVENT_CONTRACTS` is the canonical typed table for active/inactive
   events, matchers, failure semantics, and telemetry. Read it with
-  `python3 .codex/hooks/hook_dispatcher.py --contract`.
-- `UserPromptSubmit` uses the pure `hook_safety.py` leaf for high-confidence
+  `agent-canon hook-dispatcher --contract`.
+- `UserPromptSubmit` uses the pure `hook_safety.rs` leaf for high-confidence
   secret matching. `PreToolUse` uses the same leaf for destructive Git intent;
   a blocked payload exposes only `operation` and `command_sha256` as command
   information.

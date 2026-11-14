@@ -14,7 +14,7 @@
       "path": "../outside.rs"
     },
     {
-      "command": "python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py && python3 -m pytest tests/agent_tools/test_codex_hooks.py -q",
+      "command": "tools/bin/agent-canon check-agent-runtime-alignment && python3 -m pytest tests/agent_tools/test_codex_hooks.py -q",
       "gate": "codex_hook_runtime_alignment",
       "handoff": "include hook wiring, quiet-pass behavior, and runtime alignment evidence",
       "path": ".codex/hooks.json"
@@ -28,7 +28,7 @@
     {
       "command": "tools/bin/agent-canon responsibility-scope --root . --format json",
       "gate": "responsibility_scope",
-      "handoff": "scope:runtime-entrypoints owner:agent-canon class:shared_runtime protecting_tools:tools/validation/semantic/runtime/check_agent_runtime_alignment.py",
+      "handoff": "scope:runtime-entrypoints owner:agent-canon class:shared_runtime protecting_tools:tools/runtime/dispatch/agent-canon/src/runtime_alignment.rs",
       "path": ".codex/hooks.json"
     },
     {
@@ -38,7 +38,7 @@
       "path": ".codex/hooks/hook_dispatcher.py"
     },
     {
-      "command": "python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py && python3 -m pytest tests/agent_tools/test_codex_hooks.py -q",
+      "command": "tools/bin/agent-canon check-agent-runtime-alignment && python3 -m pytest tests/agent_tools/test_codex_hooks.py -q",
       "gate": "codex_hook_runtime_alignment",
       "handoff": "include hook wiring, quiet-pass behavior, and runtime alignment evidence",
       "path": ".codex/hooks/hook_dispatcher.py"
@@ -50,7 +50,7 @@
       "path": ".codex/hooks/hook_dispatcher.py"
     },
     {
-      "command": "python3 tools/validation/code/oop/python/readability.py --root . .codex/hooks/hook_dispatcher.py",
+      "command": "tools/bin/agent-canon oop-python-readability --root . .codex/hooks/hook_dispatcher.py",
       "gate": "oop_readability_guard",
       "handoff": "include OOP readability risk, repair plan, and the non-blocking review_oop_boundary_signal / OOP_READABILITY_REVIEW_SIGNAL_FINDINGS disposition before implementation edits",
       "path": ".codex/hooks/hook_dispatcher.py"
@@ -58,7 +58,7 @@
     {
       "command": "tools/bin/agent-canon responsibility-scope --root . --format json",
       "gate": "responsibility_scope",
-      "handoff": "scope:runtime-entrypoints owner:agent-canon class:shared_runtime protecting_tools:tools/validation/semantic/runtime/check_agent_runtime_alignment.py",
+      "handoff": "scope:runtime-entrypoints owner:agent-canon class:shared_runtime protecting_tools:tools/runtime/dispatch/agent-canon/src/runtime_alignment.rs",
       "path": ".codex/hooks/hook_dispatcher.py"
     },
     {
@@ -82,7 +82,7 @@
     {
       "command": "tools/bin/agent-canon responsibility-scope --root . --format json",
       "gate": "responsibility_scope",
-      "handoff": "scope:runtime-entrypoints owner:agent-canon class:shared_runtime protecting_tools:tools/validation/semantic/runtime/check_agent_runtime_alignment.py",
+      "handoff": "scope:runtime-entrypoints owner:agent-canon class:shared_runtime protecting_tools:tools/runtime/dispatch/agent-canon/src/runtime_alignment.rs",
       "path": ".codex/personal/skills/subagent-bootstrap/SKILL.md"
     },
     {
@@ -124,7 +124,7 @@
     {
       "command": "tools/bin/agent-canon responsibility-scope --root . --format json",
       "gate": "responsibility_scope",
-      "handoff": "scope:runtime-entrypoints owner:agent-canon class:shared_runtime protecting_tools:tools/validation/semantic/runtime/check_agent_runtime_alignment.py",
+      "handoff": "scope:runtime-entrypoints owner:agent-canon class:shared_runtime protecting_tools:tools/runtime/dispatch/agent-canon/src/runtime_alignment.rs",
       "path": "agents/COMMUNICATION_PROTOCOL.md"
     },
     {
@@ -140,9 +140,9 @@
       "path": "experiments/registry.toml"
     },
     {
-      "command": "if [ -e experiments/registry.toml ]; then tools/bin/agent-canon experiment-registry; else echo EXPERIMENT_REGISTRY_CHECK=skipped_no_project_registry; fi && python3 -m pytest tests/tools/test_run_managed_experiment.py -q",
+      "command": "if [ -e experiments/registry.toml ]; then tools/bin/agent-canon experiment-registry; else echo EXPERIMENT_REGISTRY_CHECK=skipped_no_project_registry; fi && cargo test --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --test managed_experiment_native",
       "gate": "experiment_execution_surface_guard",
-      "handoff": "route planned edits through $experiment-lifecycle and $test-design; preserve the managed runner, registry checker, registry contract, and deterministic raw-only git-annex retention contract with lightweight registry and runner validation evidence",
+      "handoff": "route planned edits through $experiment-lifecycle and $test-design; preserve the native managed CLI, registry checker, registry contract, and deterministic raw-only git-annex retention contract with protocol fixture evidence",
       "path": "experiments/registry.toml"
     },
     {
@@ -188,7 +188,7 @@
       "path": "scratch/emoji-\ud83d\ude00.py"
     },
     {
-      "command": "python3 tools/validation/code/oop/python/readability.py --root . scratch/emoji-\ud83d\ude00.py",
+      "command": "tools/bin/agent-canon oop-python-readability --root . scratch/emoji-\ud83d\ude00.py",
       "gate": "oop_readability_guard",
       "handoff": "include OOP readability risk, repair plan, and the non-blocking review_oop_boundary_signal / OOP_READABILITY_REVIEW_SIGNAL_FINDINGS disposition before implementation edits",
       "path": "scratch/emoji-\ud83d\ude00.py"
@@ -224,7 +224,7 @@
       "path": "scratch/quote\"file.py"
     },
     {
-      "command": "python3 tools/validation/code/oop/python/readability.py --root . scratch/quote\"file.py",
+      "command": "tools/bin/agent-canon oop-python-readability --root . scratch/quote\"file.py",
       "gate": "oop_readability_guard",
       "handoff": "include OOP readability risk, repair plan, and the non-blocking review_oop_boundary_signal / OOP_READABILITY_REVIEW_SIGNAL_FINDINGS disposition before implementation edits",
       "path": "scratch/quote\"file.py"
@@ -260,7 +260,7 @@
       "path": "scratch/\u65e5\u672c\u8a9e.py"
     },
     {
-      "command": "python3 tools/validation/code/oop/python/readability.py --root . scratch/\u65e5\u672c\u8a9e.py",
+      "command": "tools/bin/agent-canon oop-python-readability --root . scratch/\u65e5\u672c\u8a9e.py",
       "gate": "oop_readability_guard",
       "handoff": "include OOP readability risk, repair plan, and the non-blocking review_oop_boundary_signal / OOP_READABILITY_REVIEW_SIGNAL_FINDINGS disposition before implementation edits",
       "path": "scratch/\u65e5\u672c\u8a9e.py"
@@ -296,7 +296,7 @@
       "path": "src/model.cpp"
     },
     {
-      "command": "python3 tools/validation/code/oop/cpp/readability.py --root . src/model.cpp",
+      "command": "tools/bin/agent-canon oop-cpp-readability --root . src/model.cpp",
       "gate": "oop_readability_guard",
       "handoff": "include C/C++ OOP readability risk before edits",
       "path": "src/model.cpp"
@@ -332,7 +332,7 @@
       "path": "tools/agent_tools/new_shared_checker_oracle.py"
     },
     {
-      "command": "python3 tools/validation/code/oop/python/readability.py --root . tools/agent_tools/new_shared_checker_oracle.py",
+      "command": "tools/bin/agent-canon oop-python-readability --root . tools/agent_tools/new_shared_checker_oracle.py",
       "gate": "oop_readability_guard",
       "handoff": "include OOP readability risk, repair plan, and the non-blocking review_oop_boundary_signal / OOP_READABILITY_REVIEW_SIGNAL_FINDINGS disposition before implementation edits",
       "path": "tools/agent_tools/new_shared_checker_oracle.py"

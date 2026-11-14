@@ -5,7 +5,7 @@
 // upstream implementation source_dependency_graph.rs derives dependency query and context without runtime state
 // upstream implementation graph.rs owns opt-in persisted graph build/status and non-dependency relations
 // downstream implementation main.rs exposes the native GraphClient API to in-process callers
-// downstream implementation ../../../../analysis/documents/prose_reasoning_graph.py consumes the native typed source query route
+// downstream implementation prose_reasoning_graph.rs consumes the native typed source query route
 // downstream implementation tool_drift.rs consumes source-derived dependency facts
 // downstream implementation agent_search.rs consumes selected source-derived dependency facts
 // downstream implementation source_dependency_tests.rs verifies source and persisted client behavior

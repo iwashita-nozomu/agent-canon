@@ -14,7 +14,7 @@
       "path": "changed.py"
     },
     {
-      "command": "python3 tools/validation/code/oop/python/readability.py --root . changed.py",
+      "command": "tools/bin/agent-canon oop-python-readability --root . changed.py",
       "gate": "oop_readability_guard",
       "handoff": "include OOP readability risk, repair plan, and the non-blocking review_oop_boundary_signal / OOP_READABILITY_REVIEW_SIGNAL_FINDINGS disposition before implementation edits",
       "path": "changed.py"
@@ -50,7 +50,7 @@
       "path": "separator.py"
     },
     {
-      "command": "python3 tools/validation/code/oop/python/readability.py --root . separator.py",
+      "command": "tools/bin/agent-canon oop-python-readability --root . separator.py",
       "gate": "oop_readability_guard",
       "handoff": "include OOP readability risk, repair plan, and the non-blocking review_oop_boundary_signal / OOP_READABILITY_REVIEW_SIGNAL_FINDINGS disposition before implementation edits",
       "path": "separator.py"

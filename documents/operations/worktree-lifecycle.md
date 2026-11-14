@@ -29,7 +29,7 @@ read-only inventory で分類します。経過日数、最終更新日時、sta
 ## cleanup 前の確認
 
 - `git fetch --prune origin main` 後の exact `refs/remotes/origin/main` を固定し、
-  `python3 tools/repository/git/orphan_lifecycle.py inventory ...` の digest と candidate identity を残します。
+  `agent-canon orphan-lifecycle inventory ...` の digest と candidate identity を残します。
   対象 branch の local/remote 状態も確認し、未公開の内容を保持します。
 - `orphan_safe_to_remove` 以外、または cleanup blocker が一つでもある candidate は削除しません。
 - 作業を続けられる既存 checkout がある場合は、現在の branch と Git state を確認して継続先を選びます。

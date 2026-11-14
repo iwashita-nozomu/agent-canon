@@ -7,21 +7,23 @@
 // upstream implementation ../path_resolution.rs shared non-strict filesystem resolution
 // upstream implementation ../python_text.rs Python-compatible route text normalization
 // downstream implementation ../main.rs native capability-route command
-// downstream implementation ../../../../../../tools/agent/orchestration/route.py public route facade
-// downstream implementation ../../../../../../tests/agent_tools/test_route.py capability route contract tests
+// downstream test ../../../../../../tests/agent_tools/test_route.py native route and capability contract tests
 // @dependency-end
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::env;
 use std::fmt;
+use std::fs;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::sync::LazyLock;
 
-use crate::agent_canon_source_root::has_catalog;
+use crate::agent_canon_source_root::{has_catalog, resolve_source_roots};
+use crate::python_cli_options::{resolve_long_option_prefix, LongOptionError};
 use regex::Regex;
 use serde::ser::SerializeMap;
-use serde::{Serialize, Serializer};
+use serde::{Deserialize, Serialize, Serializer};
 use serde_json::{json, Value as JsonValue};
 use yaml_rust2::{Yaml, YamlLoader};
 
@@ -36,6 +38,154 @@ pub const CAPABILITY_ROUTE_SCHEMA: &str = "agent_canon.route.capability_route.v1
 pub const CAPABILITY_FORMAT_VALUES: [&str; 3] = ["text", "json", "markdown"];
 pub const CAPABILITY_MODE_VALUES: [&str; 2] = ["routing-only", "repo-changing"];
 pub const CAPABILITY_RISK_VALUES: [&str; 5] = ["routine", "focused", "profile", "shared", "large"];
+pub const TASK_ROUTE_SELECTOR: &str = "route";
+const TASK_ROUTE_TOOL: &str = "tools/bin/agent-canon route";
+const TASK_ROUTE_NAME: &str = "task-routing";
+const TASK_ROUTE_MODES: [&str; 2] = ["routing-only", "repo-changing"];
+const TASK_ROUTE_FORMATS: [&str; 3] = ["text", "json", "markdown"];
+const TASK_ROUTE_RISKS: [&str; 5] = ["routine", "focused", "profile", "shared", "large"];
+const TASK_ROUTE_USAGE: &str = "usage: route.py [-h] [--root ROOT] [--area AREA] [--execution-context EXECUTION_CONTEXT] [--name NAME] [--prompt PROMPT] [--prompt-file PROMPT_FILE] [--prompt-stdin] [--mode {routing-only,repo-changing}] [--list] [--format {text,json,markdown}] [--risk {routine,focused,profile,shared,large}] [--changed [CHANGED ...]] [prompt_parts ...]";
+const PRIVATE_ROUTE_ALIASES: [&str; 4] = [
+    "subagent-beginning",
+    "_subagent-beginning",
+    "subagent-startup",
+    "_subagent-startup",
+];
+const PRIVATE_ROUTE_FIELDS: [&str; 2] = ["subagent_startup_route", "internal_skill_routes"];
+
+const TASK_ROUTE_AREAS_JSON: &str = r##"[
+  {"key":"surface","label":"runtime surfaces","purpose":"Decide which AgentCanon root views are active, optional, or hidden.","next_action":"classify_runtime_surface","commands":["tools/bin/agent-canon route --area surface"],"aliases":["profile_surface_resolver.py","runtime-surface-minimize","tool_profile_visibility.py"]},
+  {"key":"structure","label":"repository structure","purpose":"Classify repo-root, shared-canon, project runtime view, and personal runtime surfaces before refactors.","next_action":"classify_structure_refactor_surface","commands":["python3 tools/validation/semantic/structure/repo_structure_contract.py --root <root> --format json","tools/bin/agent-canon responsibility-scope --root <root> --format json"],"aliases":["structure-refactor","repo-refactor","repo_refactor_skill","refactor","repository-refactor","repo-structure","repository-structure","structure-review","structure-review-skill","structural-review","responsibility-scope","personal-runtime-surface","codex-personal-runtime","codex-config-surface","dot-codex-surface","~/.codex"]},
+  {"key":"profile","label":"optional profiles","purpose":"Select optional Docker, C++, experiment, GitHub, or memory profiles.","next_action":"select_active_profiles","commands":["tools/bin/agent-canon route --area profile"],"aliases":["optional_profile_matrix.py","profile-selection","language_surface_detector.py","language-profile"]},
+  {"key":"checks","label":"check plan","purpose":"Choose the validation set that covers the changed paths and risk.","next_action":"run_selected_checks","commands":["make check-matrix"],"aliases":["workflow_step_router.py","workflow-lite-routing","validation_min_set.py","validation-profile","static_check_matrix.py","static-check-lite","github_check_matrix.py","github-check-lite"]},
+  {"key":"env","label":"environment","purpose":"Keep the shared AgentCanon tool container separate from the project Docker/test runner.","next_action":"classify_environment_profile","commands":["./bootstrap.sh --control-parent-root <parent> status","docker build -f docker/Dockerfile -t <project-image> . && docker run --rm <project-image> test/testrunner.sh","python3 -m pytest -q tests/tools/test_bootstrap_container_contract.py","cargo test --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --lib bootstrap_runtime::tests"],"aliases":["agent-canon-bootstrap","environment_profile_detect.py","environment-profile","project-docker-test-runner","container-on-demand"]},
+  {"key":"read","label":"read order","purpose":"Return the shortest required document packet for the task.","next_action":"read_minimal_packet","commands":["tools/bin/agent-canon route --area read"],"aliases":["read_order_compactor.py","onboarding-lite"]},
+  {"key":"remote","label":"remote policy","purpose":"Keep standalone AgentCanon source PR/archive publication separate from project Docker execution.","next_action":"route_remote_policy","commands":["git status --short --branch","gh pr view --repo iwashita-nozomu/agent-canon","gh issue view 841 --repo iwashita-nozomu/agent-canon"],"aliases":["remote_policy_router.py","remote-policy-cleanup","pr_update_route.py","pr-route-minimize"]},
+  {"key":"canon","label":"AgentCanon update","purpose":"Route standalone AgentCanon source, bootstrap runtime, and source PR readback.","next_action":"route_agentcanon_update","commands":["./bootstrap.sh --control-parent-root <parent> status","git status --short --branch","gh pr view --repo iwashita-nozomu/agent-canon"],"aliases":["agent-canon-bootstrap","agent-canon-update"]},
+  {"key":"runtime","label":"runtime capability","purpose":"Hide Codex or CLI examples when unavailable.","next_action":"probe_runtime_capability","commands":["tools/bin/agent-canon route --area runtime"],"aliases":["runtime_capability_probe.py","runtime-capability-routing"]},
+  {"key":"tokens","label":"token budget","purpose":"Pick light or full workflow gates from token budget and task risk.","next_action":"select_token_budget_gates","commands":["tools/bin/agent-canon route --area tokens"],"aliases":["token_budget_gate.py","token-lite"]},
+  {"key":"skills","label":"skill map","purpose":"Collapse duplicate workflow and skill entrypoints into one selection.","next_action":"select_public_skills","commands":["tools/bin/agent-canon route --area skills"],"aliases":["skill_workflow_mapper.py","routing-single-source","skill_dedupe.py","skill-minimizer"]},
+  {"key":"agents","label":"agent mode","purpose":"Choose write-capable child, read-only scout, or staged agents by risk.","next_action":"select_agent_mode","commands":["tools/bin/agent-canon route --area agents"],"aliases":["multi_agent_mode_selector.py","agent-mode","subagent_role_budget.py","subagent-budget"]},
+  {"key":"closeout","label":"closeout","purpose":"Select artifact-free or coordinated closeout from explicit execution context.","next_action":"supply_execution_context_to_select_closeout","commands":[],"aliases":["closeout_profile_gate.py","closeout-lite","artifact_bundle_generator.py","artifact-lite"]},
+  {"key":"deps","label":"dependency review","purpose":"Select changed-file or full dependency manifest checks.","next_action":"select_dependency_review","commands":["tools/bin/agent-canon check-dependency-headers --changed","bash tools/analysis/dependencies/scan_dependency_headers.sh --changed --fail-missing"],"aliases":["dependency_manifest_scope.py","dependency-manifest-lite","dependency_tool_aggregator.py","dependency-review-one-shot"]},
+  {"key":"conventions","label":"conventions","purpose":"Route convention subchecks without making every rule a prompt clause.","next_action":"run_convention_subchecks","commands":["agent-canon check-convention-compliance"],"aliases":["convention_subcheck_router.py","convention-gate-lite","policy_risk_classifier.py","policy-exception-routing"]},
+  {"key":"docs","label":"document canon","purpose":"Find canonical docs and route mirror/generated/stale docs away from edits.","next_action":"route_document_canon","commands":["agent-canon structured-analysis document-inventory --root ."],"aliases":["canon_doc_router.py","doc-canon-flex","docs_check_router.py","docs-lite"]},
+  {"key":"search","label":"repository search","purpose":"Route exact text and explicit semantic, catalog, dependency, or code queries to their owning provider.","next_action":"select_search_provider","commands":["tools/bin/agent-canon agent-search --query \"<git-pattern>\" --providers text --regex","tools/bin/agent-canon agent-search --purpose \"<goal>\" --providers semantic"],"aliases":["vector_search.py","tool-search","semantic-search","semantic-search","search-to-edit-scope","dependency-expanded-search"]},
+  {"key":"logs","label":"logs and evals","purpose":"Route hook, skill, eval, and result evidence without overwriting logs.","next_action":"route_result_evidence","commands":["tools/bin/agent-canon generate-agent-improvement-guide"],"aliases":["log_retention_decider.py","log-retention-lite","eval_trigger_router.py","eval-on-demand","evidence_compactor.py","runtime-evidence-lite"]},
+  {"key":"tools","label":"tool catalog","purpose":"Keep tool lists short while preserving catalog and docs checks.","next_action":"check_tool_catalog","commands":["tools/bin/agent-canon tool-catalog"],"aliases":["tool_catalog_summarizer.py","tool-selection","retired_tool_guard.py","legacy-tool-cleanup"]}
+]"##;
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct TaskRouteArea {
+    key: String,
+    label: String,
+    purpose: String,
+    next_action: String,
+    commands: Vec<String>,
+    aliases: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct TaskRouteDecision {
+    route: String,
+    area: String,
+    label: String,
+    tool: String,
+    skill: String,
+    next_action: String,
+    commands: Vec<String>,
+    skip_reason: String,
+    evidence: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct PromptSkillDecision {
+    schema: String,
+    route: String,
+    mode: String,
+    skills: Vec<String>,
+    active_skills: Vec<String>,
+    deferred_skills: Vec<String>,
+    matched_skills: Vec<String>,
+    related_skill_candidates: Vec<String>,
+    related_skills: OrderedMap<String, Vec<String>>,
+    reasons: Vec<String>,
+    evidence: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct TaskNameResolution {
+    name: String,
+    status: String,
+    canonical_area: String,
+    canonical_tool: String,
+    canonical_skill: String,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum TaskRouteOption {
+    Help,
+    Root,
+    Area,
+    ExecutionContext,
+    Name,
+    Prompt,
+    PromptFile,
+    PromptStdin,
+    Mode,
+    List,
+    Format,
+    Risk,
+    Changed,
+}
+
+const TASK_ROUTE_CLI_OPTIONS: &[(&str, TaskRouteOption)] = &[
+    ("--help", TaskRouteOption::Help),
+    ("--root", TaskRouteOption::Root),
+    ("--area", TaskRouteOption::Area),
+    ("--execution-context", TaskRouteOption::ExecutionContext),
+    ("--name", TaskRouteOption::Name),
+    ("--prompt", TaskRouteOption::Prompt),
+    ("--request", TaskRouteOption::Prompt),
+    ("--purpose", TaskRouteOption::Prompt),
+    ("--task", TaskRouteOption::Prompt),
+    ("--prompt-file", TaskRouteOption::PromptFile),
+    ("--request-file", TaskRouteOption::PromptFile),
+    ("--query-file", TaskRouteOption::PromptFile),
+    ("--prompt-stdin", TaskRouteOption::PromptStdin),
+    ("--request-stdin", TaskRouteOption::PromptStdin),
+    ("--query-stdin", TaskRouteOption::PromptStdin),
+    ("--mode", TaskRouteOption::Mode),
+    ("--list", TaskRouteOption::List),
+    ("--format", TaskRouteOption::Format),
+    ("--risk", TaskRouteOption::Risk),
+    ("--changed", TaskRouteOption::Changed),
+];
+
+struct TaskRouteOptions {
+    root: PathBuf,
+    area: Option<String>,
+    execution_context: Option<String>,
+    names: Vec<String>,
+    prompts: Vec<String>,
+    prompt_files: Vec<String>,
+    prompt_stdin: bool,
+    mode: String,
+    list: bool,
+    format: String,
+    risk: String,
+    changed: Vec<String>,
+    positional_prompt: Vec<String>,
+}
+
+#[derive(Serialize)]
+struct ExecutionRouteDecision {
+    execution_route: String,
+    next_action: String,
+    commands: Vec<String>,
+    selected_validation: String,
+    verification_status: String,
+}
 
 pub const CATALOG_SCHEMA_PATHS: [(&str, &str); 3] = [
     (
@@ -1066,6 +1216,1023 @@ pub fn related_skill_candidates(
     (related_by_source, ordered_unique(&candidates))
 }
 
+fn public_skill_name_mentioned(text: &str, skill: &str) -> bool {
+    let folded = text.to_ascii_lowercase();
+    for (start, _) in folded.match_indices(skill) {
+        let mut boundary_start = start;
+        if start > 0 && folded.as_bytes()[start - 1] == b'$' {
+            boundary_start -= 1;
+        }
+        let before = folded[..boundary_start].chars().next_back();
+        let after = folded[start + skill.len()..].chars().next();
+        if before.is_some_and(is_route_word_character) || after.is_some_and(is_route_word_character)
+        {
+            continue;
+        }
+        return true;
+    }
+    false
+}
+
+fn is_route_word_character(character: char) -> bool {
+    character.is_ascii_alphanumeric() || matches!(character, '_' | '-')
+}
+
+fn strip_private_route_aliases(text: &str) -> String {
+    let field_pattern = PRIVATE_ROUTE_FIELDS
+        .iter()
+        .map(|field| regex::escape(field).replace('_', "[-_]"))
+        .collect::<Vec<_>>()
+        .join("|");
+    let structural = Regex::new(&format!(r"(?im)^\s*(?:{field_pattern})\s*[:=].*$"))
+        .expect("private route structural fields compile");
+    let mut scrubbed = structural.replace_all(text, " ").into_owned();
+    for alias in PRIVATE_ROUTE_ALIASES {
+        let folded = scrubbed.to_ascii_lowercase();
+        let mut replaced = String::new();
+        let mut cursor = 0;
+        for (start, _) in folded.match_indices(alias) {
+            let mut boundary_start = start;
+            if start > 0 && folded.as_bytes()[start - 1] == b'$' {
+                boundary_start -= 1;
+            }
+            let before = folded[..boundary_start].chars().next_back();
+            let end = start + alias.len();
+            let after = folded[end..].chars().next();
+            if before.is_some_and(is_route_word_character)
+                || after.is_some_and(is_route_word_character)
+            {
+                continue;
+            }
+            if boundary_start < cursor {
+                continue;
+            }
+            replaced.push_str(&scrubbed[cursor..boundary_start]);
+            replaced.push(' ');
+            cursor = end;
+        }
+        replaced.push_str(&scrubbed[cursor..]);
+        scrubbed = replaced;
+    }
+    scrubbed
+}
+
+/// Build the route owner's existing prompt-derived public skill decision.
+pub fn decide_task_route_skills(
+    prompt: &str,
+    mode: &str,
+    rules: &[SkillRoutingRule],
+) -> Result<JsonValue, String> {
+    let decision = decide_task_route_skills_projection(prompt, mode, rules)?;
+    serde_json::to_value(decision).map_err(|error| format!("route_json_invalid:{error}"))
+}
+
+fn decide_task_route_skills_projection(
+    prompt: &str,
+    mode: &str,
+    rules: &[SkillRoutingRule],
+) -> Result<PromptSkillDecision, String> {
+    if !TASK_ROUTE_MODES.contains(&mode) {
+        return Err(format!("invalid-mode:{mode}"));
+    }
+    let public_prompt = strip_private_route_aliases(prompt);
+    let lower_prompt = public_prompt.to_lowercase();
+    let matches = rules
+        .iter()
+        .filter(|rule| public_skill_name_mentioned(&lower_prompt, &rule.skill))
+        .map(|rule| {
+            (
+                rule.skill.clone(),
+                "prompt explicitly names public skill".to_owned(),
+            )
+        })
+        .collect::<Vec<_>>();
+    let matched_skills = ordered_unique(
+        &matches
+            .iter()
+            .map(|(skill, _)| skill.clone())
+            .collect::<Vec<_>>(),
+    );
+    let rules_by_skill = freeze_skill_rule_mapping(
+        rules
+            .iter()
+            .map(|rule| (rule.skill.clone(), rule.clone()))
+            .collect(),
+        "skill routing rules",
+    )?;
+    let mut base_skills = vec!["agent-orchestration".to_owned()];
+    if mode == "repo-changing" {
+        base_skills.push("codex-task-workflow".to_owned());
+    }
+    let selected_skill_inputs = ordered_unique(
+        &base_skills
+            .iter()
+            .chain(matched_skills.iter())
+            .cloned()
+            .collect::<Vec<_>>(),
+    );
+    let skills = if rules.is_empty() {
+        selected_skill_inputs.clone()
+    } else {
+        derive_skill_invocation_order(&selected_skill_inputs, rules)?
+    };
+    let active_inputs = ordered_unique(
+        &std::iter::once("agent-orchestration".to_owned())
+            .chain(matched_skills.iter().cloned())
+            .collect::<Vec<_>>(),
+    );
+    let active_skills = if rules.is_empty() {
+        active_inputs
+    } else {
+        derive_skill_invocation_order(&active_inputs, rules)?
+    };
+    let active_set = active_skills
+        .iter()
+        .map(String::as_str)
+        .collect::<BTreeSet<_>>();
+    let deferred_skills = skills
+        .iter()
+        .filter(|skill| !active_set.contains(skill.as_str()))
+        .cloned()
+        .collect::<Vec<_>>();
+    let (related_skills, related_skill_candidates) =
+        related_skill_candidates(&matched_skills, &rules_by_skill, &matched_skills);
+    let reasons = matches
+        .iter()
+        .map(|(skill, reason)| format!("{skill}:{reason}"))
+        .collect::<Vec<_>>();
+    let evidence = format!(
+        "mode={mode};matched={};active={};deferred={};related={}",
+        if matched_skills.is_empty() {
+            "none".to_owned()
+        } else {
+            matched_skills.join(",")
+        },
+        active_skills.join(","),
+        if deferred_skills.is_empty() {
+            "none".to_owned()
+        } else {
+            deferred_skills.join(",")
+        },
+        if related_skill_candidates.is_empty() {
+            "none".to_owned()
+        } else {
+            related_skill_candidates.join(",")
+        },
+    );
+    Ok(PromptSkillDecision {
+        schema: "agent_canon.route.skill_route.v1".to_owned(),
+        route: "skill-selection".to_owned(),
+        mode: mode.to_owned(),
+        skills,
+        active_skills,
+        deferred_skills,
+        matched_skills,
+        related_skill_candidates,
+        related_skills,
+        reasons,
+        evidence,
+    })
+}
+
+/// Return the fixed route projection used for a failed prompt route.
+pub fn empty_task_route(mode: &str) -> JsonValue {
+    json!({
+        "schema": "agent_canon.route.skill_route.v1",
+        "route": "",
+        "mode": mode,
+        "skills": [],
+        "active_skills": [],
+        "deferred_skills": [],
+        "matched_skills": [],
+        "related_skill_candidates": [],
+        "related_skills": {},
+        "reasons": [],
+        "evidence": "",
+    })
+}
+
+struct TaskRouteCatalog {
+    areas: Vec<TaskRouteArea>,
+    aliases: BTreeMap<String, String>,
+    skill_ids: BTreeSet<String>,
+}
+
+impl TaskRouteCatalog {
+    fn from_rules(rules: &[SkillRoutingRule]) -> Self {
+        let areas = serde_json::from_str::<Vec<TaskRouteArea>>(TASK_ROUTE_AREAS_JSON)
+            .expect("static task route catalog is valid JSON");
+        let mut aliases = BTreeMap::new();
+        for area in &areas {
+            aliases.insert(normalize_task_route_name(&area.key), area.key.clone());
+            for alias in &area.aliases {
+                aliases.insert(normalize_task_route_name(alias), area.key.clone());
+            }
+        }
+        let skill_ids = rules.iter().map(|rule| rule.skill.clone()).collect();
+        Self {
+            areas,
+            aliases,
+            skill_ids,
+        }
+    }
+
+    fn area(&self, key: &str) -> Option<&TaskRouteArea> {
+        self.areas.iter().find(|area| area.key == key)
+    }
+
+    fn resolve_name(&self, name: &str) -> TaskNameResolution {
+        let normalized = normalize_task_route_name(name);
+        if self.skill_ids.contains(&normalized) {
+            return TaskNameResolution {
+                name: name.to_owned(),
+                status: "canonical".to_owned(),
+                canonical_area: "skills".to_owned(),
+                canonical_tool: format!("{TASK_ROUTE_TOOL} --area skills"),
+                canonical_skill: normalized,
+            };
+        }
+        let area = self.aliases.get(&normalized).cloned().unwrap_or_default();
+        if area.is_empty() {
+            return TaskNameResolution {
+                name: name.to_owned(),
+                status: "unknown".to_owned(),
+                canonical_area: String::new(),
+                canonical_tool: String::new(),
+                canonical_skill: String::new(),
+            };
+        }
+        TaskNameResolution {
+            name: name.to_owned(),
+            status: if normalized == area {
+                "canonical"
+            } else {
+                "alias"
+            }
+            .to_owned(),
+            canonical_tool: format!("{TASK_ROUTE_TOOL} --area {area}"),
+            canonical_area: area,
+            canonical_skill: TASK_ROUTE_NAME.to_owned(),
+        }
+    }
+}
+
+fn normalize_task_route_name(value: &str) -> String {
+    let mut name = value.trim();
+    if let Some(stripped) = name.strip_prefix('$') {
+        name = stripped;
+    }
+    if let Some((_, tail)) = name.rsplit_once('/') {
+        name = tail;
+    }
+    if let Some(stripped) = name.strip_suffix(".py") {
+        name = stripped;
+    }
+    name.replace('_', "-")
+}
+
+fn task_route_decision(area: &TaskRouteArea, risk: &str, changed: &[String]) -> TaskRouteDecision {
+    TaskRouteDecision {
+        route: TASK_ROUTE_NAME.to_owned(),
+        area: area.key.clone(),
+        label: area.label.clone(),
+        tool: TASK_ROUTE_TOOL.to_owned(),
+        skill: TASK_ROUTE_NAME.to_owned(),
+        next_action: area.next_action.clone(),
+        commands: area.commands.clone(),
+        skip_reason: String::new(),
+        evidence: format!(
+            "area={};risk={risk};changed={}",
+            area.key,
+            if changed.is_empty() {
+                "none".to_owned()
+            } else {
+                changed.join(",")
+            }
+        ),
+    }
+}
+
+fn task_route_render_areas(areas: &[TaskRouteArea], format: &str) -> String {
+    match format {
+        "json" => {
+            serde_json::to_string_pretty(&serde_json::to_value(areas).unwrap_or_else(|_| json!([])))
+                .unwrap_or_else(|_| "[]".to_owned())
+        }
+        "markdown" => {
+            let mut rows = vec![
+                "| Area | Label | Tool | Skill | Purpose |".to_owned(),
+                "| ---- | ----- | ---- | ----- | ------- |".to_owned(),
+            ];
+            rows.extend(areas.iter().map(|area| {
+                format!(
+                    "| `{}` | {} | `{TASK_ROUTE_TOOL} --area {}` | `${TASK_ROUTE_NAME}` | {} |",
+                    area.key, area.label, area.key, area.purpose
+                )
+            }));
+            rows.join("\n")
+        }
+        _ => areas
+            .iter()
+            .map(|area| {
+                format!(
+                    "AREA={}\tLABEL={}\tTOOL={TASK_ROUTE_TOOL} --area {}\tSKILL={}\tNEXT_ACTION={}",
+                    area.key, area.label, area.key, TASK_ROUTE_NAME, area.next_action
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n"),
+    }
+}
+
+fn task_route_render_decision(decision: &TaskRouteDecision, format: &str) -> String {
+    match format {
+        "json" => serde_json::to_string_pretty(
+            &serde_json::to_value(decision).unwrap_or_else(|_| json!({})),
+        )
+        .unwrap_or_else(|_| "{}".to_owned()),
+        "markdown" => {
+            let commands = decision
+                .commands
+                .iter()
+                .map(|command| format!("`{command}`"))
+                .collect::<Vec<_>>()
+                .join("<br>");
+            format!(
+                "- Route: `{}`\n- Area: `{}`\n- Tool: `{}`\n- Skill: `${}`\n- Next action: `{}`\n- Commands: {commands}\n- Evidence: `{}`",
+                decision.route,
+                decision.area,
+                decision.tool,
+                decision.skill,
+                decision.next_action,
+                decision.evidence,
+            )
+        }
+        _ => [
+            format!("ROUTE={}", decision.route),
+            format!("AREA={}", decision.area),
+            format!("LABEL={}", decision.label),
+            format!("TOOL={}", decision.tool),
+            format!("SKILL={}", decision.skill),
+            format!("NEXT_ACTION={}", decision.next_action),
+            format!("COMMANDS={}", decision.commands.join(" && ")),
+            format!("SKIP_REASON={}", decision.skip_reason),
+            format!("EVIDENCE={}", decision.evidence),
+        ]
+        .join("\n"),
+    }
+}
+
+fn task_route_render_resolutions(resolutions: &[TaskNameResolution], format: &str) -> String {
+    match format {
+        "json" => serde_json::to_string_pretty(
+            &serde_json::to_value(resolutions).unwrap_or_else(|_| json!([])),
+        )
+        .unwrap_or_else(|_| "[]".to_owned()),
+        "markdown" => {
+            let mut rows = vec![
+                "| Name | Status | Area | Tool | Skill |".to_owned(),
+                "| ---- | ------ | ---- | ---- | ----- |".to_owned(),
+            ];
+            rows.extend(resolutions.iter().map(|item| {
+                format!(
+                    "| `{}` | `{}` | `{}` | `{}` | `{}` |",
+                    item.name,
+                    item.status,
+                    item.canonical_area,
+                    item.canonical_tool,
+                    item.canonical_skill
+                )
+            }));
+            rows.join("\n")
+        }
+        _ => resolutions
+            .iter()
+            .map(|item| {
+                format!(
+                    "NAME={}\tSTATUS={}\tCANONICAL_AREA={}\tCANONICAL_TOOL={}\tCANONICAL_SKILL={}",
+                    item.name,
+                    item.status,
+                    item.canonical_area,
+                    item.canonical_tool,
+                    item.canonical_skill
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n"),
+    }
+}
+
+fn task_route_render_skills(decision: &PromptSkillDecision, format: &str) -> String {
+    if format == "json" {
+        return serde_json::to_value(decision)
+            .and_then(|value| serde_json::to_string_pretty(&value))
+            .unwrap_or_else(|_| "{}".to_owned());
+    }
+    if format == "markdown" {
+        let render = |values: &[String]| {
+            if values.is_empty() {
+                "`none`".to_owned()
+            } else {
+                values
+                    .iter()
+                    .map(|value| format!("`${value}`"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            }
+        };
+        return format!(
+            "- Route: `{}`\n- Mode: `{}`\n- Skills: {}\n- Active skills: {}\n- Deferred skills: {}\n- Matched skills: `{}`\n- Related skill candidates: {}\n- Reasons: {}\n- Evidence: `{}`",
+            decision.route,
+            decision.mode,
+            render(&decision.skills),
+            render(&decision.active_skills),
+            render(&decision.deferred_skills),
+            if decision.matched_skills.is_empty() { "none".to_owned() } else { decision.matched_skills.join(",") },
+            render(&decision.related_skill_candidates),
+            if decision.reasons.is_empty() { "`none`".to_owned() } else { decision.reasons.iter().map(|reason| format!("`{reason}`")).collect::<Vec<_>>().join("<br>") },
+            decision.evidence,
+        );
+    }
+    let related_lines = if decision.related_skills.is_empty() {
+        "-".to_owned()
+    } else {
+        decision
+            .related_skills
+            .iter()
+            .map(|(source, values)| format!("{source}:{}", values.join("|")))
+            .collect::<Vec<_>>()
+            .join(";")
+    };
+    [
+        format!("ROUTE={}", decision.route),
+        "SCHEMA=agent_canon.route.skill_route.v1".to_owned(),
+        format!("MODE={}", decision.mode),
+        format!("SKILLS={}", render_route_skills(&decision.skills, "$")),
+        format!(
+            "ACTIVE_SKILLS={}",
+            render_route_skills(&decision.active_skills, "$")
+        ),
+        format!(
+            "DEFERRED_SKILLS={}",
+            render_route_skills(&decision.deferred_skills, "$")
+        ),
+        format!(
+            "MATCHED_SKILLS={}",
+            if decision.matched_skills.is_empty() {
+                "-".to_owned()
+            } else {
+                decision.matched_skills.join(",")
+            }
+        ),
+        format!(
+            "RELATED_SKILL_CANDIDATES={}",
+            render_route_skills(&decision.related_skill_candidates, "$")
+        ),
+        format!("RELATED_SKILLS={related_lines}"),
+        format!(
+            "REASONS={}",
+            if decision.reasons.is_empty() {
+                "-".to_owned()
+            } else {
+                decision.reasons.join(";")
+            }
+        ),
+        format!("EVIDENCE={}", decision.evidence),
+    ]
+    .join("\n")
+}
+
+fn render_route_skills(values: &[String], prefix: &str) -> String {
+    if values.is_empty() {
+        "-".to_owned()
+    } else {
+        values
+            .iter()
+            .map(|value| format!("{prefix}{value}"))
+            .collect::<Vec<_>>()
+            .join(",")
+    }
+}
+
+fn parse_task_route_args(args: &[String]) -> Result<Option<TaskRouteOptions>, String> {
+    let mut root = None;
+    let mut area = None;
+    let mut execution_context = None;
+    let mut names = Vec::new();
+    let mut prompts = Vec::new();
+    let mut prompt_files = Vec::new();
+    let mut prompt_stdin = false;
+    let mut mode = "routing-only".to_owned();
+    let mut list = false;
+    let mut format = "text".to_owned();
+    let mut risk = "focused".to_owned();
+    let mut changed = Vec::new();
+    let mut positional_prompt = Vec::new();
+    let mut index = 0;
+    let mut positional_only = false;
+    while index < args.len() {
+        let argument = args[index].as_str();
+        if positional_only {
+            positional_prompt.push(argument.to_owned());
+            index += 1;
+            continue;
+        }
+        if argument == "--" {
+            positional_only = true;
+            index += 1;
+            continue;
+        }
+        if argument == "-h" {
+            return Ok(None);
+        }
+        if !argument.starts_with('-') {
+            positional_prompt.push(argument.to_owned());
+            index += 1;
+            continue;
+        }
+        let (option, inline_value) = argument
+            .split_once('=')
+            .map_or((argument, None), |(option, value)| (option, Some(value)));
+        let selected = if let Some((_, exact)) = TASK_ROUTE_CLI_OPTIONS
+            .iter()
+            .find(|(candidate, _)| *candidate == option)
+        {
+            *exact
+        } else {
+            resolve_long_option_prefix(option, TASK_ROUTE_CLI_OPTIONS).map_err(
+                |error| match error {
+                    LongOptionError::Unrecognized => format!("unrecognized arguments: {argument}"),
+                    LongOptionError::Ambiguous(matches) => format!(
+                        "ambiguous option: {option} could match {}",
+                        matches.join(", ")
+                    ),
+                },
+            )?
+        };
+        if selected == TaskRouteOption::Help {
+            return Ok(None);
+        }
+        if matches!(
+            selected,
+            TaskRouteOption::PromptStdin | TaskRouteOption::List
+        ) {
+            if inline_value.is_some() {
+                return Err(format!("argument {option}: ignored explicit argument"));
+            }
+            if selected == TaskRouteOption::PromptStdin {
+                prompt_stdin = true;
+            } else {
+                list = true;
+            }
+            index += 1;
+            continue;
+        }
+        if selected == TaskRouteOption::Changed {
+            if let Some(value) = inline_value {
+                changed.push(value.to_owned());
+                index += 1;
+                continue;
+            }
+            index += 1;
+            while index < args.len() && !args[index].starts_with('-') {
+                changed.push(args[index].clone());
+                index += 1;
+            }
+            continue;
+        }
+        let value = if let Some(value) = inline_value {
+            value
+        } else {
+            index += 1;
+            args.get(index)
+                .ok_or_else(|| format!("argument {option}: expected one argument"))?
+                .as_str()
+        };
+        match selected {
+            TaskRouteOption::Help => return Ok(None),
+            TaskRouteOption::Root => root = Some(PathBuf::from(value)),
+            TaskRouteOption::Area => area = Some(value.to_owned()),
+            TaskRouteOption::ExecutionContext => execution_context = Some(value.to_owned()),
+            TaskRouteOption::Name => names.push(value.to_owned()),
+            TaskRouteOption::Prompt => prompts.push(value.to_owned()),
+            TaskRouteOption::PromptFile => prompt_files.push(value.to_owned()),
+            TaskRouteOption::Mode => mode = value.to_owned(),
+            TaskRouteOption::List | TaskRouteOption::PromptStdin => {
+                unreachable!("boolean options handled above")
+            }
+            TaskRouteOption::Format => format = value.to_owned(),
+            TaskRouteOption::Risk => risk = value.to_owned(),
+            TaskRouteOption::Changed => unreachable!("changed option handled above"),
+        }
+        index += 1;
+    }
+    let root = match root {
+        Some(root) => root,
+        None => {
+            env::current_dir().map_err(|error| format!("resolve current directory: {error}"))?
+        }
+    };
+    if !TASK_ROUTE_FORMATS.contains(&format.as_str()) {
+        return Err(format!(
+            "argument --format: invalid choice: '{format}' (choose from 'text', 'json', 'markdown')"
+        ));
+    }
+    if !TASK_ROUTE_MODES.contains(&mode.as_str()) {
+        return Err(format!(
+            "argument --mode: invalid choice: '{mode}' (choose from 'routing-only', 'repo-changing')"
+        ));
+    }
+    if !TASK_ROUTE_RISKS.contains(&risk.as_str()) {
+        return Err(format!(
+            "argument --risk: invalid choice: '{risk}' (choose from 'routine', 'focused', 'profile', 'shared', 'large')"
+        ));
+    }
+    if let Some(area) = &area {
+        let known = serde_json::from_str::<Vec<TaskRouteArea>>(TASK_ROUTE_AREAS_JSON)
+            .expect("static task route catalog parses")
+            .into_iter()
+            .map(|area| area.key)
+            .collect::<Vec<_>>();
+        if !known.contains(area) {
+            return Err(format!(
+                "argument --area: invalid choice: '{area}' (choose from {})",
+                known
+                    .iter()
+                    .map(|item| format!("'{item}'"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ));
+        }
+    }
+    Ok(Some(TaskRouteOptions {
+        root,
+        area,
+        execution_context,
+        names,
+        prompts,
+        prompt_files,
+        prompt_stdin,
+        mode,
+        list,
+        format,
+        risk,
+        changed,
+        positional_prompt,
+    }))
+}
+
+fn task_route_prompt(options: &TaskRouteOptions) -> Result<String, String> {
+    let mut parts = options.prompts.clone();
+    parts.extend(options.positional_prompt.iter().cloned());
+    for raw_path in &options.prompt_files {
+        let path = Path::new(raw_path);
+        let path = if path.is_absolute() {
+            path.to_path_buf()
+        } else {
+            options.root.join(path)
+        };
+        if !path.is_file() {
+            return Err(format!("prompt-file-not-found:{raw_path}"));
+        }
+        parts.push(fs::read_to_string(&path).map_err(|error| error.to_string())?);
+    }
+    if options.prompt_stdin {
+        let mut value = String::new();
+        std::io::stdin()
+            .read_to_string(&mut value)
+            .map_err(|error| error.to_string())?;
+        parts.push(value);
+    }
+    Ok(parts
+        .into_iter()
+        .map(|part| part.trim().to_owned())
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n"))
+}
+
+fn decide_task_execution(
+    root: &Path,
+    context: &JsonValue,
+) -> Result<ExecutionRouteDecision, String> {
+    let catalog = fs::read_to_string(root.join("agents/task_catalog.yaml"))
+        .map_err(|_| "execution-catalog-unreadable".to_owned())?;
+    let documents = YamlLoader::load_from_str(&catalog)
+        .map_err(|_| "execution-catalog-unreadable".to_owned())?;
+    let document = documents
+        .first()
+        .ok_or_else(|| "execution-catalog-unreadable".to_owned())?;
+    let policy = yaml_get(document, "execution_route_policy")
+        .ok_or_else(|| "execution-route-policy-missing".to_owned())?;
+    let singletons = yaml_string_list(yaml_get(policy, "singletons"), "singletons")?;
+    let resolved = yaml_string_list(yaml_get(policy, "resolved"), "resolved")?;
+    let coordination_reasons = yaml_string_list(
+        yaml_get(policy, "coordination_reasons"),
+        "coordination_reasons",
+    )?;
+    for (key, values) in [
+        ("singletons", &singletons),
+        ("resolved", &resolved),
+        ("coordination_reasons", &coordination_reasons),
+    ] {
+        if values.is_empty() || values.iter().any(String::is_empty) {
+            return Err(format!("execution-route-policy-invalid:{key}"));
+        }
+        if values.iter().collect::<BTreeSet<_>>().len() != values.len() {
+            return Err(format!("execution-route-policy-invalid:{key}"));
+        }
+    }
+    let routes = yaml_get(policy, "routes").ok_or_else(|| "execution-routes-invalid".to_owned())?;
+    let routes_hash = routes
+        .as_hash()
+        .ok_or_else(|| "execution-routes-invalid".to_owned())?;
+    let route_keys = routes_hash
+        .keys()
+        .filter_map(Yaml::as_str)
+        .collect::<BTreeSet<_>>();
+    let expected_route_keys = ["bounded_fast_path", "coordination"]
+        .into_iter()
+        .collect::<BTreeSet<_>>();
+    if route_keys != expected_route_keys {
+        return Err("execution-routes-invalid".to_owned());
+    }
+    let mut required = singletons
+        .iter()
+        .chain(&resolved)
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    required.insert("validation".to_owned());
+    required.insert("coordination".to_owned());
+    let context = context
+        .as_object()
+        .ok_or_else(|| "execution-context-fields-invalid".to_owned())?;
+    let context_keys = context.keys().cloned().collect::<BTreeSet<_>>();
+    let allowed = required
+        .iter()
+        .cloned()
+        .chain(std::iter::once("validation_status".to_owned()))
+        .collect::<BTreeSet<_>>();
+    if !required.is_subset(&context_keys) || !context_keys.is_subset(&allowed) {
+        return Err("execution-context-fields-invalid".to_owned());
+    }
+    for key in &singletons {
+        if context
+            .get(key)
+            .and_then(JsonValue::as_i64)
+            .is_none_or(|value| value < 1)
+        {
+            return Err(format!("execution-context-count-invalid:{key}"));
+        }
+    }
+    for key in &resolved {
+        if context.get(key) != Some(&JsonValue::Bool(true)) {
+            return Err(format!("execution-context-unresolved:{key}"));
+        }
+    }
+    let validation = context
+        .get("validation")
+        .and_then(JsonValue::as_str)
+        .filter(|value| !value.trim().is_empty())
+        .ok_or_else(|| "execution-validation-oracle-unresolved".to_owned())?;
+    let reasons = context
+        .get("coordination")
+        .and_then(JsonValue::as_array)
+        .ok_or_else(|| "execution-coordination-reasons-invalid".to_owned())?;
+    if reasons.iter().any(|reason| {
+        reason
+            .as_str()
+            .is_none_or(|reason| !coordination_reasons.iter().any(|allowed| allowed == reason))
+    }) {
+        return Err("execution-coordination-reasons-invalid".to_owned());
+    }
+    let status = match context.get("validation_status") {
+        None => "pending",
+        Some(JsonValue::String(status)) => status.as_str(),
+        Some(_) => return Err("execution-validation-status-invalid".to_owned()),
+    };
+    if !["pending", "pass", "failed", "unavailable"].contains(&status) {
+        return Err("execution-validation-status-invalid".to_owned());
+    }
+    let bounded = singletons
+        .iter()
+        .all(|key| context.get(key).and_then(JsonValue::as_i64) == Some(1))
+        && reasons.is_empty();
+    let selected = if bounded {
+        "bounded_fast_path"
+    } else {
+        "coordination"
+    };
+    let route = yaml_get(routes, selected)
+        .ok_or_else(|| "execution-route-projection-invalid".to_owned())?;
+    let next_action = yaml_get(route, "next_action")
+        .and_then(Yaml::as_str)
+        .ok_or_else(|| "execution-route-projection-invalid".to_owned())?
+        .to_owned();
+    let commands = yaml_get(route, "commands")
+        .and_then(Yaml::as_vec)
+        .ok_or_else(|| "execution-route-commands-invalid".to_owned())?
+        .iter()
+        .map(|command| {
+            command
+                .as_str()
+                .map(str::to_owned)
+                .ok_or_else(|| "execution-route-commands-invalid".to_owned())
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(ExecutionRouteDecision {
+        execution_route: selected.to_owned(),
+        next_action,
+        commands,
+        selected_validation: validation.to_owned(),
+        verification_status: if status == "unavailable" {
+            "need verification".to_owned()
+        } else {
+            status.to_owned()
+        },
+    })
+}
+
+fn yaml_string_list(value: Option<&Yaml>, field: &str) -> Result<Vec<String>, String> {
+    let values = value
+        .and_then(Yaml::as_vec)
+        .ok_or_else(|| format!("execution-route-policy-invalid:{field}"))?;
+    let mut result = Vec::with_capacity(values.len());
+    for value in values {
+        let Some(value) = value.as_str().filter(|value| !value.is_empty()) else {
+            return Err(format!("execution-route-policy-invalid:{field}"));
+        };
+        result.push(value.to_owned());
+    }
+    Ok(result)
+}
+
+fn print_execution_route(decision: &ExecutionRouteDecision, format: &str) {
+    if format == "json" {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(decision).unwrap_or_else(|_| "{}".to_owned())
+        );
+    } else if format == "markdown" {
+        println!(
+            "**execution_route**: `{}`\n**next_action**: `{}`\n**commands**: `{}`\n**selected_validation**: `{}`\n**verification_status**: `{}`",
+            decision.execution_route,
+            decision.next_action,
+            serde_json::to_string(&decision.commands).unwrap_or_default(),
+            decision.selected_validation,
+            decision.verification_status,
+        );
+    } else {
+        println!(
+            "EXECUTION_ROUTE={}\nNEXT_ACTION={}\nCOMMANDS={}\nSELECTED_VALIDATION={}\nVERIFICATION_STATUS={}",
+            serde_json::to_string(&decision.execution_route).unwrap_or_default(),
+            serde_json::to_string(&decision.next_action).unwrap_or_default(),
+            serde_json::to_string(&decision.commands).unwrap_or_default(),
+            serde_json::to_string(&decision.selected_validation).unwrap_or_default(),
+            serde_json::to_string(&decision.verification_status).unwrap_or_default(),
+        );
+    }
+}
+
+/// Run the native general-purpose route CLI; explicit capabilities reuse the existing capability owner.
+pub fn run_task_route(args: &[String]) -> i32 {
+    if args
+        .iter()
+        .any(|argument| argument == "--capability" || argument.starts_with("--capability="))
+    {
+        return run_capability_route(args);
+    }
+    let options = match parse_task_route_args(args) {
+        Ok(Some(options)) => options,
+        Ok(None) => {
+            println!("{TASK_ROUTE_USAGE}");
+            return 0;
+        }
+        Err(error) => {
+            eprintln!("{TASK_ROUTE_USAGE}");
+            eprintln!("route.py: error: {error}");
+            return 2;
+        }
+    };
+    let raw_root = crate::path_resolution::resolve_non_strict(&options.root)
+        .unwrap_or_else(|_| options.root.clone());
+    let environment = env::vars_os()
+        .filter_map(|(name, value)| Some((name.into_string().ok()?, value.into_string().ok()?)))
+        .collect::<BTreeMap<_, _>>();
+    let prompt = match task_route_prompt(&options) {
+        Ok(prompt) => prompt,
+        Err(error) => {
+            eprintln!("SKILL_ROUTER_ERROR={error}");
+            return 2;
+        }
+    };
+    if let Some(raw_context) = &options.execution_context {
+        if options.area.as_deref() != Some("closeout")
+            || !prompt.is_empty()
+            || !options.names.is_empty()
+            || options.list
+        {
+            eprintln!("{TASK_ROUTE_USAGE}");
+            eprintln!("route.py: error: --execution-context requires --area closeout without another route selector");
+            return 2;
+        }
+        let context_text = if raw_context == "-" {
+            let mut text = String::new();
+            if let Err(error) = std::io::stdin().read_to_string(&mut text) {
+                eprintln!("EXECUTION_ROUTE_ERROR={error}");
+                return 2;
+            }
+            text
+        } else {
+            raw_context.clone()
+        };
+        let context: JsonValue = match serde_json::from_str(&context_text) {
+            Ok(context) => context,
+            Err(error) => {
+                eprintln!("EXECUTION_ROUTE_ERROR={error}");
+                return 2;
+            }
+        };
+        let decision = match decide_task_execution(&raw_root, &context) {
+            Ok(decision) => decision,
+            Err(error) => {
+                eprintln!("EXECUTION_ROUTE_ERROR={error}");
+                return 2;
+            }
+        };
+        print_execution_route(&decision, &options.format);
+        return 0;
+    }
+    let roots = match resolve_source_roots(&raw_root, &environment) {
+        Ok(roots) => roots,
+        Err(error) => {
+            eprintln!("ROUTE_SOURCE_ROOT_FAILURE={}:{}", error.code, error.detail);
+            return 2;
+        }
+    };
+    let area_without_context = options.area.as_deref() == Some("closeout")
+        && prompt.is_empty()
+        && options.names.is_empty();
+    let rules = if area_without_context {
+        Vec::new()
+    } else {
+        match load_skill_route_rules(&roots.source_root) {
+            Ok(rules) => rules,
+            Err(error) => {
+                eprintln!("SKILL_ROUTER_ERROR={error}");
+                return 2;
+            }
+        }
+    };
+    if !prompt.is_empty() {
+        let route = match decide_task_route_skills_projection(&prompt, &options.mode, &rules) {
+            Ok(route) => route,
+            Err(error) => {
+                eprintln!("SKILL_ROUTER_ERROR={error}");
+                return 2;
+            }
+        };
+        println!("{}", task_route_render_skills(&route, &options.format));
+        return 0;
+    }
+    let catalog = TaskRouteCatalog::from_rules(&rules);
+    if !options.names.is_empty() {
+        let resolutions = options
+            .names
+            .iter()
+            .map(|name| catalog.resolve_name(name))
+            .collect::<Vec<_>>();
+        println!(
+            "{}",
+            task_route_render_resolutions(&resolutions, &options.format)
+        );
+        return if resolutions.iter().any(|item| item.status == "unknown") {
+            1
+        } else {
+            0
+        };
+    }
+    if let Some(area) = &options.area {
+        let Some(area) = catalog.area(area) else {
+            eprintln!("ROUTE=task-routing\nSTATUS=unknown-area\nAREA={area}");
+            return 2;
+        };
+        if area.key == "closeout" {
+            let decision = task_route_decision(area, &options.risk, &options.changed);
+            println!("{}", task_route_render_decision(&decision, &options.format));
+            return 0;
+        }
+        let decision = task_route_decision(area, &options.risk, &options.changed);
+        println!("{}", task_route_render_decision(&decision, &options.format));
+        return 0;
+    }
+    println!(
+        "{}",
+        task_route_render_areas(&catalog.areas, &options.format)
+    );
+    0
+}
+
 fn capability_value_option(option: &str) -> Option<&str> {
     match option {
         "--capability" | "--format" | "--mode" | "--risk" | "--root" | "--name" | "--area" => {
@@ -2049,5 +3216,96 @@ mod validator_tests {
             );
             assert_eq!(count, failed_call + 1);
         }
+    }
+}
+
+#[cfg(test)]
+mod task_route_tests {
+    use super::*;
+
+    fn project_root() -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../../")
+            .canonicalize()
+            .expect("resolve AgentCanon project root")
+    }
+
+    #[test]
+    fn native_prompt_route_preserves_explicit_skills_and_dependency_order() {
+        let root = project_root();
+        let rules = load_skill_route_rules(&root).expect("public route catalog is valid");
+        let decision = decide_task_route_skills(
+            "Please use $code-cleanup for the changed implementation",
+            "repo-changing",
+            &rules,
+        )
+        .expect("prompt route resolves");
+        assert_eq!(decision["schema"], "agent_canon.route.skill_route.v1");
+        assert_eq!(decision["route"], "skill-selection");
+        assert_eq!(decision["mode"], "repo-changing");
+        assert_eq!(decision["matched_skills"], json!(["code-cleanup"]));
+        let skills = decision["skills"]
+            .as_array()
+            .expect("skills serialize as an array");
+        let prerequisite = skills
+            .iter()
+            .position(|skill| skill == "responsibility-cleanup")
+            .expect("code cleanup includes its responsibility prerequisite");
+        let dependency = skills
+            .iter()
+            .position(|skill| skill == "dependency-analysis")
+            .expect("code cleanup includes its dependency prerequisite");
+        let selected = skills
+            .iter()
+            .position(|skill| skill == "code-cleanup")
+            .expect("explicit code-cleanup skill is retained");
+        assert!(prerequisite < selected);
+        assert!(dependency < selected);
+    }
+
+    #[test]
+    fn private_route_aliases_are_stripped_before_public_skill_matching() {
+        let root = project_root();
+        let rules = load_skill_route_rules(&root).expect("public route catalog is valid");
+        let private = decide_task_route_skills(
+            "subagent-startup\ninternal_skill_routes: [subagent-bootstrap]",
+            "routing-only",
+            &rules,
+        )
+        .expect("private route hints remain valid prompt text");
+        assert_eq!(private["matched_skills"], json!([]));
+
+        let public = decide_task_route_skills(
+            "Use $subagent-bootstrap for the writer handoff",
+            "routing-only",
+            &rules,
+        )
+        .expect("public skill names remain matchable");
+        assert_eq!(public["matched_skills"], json!(["subagent-bootstrap"]));
+    }
+
+    #[test]
+    fn route_alias_normalization_matches_public_skill_and_area_contracts() {
+        let root = project_root();
+        let rules = load_skill_route_rules(&root).expect("public route catalog is valid");
+        let catalog = TaskRouteCatalog::from_rules(&rules);
+        let area = catalog.resolve_name("repository-structure");
+        assert_eq!(area.status, "alias");
+        assert_eq!(area.canonical_area, "structure");
+        let skill = catalog.resolve_name("$change_review.py");
+        assert_eq!(skill.status, "canonical");
+        assert_eq!(skill.canonical_skill, "change-review");
+        let unknown = catalog.resolve_name("private-startup-alias");
+        assert_eq!(unknown.status, "unknown");
+    }
+
+    #[test]
+    fn route_prompt_mode_fails_on_invalid_values() {
+        let root = project_root();
+        let rules = load_skill_route_rules(&root).expect("public route catalog is valid");
+        assert_eq!(
+            decide_task_route_skills("update source", "write", &rules).unwrap_err(),
+            "invalid-mode:write"
+        );
     }
 }

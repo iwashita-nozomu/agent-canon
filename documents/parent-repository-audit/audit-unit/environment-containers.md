@@ -6,7 +6,7 @@ responsibility Audits Ubuntu direct base, cold-build reproducibility, non-root o
 upstream design ../README.md owns static-first audit policy
 upstream design ../../runtime/runtime-profiles-and-check-matrix.md owns profile validation selection
 upstream implementation ../../../agents/skills/environment-maintenance.md owns environment repair
-downstream implementation ../../../tools/analysis/code/parent_repository_audit.py selects this unit by semantic change surface
+downstream implementation ../../../tools/runtime/dispatch/agent-canon/src/parent_repository_audit.rs selects this unit by semantic change surface
 @dependency-end
 -->
 

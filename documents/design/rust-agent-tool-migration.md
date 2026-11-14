@@ -18,9 +18,10 @@ downstream implementation ../../tools/bin/agent-canon stable native entrypoint
 ## Scope and Intent
 
 The [agent tool-authoring rule](../../ROOT_AGENTS.md#always-on-boundary) requires
-shell scripts or Rust for new tools and task automation, including temporary
-and inline code. Existing Python tools and external Python providers may still
-be invoked through their selected execution contract during migration.
+shell scripts or Rust for tools and task automation, including temporary
+and inline code. AgentCanon-owned tool implementations now use Rust or shell;
+consumer/test Python and explicitly selected external Python providers retain
+their existing execution contracts.
 
 Migrate every AgentCanon-owned Python tool implementation to Rust, including
 workflow orchestration, runtime lifecycle, Eval producers and checkers, and
@@ -92,9 +93,8 @@ trust admission and target-mount transaction. Its dispatcher composes the native
 safety, event-assembly, spool, and report owners. Frozen old
 CLI cases check both the library and real command; integration tests retain
 report selection and containment, privacy, append/report failures, and ordinary
-editing without runtime role or receipt gates. The Python dispatcher is retired after its direct tests and consumers move to
-the native command. Shared Python helpers retain their remaining consumers and
-remain in the migration inventory.
+editing without runtime role or receipt gates. The Python dispatcher and shared
+Python helpers are retired; their active consumers use the native owners.
 
 The stable entrypoint is `tools/bin/agent-canon`; native source belongs under
 `tools/runtime/dispatch/agent-canon/src`. Use the selected shared build and
@@ -111,8 +111,8 @@ not actual container admission or runtime identity.
 Retain consumer Python functions, JAX execution, and explicitly contracted
 external Python producer interfaces. Keep basic CLI paths independent of Python.
 External runtime connections do not exempt AgentCanon-owned logic from migration;
-the default surface-manifest producer must become native while explicit external
-producer identity, root/foreign restrictions, and stale guards are preserved.
+the default surface-manifest producer is native, with explicit external
+producer identity, root/foreign restrictions, and stale guards preserved.
 No substantial Python implementation belongs in Rust or bootstrap strings.
 
 Preserve these existing provider capabilities:
@@ -121,13 +121,14 @@ Preserve these existing provider capabilities:
   files with the pinned `experiment-runner-admitted` provider declared in
   `agent-canon-environment.toml`. Port admission, fingerprints, receipts,
   lifecycle checks, and artifacts while preserving that provider and consumer
-  `experiments/<topic>/run.py` execution.
+  `experiments/<topic>/run.py` execution. The native `managed_experiment.rs`
+  owner implements this orchestration.
 - JIT extraction accepts `path.py::qualname` and an input factory, dynamically
   calls Equinox/JAX lowering and shape/tree APIs, and produces StableHLO,
   public-interface, and backend evidence. The native `jit_ir_to_lean.rs` owner
   consumes downstream JSON; it does not replace this lowering contract.
-  Select a reviewed safe native connection to the external CPython/JAX runtime.
-  Requiring only pre-exported StableHLO would remove existing functionality.
+  The Rust provider's `jit_runtime.rs` connects to the external CPython/JAX
+  runtime through safe PyO3 APIs and retains dynamic lowering.
 - Preserve configured LSP servers while migrating `pylsp_jsonrpc` transport
   responsibilities. PDF extraction currently supports both `pypdf` and
   `pdftotext`; removing the pypdf-only case needs an explicit replacement
@@ -137,9 +138,27 @@ Native parser, Python runtime binding, and filesystem capability dependencies
 require their own investigated design and validation. Do not weaken
 Python-AST semantics or descriptor-relative writes, inode/device identity,
 no-follow handling, locks, and authenticated handoffs to avoid that work.
-`runtime_boundary.rs` provides useful external-artifact checks but does not yet
-replace all guarantees of `parent_root_side_effects.py` and
-`runtime_artifacts.py`.
+The native `authority` and `artifacts` modules own the root and artifact
+boundaries formerly implemented in Python. `runtime_boundary.rs` continues to
+provide external-artifact checks.
+
+The optional native CPython connection lives at
+`tools/runtime/python-provider`. It uses PyO3's safe, interpreter-bound object
+APIs to call the selected external modules and existing consumer code. Build
+this provider for the Python runtime selected with `PYO3_PYTHON`; its shared
+library remains owned by that environment. Keep the standalone AgentCanon CLI
+independent of this link so ordinary commands retain their Python-free startup.
+Provider selection and module/function calls belong in Rust. Existing consumer
+Python remains an input; no AgentCanon Python source or inline program is added.
+The consumers include PDF extraction, retained proof-trace loading, and dynamic
+JAX extraction through the provider's `jit-lower` command.
+
+This split follows PyO3's documented
+[dynamic embedding and interpreter selection](https://github.com/PyO3/pyo3/blob/main/guide/src/building-and-distribution.md#embedding-python-in-rust)
+and its [Python object lifetime contract](https://github.com/PyO3/pyo3/blob/main/guide/src/python-from-rust.md#the-py-lifetime).
+Verify the provider against controlled external modules and the consuming
+public CLI, including unavailable runtime/module failures, before retiring each
+owning Python implementation.
 
 The native parent-root authority accepts an explicit `AttestationRequest`.
 `ParentRootAttestor::attest` validates only that request; it does not construct
@@ -185,8 +204,7 @@ File-surface inventory is implemented by
 retired. The CLI and catalog route select the Rust owner. The command retains
 default `root-only`, mutually exclusive `--root-only`/`--agentcanon-only`,
 explicit `--json-out` and `--markdown-out`, and `--max-markdown-entries`.
-The full owned-tool migration remains open; this port does not establish
-completion of other implementations or native Python delegations.
+Its behavior and caller checks establish this command's migration evidence.
 
 Inventory indexed and untracked nonignored Git paths, preserving gitlinks,
 executable and symlink modes, deleted-index exclusion, dangling symlink
@@ -215,7 +233,6 @@ Document-canon inventory is already implemented by native
 `structured-analysis document-inventory`. Its generic responsibility findings
 remain derived from dependency declarations and upstream coverage rules.
 Preserve this owner rather than restoring a Python compatibility implementation.
-Other commands in the same crate may still have the delegation gaps above.
 
 ## Native Helper Function Inventory Port and Caller Closure
 
@@ -256,7 +273,7 @@ its active consumers now use the native owner. The frozen Python source-query,
 context, and export corpus remains an independent compatibility oracle.
 External Python execution selected by an explicit v2 identity is a retained
 provider capability; it does not mean the native default delegates to an owned
-Python tool. This port does not complete other migration families.
+Python tool.
 
 ## Native DOCX Extraction and Caller Closure
 
@@ -290,8 +307,7 @@ transaction-boundary check over real staged bytes; it asserts no publication,
 stage cleanup, and preservation of an admitted empty output. The preserved CLI
 tests keep the late-failure and output transaction oracles. The XML corpus
 continues to freeze the old ElementTree events and Markdown projection. This
-closes the known DOCX caller set; it does not imply that other Python document
-tools are native or migrated.
+closes the known DOCX caller set.
 
 ## Plan and Audit Interfaces
 

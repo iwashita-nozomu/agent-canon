@@ -28,31 +28,14 @@ fail_runtime_boundary() {
 
 runtime_path() {
   local candidate="$1"
-  python3 - "$script_dir" "$ROOT_DIR" "$CONTROL_ROOT" "$RUNTIME_ROOT" "$candidate" <<'PY'
-from pathlib import Path
-import sys
-
-source, root, control, runtime, candidate = map(Path, sys.argv[1:])
-sys.path.insert(0, str(source.parents[2].resolve(strict=True)))
-from tools.runtime.artifacts.runtime_artifacts import RuntimeArtifactBoundary, RuntimeArtifactError
-
-try:
-    source_root = source.parents[2].resolve(strict=True)
-    target_root = root.resolve(strict=True)
-    control_root = control.resolve(strict=True)
-    boundary = RuntimeArtifactBoundary.for_source(source_root, runtime, create=True)
-    runtime_root = boundary.root
-    if runtime_root == target_root or runtime_root in target_root.parents:
-        raise RuntimeArtifactError("runtime root must be outside target repository")
-    try:
-        target_root.relative_to(control_root)
-    except ValueError as exc:
-        raise RuntimeArtifactError("target repository is outside control root") from exc
-    print(boundary.resolve(candidate))
-except (OSError, RuntimeArtifactError, ValueError) as exc:
-    print(f"runtime boundary invalid: {exc}", file=sys.stderr)
-    raise SystemExit(2)
-PY
+  local resolved
+  if ! resolved="$("${AGENT_CANON_NATIVE_BIN:-${AGENT_CANON_CLI:-${CANON_SOURCE_ROOT}/tools/bin/agent-canon}}" \
+    runtime-paths path --source-root "$CANON_SOURCE_ROOT" --target-root "$ROOT_DIR" \
+    --control-parent-root "$CONTROL_ROOT" --runtime-root "$RUNTIME_ROOT" --candidate "$candidate" 2>&1)"; then
+    printf 'runtime boundary invalid: %s\n' "$resolved" >&2
+    return 2
+  fi
+  printf '%s\n' "$resolved"
 }
 
 require_runtime_boundary() {

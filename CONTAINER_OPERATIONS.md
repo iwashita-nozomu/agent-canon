@@ -7,8 +7,8 @@ responsibility Defines the standalone shared AgentCanon tool container and its h
 upstream design documents/design/agent-canon-bootstrap-tool-runtime.md shared runtime design
 upstream design documents/runtime/bootstrap-runtime.md user lifecycle contract
 upstream implementation bootstrap/container/image/Dockerfile shared tool image
-upstream implementation tools/runtime/container/bootstrap_runtime.py container controller
-downstream implementation tests/bootstrap/test_bootstrap_runtime.py lifecycle validation
+upstream implementation tools/runtime/dispatch/agent-canon/src/bootstrap_runtime.rs container controller
+downstream implementation tools/runtime/dispatch/agent-canon/tests/bootstrap_runtime_native.rs lifecycle validation
 @dependency-end
 -->
 
@@ -234,8 +234,8 @@ external runtime-root spool. `eval collect` records run/task/source identity,
 source HEAD and unchanged result, AgentCanon/tool digest, family status, and
 metrics. It does not write source-local reports.
 
-`eval sync` uses the typed host Git adapter and the existing
-`runtime_log_archive_git.py` owner to publish to
+`eval sync` uses the host entrypoint's native
+`runtime-log-archive-git` command to publish to
 `iwashita-nozomu/agent-canon-log`. The log repository owns branch and retention
 policy. Network/archive failure keeps the spool and failure receipt for retry.
 Publication is complete only after non-force push and remote ref/tree/blob
@@ -279,8 +279,7 @@ the runtime profile matrix:
 
 ```bash
 python3 -m pytest -q tests/bootstrap tests/tools/test_bootstrap_container_contract.py
-python3 -m pytest -q tests/agent_tools/test_runtime_artifacts.py \
-  tests/agent_tools/test_tool_dispatch.py
+python3 -m pytest -q tests/agent_tools/test_tool_dispatch.py
 ```
 
 For a selected offline image-receipt check, use the image-owned manifest and
@@ -293,7 +292,7 @@ home and the neutral image workspace, keeping all receipt checks enabled:
   --control-parent-root <authorized-parent-root> \
   exec --root <registered-agent-canon-source> -- \
   env CARGO_HOME=/usr/local/share/agent-canon/toolchains/cargo \
-  python3 tools/analysis/dependencies/dependency_plan.py image-verify \
+  ./tools/bin/agent-canon environment-dependencies image-verify \
     --workspace /usr/local/share/agent-canon/runtime \
     --manifest /usr/local/share/agent-canon/runtime/dependencies.toml
 ```

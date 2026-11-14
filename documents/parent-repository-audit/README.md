@@ -6,7 +6,7 @@ responsibility Defines the canonical semantic-unit route for auditing an AgentCa
 upstream design ../design/parent-repository-audit.md owns unit identity, selection, and failure semantics
 upstream design ../rule/README.md owns document placement and filename rules
 upstream design ../../responsibility-scope.toml owns AgentCanon path owner/class assignments
-upstream implementation ../../tools/analysis/code/parent_repository_audit.py enumerates semantic units and records tracked evidence
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/parent_repository_audit.rs enumerates semantic units and records tracked evidence
 upstream implementation ../../agents/skills/parent-repository-audit.md owns the public repair workflow
 @dependency-end
 -->
@@ -36,7 +36,7 @@ path を一件も持たないことは、path の存在要求ではないため�
 
 ## Unit Selection And Evidence
 
-`parent_repository_audit.py` は unit file を POSIX lexicographic order で読み、
+`parent-repository-audit` は unit file を POSIX lexicographic order で読み、
 `Related Change Surfaces` にある `surface:<stable-id>` を semantic selector として使います。
 `--surface` を省略すると全 unit、指定するとその surface を宣言する unit だけを選択します。
 未知の surface は推測せず typed failure にします。
@@ -47,11 +47,11 @@ path を一件も持たないことは、path の存在要求ではないため�
 で返します。
 
 ```bash
-python3 tools/analysis/code/parent_repository_audit.py list \
+agent-canon parent-repository-audit list \
   --root <parent-root> --format text
-python3 tools/analysis/code/parent_repository_audit.py list \
+agent-canon parent-repository-audit list \
   --root <parent-root> --surface environment.containers --scope docker --format text
-python3 tools/analysis/code/parent_repository_audit.py check \
+agent-canon parent-repository-audit check \
   --root <parent-root> --unit-status pass --unit-status closed --format text
 ```
 

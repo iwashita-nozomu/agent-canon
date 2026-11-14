@@ -8,7 +8,7 @@ upstream design README.md internal routine registry
 upstream design ../COMMUNICATION_PROTOCOL.md owns Fresh Subagent Context Capsule fields
 upstream design ../skills/user-guided-debugging.md owns guided cadence activation and execution ownership
 downstream design ../skills/subagent-bootstrap.md consumes the canonical private subagent startup route
-downstream implementation ../../tools/agent/orchestration/route.py strips private startup labels from prompt skill activation
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs strips private startup labels from prompt skill activation
 downstream implementation ../../tests/agent_tools/test_route.py checks historical startup labels are not public aliases
 @dependency-end
 -->
@@ -43,7 +43,7 @@ text, not a public skill namespace.
 Public skills remain plain hyphen-case, catalog-backed, and discoverable through
 `agents/skills/catalog.yaml` plus `.codex/personal/skills/<skill>/SKILL.md`. Do not add
 these historical startup labels to public `SKILLS`, `ACTIVE_SKILLS`,
-`agents/skills/catalog.yaml`, `.codex/config.toml`, `route.py --name` aliases,
+`agents/skills/catalog.yaml`, `.codex/config.toml`, `agent-canon route --name` aliases,
 or public prompt-routing skill lists.
 
 ## Handoff Use

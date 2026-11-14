@@ -15,9 +15,20 @@
 
 [package]
 name = "agent-canon"
+default-run = "agent-canon"
 version = "0.1.0"
 edition = "2021"
 license = "Apache-2.0"
+
+[features]
+controller-test-driver = []
+
+[[bin]]
+name = "agent-canon-controller-test-driver"
+path = "tests/support/bootstrap_runtime_driver.rs"
+required-features = ["controller-test-driver"]
+test = false
+bench = false
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
@@ -34,7 +45,7 @@ cap-fs-ext = "=4.0.3"
 regex = "=1.12.2"
 num-rational = "=0.4.2"
 num-traits = "=0.2.19"
-time = { version = "=0.3.47", features = ["formatting", "local-offset"] }
+time = { version = "=0.3.47", features = ["formatting", "parsing", "local-offset"] }
 rustpython-ast = { version = "0.4.0", default-features = false, features = ["location", "num-bigint", "unparse", "visitor"] }
 rustpython-literal = "=0.4.0"
 rustpython-parser = { version = "0.4.0", default-features = false, features = ["location", "num-bigint"] }
@@ -61,4 +72,4 @@ protobuf = "=3.7.2"
 expat = { version = "=0.1.0-beta.1", features = ["internal-api"] }
 
 [target.'cfg(unix)'.dependencies]
-nix = { version = "=0.30.1", default-features = false, features = ["user"] }
+nix = { version = "=0.30.1", default-features = false, features = ["fs", "user", "process"] }

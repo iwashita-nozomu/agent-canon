@@ -1,19 +1,19 @@
 <!--
 @dependency-start
 contract reference
-responsibility Documents formal_proof.py operator usage and proof-status boundary.
-upstream implementation ../../tools/analysis/proof/formal_proof.py builds proof scaffold artifacts.
+responsibility Documents formal-proof CLI operator usage and proof-status boundary.
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/formal_proof.rs builds proof scaffold artifacts.
 upstream design ../../agents/skills/formal-proof-workflow.md defines the natural-language to formal-proof workflow.
 upstream design ../../references/agent-canon-technology-bibliography.md records proof-assistant source evidence.
 downstream implementation ../../tests/agent_tools/test_formal_proof.py tests CLI output.
 @dependency-end
 -->
 
-# formal_proof.py
+# formal-proof CLI
 
 ## Reader Map
 
-- Owns the operator usage and proof-status boundary for `formal_proof.py`.
+- Owns the operator usage and proof-status boundary for `formal-proof CLI`.
 - Main path: the opening description defines purpose, followed by the command
   example, output behavior, and proof-status limits.
 - Read this before generating proof-planning scaffolds from natural-language
@@ -21,7 +21,7 @@ downstream implementation ../../tests/agent_tools/test_formal_proof.py tests CLI
 - Boundary: the tool scaffolds proof obligations; proof validity remains with
   the target proof assistant and formal-proof workflow.
 
-`formal_proof.py` turns a natural-language mathematical claim, or a selected
+`formal-proof CLI` turns a natural-language mathematical claim, or a selected
 Python symbol parsed through `ast.parse`, into a proof-planning scaffold. It
 does not prove the claim. Its output status is
 `scaffold_only_unverified` until a target proof assistant checks a completed
@@ -34,7 +34,7 @@ below that root.  There is no source-local `reports/` fallback.
 
 ```bash
 RUNTIME_ROOT=/abs/path/to/external/agent-canon-runtime/<run>
-python3 tools/analysis/proof/formal_proof.py \
+tools/bin/agent-canon formal-proof \
   --claim-file /path/to/claim.md \
   --target lean \
   --domain "linear algebra" \
@@ -63,7 +63,7 @@ The output directory contains:
 For implementation-derived proof planning, pass a Python source reference:
 
 ```bash
-python3 tools/analysis/proof/formal_proof.py \
+tools/bin/agent-canon formal-proof \
   --python-symbol path/to/algorithm.py::<implementation_symbol> \
   --target lean \
   --domain "<mathematical domain>" \

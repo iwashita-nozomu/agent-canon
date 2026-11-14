@@ -32,7 +32,7 @@ task catalog, runtime profile matrix, or closeout tools as policy authority.
 | default specialists and review packs | `agents/task_catalog.yaml`; `agents/agents_config.json` |
 | role behavior and write authority | `.codex/agents/*.toml` |
 | Skill selection and canonical Skill text | `agents/skills/catalog.yaml`; selected Skill links |
-| skill selection | `agents/skills/catalog.yaml`; `.codex/personal/skills/*/SKILL.md`; `python3 tools/agent/orchestration/route.py --prompt` |
+| skill selection | `agents/skills/catalog.yaml`; `.codex/personal/skills/*/SKILL.md`; `tools/bin/agent-canon route --prompt` |
 | implementation guidance and closeout | [agents/skills/codex-task-workflow.md](skills/codex-task-workflow.md); selected family row in `agents/task_catalog.yaml` |
 | closeout authority | `agents/canonical/CODEX_COMPLETION.md`; `tools/runtime/dispatch/agent-canon/src/report_artifact_checks.rs` |
 | validation failure response taxonomy | `documents/runtime/runtime-profiles-and-check-matrix.json`; generated reader projection: [documents/runtime/runtime-profiles-and-check-matrix.md](../documents/runtime/runtime-profiles-and-check-matrix.md) |
@@ -104,5 +104,5 @@ monitor row alone. A route difference alone is not an Eval failure.
 
 ## Validation
 
-- `python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py`
-- `python3 tools/validation/semantic/convention/check_convention_compliance.py`
+- `tools/bin/agent-canon check-agent-runtime-alignment`
+- `agent-canon check-convention-compliance`

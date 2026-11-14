@@ -1,10 +1,10 @@
 <!--
 @dependency-start
 contract reference
-responsibility Documents prose_reasoning_graph.py usage and contract.
+responsibility Documents prose-reasoning-graph usage and contract.
 upstream design ../prose-reasoning-graph/dsl-spec.md normative graph and DSL contract
 upstream design ../structured-analysis/graph-dsl.md shared Graph DSL Core storage contract
-upstream implementation ../../tools/analysis/documents/prose_reasoning_graph.py builds SQLite-backed prose reasoning graphs
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/prose_reasoning_graph.rs builds SQLite-backed prose reasoning graphs
 upstream implementation ../../tools/runtime/dispatch/agent-canon/src/structured_analysis.rs checks document responsibility gaps for tool docs
 upstream design ../../agents/workflows/workflow-references.md discourse, argument, and writing prior art
 upstream design ../../agents/skills/prose-reasoning-graph.md prose graph skill contract
@@ -12,7 +12,7 @@ downstream implementation ../../tests/agent_tools/test_prose_reasoning_graph.py 
 @dependency-end
 -->
 
-# prose_reasoning_graph.py
+# prose-reasoning-graph
 
 ## 語の抽出
 
@@ -25,7 +25,7 @@ Unicodeを扱うライブラリICU4Xの辞書で日本語を区切り、句読�
 一括で渡し、各入力の `terms`、文書全体の `top_terms`、`corpus_hints` を受け取ります。
 解析では必要な本文を一括処理し、文の比較ごとに別プロセスを起動しません。
 
-`prose_reasoning_graph.py` は、Markdown または plain text を一時的な
+`prose-reasoning-graph` は、Markdown または plain text を一時的な
 SQLite-backed prose reasoning graph に変換する文章解析ツールです。
 根拠として graph DB は中間解析 artifact であり、したがって source document や DSL spec の代替ではありません。
 この文書は Graph DSL Core や prose adapter DSL を再定義せず、tool の責務、
@@ -42,7 +42,7 @@ command surface、result surface、verification route、skill handoff を説明�
 - Shared graph storage:
   [Graph DSL Core](../structured-analysis/graph-dsl.md)
 - CLI behavior:
-  [tools/analysis/documents/prose_reasoning_graph.py](../../tools/analysis/documents/prose_reasoning_graph.py)
+  [tools/runtime/dispatch/agent-canon/src/prose_reasoning_graph.rs](../../tools/runtime/dispatch/agent-canon/src/prose_reasoning_graph.rs)
 - expected behavior:
   [tests/agent_tools/test_prose_reasoning_graph.py](../../tests/agent_tools/test_prose_reasoning_graph.py)
 - result split:
@@ -72,7 +72,7 @@ AgentCanon の generic graph storage contract は
 [Graph DSL Core](../structured-analysis/graph-dsl.md) が持ちます。Prose-specific
 projection and source anchoring are owned by
 [Prose Reasoning Graph DSL Specification](../prose-reasoning-graph/dsl-spec.md)。
-`prose_reasoning_graph.py` は source-anchored graph、projection
+`prose-reasoning-graph` は source-anchored graph、projection
 payload、presentation feature、adapter metadata、diagnostic / verification route
 を保持する共通入口です。
 
@@ -194,7 +194,7 @@ source-local cache への fallback はありません。run-local artifact と�
 ```bash
 export AGENT_CANON_RUNTIME_ROOT="/path/to/external/agent-canon-runtime"
 RUN_DIR="$AGENT_CANON_RUNTIME_ROOT/runs/<run-id>/prose_tool_doc_check"
-python3 tools/analysis/documents/prose_reasoning_graph.py check-document documents/tools/prose_reasoning_graph.md \
+tools/bin/agent-canon prose-reasoning-graph check-document documents/tools/prose_reasoning_graph.md \
   --out-dir "$RUN_DIR" \
   --profile all \
   --stats-out "$RUN_DIR.stats.json"
@@ -206,19 +206,19 @@ python3 tools/analysis/documents/prose_reasoning_graph.py check-document documen
 ```bash
 export AGENT_CANON_RUNTIME_ROOT="/path/to/external/agent-canon-runtime"
 RUN_DIR="$AGENT_CANON_RUNTIME_ROOT/runs/<run-id>/prose"
-python3 tools/analysis/documents/prose_reasoning_graph.py ingest documents/notes/draft.md \
+tools/bin/agent-canon prose-reasoning-graph ingest documents/notes/draft.md \
   --prompt-file "$RUN_DIR/user_request_contract.md" \
   --stats-out "$RUN_DIR/prose_ingest.stats.json"
 GRAPH_DB="<PROSE_REASONING_GRAPH_DB from stats JSON>"
-python3 tools/analysis/documents/prose_reasoning_graph.py analyze --db "$GRAPH_DB" --profile all \
+tools/bin/agent-canon prose-reasoning-graph analyze --db "$GRAPH_DB" --profile all \
   --stats-out "$RUN_DIR/prose_analyze.stats.json"
-python3 tools/analysis/documents/prose_reasoning_graph.py lint --db "$GRAPH_DB" --profile all \
+tools/bin/agent-canon prose-reasoning-graph lint --db "$GRAPH_DB" --profile all \
   --out "$RUN_DIR/prose_diagnostics.md" \
   --stats-out "$RUN_DIR/prose_lint.stats.json"
-python3 tools/analysis/documents/prose_reasoning_graph.py integrate --db "$GRAPH_DB" --profile all \
+tools/bin/agent-canon prose-reasoning-graph integrate --db "$GRAPH_DB" --profile all \
   --out "$RUN_DIR/prose_integration.md" \
   --stats-out "$RUN_DIR/prose_integrate.stats.json"
-python3 tools/analysis/documents/prose_reasoning_graph.py skill-handoff --db "$GRAPH_DB" --profile all \
+tools/bin/agent-canon prose-reasoning-graph skill-handoff --db "$GRAPH_DB" --profile all \
   --out "$RUN_DIR/prose_handoff.md" \
   --stats-out "$RUN_DIR/prose_handoff.stats.json"
 ```
@@ -227,11 +227,11 @@ python3 tools/analysis/documents/prose_reasoning_graph.py skill-handoff --db "$G
 各 file は別々の `documents` row として残り、form node id は file ごとに prefix されます。
 
 ```bash
-python3 tools/analysis/documents/prose_reasoning_graph.py ingest-set documents/structured-analysis \
+tools/bin/agent-canon prose-reasoning-graph ingest-set documents/structured-analysis \
   --prompt-file reports/agents/<run-id>/user_request_contract.md \
   --stats-out reports/agents/<run-id>/ingest_set.stats.json
 GRAPH_DB="<PROSE_REASONING_GRAPH_DB from stats JSON>"
-python3 tools/analysis/documents/prose_reasoning_graph.py analyze --db "$GRAPH_DB" --profile report
+tools/bin/agent-canon prose-reasoning-graph analyze --db "$GRAPH_DB" --profile report
 ```
 
 `integrate` が split、merge、bridge、reorder などの concrete operation id を返す場合だけ

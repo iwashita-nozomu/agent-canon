@@ -292,14 +292,14 @@ id = "agent-log-analysis"
 description = "Accumulated runtime log analysis should route to compact dashboard tooling."
 expected_workflows = ["codex-task-workflow"]
 expected_skills = ["agent-log-analysis"]
-expected_tools = ["generate_agent_runtime_dashboard.py"]
+expected_tools = ["generate-agent-runtime-dashboard"]
 limit = 25
 prompt_templates = [
-  "generate_agent_runtime_dashboard.py で {subject} の routing miss と selection gap を分析して",
-  "生ログを読みすぎず generate_agent_runtime_dashboard.py で {subject} を要約して",
-  "generate_agent_runtime_dashboard.py で {subject} の toolcall skillcall coverage を compact report で見て",
-  "generate_agent_runtime_dashboard.py でルーティングログから {subject} の selection gap を探して",
-  "generate_agent_runtime_dashboard.py で {subject} の agent dashboard を生成し、recent trend を確認して",
+  "generate-agent-runtime-dashboard で {subject} の routing miss と selection gap を分析して",
+  "生ログを読みすぎず generate-agent-runtime-dashboard で {subject} を要約して",
+  "generate-agent-runtime-dashboard で {subject} の toolcall skillcall coverage を compact report で見て",
+  "generate-agent-runtime-dashboard でルーティングログから {subject} の selection gap を探して",
+  "generate-agent-runtime-dashboard で {subject} の agent dashboard を生成し、recent trend を確認して",
 ]
 subjects = [
   "skill selection",
@@ -441,14 +441,14 @@ id = "run-report-archive"
 description = "RunBundle and agent report collection tasks should route to artifact writeout and archive tools."
 expected_workflows = ["codex-task-workflow"]
 expected_skills = ["result-artifact-writeout", "report-writing"]
-expected_tools = ["runtime_log_archive_git.py"]
+expected_tools = ["runtime-log-archive-git"]
 limit = 25
 prompt_templates = [
-  "runtime_log_archive_git.py で {subject} の run bundle evidence と agent report archive を残して",
-  "runtime_log_archive_git.py で過去の RunBundle と Agent レポートを集める {subject} の動線を補強して",
-  "runtime_log_archive_git.py で {subject} の artifact evidence と report を append-only に書き出して",
-  "runtime_log_archive_git.py で蓄積分析レポートとして {subject} のログを archive path に残して",
-  "runtime_log_archive_git.py で {subject} は結果を書き出し、agent report archive と summary evidence を作って",
+  "runtime-log-archive-git で {subject} の run bundle evidence と agent report archive を残して",
+  "runtime-log-archive-git で過去の RunBundle と Agent レポートを集める {subject} の動線を補強して",
+  "runtime-log-archive-git で {subject} の artifact evidence と report を append-only に書き出して",
+  "runtime-log-archive-git で蓄積分析レポートとして {subject} のログを archive path に残して",
+  "runtime-log-archive-git で {subject} は結果を書き出し、agent report archive と summary evidence を作って",
 ]
 subjects = [
   "workflow selection eval",

@@ -9,7 +9,7 @@ upstream design ../../documents/runtime/runtime-log-archive.md runtime delivery 
 upstream design agent-eval-accumulation.md accumulated eval repair loop
 upstream design result-artifact-writeout.md durable raw and summary artifact writeout
 upstream design issue-finding-report.md durable issue candidate writing
-upstream implementation ../../eval/producers/generate_agent_runtime_dashboard.py owns dashboard API fields
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/agent_runtime_dashboard.rs owns dashboard API fields
 downstream implementation ../../.codex/personal/skills/runtime-log-repair/SKILL.md exposes this workflow as a runtime skill
 @dependency-end
 -->
@@ -96,7 +96,7 @@ belong to the `agent-canon-log` policy repository. This skill routes dashboard
 evidence and does not duplicate those policy definitions.
 
 - Raw log compaction and dashboard API schema belong to `$agent-log-analysis`
-  and `generate_agent_runtime_dashboard.py`.
+  and `tools/bin/agent-canon generate-agent-runtime-dashboard`.
 - Continuous delivery and retry belong to the existing runtime scheduler and
   archive publishers, as defined by the linked delivery owner. Do not replace
   them with per-task manual sync, a new daemon, or artifact-writeout duties.

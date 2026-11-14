@@ -73,7 +73,7 @@ downstream design ./object-oriented-design.md expands OOP policy for class and P
 - contract-complete implementation は、request clause、acceptance contract、Implementation Source Packet、validation route が同じ implementation slice で対応している状態です。
 - 要求を縮める implementation shortcut を見つけた場合は、局所実装で埋めず `design_issue_blocker` と evidence を記録して design review へ戻します。
 - two-stage refactor は、forced migration で正本 surface と旧 route を移動または削除し、usage-surface repair で全利用面を新 surface へ合わせ、return-gate validation で検証をまとめる手順です。
-- この GuardRail は `check_convention_compliance.py` の `implementation_guardrails` check で marker coverage を検証します。
+- この GuardRail は `check-convention-compliance` の `implementation_guardrails` check で marker coverage を検証します。
 
 ### 3. 型境界
 

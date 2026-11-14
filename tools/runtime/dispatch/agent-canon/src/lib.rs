@@ -50,6 +50,9 @@
 // downstream implementation path_expansion.rs owns shared user-home path expansion
 // downstream implementation scip_index.rs owns the native generated-index reader and SCIP command
 // downstream implementation git_dependency_diff_summary.rs owns native Git dependency summaries
+// downstream implementation checkout_identity.rs reads bounded checkout identity
+// downstream implementation repository_topic_clone.rs owns native topic checkout lifecycle
+// downstream implementation dependency_module_change.rs decorates lifecycle with .gitmodules identity
 // downstream implementation main.rs consumes the shared runtime and CLI library APIs
 // downstream implementation ../tests/owner_guarantee_native.rs validates Python packet and projection oracles
 // downstream implementation ../tests/artifacts_native.rs validates the shared artifact API
@@ -60,32 +63,54 @@
 // @dependency-end
 
 pub mod active_design_packet;
+pub mod agent_runtime_dashboard;
 pub mod agent_tool_calls;
 pub mod artifacts;
 pub mod authority;
 pub mod catalog;
 pub mod chatgpt_codex_routing;
+pub mod check_proof_trace_alignment;
+pub mod checkout_identity;
 pub mod code_template_rendering;
 pub mod codex_agent_role_eval;
 pub mod codex_runtime_summary;
 pub mod compare_agent_run_paths;
+pub mod container_runtime;
+pub mod convention_compliance;
+pub mod cpp_source_canonical_ir;
+pub mod cpp_template_to_lean;
+mod dashboard_render;
+mod dashboard_token_usage;
+pub mod dependency_manifest_graph;
 pub mod docs;
 pub mod entrypoint_composer;
 pub(crate) mod entrypoint_owner_map;
+pub mod execution_resource_plan;
 pub mod execution_resource_projection;
+pub mod execution_source_freeze;
 pub mod experiment_identity;
 pub mod experiment_registry;
 pub mod extract_docx;
+pub mod formal_proof;
 pub mod generated_completeness;
 pub mod git_read;
+pub mod github_publish;
+pub mod github_status_lifecycle;
+pub mod gpu_command_admission;
 pub mod historical_skill_usage;
+pub mod managed_experiment;
 pub mod server_readiness;
 pub mod skill_frontmatter;
+pub mod skill_shim_evaluation;
 // This shared source module also serves the CLI's AST tools; the reusable LSP
 // API uses only the newline and source-offset helpers from this owner.
 pub mod agent_canon_source_root;
+pub mod annex_retention;
 pub mod behavior_event_assembly;
+pub mod bootstrap_runtime;
+pub mod dependency_module_change;
 pub mod environment_dependencies;
+pub mod eval_accumulation;
 pub mod eval_accumulation_check;
 pub mod eval_archive_paths;
 pub mod eval_manifest_paths;
@@ -93,11 +118,26 @@ pub mod git_dependency_diff_summary;
 pub mod hook_dispatcher;
 pub mod hook_event_log;
 pub mod hook_safety;
+pub mod html_artifact_access;
+pub mod issue_sync;
+pub mod jit_canonical_ir;
+pub mod latest_result;
 pub mod lean_proof_env;
+pub mod lean_recursive_proof_search;
+pub mod log_policy;
 pub mod log_repository_identity;
 pub mod lsp_code_analysis;
 pub mod native_release;
+#[path = "oop/cpp/readability.rs"]
+mod oop_cpp;
+#[path = "oop/python/readability.rs"]
+mod oop_python;
+#[path = "oop/readability.rs"]
+pub mod oop_readability;
+pub mod operational_ir_to_lean;
+pub mod orphan_lifecycle;
 pub mod owner_guarantee;
+pub mod parent_repository_audit;
 pub mod path_expansion;
 pub mod path_resolution;
 pub mod private_feedback;
@@ -110,9 +150,14 @@ pub(crate) mod python_cli_options;
 pub mod python_json;
 pub mod python_sequence_matcher;
 pub mod python_text;
+pub mod reference_materializer;
+pub mod repo_structure_contract;
 pub mod report_artifact_checks;
+pub mod repository_topic_clone;
 pub mod run_evaluation;
+pub mod runtime_alignment;
 pub mod runtime_boundary;
+pub mod runtime_paths;
 pub mod scip_index;
 pub mod skill_lane_detector;
 pub mod source_mutation;
@@ -125,6 +170,7 @@ pub mod tool_dispatch;
 pub mod tool_proof_coverage;
 pub mod tool_selection;
 pub mod update_lifecycle_contract;
+pub mod wiki_publish;
 pub mod work_log;
 pub mod workflow_context;
 pub mod workflow_selection_eval;

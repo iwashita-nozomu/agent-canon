@@ -4,7 +4,7 @@
 // upstream design ../../../../../documents/conventions/coding-conventions-logging.md logging convention overview
 // upstream design ../../../../../documents/conventions/common/01_principles.md canonical simplicity principle
 // upstream implementation python_ast.rs reuses Python AST parsing and source line offsets
-// upstream implementation ../../../../../tools/support/path_filters.py shared path exclusion contract
+// upstream implementation path_resolution.rs shared path exclusion contract
 // downstream implementation ../../../../../tests/agent_tools/test_check_run_log_contract.py CLI behavior oracles
 // @dependency-end
 

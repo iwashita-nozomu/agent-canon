@@ -2,7 +2,7 @@
 @dependency-start
 contract reference
 responsibility Documents native dependency graph inputs, bundles, and output projections.
-upstream implementation ../../tools/analysis/dependencies/render_dependency_manifest_graph.py renders native graph reports.
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/dependency_manifest_graph.rs renders native graph reports.
 upstream implementation ../../tools/runtime/dispatch/agent-canon/src/template_bundle.rs exposes committed tree entries for repository structure.
 upstream design ../design/dependency-manifest-design.md defines dependency manifest semantics.
 upstream design ../structured-analysis/graph-dsl.md defines shared graph storage and projection contract.
@@ -11,7 +11,7 @@ downstream implementation ../../tests/agent_tools/test_render_dependency_manifes
 @dependency-end
 -->
 
-# render_dependency_manifest_graph.py
+# render-dependency-manifest-graph
 
 Use this tool when a review needs a repo-local dependency-manifest graph artifact.
 
@@ -32,7 +32,7 @@ These commands use the renderer's default checker input. `--scope changed`
 filters the checker output to the current change set.
 
 ```bash
-python3 tools/analysis/dependencies/render_dependency_manifest_graph.py \
+tools/bin/agent-canon render-dependency-manifest-graph \
   --root . \
   --scope full \
   --bundle-dir reports/dependency-graph \
@@ -40,7 +40,7 @@ python3 tools/analysis/dependencies/render_dependency_manifest_graph.py \
 ```
 
 ```bash
-python3 tools/analysis/dependencies/render_dependency_manifest_graph.py \
+tools/bin/agent-canon render-dependency-manifest-graph \
   --root . \
   --scope changed \
   --bundle-dir reports/dependency-graph \
@@ -101,6 +101,12 @@ retain their existing relation nodes and diagnostics. The source envelope,
 Git-tree document, and node payloads retain the selected commit for readback.
 
 ## Bundle Outputs
+
+Atomic bundle publication uses the retained parent directory and the operating
+system's exclusive rename on Linux and Apple platforms. Other platforms return
+an explicit unsupported-operation error and preserve existing output.
+Named projections remain available through their existing
+file-writing path.
 
 Bundle mode requires `--bundle-dir` and emits:
 
@@ -222,7 +228,7 @@ TSVはrendererが読み取り用snapshotとしてcaptureしてから、bundle tr
 ## CLI and Reference
 
 ```bash
-python3 tools/analysis/dependencies/render_dependency_manifest_graph.py \
+tools/bin/agent-canon render-dependency-manifest-graph \
   --root . \
   --source-revision HEAD \
   --ir-out reports/dependency_graph.ir.json \

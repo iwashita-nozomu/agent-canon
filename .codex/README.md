@@ -9,8 +9,8 @@ upstream design ../agents/task_catalog.yaml workflow family runtime budgets
 upstream design ../agents/canonical/CODEX_SUBAGENTS.md subagent routing
 downstream implementation ./hooks.json project-local hook declarations
 downstream implementation ../tools/runtime/dispatch/agent-canon/src/hook_dispatcher.rs owns the in-process active lifecycle contract
-downstream implementation ../tools/runtime/authority/hook_safety.py owns pure secret and destructive-Git leaves
-downstream implementation ../tools/runtime/container/execution_resource_projection.py validates exact PostToolUse projection bytes
+downstream implementation ../tools/runtime/dispatch/agent-canon/src/hook_safety.rs owns pure secret and destructive-Git leaves
+downstream implementation ../tools/runtime/dispatch/agent-canon/src/execution_resource_projection.rs validates exact PostToolUse projection bytes
 downstream design ../tools/runtime/dispatch/agent-canon/src/hook_dispatcher.rs RETIRED_HOOK_ROUTES assigns former child routes to explicit owners
 @dependency-end
 -->
@@ -121,8 +121,8 @@ waive workflow gates and do not authorize dropping decision-relevant context.
 - `agents/model_profiles.toml` is the canonical typed authority for every
   parent and child model, reasoning, capability, context, return, checkpoint,
   and continuation field.
-- `tools/agent/orchestration/model_profile_registry.py` materializes closed
-  `.codex/agents/*.toml` and `agents/agents_config.json` generated views.
+- `tools/bin/agent-canon evaluate-codex-agent-roles` materializes and checks
+  closed `.codex/agents/*.toml` and `agents/agents_config.json` generated views.
 - `tools/validation/semantic/runtime/check_agent_runtime_alignment.py` and
   `eval/producers/evaluate_codex_agent_roles.py` validate the materialized
   agent TOML files directly.

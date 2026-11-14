@@ -20,7 +20,7 @@ downstream implementation ../../.codex/agents/oop_readability_reviewer.toml OOP 
 shared workflow は [agents/canonical/CODEX_WORKFLOW.md](CODEX_WORKFLOW.md) に置き、この文書は inventory、mapping、activation に寄せます。
 permanent team role ownership、required output、write policy は `agents/agents_config.json` を正本にします。
 role profile/instruction authority は `agents/model_profiles.toml` と
-`tools/agent/orchestration/model_profile_registry.py` が所有し、`.codex/agents/*.toml`
+`tools/bin/agent-canon evaluate-codex-agent-roles` が所有し、`.codex/agents/*.toml`
 は closed generated readback view です。
 project-level subagent registration と runtime limits は `.codex/config.toml` の `[agents]` と `[agents.<name>]` を正本にします。
 prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` を先に通し、
@@ -430,7 +430,7 @@ role / Skills / authority を `$direct-luna-communication` packet に載せま�
 - `cpp_reviewer`
   - C / C++ diff を build、header、ownership、native test 前提で洗う
 - `oop_readability_reviewer`
-  - `tools/oop/*/readability.py` の機械 report を読み、判定値を変えずに reader-facing な文書化、false positive 候補、優先度整理を行う
+  - `tools/bin/agent-canon oop-<language>-readability` の機械 report を読み、判定値を変えずに reader-facing な文書化、false positive 候補、優先度整理を行う
 - `worker`
   - bounded な実装変更を切り出し、approved design と local precedent の naming に従う。commit/push を含む実装・統合境界の実行は可能だが、PR create/merge/close、admin override、base integration 判断、最終統合評価は parent が保持する。
 - `terra`
@@ -503,8 +503,9 @@ launch work or require a particular sequence.
   `forbidden_surfaces`、`separate_handoff_targets` を含みます。必須欄、map、oracle が欠けた
   handoff は `math_packet_missing` として停止し、worker は推測で scope を補いません
 - math writer の handoff は `--math-intent-packet '<JSON>'` から作られ、必要な数理
-  intent と write scope を実際の child に渡します。math writer の
-  `writer_target.allowed_paths` は packet の `allowed_write_paths` の部分集合でなければならず、
+  intent と write scope を実際の child に渡します。レビュー済みの数理
+  `allowed_write_paths` は source の書き込み対象を示す助言情報であり、agent identity control や
+  runtime path gate にはなりません。
   architecture / JIT / backend / runtime / routing / environment / proof / IR infrastructure
   は `separate_handoff_targets` に残し、math packet の厳密な `allowed_write_paths` にない
   path は spawn 前に拒否します。packet が明示的に数理実装として mapped した `src/runtime`
@@ -524,10 +525,9 @@ require another read.
 
 ## Parallel Write Safety
 
-- parent は選択済み writer handoff で各 writer の allowed path / directory を管理します
-- write-capable handoff は `writer_target`（絶対 `checkout_root`、固定 `branch`、正規化済み `remote`、`allowed_paths`）を必須とし、branch は handoff 前に `repository-topic-clone.prepare` で用意します
-- 同じ `checkout_root` で write target が衝突する作業は同時に起動せず、reader は同じ checkout を共有できます
-- `repository-topic-clone.prepare` は prepared checkout の ignored `.agent-canon/writer-target.json` に target と検証済み checkout identity を materialize します。作業範囲は handoff と Git diff で確認します。PreToolUse は role、identity receipt、spawn 記録、writer packet を編集の許可条件にしません。
+- parent は current task handoff で repository、branch、責務 path を指定し、作業者は編集前に checkout identity と Git state を読みます
+- 同じ file、directory owner、Git index、public surface を同時に変更せず、衝突する作業は直列化します
+- `repository-topic-clone.prepare` は selected checkout path と branch を用意します
 - 選択済みの実行 owner が合意済み範囲を編集します。委譲した reviewer と artifact-only role は read-only、IssueWorker の `publisher` は外部 GitHub publication 専用とします。
 - 同一 path、同一 directory ownership、同一 public API surface、shared Git index/HEAD、generated output、formatter output は順序制約つきの writer に割り当てます
 - write-capable subagent instance を並行させる場合は、checkout roots と write targets の衝突を避けます
@@ -536,14 +536,14 @@ require another read.
 - checkout の分離は通常の衝突回避を手動で行うためではなく、repository-topic lifecycle が親/同一 repository の `linked-worktree` または dependency repository の `independent-clone` として選択した独立 workstream に限ります
 - review role は常に read-only とし、parent-managed write-scope discipline と writer-instance separation の確認は `plan_reviewer` と `project_reviewer` の固定責務です
 
-writer target は短命な handoff 値であり、claim file、PID、expiry、daemon、または別の writer registry を作りません。worker と integration_executor の生成 prompt は target の checkout で開始し、`git switch`、`git checkout`、branch rename、`git worktree` を実行しないことを明示します。外部 GitHub publication 専用の publisher は target 不要です。
+Git status and readback establish the current branch and preserve unknown state. Shared checkout mutation follows the assigned responsibility and existing Git authority; the current conversation supplies work scope, without a manager packet or writer registry.
 
 ## Codex Model Settings
 
 `agents/model_profiles.toml` が canonical typed profile authority です。
 `agents/execution_topology.json` は logical role と physical execution profile の
 分離、および direct-Luna default を所有します。
-`tools/agent/orchestration/model_profile_registry.py` は closed generated views として
+`tools/bin/agent-canon evaluate-codex-agent-roles` は closed generated views として
 `.codex/agents/*.toml` と `agents/agents_config.json` を materialize します。
 generated views は projection digest / readback surfaces であり、手動で編集しては
 なりません。model / reasoning の変更は registry / team / runtime source から始め、
@@ -602,7 +602,7 @@ runtime は再生成後に restart し、readback で反映を確認します。
 Role inventory and selected review-pack changes use the existing alignment checker:
 
 ```bash
-python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py
+tools/bin/agent-canon check-agent-runtime-alignment
 ```
 
 This validates role references and model/profile projections independently of task progress files.

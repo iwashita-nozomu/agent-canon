@@ -12,7 +12,7 @@ downstream implementation ../../tools/validation/semantic/dependencies/check_dep
 downstream implementation ../../tools/analysis/dependencies/check_dependency_graph.sh validates manifest graph semantics
 downstream implementation ../../tools/analysis/dependencies/run_repo_dependency_review.sh wraps repo-wide dependency review
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/scip_index.rs owns native SCIP artifacts and bounded query projections
-downstream implementation ../../tools/analysis/dependencies/render_dependency_manifest_graph.py renders dependency graph review artifacts
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/dependency_manifest_graph.rs renders dependency graph review artifacts
 downstream implementation ../../tests/agent_tools/test_check_dependency_headers.py verifies the native manifest checker CLI
 downstream implementation ../../tests/agent_tools/test_dependency_manifest_tools.py verifies manifest shell tools
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/dependency_manifest.rs owns the sole complete-file manifest parser and source snapshot
@@ -517,7 +517,7 @@ compare bytes/hashes, not retry counts or timing heuristics.
 
 When a repo has known graph-cycle debt, PR gates may run
 `run_repo_dependency_review.sh --cycle-report-only --report-dir <dir>` and
-publish `render_dependency_manifest_graph.py` output from the same canonical
+publish `render-dependency-manifest-graph` output from the same canonical
 graph query.
 This keeps missing/invalid/self-reference findings blocking while making cycles
 visible as review debt instead of silently blocking unrelated PR work.

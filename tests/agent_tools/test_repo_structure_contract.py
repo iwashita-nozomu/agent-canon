@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests path existence/kind comparison without duplicating responsibility owner/class.
-# upstream implementation ../../tools/validation/semantic/structure/repo_structure_contract.py compares repo trees with contract profiles
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/repo_structure_contract.rs compares repo trees with contract profiles
 # upstream design ../../documents/structure/repo-structure-contract.toml defines expected repository structure profiles
 # upstream design ../../responsibility-scope.toml owns path owner and class
 # @dependency-end
@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import json
 import subprocess
-import sys
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -23,7 +23,6 @@ except ModuleNotFoundError:  # Python < 3.11 compatibility.
     import tomli as tomllib
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-CHECKER = PROJECT_ROOT / "tools" / "validation" / "semantic" / "structure" / "repo_structure_contract.py"
 CONTRACT = PROJECT_ROOT / "documents" / "structure" / "repo-structure-contract.toml"
 
 
@@ -34,8 +33,8 @@ class RepoStructureContractTest(unittest.TestCase):
         """Run the checker against a fixture root."""
         return subprocess.run(
             [
-                sys.executable,
-                str(CHECKER),
+                os.environ["AGENT_CANON_CLI"],
+                "repo-structure-contract",
                 "--root",
                 str(root),
                 "--contract",
@@ -67,7 +66,9 @@ class RepoStructureContractTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("REPO_STRUCTURE=pass", result.stdout)
-            self.assertIn("REPO_STRUCTURE_PROFILE=agent_canon_standalone", result.stdout)
+            self.assertIn(
+                "REPO_STRUCTURE_PROFILE=agent_canon_standalone", result.stdout
+            )
             self.assertIn("REPO_STRUCTURE_TREE_SOURCE=tree-command:", result.stdout)
 
     def test_managed_results_are_excluded_by_exact_path(self) -> None:
@@ -75,9 +76,13 @@ class RepoStructureContractTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_standalone_fixture(root)
-            managed_artifact = root / "experiments" / "topic" / "result" / "run" / "artifact.json"
+            managed_artifact = (
+                root / "experiments" / "topic" / "result" / "run" / "artifact.json"
+            )
             source_artifact = root / "documents" / "notes" / "result" / "source.md"
-            self.write_file(root, str(managed_artifact.relative_to(root)), "generated\n")
+            self.write_file(
+                root, str(managed_artifact.relative_to(root)), "generated\n"
+            )
             self.write_file(root, str(source_artifact.relative_to(root)), "source\n")
 
             with_source = self.run_checker(
@@ -96,7 +101,9 @@ class RepoStructureContractTest(unittest.TestCase):
                 "json",
             )
 
-            self.assertEqual(with_source.returncode, 0, with_source.stdout + with_source.stderr)
+            self.assertEqual(
+                with_source.returncode, 0, with_source.stdout + with_source.stderr
+            )
             self.assertEqual(
                 without_source.returncode,
                 0,
@@ -205,7 +212,7 @@ class RepoStructureContractTest(unittest.TestCase):
             "documents/structure/repo-structure-contract.toml",
             "tools/catalog.yaml",
             "tools/runtime/dispatch/agent-canon/Cargo.toml",
-            "tools/runtime/lifecycle/update_lifecycle_contract.py",
+            "tools/runtime/dispatch/agent-canon/src/update_lifecycle_contract.rs",
             "eval/definitions/README.md",
         ]:
             self.write_file(root, file_path, f"{file_path}\n")
@@ -312,65 +319,65 @@ class RepoStructureContractTest(unittest.TestCase):
                         {"type": "directory", "name": "notes"},
                     ],
                 },
+                {
+                    "type": "directory",
+                    "name": "tools",
+                    "contents": [
+                        {"type": "file", "name": "catalog.yaml"},
                         {
                             "type": "directory",
-                            "name": "tools",
+                            "name": "agent",
+                        },
+                        {"type": "directory", "name": "analysis"},
+                        {"type": "directory", "name": "repository"},
+                        {
+                            "type": "directory",
+                            "name": "runtime",
                             "contents": [
-                                {"type": "file", "name": "catalog.yaml"},
                                 {
                                     "type": "directory",
-                                    "name": "agent",
-                                },
-                                {"type": "directory", "name": "analysis"},
-                                {"type": "directory", "name": "repository"},
-                                {
-                                    "type": "directory",
-                                    "name": "runtime",
+                                    "name": "dispatch",
                                     "contents": [
                                         {
                                             "type": "directory",
-                                            "name": "dispatch",
-                                            "contents": [
-                                                {
-                                                    "type": "directory",
-                                                    "name": "agent-canon",
-                                                    "contents": [
-                                                        {
-                                                            "type": "file",
-                                                            "name": "Cargo.toml",
-                                                        }
-                                                    ],
-                                                }
-                                            ],
-                                        },
-                                        {
-                                            "type": "directory",
-                                            "name": "lifecycle",
+                                            "name": "agent-canon",
                                             "contents": [
                                                 {
                                                     "type": "file",
-                                                    "name": "update_lifecycle_contract.py",
-                                                }
+                                                    "name": "Cargo.toml",
+                                                },
+                                                {
+                                                    "type": "directory",
+                                                    "name": "src",
+                                                    "contents": [
+                                                        {
+                                                            "type": "file",
+                                                            "name": "update_lifecycle_contract.rs",
+                                                        }
+                                                    ],
+                                                },
                                             ],
-                                        },
+                                        }
                                     ],
                                 },
-                                {"type": "directory", "name": "validation"},
-                                {"type": "directory", "name": "internal"},
-                                {"type": "directory", "name": "ci"},
                             ],
                         },
+                        {"type": "directory", "name": "validation"},
+                        {"type": "directory", "name": "internal"},
+                        {"type": "directory", "name": "ci"},
+                    ],
+                },
+                {
+                    "type": "directory",
+                    "name": "eval",
+                    "contents": [
                         {
                             "type": "directory",
-                            "name": "eval",
-                            "contents": [
-                                {
-                                    "type": "directory",
-                                    "name": "definitions",
-                                    "contents": [{"type": "file", "name": "README.md"}],
-                                }
-                            ],
-                        },
+                            "name": "definitions",
+                            "contents": [{"type": "file", "name": "README.md"}],
+                        }
+                    ],
+                },
                 {
                     "type": "directory",
                     "name": "tests",

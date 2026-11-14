@@ -277,7 +277,7 @@ contract-only wrapper の validation evidence は次のように固定します�
 - SOLID / OOP boundary assertion は checker-owned property として扱います。
   Single responsibility、Open/closed、Liskov substitution、Interface segregation、
   Dependency inversion の risk は `$oop-readability-check`、
-  `tools/validation/code/oop/python/readability.py` / `tools/validation/code/oop/cpp/readability.py`、
+  `tools/runtime/dispatch/agent-canon/src/oop/readability.rs` / `tools/runtime/dispatch/agent-canon/src/oop/readability.rs`、
   type checker と dependency review の evidence route に置きます。
   実行テストは observable behavior、shared behavior contract、または public API regression
   を固定する場合に限ります。
@@ -346,7 +346,7 @@ hand-picked example だけで終えず、契約に合う property / metamorphic 
 
 ### 4.1 標準出力を表示する
 
-- ファイル単位: `pytest -q -s tests/tools/test_run_managed_experiment.py`
+- managed experiment native owner: `cargo test --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --test managed_experiment_native`
 - 全体: `pytest -q -s`
 
 ### 4.2 `python file.py` での補助実行

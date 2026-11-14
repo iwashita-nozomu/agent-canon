@@ -135,7 +135,7 @@ fn canonicalize_with_missing_suffix(path: &Path) -> Result<PathBuf, String> {
                 return Err(format!(
                     "cannot resolve runtime path {}: {error}",
                     path.display()
-                ))
+                ));
             }
         }
     }
@@ -145,10 +145,7 @@ fn canonicalize_with_missing_suffix(path: &Path) -> Result<PathBuf, String> {
 ///
 /// This preserves the additive explicit-path route while refusing source-local
 /// artifacts and symlink components.
-pub(crate) fn resolve_external_artifact_path(
-    source_root: &Path,
-    path: &Path,
-) -> Result<PathBuf, String> {
+pub fn resolve_external_artifact_path(source_root: &Path, path: &Path) -> Result<PathBuf, String> {
     let candidate = expand_user_path(path)?;
     if !candidate.is_absolute() {
         return Err(format!(
@@ -342,6 +339,57 @@ pub(crate) struct RuntimeDirectory {
 }
 
 impl RuntimeDirectory {
+    #[cfg(target_os = "linux")]
+    pub(crate) fn publish_anonymous_once(
+        &self,
+        relative: &Path,
+        bytes: &[u8],
+        mode: u32,
+    ) -> std::io::Result<std::fs::File> {
+        use cap_fs_ext::{FollowSymlinks, OpenOptionsFollowExt};
+        let (parent, name) = self.parent(relative, false)?;
+        let descriptor = rustix::fs::openat(
+            &parent.directory,
+            ".",
+            rustix::fs::OFlags::WRONLY | rustix::fs::OFlags::TMPFILE | rustix::fs::OFlags::CLOEXEC,
+            rustix::fs::Mode::from_bits_truncate(mode),
+        )?;
+        let mut file = std::fs::File::from(descriptor);
+        file.write_all(bytes)?;
+        file.sync_all()?;
+        rustix::fs::linkat(
+            &file,
+            "",
+            &parent.directory,
+            &name,
+            rustix::fs::AtFlags::EMPTY_PATH,
+        )?;
+        parent.sync_directory()?;
+        let mut options = cap_std::fs::OpenOptions::new();
+        options.read(true).follow(FollowSymlinks::No);
+        Ok(parent.directory.open_with(name, &options)?.into_std())
+    }
+    pub(crate) fn create_file_once(
+        &self,
+        relative: &Path,
+        mode: u32,
+    ) -> std::io::Result<std::fs::File> {
+        use cap_fs_ext::{FollowSymlinks, OpenOptionsFollowExt};
+        let (parent, name) = self.parent(relative, false)?;
+        let mut options = cap_std::fs::OpenOptions::new();
+        options
+            .write(true)
+            .create_new(true)
+            .follow(FollowSymlinks::No);
+        #[cfg(unix)]
+        {
+            use cap_std::fs::OpenOptionsExt;
+            options.mode(mode);
+        }
+        #[cfg(not(unix))]
+        let _ = mode;
+        Ok(parent.directory.open_with(name, &options)?.into_std())
+    }
     pub(crate) fn open(path: &Path, create: bool) -> std::io::Result<Self> {
         if !path.is_absolute() {
             return Err(std::io::Error::new(
@@ -375,7 +423,7 @@ impl RuntimeDirectory {
                     return Err(std::io::Error::new(
                         std::io::ErrorKind::InvalidInput,
                         "absolute runtime directory requires a volume prefix",
-                    ))
+                    ));
                 }
             };
             if !matches!(components.next(), Some(Component::RootDir)) {
@@ -461,7 +509,7 @@ impl RuntimeDirectory {
         private_directory_mode(&self.directory)
     }
 
-    fn sync_directory(&self) -> std::io::Result<()> {
+    pub(crate) fn sync_directory(&self) -> std::io::Result<()> {
         use cap_fs_ext::{FollowSymlinks, OpenOptionsFollowExt};
 
         // Dir handles are opened for capability-relative traversal and may be O_PATH.
@@ -526,6 +574,34 @@ impl RuntimeDirectory {
             .map(|result| result.map(|(bytes, _)| bytes))
     }
 
+    /// Observe an existing entry through its parent handle without reading user bytes.
+    #[cfg(target_os = "linux")]
+    pub(crate) fn entry_exists(&self, relative: &Path) -> std::io::Result<bool> {
+        let (parent, name) = match self.parent(relative, false) {
+            Ok(value) => value,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+            Err(error) => return Err(error),
+        };
+        match parent.directory.symlink_metadata(name) {
+            Ok(_) => Ok(true),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
+            Err(error) => Err(error),
+        }
+    }
+
+    pub(crate) fn remove_file(&self, relative: &Path) -> std::io::Result<()> {
+        let (parent, name) = self.parent(relative, false)?;
+        let metadata = parent.directory.symlink_metadata(&name)?;
+        if !metadata.is_file() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "runtime target is not a regular file",
+            ));
+        }
+        parent.directory.remove_file(name)?;
+        parent.sync_directory()
+    }
+
     pub(crate) fn read_stable(
         &self,
         relative: &Path,
@@ -544,7 +620,7 @@ impl RuntimeDirectory {
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::InvalidData,
                     "runtime target is not a regular file",
-                ))
+                ));
             }
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
             Err(error) => return Err(error),
@@ -683,7 +759,7 @@ impl RuntimeDirectory {
                         std::io::ErrorKind::InvalidData,
                         "runtime target is not a regular file",
                     ),
-                ))
+                ));
             }
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
             Err(error) => return Err(atomic_write_stage("target_inspect", error)),
@@ -766,6 +842,42 @@ impl RuntimeDirectory {
 
     pub(crate) fn lock(&self, relative: &Path) -> std::io::Result<RuntimeFileLock> {
         self.lock_with_marker(relative, true)
+    }
+
+    pub(crate) fn try_lock_with_empty_marker(
+        &self,
+        relative: &Path,
+    ) -> std::io::Result<RuntimeFileLock> {
+        use cap_fs_ext::{FollowSymlinks, OpenOptionsFollowExt};
+        let (parent, name) = self.parent(relative, true)?;
+        let mut options = cap_std::fs::OpenOptions::new();
+        options
+            .read(true)
+            .write(true)
+            .create(true)
+            .follow(FollowSymlinks::No);
+        #[cfg(unix)]
+        {
+            use cap_std::fs::OpenOptionsExt;
+            options.mode(0o600);
+        }
+        let file = parent.directory.open_with(&name, &options)?.into_std();
+        if !file.metadata()?.is_file() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "runtime lock is not a regular file",
+            ));
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            file.set_permissions(fs::Permissions::from_mode(0o600))?;
+            rustix::fs::flock(&file, rustix::fs::FlockOperation::NonBlockingLockExclusive)
+                .map_err(std::io::Error::from)?;
+        }
+        #[cfg(not(unix))]
+        file.lock()?;
+        Ok(RuntimeFileLock { file })
     }
 
     fn lock_with_marker(
@@ -914,12 +1026,12 @@ fn private_directory_mode(directory: &cap_std::fs::Dir) -> std::io::Result<()> {
     Ok(())
 }
 
-pub(crate) struct RuntimeFileLock {
+pub struct RuntimeFileLock {
     file: fs::File,
 }
 
 impl RuntimeFileLock {
-    pub(crate) fn finish(self) -> std::io::Result<()> {
+    pub fn finish(self) -> std::io::Result<()> {
         self.file.unlock()
     }
 }
@@ -1094,7 +1206,7 @@ impl RuntimeArtifactBoundary {
         match self.directory.parent(relative, false) {
             Ok((parent, name)) => match parent.directory.symlink_metadata(&name) {
                 Ok(metadata) if metadata.is_symlink() => {
-                    return Err(format!("runtime target is a symlink: {}", joined.display()))
+                    return Err(format!("runtime target is a symlink: {}", joined.display()));
                 }
                 Ok(_) => {}
                 Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
@@ -1102,7 +1214,7 @@ impl RuntimeArtifactBoundary {
                     return Err(format!(
                         "cannot inspect runtime path {}: {error}",
                         joined.display()
-                    ))
+                    ));
                 }
             },
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
@@ -1110,7 +1222,7 @@ impl RuntimeArtifactBoundary {
                 return Err(format!(
                     "cannot inspect runtime path {}: {error}",
                     joined.display()
-                ))
+                ));
             }
         }
         Ok(joined)
@@ -1132,6 +1244,144 @@ impl RuntimeArtifactBoundary {
             )
         })?;
         Ok(target)
+    }
+
+    /// Reserve one private temporary directory through the retained runtime handle.
+    pub fn temporary_directory(&self, path: &Path, prefix: &str) -> Result<PathBuf, String> {
+        if prefix.is_empty() || prefix.contains(['/', '\\']) || prefix.chars().any(char::is_control)
+        {
+            return Err("temporary directory prefix must be one filename component".into());
+        }
+        let parent_path = self.ensure_directory(path)?;
+        let relative = parent_path
+            .strip_prefix(&self.root)
+            .map_err(|error| error.to_string())?;
+        let parent = self
+            .directory
+            .child(relative, false)
+            .map_err(|error| error.to_string())?;
+        let mut nonce = [0u8; 16];
+        getrandom::getrandom(&mut nonce).map_err(|error| error.to_string())?;
+        let suffix = nonce
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>();
+        let name = format!("{prefix}{suffix}");
+        parent
+            .directory
+            .create_dir(&name)
+            .map_err(|error| error.to_string())?;
+        parent
+            .child(Path::new(&name), false)
+            .and_then(|directory| directory.make_private())
+            .map_err(|error| error.to_string())?;
+        Ok(parent_path.join(name))
+    }
+
+    /// Remove one selected directory beneath the runtime through no-follow parents.
+    pub fn remove_directory_tree(&self, path: &Path) -> Result<(), String> {
+        let target = self.resolve(path)?;
+        let relative = target
+            .strip_prefix(&self.root)
+            .map_err(|error| error.to_string())?;
+        let (parent, name) = self
+            .directory
+            .parent(relative, false)
+            .map_err(|error| error.to_string())?;
+        let metadata = parent
+            .directory
+            .symlink_metadata(&name)
+            .map_err(|error| error.to_string())?;
+        if !metadata.is_dir() || metadata.is_symlink() {
+            return Err("runtime cleanup requires a real directory".into());
+        }
+        parent
+            .directory
+            .remove_dir_all(&name)
+            .map_err(|error| error.to_string())
+    }
+
+    /// Copy a regular source file through read-only no-follow source handles.
+    pub fn copy_source_file(&self, source: &Path, target: &Path) -> Result<PathBuf, String> {
+        let source = if source.is_absolute() {
+            source.to_path_buf()
+        } else {
+            self.source_root.join(source)
+        };
+        let relative = source
+            .strip_prefix(&self.source_root)
+            .map_err(|_| "copy source escapes source root")?;
+        let directory = RuntimeDirectory::open_nofollow(&self.source_root, false)
+            .map_err(|error| error.to_string())?;
+        let bytes = directory
+            .read(relative)
+            .map_err(|error| error.to_string())?
+            .ok_or("copy source is missing")?;
+        self.atomic_write_bytes(target, &bytes, 0o600)
+    }
+
+    /// Acquire a no-follow runtime lock without seeding the empty marker byte.
+    ///
+    /// Archive transactions historically use an empty lock file; other spool
+    /// protocols retain their existing seeded-marker behavior.
+    pub fn lock_with_empty_marker(&self, path: &Path) -> Result<RuntimeFileLock, String> {
+        let target = self.resolve(path)?;
+        let relative = target
+            .strip_prefix(&self.root)
+            .map_err(|_| format!("path escapes runtime root: {}", target.display()))?;
+        self.directory
+            .lock_with_marker(relative, false)
+            .map_err(|error| format!("runtime lock failed: {}: {error}", target.display()))
+    }
+
+    /// Acquire a nonblocking no-follow runtime lock without seeding its marker.
+    pub fn try_lock_with_empty_marker(&self, path: &Path) -> Result<RuntimeFileLock, String> {
+        let target = self.resolve(path)?;
+        let relative = target
+            .strip_prefix(&self.root)
+            .map_err(|_| format!("path escapes runtime root: {}", target.display()))?;
+        self.directory
+            .try_lock_with_empty_marker(relative)
+            .map_err(|error| format!("runtime lock failed: {}: {error}", target.display()))
+    }
+
+    /// Publish immutable bytes once beneath the runtime without following path
+    /// components. Existing identical bytes are idempotent; conflicting bytes
+    /// remain untouched.
+    pub fn write_once_bytes(&self, path: &Path, bytes: &[u8]) -> Result<PathBuf, String> {
+        let target = self.resolve(path)?;
+        let relative = target
+            .strip_prefix(&self.root)
+            .map_err(|_| format!("path escapes runtime root: {}", target.display()))?;
+        self.directory
+            .write_once(relative, bytes)
+            .map_err(|error| {
+                format!(
+                    "immutable runtime publication failed: {}: {error}",
+                    target.display()
+                )
+            })?;
+        Ok(target)
+    }
+
+    /// Remove one regular artifact through the existing no-follow boundary.
+    pub fn remove_file(&self, path: &Path) -> Result<bool, String> {
+        let target = self.resolve(path)?;
+        let relative = target
+            .strip_prefix(&self.root)
+            .map_err(|_| format!("path escapes runtime root: {}", target.display()))?;
+        if self
+            .directory
+            .read(relative)
+            .map_err(|error| format!("runtime file check failed: {}: {error}", target.display()))?
+            .is_none()
+        {
+            return Ok(false);
+        }
+        self.directory.remove_file(relative).map_err(|error| {
+            format!("runtime file removal failed: {}: {error}", target.display())
+        })?;
+        Ok(true)
     }
 
     pub fn atomic_write_bytes(
@@ -1319,6 +1569,23 @@ impl RuntimeSpoolBoundary {
     pub fn boundary(&self) -> &RuntimeArtifactBoundary {
         &self.0
     }
+
+    pub fn root(&self) -> &Path {
+        self.0.root()
+    }
+
+    pub fn resolve(&self, path: &Path) -> Result<PathBuf, String> {
+        self.0.resolve(path)
+    }
+
+    pub fn read_bytes(&self, path: &Path) -> Result<Option<Vec<u8>>, String> {
+        self.0.read_bytes(path)
+    }
+
+    /// Remove one spool file after its owning protocol has verified durable readback.
+    pub fn remove_file(&self, path: &Path) -> Result<bool, String> {
+        self.0.remove_file(path)
+    }
 }
 
 fn resolve_readonly_runtime_path(
@@ -1472,7 +1739,7 @@ fn reject_symlink_components(path: &Path, stop: &Path) -> Result<(), String> {
                 }
                 Component::CurDir => {}
                 Component::RootDir | Component::Prefix(_) => {
-                    return Err(format!("path is outside boundary: {}", path.display()))
+                    return Err(format!("path is outside boundary: {}", path.display()));
                 }
             }
         }
