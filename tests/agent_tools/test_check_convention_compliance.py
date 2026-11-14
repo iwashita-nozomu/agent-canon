@@ -679,6 +679,19 @@ class CheckConventionComplianceTest(unittest.TestCase):
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("normative-lines-without-verification-route", result.stdout)
 
+    def test_native_convention_checker_is_a_verification_route(self) -> None:
+        """A convention may name the published hyphenated CLI command."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            (root / "documents" / "conventions" / "coding-conventions-python.md").write_text(
+                "# Python\n\n- 公開関数には型注釈が必須です。\n"
+                "\n## 検証\n\nagent-canon check-convention-compliance で確認します。\n",
+                encoding="utf-8",
+            )
+            result = self.run_checker(root)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_runtime_boundary_wording_is_not_a_blanket_checker_gate(self) -> None:
         """Reachability boundaries may use negative wording without a style gate."""
         with tempfile.TemporaryDirectory() as tmp_dir:
