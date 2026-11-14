@@ -1480,7 +1480,8 @@ def main(argv: list[str]) -> int:
                 exchange /= "exchange"
             exchange /= relative
             eval_failed = os.environ.get("FAKE_EVAL_FAIL") == "1"
-            (exchange / "eval-results").mkdir(parents=True, exist_ok=True)
+            reports = exchange / "archive" / "agent-canon-log" / "eval-results"
+            reports.mkdir(parents=True, exist_ok=True)
             families = {
                 "workflow-selection": (
                     "workflow-selection-eval-20260101T000000000000Z-0123456789-pass.md",
@@ -1494,7 +1495,7 @@ def main(argv: list[str]) -> int:
             for family, (filename, content) in families.items():
                 if eval_failed:
                     continue
-                destination = exchange / "eval-results" / family / filename
+                destination = reports / family / filename
                 destination.parent.mkdir(parents=True, exist_ok=True)
                 destination.write_text(content, encoding="utf-8")
             log_dir = exchange / "tasks" / run_id / "logs"
