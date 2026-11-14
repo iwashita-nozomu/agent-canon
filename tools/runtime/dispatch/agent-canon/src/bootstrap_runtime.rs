@@ -4868,7 +4868,7 @@ mod tests {
     #[test]
     fn exchange_directory_keeps_the_requested_sticky_permissions() {
         let temporary = tempfile::tempdir().unwrap();
-        let exchange = temporary.path().join("exchange");
+        let exchange = temporary.path().canonicalize().unwrap().join("exchange");
         RuntimeFs::new()
             .unwrap()
             .ensure_directory(&exchange, 0o1733)
