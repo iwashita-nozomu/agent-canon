@@ -5,13 +5,13 @@
 # upstream design ../../../README.md shared automation index
 # upstream design ../../../../agents/skills/agent-canon-update.md shared canon PR workflow
 # upstream design ../../../../.github/PULL_REQUEST_TEMPLATE.md standalone AgentCanon PR checklist
-# upstream implementation ../../../repository/workspace/parent_root_side_effects.py owns explicit control authentication and child execution
-# upstream implementation ../../../runtime/artifacts/runtime_artifacts.py owns PR scratch, archive, and receipt output boundaries
+# upstream implementation ../../../runtime/dispatch/agent-canon/src/runtime_paths.rs validates explicit control/runtime paths
+# upstream implementation ../../../runtime/dispatch/agent-canon/src/runtime_boundary.rs owns PR scratch, archive, and receipt output boundaries
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/report_artifact_checks.rs rejects regenerated report leftovers before PR check pass
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/generated_completeness.rs materializes the post-check G2 receipt
-# upstream implementation ../../semantic/runtime/check_agent_runtime_alignment.py Codex runtime role alignment eval
-# upstream implementation ../../semantic/convention/check_convention_compliance.py convention gate wiring eval
-# upstream implementation ../../../runtime/lifecycle/update_lifecycle_contract.py owns G1-G3 receipt identity.
+# upstream implementation ../../../runtime/dispatch/agent-canon/src/runtime_alignment.rs native Codex runtime role alignment check
+# upstream implementation ../../../runtime/dispatch/agent-canon/src/convention_compliance.rs convention gate wiring eval
+# upstream implementation ../../../runtime/dispatch/agent-canon/src/update_lifecycle_contract.rs owns G1-G3 receipt identity.
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/main.rs owns the Rust CLI build gate.
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/github_workflow_check.rs GitHub workflow and PR template checks
 # upstream implementation run_python_quality_checks.sh owns shared Python static quality checks
@@ -29,7 +29,6 @@ source "${SCRIPT_DIR}/../../../repository/support/repo_paths.sh"
 WORKSPACE_ROOT="$(agent_canon_repo_root "${BASH_SOURCE[0]}")"
 CANON_TOOLS_ROOT="$(agent_canon_source_tools_root "${WORKSPACE_ROOT}")"
 CANON_CI_ROOT="${WORKSPACE_ROOT}/tools/validation/ci"
-AGENT_CANON_BOUNDARY_SCRIPT="${WORKSPACE_ROOT}/tools/repository/workspace/parent_root_side_effects.py"
 AGENT_CANON_SOURCE_ROOT="${WORKSPACE_ROOT}"
 cd "${WORKSPACE_ROOT}"
 # The source checkout is read-only input.  A caller must provide both the
@@ -44,16 +43,7 @@ if [[ -z "${AGENT_CANON_RUNTIME_ROOT:-}" ]]; then
   echo "AGENT_CANON_PR_BOUNDARY=fail reason=runtime_root_required" >&2
   exit 2
 fi
-if ! python3 - "${AGENT_CANON_SOURCE_ROOT}" "${AGENT_CANON_CONTROL_PARENT_ROOT}" <<'PY'
-from pathlib import Path
-import sys
-
-source = Path(sys.argv[1]).resolve(strict=True)
-control = Path(sys.argv[2]).resolve(strict=False)
-if source == control:
-    raise SystemExit("control parent root must differ from source root")
-PY
-then
+if ! "${AGENT_CANON_NATIVE_BIN:-${AGENT_CANON_CLI:-${WORKSPACE_ROOT}/tools/bin/agent-canon}}" runtime-paths check-control --source-root "${AGENT_CANON_SOURCE_ROOT}" --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}"; then
   echo "AGENT_CANON_PR_BOUNDARY=fail reason=control_parent_root_is_source" >&2
   exit 2
 fi
@@ -64,49 +54,16 @@ export AGENT_CANON_ACTIVE_REPOSITORY_ROOT="${AGENT_CANON_CONTROL_PARENT_ROOT}"
 unset TMPDIR TEMP TMP XDG_CACHE_HOME PYTHONPYCACHEPREFIX
 unset AGENT_CANON_TOOLS_HOME CARGO_HOME CARGO_TARGET_DIR
 unset AGENT_CANON_CLI_TARGET_DIR RUSTUP_HOME ELAN_HOME
-if [[ "${AGENT_CANON_CHILD_PURPOSE:-}" == "agent-canon-pr-script" ]]; then
-  python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" verify-child \
-    --root "${AGENT_CANON_CONTROL_PARENT_ROOT}" \
-    --source-root "${AGENT_CANON_SOURCE_ROOT}" \
-    --purpose agent-canon-pr-script \
-    --consume >/dev/null
-else
-  exec python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" exec-parent-bound \
-    --root "${AGENT_CANON_CONTROL_PARENT_ROOT}" \
-    --source-root "${AGENT_CANON_SOURCE_ROOT}" \
-    --purpose agent-canon-pr-script \
-    --issue-handoff \
-    -- bash "${BASH_SOURCE[0]}"
-fi
 unset AGENT_CANON_CHILD_HANDOFF AGENT_CANON_HANDOFF_AUDIENCE AGENT_CANON_CHILD_PURPOSE
 
 # Runtime artifacts use one validated external root.  The Python boundary is
 # shared with producers and archive readers; no source-local fallback exists.
 runtime_boundary_root() {
-  local candidate="$1"
-  PYTHONPATH="${WORKSPACE_ROOT}${PYTHONPATH:+:${PYTHONPATH}}" \
-    python3 - "${AGENT_CANON_SOURCE_ROOT}" "${candidate}" <<'PY'
-from pathlib import Path
-import sys
-
-from tools.runtime.artifacts.runtime_artifacts import runtime_artifact_boundary
-
-print(runtime_artifact_boundary(Path(sys.argv[1]), Path(sys.argv[2]), create=True).root)
-PY
+  "${AGENT_CANON_NATIVE_BIN:-${AGENT_CANON_CLI:-${WORKSPACE_ROOT}/tools/bin/agent-canon}}" runtime-paths root --source-root "${AGENT_CANON_SOURCE_ROOT}" --runtime-root "$1"
 }
 
 runtime_boundary_path() {
-  local candidate="$1"
-  PYTHONPATH="${WORKSPACE_ROOT}${PYTHONPATH:+:${PYTHONPATH}}" \
-    python3 - "${AGENT_CANON_SOURCE_ROOT}" "${AGENT_CANON_RUNTIME_ROOT}" "${candidate}" <<'PY'
-from pathlib import Path
-import sys
-
-from tools.runtime.artifacts.runtime_artifacts import runtime_artifact_boundary
-
-boundary = runtime_artifact_boundary(Path(sys.argv[1]), Path(sys.argv[2]), create=True)
-print(boundary.resolve(Path(sys.argv[3])))
-PY
+  "${AGENT_CANON_NATIVE_BIN:-${AGENT_CANON_CLI:-${WORKSPACE_ROOT}/tools/bin/agent-canon}}" runtime-paths path --source-root "${AGENT_CANON_SOURCE_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" --candidate "$1"
 }
 
 AGENT_CANON_RUNTIME_ROOT="$(runtime_boundary_root "${AGENT_CANON_RUNTIME_ROOT}")"
@@ -144,11 +101,11 @@ if git remote get-url "${REMOTE_NAME}" >/dev/null 2>&1; then
 fi
 run_direct_agent_checks() {
   run_convention_compliance_gate
-  python3 "${WORKSPACE_ROOT}/tools/validation/semantic/runtime/check_agent_runtime_alignment.py"
+  run_agent_canon check-agent-runtime-alignment --root "${WORKSPACE_ROOT}"
 }
 
 run_convention_compliance_gate() {
-  python3 "${WORKSPACE_ROOT}/tools/validation/semantic/convention/check_convention_compliance.py" --root "${WORKSPACE_ROOT}" --format json
+  run_agent_canon check-convention-compliance --root "${WORKSPACE_ROOT}" --format json
 }
 
 run_agent_canon() {
@@ -182,21 +139,7 @@ consume_source_correctness_receipt() {
     echo "AGENT_CANON_G1_RECEIPT=not_materialized_nontransaction"
     return
   fi
-  PYTHONPATH="${PR_AGENT_CANON_SOURCE_ROOT}${PYTHONPATH:+:${PYTHONPATH}}" \
-    python3 - "${bundle}" <<'PY'
-import json
-import sys
-from pathlib import Path
-from tools.runtime.lifecycle.update_lifecycle_contract import validate_gate_chain
-
-payload = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-values = payload.get("gate_verdicts") if isinstance(payload, dict) else None
-if not isinstance(values, list):
-    raise SystemExit("agent_canon_pr_gate_bundle:gate_verdicts_missing")
-validate_gate_chain(values, expected_gate_ids=("G1",), require_pass=True)
-print("AGENT_CANON_G1_RECEIPT=consumed")
-print("AGENT_CANON_PR_GATE_ORDER=G1")
-PY
+  run_agent_canon runtime-paths gate-g1 --input "${bundle}"
   AGENT_CANON_G1_BUNDLE_ACTIVE=1
 }
 

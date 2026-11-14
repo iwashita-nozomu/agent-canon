@@ -33,7 +33,7 @@ JSONL and accumulated eval archive branch policy belong to
 ## Storage Classes
 
 - `reports/agents/<run-id>/` stores source-repo-local agent workflow evidence,
-  reviews, validation, monitoring, and closeout material. `runtime_log_archive_git.py
+  reviews, validation, monitoring, and closeout material. `runtime-log-archive-git
   sync` copies those run bundles into the external log archive under
   `agent-reports/<repo-key>/<run-id>/` for accumulated retention.
 - `reports/` stores repo-wide automation reports, dependency reviews, lint
@@ -105,14 +105,14 @@ Canonical helper commands:
 ```bash
 tools/bin/agent-canon jsonl-to-md <input.jsonl> <output.md>
 tools/bin/agent-canon summarize-hlo-jsonl <hlo.jsonl> > summary.json
-python3 tools/experiments/artifacts/html_artifact_access.py <report.html>
+agent-canon html-artifact-access <report.html>
 git annex add <archive-path>
-python3 -m tools.experiments.artifacts.update_latest_result experiments/<topic>/result --variant <variant>
+agent-canon update-latest-result experiments/<topic>/result --variant <variant>
 dot -V
 ```
 
 When an HTML report is produced on an SSH-reached HPC host or inside a container
-on that host, use `tools/experiments/artifacts/html_artifact_access.py` to record the
+on that host, use `tools/runtime/dispatch/agent-canon/src/html_artifact_access.rs` to record the
 `python3 -m http.server` command, SSH tunnel command, and local browser URL. The
 default bind address is `127.0.0.1`; use `--use-container-ip` when serving
 directly from inside a container and tunneling to the container IP.
@@ -129,7 +129,7 @@ directly from inside a container and tunneling to the container IP.
 - If a generated artifact is needed for review but should not be tracked, put
   its path and checksum in `verification.txt` or the experiment report.
 - If a run-local `reports/agents/<run-id>/` bundle is needed after the current
-  task, archive it mechanically with `runtime_log_archive_git.py
+  task, archive it mechanically with `runtime-log-archive-git
   archive-agent-report`; do not create a hand-written duplicate report in the
   source tree.
 - For experiment source placement, follow

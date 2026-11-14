@@ -2,9 +2,10 @@ use super::{
     digest_bytes, digest_hex, encode_hex, AttestationRequest, AttestedParent, AuthorityError,
     ChildHandoffReceipt, ChildHandoffRequest, ComponentIdentity, EntryKind, FileIdentity, FileMode,
     HandoffMode, HandoffStorage, HandoffTransport, LexicalEntrySnapshot, LexicalSnapshot,
-    NonEmptyTrimmedString, Nonce128, OwnerRoot, ParentOwnedNoReplaceOutcome,
-    ParentOwnedPathReceipt, ParentRootReject, PhysicalRoot, RootKind, RootPrecedence, SecretToken,
-    Sha256Digest, TargetIdentity, VerifiedChildHandoff, HANDOFF_SCHEMA,
+    NonEmptyTrimmedString, Nonce128, OwnerRoot, ParentOwnedDirectoryTarget,
+    ParentOwnedNoReplaceOutcome, ParentOwnedPathReceipt, ParentRootReject, PhysicalRoot, RootKind,
+    RootPrecedence, SecretToken, Sha256Digest, TargetIdentity, VerifiedChildHandoff,
+    HANDOFF_SCHEMA,
 };
 use base64::engine::general_purpose::URL_SAFE;
 use base64::Engine;
@@ -664,6 +665,453 @@ pub(crate) fn resolve_parent_owned_path(
     Ok(receipt)
 }
 
+pub(crate) fn ensure_parent_owned_directory(
+    attested: &AttestedParent,
+    candidate: &Path,
+    purpose: NonEmptyTrimmedString,
+) -> Result<ParentOwnedPathReceipt, AuthorityError> {
+    let receipt = resolve_parent_owned_path(attested, candidate, purpose.clone())?;
+    let root = validate_receipt(attested, &receipt)?;
+    let parts = relative_components(root.path(), &receipt.physical_path)?;
+    let (_, components) = open_component_chain(root, &parts, &receipt.parent_components, true)?;
+    if components.len() != parts.len() {
+        return Err(error(
+            ParentRootReject::RootRaceDetected,
+            "created parent-owned directory path is incomplete",
+        ));
+    }
+    attested.verify_live_identity()?;
+    let checked = resolve_parent_owned_path(attested, candidate, purpose)?;
+    match checked.target {
+        Some(target) if target.kind == EntryKind::Directory => Ok(checked),
+        _ => Err(error(
+            ParentRootReject::RootRaceDetected,
+            "parent-owned directory target is not a directory",
+        )),
+    }
+}
+
+pub(crate) fn set_parent_owned_directory_mode(
+    attested: &AttestedParent,
+    receipt: &ParentOwnedPathReceipt,
+    mode: u32,
+) -> Result<(), AuthorityError> {
+    attested.verify_live_identity()?;
+    let root = validate_receipt(attested, receipt)?;
+    verify_lexical_snapshot(root, receipt, true, false)?;
+    let expected = receipt.target.ok_or_else(|| {
+        error(
+            ParentRootReject::RootRaceDetected,
+            "parent-owned mode target has no identity",
+        )
+    })?;
+    if expected.kind != EntryKind::Directory {
+        return Err(error(
+            ParentRootReject::RootRaceDetected,
+            "parent-owned mode target is not a directory",
+        ));
+    }
+    let parts = relative_components(root.path(), &receipt.physical_path)?;
+    let Some((leaf, parent_parts)) = parts.split_last() else {
+        return Err(error(
+            ParentRootReject::RootMismatch,
+            "parent-owned mode target has no final component",
+        ));
+    };
+    let (parent, _) = open_component_chain(root, parent_parts, &receipt.parent_components, false)?;
+    verify_target_identity(&parent, leaf.as_os_str(), Some(expected), false)?;
+    let directory = parent.open_dir_nofollow(leaf).map_err(|_| {
+        error(
+            ParentRootReject::SymlinkEscape,
+            "parent-owned mode target is not a no-follow directory",
+        )
+    })?;
+    let before = directory.metadata(".").map_err(|_| {
+        error(
+            ParentRootReject::RootRaceDetected,
+            "cannot inspect parent-owned mode target",
+        )
+    })?;
+    if identity_from_cap_metadata(&before) != expected.identity {
+        return Err(error(
+            ParentRootReject::RootRaceDetected,
+            "parent-owned mode target identity changed",
+        ));
+    }
+    directory
+        .set_permissions(".", Permissions::from_mode(mode))
+        .map_err(|_| {
+            error(
+                ParentRootReject::RootRaceDetected,
+                "cannot set parent-owned directory mode",
+            )
+        })?;
+    sync_directory(&directory)?;
+    verify_target_identity(&parent, leaf.as_os_str(), Some(expected), false)?;
+    attested.verify_live_identity()
+}
+
+pub(crate) fn reserve_parent_owned_directory_target(
+    attested: &AttestedParent,
+    candidate: &Path,
+    purpose: NonEmptyTrimmedString,
+) -> Result<ParentOwnedDirectoryTarget, AuthorityError> {
+    let initial = resolve_parent_owned_path(attested, candidate, purpose.clone())?;
+    let root = validate_receipt(attested, &initial)?;
+    let parts = relative_components(root.path(), &initial.physical_path)?;
+    let Some((leaf, parent_parts)) = parts.split_last() else {
+        return Err(error(
+            ParentRootReject::RootMismatch,
+            "parent-owned directory target has no final component",
+        ));
+    };
+    let (parent, parent_components) =
+        open_component_chain(root, parent_parts, &initial.parent_components, true)?;
+    let name = leaf.as_os_str();
+    let mut builder = DirBuilder::new();
+    builder.mode(0o700);
+    parent
+        .create_dir_with(name, &builder)
+        .map_err(|error_value| {
+            if error_value.kind() == std::io::ErrorKind::AlreadyExists {
+                error(
+                    ParentRootReject::RootRaceDetected,
+                    "parent-owned directory target already exists",
+                )
+            } else {
+                error(
+                    ParentRootReject::RootRaceDetected,
+                    "cannot reserve parent-owned directory target",
+                )
+            }
+        })?;
+    let directory = parent.open_dir_nofollow(name).map_err(|_| {
+        error(
+            ParentRootReject::RootRaceDetected,
+            "reserved parent-owned directory changed during open",
+        )
+    })?;
+    let metadata = directory.metadata(".").map_err(|_| {
+        error(
+            ParentRootReject::RootRaceDetected,
+            "cannot inspect reserved parent-owned directory",
+        )
+    })?;
+    if !metadata.is_dir()
+        || directory
+            .entries()
+            .map_err(|_| {
+                error(
+                    ParentRootReject::RootRaceDetected,
+                    "cannot inspect reserved parent-owned directory contents",
+                )
+            })?
+            .next()
+            .is_some()
+    {
+        let _ = parent.remove_dir(name);
+        return Err(error(
+            ParentRootReject::RootRaceDetected,
+            "reserved parent-owned directory is not empty",
+        ));
+    }
+    sync_directory(&parent)?;
+    attested.verify_live_identity()?;
+    let receipt = resolve_parent_owned_path(attested, candidate, purpose)?;
+    let expected = receipt.target.ok_or_else(|| {
+        error(
+            ParentRootReject::RootRaceDetected,
+            "reserved parent-owned directory identity is unavailable",
+        )
+    })?;
+    if expected.kind != EntryKind::Directory
+        || expected.identity != identity_from_cap_metadata(&metadata)
+        || receipt.parent_components != parent_components
+    {
+        return Err(error(
+            ParentRootReject::RootRaceDetected,
+            "reserved parent-owned directory identity changed",
+        ));
+    }
+    let target = ParentOwnedDirectoryTarget { receipt, directory };
+    Ok(target)
+}
+
+pub(crate) fn verify_parent_owned_directory_target(
+    attested: &AttestedParent,
+    target: &ParentOwnedDirectoryTarget,
+) -> Result<(), AuthorityError> {
+    let receipt = &target.receipt;
+    let root = validate_receipt(attested, receipt)?;
+    verify_lexical_snapshot(root, receipt, true, false)?;
+    let expected = receipt.target.ok_or_else(|| {
+        error(
+            ParentRootReject::RootRaceDetected,
+            "reserved directory receipt has no target identity",
+        )
+    })?;
+    if expected.kind != EntryKind::Directory {
+        return Err(error(
+            ParentRootReject::RootRaceDetected,
+            "reserved directory receipt target is not a directory",
+        ));
+    }
+    let observed = target.directory.metadata(".").map_err(|_| {
+        error(
+            ParentRootReject::RootRaceDetected,
+            "cannot inspect reserved parent-owned directory handle",
+        )
+    })?;
+    if identity_from_cap_metadata(&observed) != expected.identity {
+        return Err(error(
+            ParentRootReject::RootRaceDetected,
+            "reserved parent-owned directory handle identity changed",
+        ));
+    }
+    let parts = relative_components(root.path(), &receipt.physical_path)?;
+    let Some((leaf, parent_parts)) = parts.split_last() else {
+        return Err(error(
+            ParentRootReject::RootMismatch,
+            "reserved parent-owned directory has no final component",
+        ));
+    };
+    let (parent, _) = open_component_chain(root, parent_parts, &receipt.parent_components, false)?;
+    verify_target_identity(&parent, leaf.as_os_str(), Some(expected), false)?;
+    attested.verify_live_identity()
+}
+
+pub(crate) fn abort_parent_owned_directory_target(
+    attested: &AttestedParent,
+    target: &ParentOwnedDirectoryTarget,
+) -> Result<(), AuthorityError> {
+    verify_parent_owned_directory_target(attested, target)?;
+    remove_parent_owned_tree(attested, &target.receipt)
+}
+
+pub(crate) fn remove_parent_owned_tree(
+    attested: &AttestedParent,
+    receipt: &ParentOwnedPathReceipt,
+) -> Result<(), AuthorityError> {
+    attested.verify_live_identity()?;
+    let root = validate_receipt(attested, receipt)?;
+    verify_lexical_snapshot(root, receipt, true, false)?;
+    let expected = receipt.target.ok_or_else(|| {
+        error(
+            ParentRootReject::RootRaceDetected,
+            "parent-owned tree receipt has no target identity",
+        )
+    })?;
+    if expected.kind != EntryKind::Directory {
+        return Err(error(
+            ParentRootReject::RootRaceDetected,
+            "parent-owned tree target is not a directory",
+        ));
+    }
+    let parts = relative_components(root.path(), &receipt.physical_path)?;
+    let Some((leaf, parent_parts)) = parts.split_last() else {
+        return Err(error(
+            ParentRootReject::RootMismatch,
+            "parent-owned tree has no final component",
+        ));
+    };
+    let (parent, opened_components) =
+        open_component_chain(root, parent_parts, &receipt.parent_components, false)?;
+    if opened_components != receipt.parent_components {
+        return Err(error(
+            ParentRootReject::RootRaceDetected,
+            "parent-owned tree parent identity changed",
+        ));
+    }
+    verify_target_identity(&parent, leaf.as_os_str(), Some(expected), false)?;
+    let directory = parent.open_dir_nofollow(leaf).map_err(|_| {
+        error(
+            ParentRootReject::SymlinkEscape,
+            "parent-owned tree target is not a no-follow directory",
+        )
+    })?;
+    let metadata = directory.metadata(".").map_err(|_| {
+        error(
+            ParentRootReject::RootRaceDetected,
+            "cannot inspect parent-owned tree target",
+        )
+    })?;
+    if identity_from_cap_metadata(&metadata) != expected.identity {
+        return Err(error(
+            ParentRootReject::RootRaceDetected,
+            "parent-owned tree target identity changed",
+        ));
+    }
+    remove_open_tree(&directory)?;
+    verify_target_identity(&parent, leaf.as_os_str(), Some(expected), false)?;
+    parent.remove_dir(leaf).map_err(|_| {
+        error(
+            ParentRootReject::RootRaceDetected,
+            "cannot remove parent-owned tree root",
+        )
+    })?;
+    sync_directory(&parent)?;
+    attested.verify_live_identity()
+}
+
+pub(crate) fn remove_empty_parent_owned_directory(
+    attested: &AttestedParent,
+    receipt: &ParentOwnedPathReceipt,
+) -> Result<bool, AuthorityError> {
+    attested.verify_live_identity()?;
+    let root = validate_receipt(attested, receipt)?;
+    verify_lexical_snapshot(root, receipt, true, false)?;
+    let expected = receipt.target.ok_or_else(|| {
+        error(
+            ParentRootReject::RootRaceDetected,
+            "parent-owned directory receipt has no target identity",
+        )
+    })?;
+    if expected.kind != EntryKind::Directory {
+        return Err(error(
+            ParentRootReject::RootRaceDetected,
+            "parent-owned empty target is not a directory",
+        ));
+    }
+    let parts = relative_components(root.path(), &receipt.physical_path)?;
+    let Some((leaf, parent_parts)) = parts.split_last() else {
+        return Err(error(
+            ParentRootReject::RootMismatch,
+            "parent-owned directory has no final component",
+        ));
+    };
+    let (parent, _) = open_component_chain(root, parent_parts, &receipt.parent_components, false)?;
+    verify_target_identity(&parent, leaf.as_os_str(), Some(expected), false)?;
+    let directory = parent.open_dir_nofollow(leaf).map_err(|_| {
+        error(
+            ParentRootReject::SymlinkEscape,
+            "parent-owned empty target is not a no-follow directory",
+        )
+    })?;
+    let metadata = directory.metadata(".").map_err(|_| {
+        error(
+            ParentRootReject::RootRaceDetected,
+            "cannot inspect parent-owned empty target",
+        )
+    })?;
+    if identity_from_cap_metadata(&metadata) != expected.identity {
+        return Err(error(
+            ParentRootReject::RootRaceDetected,
+            "parent-owned empty target identity changed",
+        ));
+    }
+    if directory
+        .entries()
+        .map_err(|_| {
+            error(
+                ParentRootReject::RootRaceDetected,
+                "cannot inspect parent-owned directory contents",
+            )
+        })?
+        .next()
+        .is_some()
+    {
+        return Ok(false);
+    }
+    verify_target_identity(&parent, leaf.as_os_str(), Some(expected), false)?;
+    parent.remove_dir(leaf).map_err(|_| {
+        error(
+            ParentRootReject::RootRaceDetected,
+            "cannot remove empty parent-owned directory",
+        )
+    })?;
+    sync_directory(&parent)?;
+    attested.verify_live_identity()?;
+    Ok(true)
+}
+
+fn remove_open_tree(directory: &Dir) -> Result<(), AuthorityError> {
+    let mut entries = directory.entries().map_err(|_| {
+        error(
+            ParentRootReject::RootRaceDetected,
+            "cannot enumerate parent-owned tree",
+        )
+    })?;
+    let mut names = Vec::new();
+    for entry in &mut entries {
+        let entry = entry.map_err(|_| {
+            error(
+                ParentRootReject::RootRaceDetected,
+                "cannot inspect parent-owned tree entry",
+            )
+        })?;
+        names.push(entry.file_name());
+    }
+    drop(entries);
+    for name in names {
+        let before = directory.symlink_metadata(&name).map_err(|_| {
+            error(
+                ParentRootReject::RootRaceDetected,
+                "parent-owned tree entry changed before removal",
+            )
+        })?;
+        let identity = identity_from_cap_metadata(&before);
+        if before.is_dir() {
+            let child = directory.open_dir_nofollow(&name).map_err(|_| {
+                error(
+                    ParentRootReject::SymlinkEscape,
+                    "parent-owned tree directory changed before open",
+                )
+            })?;
+            let opened = child.metadata(".").map_err(|_| {
+                error(
+                    ParentRootReject::RootRaceDetected,
+                    "cannot inspect parent-owned tree directory",
+                )
+            })?;
+            if identity_from_cap_metadata(&opened) != identity {
+                return Err(error(
+                    ParentRootReject::RootRaceDetected,
+                    "parent-owned tree directory identity changed",
+                ));
+            }
+            remove_open_tree(&child)?;
+            let current = directory.symlink_metadata(&name).map_err(|_| {
+                error(
+                    ParentRootReject::RootRaceDetected,
+                    "parent-owned tree directory disappeared before removal",
+                )
+            })?;
+            if identity_from_cap_metadata(&current) != identity {
+                return Err(error(
+                    ParentRootReject::RootRaceDetected,
+                    "parent-owned tree directory identity changed before removal",
+                ));
+            }
+            directory.remove_dir(&name).map_err(|_| {
+                error(
+                    ParentRootReject::RootRaceDetected,
+                    "cannot remove parent-owned tree directory",
+                )
+            })?;
+        } else {
+            let current = directory.symlink_metadata(&name).map_err(|_| {
+                error(
+                    ParentRootReject::RootRaceDetected,
+                    "parent-owned tree entry disappeared before removal",
+                )
+            })?;
+            if identity_from_cap_metadata(&current) != identity {
+                return Err(error(
+                    ParentRootReject::RootRaceDetected,
+                    "parent-owned tree entry identity changed before removal",
+                ));
+            }
+            directory.remove_file(&name).map_err(|_| {
+                error(
+                    ParentRootReject::RootRaceDetected,
+                    "cannot remove parent-owned tree entry",
+                )
+            })?;
+        }
+    }
+    sync_directory(directory)
+}
+
 pub(crate) fn read_parent_owned_file(
     attested: &AttestedParent,
     receipt: &ParentOwnedPathReceipt,
@@ -748,6 +1196,123 @@ pub(crate) fn read_parent_owned_file(
     verify_lexical_snapshot(root, receipt, true, false)?;
     attested.verify_live_identity()?;
     Ok(bytes)
+}
+
+pub(crate) fn sync_parent_owned_directory(
+    attested: &AttestedParent,
+    receipt: &ParentOwnedPathReceipt,
+) -> Result<(), AuthorityError> {
+    attested.verify_live_identity()?;
+    let root = validate_receipt(attested, receipt)?;
+    let target = receipt.target.ok_or_else(|| {
+        error(
+            ParentRootReject::RootRaceDetected,
+            "parent-owned sync receipt has no target identity",
+        )
+    })?;
+    if target.kind != EntryKind::File {
+        return Err(error(
+            ParentRootReject::RootRaceDetected,
+            "parent-owned sync target is not a regular file",
+        ));
+    }
+    let parts = relative_components(root.path(), &receipt.physical_path)?;
+    let (parent_parts, leaf) = split_leaf(&parts)?;
+    let (parent, opened_components) =
+        open_component_chain(root, parent_parts, &receipt.parent_components, false)?;
+    if opened_components != receipt.parent_components {
+        return Err(error(
+            ParentRootReject::RootRaceDetected,
+            "parent directory identity changed before sync",
+        ));
+    }
+    verify_target_identity(&parent, leaf, Some(target), false)?;
+    verify_lexical_snapshot(root, receipt, true, false)?;
+    sync_directory(&parent)?;
+    verify_component_identities(root, parent_parts, &receipt.parent_components)?;
+    verify_target_identity(&parent, leaf, Some(target), false)?;
+    verify_lexical_snapshot(root, receipt, true, false)?;
+    attested.verify_live_identity()?;
+    Ok(())
+}
+
+pub(crate) fn remove_parent_owned_file(
+    attested: &AttestedParent,
+    receipt: &ParentOwnedPathReceipt,
+) -> Result<(), AuthorityError> {
+    attested.verify_live_identity()?;
+    let root = validate_receipt(attested, receipt)?;
+    let Some(target) = receipt.target else {
+        verify_lexical_snapshot(root, receipt, false, false)?;
+        attested.verify_live_identity()?;
+        return Ok(());
+    };
+    if target.kind != EntryKind::File {
+        return Err(error(
+            ParentRootReject::RootRaceDetected,
+            "parent-owned removal target is not a regular file",
+        ));
+    }
+    let snapshot = receipt.lexical_snapshot.as_ref().ok_or_else(|| {
+        error(
+            ParentRootReject::RootRaceDetected,
+            "parent-owned removal receipt has no lexical snapshot",
+        )
+    })?;
+    let expected_entry = snapshot.entry.as_ref().ok_or_else(|| {
+        error(
+            ParentRootReject::RootRaceDetected,
+            "parent-owned removal receipt has no lexical entry",
+        )
+    })?;
+    if !matches!(expected_entry.kind, EntryKind::File | EntryKind::Symlink) {
+        return Err(error(
+            ParentRootReject::RootRaceDetected,
+            "parent-owned removal entry is not a file or symlink",
+        ));
+    }
+    let parent_parts = relative_components(root.path(), &snapshot.parent_path)?;
+    let (parent, opened_components) =
+        open_component_chain(root, &parent_parts, &snapshot.parent_components, false)?;
+    if opened_components != snapshot.parent_components
+        || opened_components
+            .last()
+            .map(|part| part.identity)
+            .unwrap_or(root.identity)
+            != snapshot.parent_identity
+    {
+        return Err(error(
+            ParentRootReject::RootRaceDetected,
+            "lexical parent identity changed before removal",
+        ));
+    }
+    let leaf = receipt.lexical_path.file_name().ok_or_else(|| {
+        error(
+            ParentRootReject::RootRaceDetected,
+            "parent-owned removal name is unavailable",
+        )
+    })?;
+    verify_lexical_snapshot(root, receipt, true, false)?;
+    attested.verify_live_identity()?;
+    verify_component_identities(root, &parent_parts, &snapshot.parent_components)?;
+    verify_target_identity(
+        &parent,
+        leaf,
+        Some(TargetIdentity {
+            identity: expected_entry.identity,
+            kind: expected_entry.kind,
+        }),
+        false,
+    )?;
+    parent.remove_file(leaf).map_err(|_| {
+        error(
+            ParentRootReject::RootRaceDetected,
+            "cannot remove parent-owned file through its capability",
+        )
+    })?;
+    sync_directory(&parent)?;
+    attested.verify_live_identity()?;
+    Ok(())
 }
 
 pub(crate) fn atomic_replace_parent_owned_file(
@@ -2490,7 +3055,7 @@ fn verify_handoff(
             return Err(error(
                 ParentRootReject::HandoffInvalid,
                 "invalid handoff storage",
-            ))
+            ));
         }
     };
     let mode = match required_string(payload, "mode")? {
@@ -2500,7 +3065,7 @@ fn verify_handoff(
             return Err(error(
                 ParentRootReject::HandoffInvalid,
                 "invalid handoff mode",
-            ))
+            ));
         }
     };
     let expected_storage = if transport == HandoffTransport::ParentLocalFile {

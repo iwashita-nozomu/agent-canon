@@ -63,16 +63,17 @@ AgentCanon の更新・再構築を要求しません。
 
 - 同じ checkout は複数 chat/session が同時に使う場合があります。unknown dirty/staged/untracked state と branch/worktree state は user または別 chat 所有として保存します。`git restore`、`git reset`、forced `git clean`、mutating `git stash`、checkout/switch、branch/worktree create/delete/move/rename/prune は protected Git mutation として扱います。proven exact task ownership は approval request に含める path を限定し、explicit destructive approval は引き続き必須です。
 - Git authority は操作リスクで分けます。通常の branch create / worktree add は同じ command segment の creation authority/reason のみを要求し、force-create または ref overwrite は creation と destructive authority/reason の両方を要求します。既存 branch の checkout/switch、branch/worktree の delete/rename/prune、reset、restore、forced clean、mutating stash、およびその他の履歴/参照破壊操作は destructive authority/reason を要求します。`latest` / `apply` / merge update wrapper は実際に branch/worktree を作成する owner route でない限り destructive authority/reason のみを要求します。`branch --set-upstream-to`、`branch --unset-upstream`、`branch --edit-description` などの tracking/description metadata 操作と、reversible な `worktree lock/unlock` は ref、履歴、worktree を変更しないため protected destructive Git mutation ではありません。worktree の remove/move/repair/prune/force-add は protected operation です。ambient 変数や prior segment は authority になりません。
-- destructive Git safety は `tools/runtime/authority/hook_safety.py` の pure owner を dispatcher が呼び出します。session 開始時に dispatcher registration を load 済みの session では次の tool call から更新後 script が効きます。hook table 自体が未 load の既存 session は session restart 後に保護対象になります。
+- destructive Git safety は `tools/runtime/dispatch/agent-canon/src/hook_safety.rs` の pure owner を dispatcher が呼び出します。session 開始時に dispatcher registration を load 済みの session では次の tool call から更新後 script が効きます。hook table 自体が未 load の既存 session は session restart 後に保護対象になります。
 - 衝突時は current branch/worktree を維持し、status を保存して user の指示を待ちます。
 
-- `repository_topic_clone.py` と `dependency_module_change.py` の canonical
-  `prepare` / `merge-main` は、computed `workspace/<topic-slug>/<repo-name>` path と
+- `tools/bin/agent-canon repository-topic-clone` と
+  `tools/bin/agent-canon dependency-module-change` の canonical `prepare` / `merge-main` は、
+  computed `workspace/<topic-slug>/<repo-name>` path と
   Git identity が揃う repo-local topic workspace に限り、
   operation-level の追加承認なしで dispatch できます。reuse は `prepare` に含まれます。
   これは lifecycle tool が管理する path の作成・再利用・使用だけを対象とし、shared
   checkout の raw Git mutation や protected update wrapper の authority を免除しません。
-- `dependency_module_change.py status` は adapter-only の read-only command で、owner
+- `dependency-module-change status` は adapter-only の read-only command で、owner
   evidence を要求せず、generic repository-topic lifecycle または operation-level approval
   carve-out の権限を持ちません。
 - closeout は `repository-topic-clone` または `dependency-module-change` skill の
@@ -90,7 +91,7 @@ AgentCanon の更新・再構築を要求しません。
   に従い、同じ checkout root の競合する writes を直列化します。独立した責務は実際の
   dependency と checkout ownership に基づいて並行できます。bounded route は child
   handoff を必須にしません。
-- repository source は `repository-topic-clone` の一つの prepare route で扱います。exact identity の既存 checkout と named local/remote branch は再利用し、branch が無い場合だけ最新 `origin/main` から作成します。parent または同一 repository の branch は `linked-worktree`、dependency repository は `independent-clone` を選び、どちらも同じ `<anchor>/workspace/<topic>/<repo>` placement にします。各 source branch は candidate review / PR 前に integration executor が最新 `origin/main` を通常 merge し、conflict はその owner が native Git index に残った実際の競合を source owner とレビューして解消します。解消後は canonical finalizer が `MERGE_HEAD` と resolved index tree に基づく commit parents/tree を確認します。`origin/main` の read/CAS だけでは merge 済みの代替になりません。writer target は短命な handoff 値であり、claim、PID、expiry、daemon、writer registry は作成しません。
+- repository source は `repository-topic-clone` の一つの native prepare route で扱います。exact identity の既存 checkout と named local/remote branch は再利用し、branch が無い場合だけ最新 `origin/main` から作成します。parent または同一 repository の branch は `linked-worktree`、dependency repository は `independent-clone` を選び、どちらも同じ `<anchor>/workspace/<topic>/<repo>` placement にします。各 source branch は candidate review / PR 前に integration executor が最新 `origin/main` を通常 merge し、conflict はその owner が native Git index に残った実際の競合を source owner とレビューして解消します。解消後は canonical finalizer が `MERGE_HEAD` と resolved index tree に基づく commit parents/tree を確認します。`origin/main` の read/CAS だけでは merge 済みの代替になりません。
 
 ## Context Sweep
 

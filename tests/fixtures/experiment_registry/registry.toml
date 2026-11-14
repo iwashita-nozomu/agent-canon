@@ -1,7 +1,7 @@
 schema_version = 1
 
 [defaults]
-managed_runner = "tools/experiments/execution/run_managed_experiment.py"
+managed_runner = "tools/runtime/dispatch/agent-canon/src/managed_experiment.rs"
 report_root = "experiments/demo_topic/report"
 integration_branch = "main"
 topic_template_dir = "vendor/agent-canon/templates/experiments/_template"

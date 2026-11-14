@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests prose reasoning graph CLI behavior.
-# upstream implementation ../../tools/analysis/documents/prose_reasoning_graph.py graph CLI
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/prose_reasoning_graph.rs graph CLI
 # upstream design ../../documents/prose-reasoning-graph/dsl-spec.md graph DSL contract
 # upstream design ../../documents/tools/prose_reasoning_graph.md tool contract
 # @dependency-end
@@ -13,20 +13,18 @@ import json
 import os
 import sqlite3
 import subprocess
-import sys
 import tempfile
 import textwrap
 import unittest
-from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator, cast
+from typing import cast
 
 import yaml
 
-from tools.analysis.documents import prose_reasoning_graph as prose_graph
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "analysis" / "documents" / "prose_reasoning_graph.py"
+AGENT_CANON_CLI = Path(
+    os.environ.get("AGENT_CANON_CLI", str(PROJECT_ROOT / "tools/bin/agent-canon"))
+)
 
 
 class ProseLexiconRegressionTest(unittest.TestCase):
@@ -76,11 +74,7 @@ class ProseLexiconRegressionTest(unittest.TestCase):
     def test_punctuation_only_text_does_not_create_terms_or_domain_hints(self) -> None:
         """Symbols cannot become content words or select a domain."""
         result = subprocess.run(
-            [
-                str(prose_graph.CANONICAL_GRAPH_EXECUTABLE),
-                "structured-analysis",
-                "lexicon",
-            ],
+            [str(AGENT_CANON_CLI), "structured-analysis", "lexicon"],
             input=json.dumps({"texts": ["——— 。。。 😀😀😀"], "prompt": ""}),
             capture_output=True,
             text=True,
@@ -107,20 +101,6 @@ def _runtime_root_from_args(args: tuple[str, ...]) -> Path:
     return Path(os.path.commonpath([str(path) for path in candidates]))
 
 
-@contextmanager
-def graph_runtime(root: Path) -> Iterator[None]:
-    """Provide the explicit external runtime capability for direct API calls."""
-    previous = os.environ.get("AGENT_CANON_RUNTIME_ROOT")
-    os.environ["AGENT_CANON_RUNTIME_ROOT"] = str(root)
-    try:
-        yield
-    finally:
-        if previous is None:
-            os.environ.pop("AGENT_CANON_RUNTIME_ROOT", None)
-        else:
-            os.environ["AGENT_CANON_RUNTIME_ROOT"] = previous
-
-
 def run_graph(*args: str) -> subprocess.CompletedProcess[str]:
     """Run the prose reasoning graph CLI."""
     environment = os.environ.copy()
@@ -128,7 +108,7 @@ def run_graph(*args: str) -> subprocess.CompletedProcess[str]:
         "AGENT_CANON_RUNTIME_ROOT", str(_runtime_root_from_args(args))
     )
     return subprocess.run(
-        [sys.executable, str(SCRIPT), *args],
+        [str(AGENT_CANON_CLI), "prose-reasoning-graph", *args],
         cwd=PROJECT_ROOT,
         check=False,
         capture_output=True,
@@ -146,7 +126,7 @@ def run_graph_with_env(
         "AGENT_CANON_RUNTIME_ROOT", str(_runtime_root_from_args(args))
     )
     return subprocess.run(
-        [sys.executable, str(SCRIPT), *args],
+        [str(AGENT_CANON_CLI), "prose-reasoning-graph", *args],
         cwd=PROJECT_ROOT,
         check=False,
         capture_output=True,
@@ -167,330 +147,52 @@ def stdout_value(result: subprocess.CompletedProcess[str], key: str) -> str:
 class ProseReasoningGraphTest(unittest.TestCase):
     """Exercise graph ingest, analysis, projection, and handoff."""
 
-    def test_missing_dependency_annotation_is_not_a_blocker(self) -> None:
-        """Old inventory payloads cannot restore the retired header requirement."""
-        self.assertEqual(
-            prose_graph.document_canon_severity("missing_dependency_manifest"),
-            "info",
-        )
-        self.assertEqual(
-            prose_graph.document_canon_severity("broken_dependency_target"),
-            "blocker",
-        )
-
-    def test_selected_ordering_topology_overrides_source_order(self) -> None:
-        """Explicit ordering edges should control whole-document sentence order."""
-        source_anchors = [
-            prose_graph.Node(
-                node_id="s:later",
-                document_id="doc",
-                layer="form",
-                kind="sentence",
-                label="later",
-                text="Graph-first sentence.",
-                payload={},
-                source_start=10,
-                source_end=20,
-            ),
-            prose_graph.Node(
-                node_id="s:earlier",
-                document_id="doc",
-                layer="form",
-                kind="sentence",
-                label="earlier",
-                text="Source-first sentence.",
-                payload={},
-                source_start=0,
-                source_end=9,
-            ),
-            prose_graph.Node(
-                node_id="s:tail",
-                document_id="doc",
-                layer="form",
-                kind="sentence",
-                label="tail",
-                text="Tail sentence.",
-                payload={},
-                source_start=21,
-                source_end=30,
-            ),
-        ]
-        ordering_edges: list[dict[str, object]] = [
-            {
-                "edge_id": "edge:explicit-order",
-                "from_node_id": "s:later",
-                "to_node_id": "s:earlier",
-                "layer": "form",
-                "kind": "contains_order",
-                "order_kind": "hard_before",
-            }
-        ]
-
-        ordered_ids, cycle_detected, relaxed_edges = (
-            prose_graph.priority_topological_order(
-                source_anchors,
-                ordering_edges,
-                "report",
-                {},
-            )
-        )
-
-        self.assertEqual(ordered_ids, ["s:later", "s:earlier", "s:tail"])
-        self.assertFalse(cycle_detected)
-        self.assertEqual(relaxed_edges, [])
-
-    def test_selected_ordering_soft_edges_are_priority_not_constraints(self) -> None:
-        """Soft adjacency preferences should not become hard topology cycles."""
-        source_anchors = [
-            prose_graph.Node(
-                node_id="s:earlier",
-                document_id="doc",
-                layer="form",
-                kind="sentence",
-                label="earlier",
-                text="Source-first sentence.",
-                payload={},
-                source_start=0,
-                source_end=9,
-            ),
-            prose_graph.Node(
-                node_id="s:later",
-                document_id="doc",
-                layer="form",
-                kind="sentence",
-                label="later",
-                text="Source-later sentence.",
-                payload={},
-                source_start=10,
-                source_end=20,
-            ),
-        ]
-        ordering_edges: list[dict[str, object]] = [
-            {
-                "edge_id": "edge:soft-a-b",
-                "from_node_id": "s:earlier",
-                "to_node_id": "s:later",
-                "layer": "discourse",
-                "kind": "relates_to",
-                "order_kind": "adjacency_preferred",
-                "confidence": 0.8,
-            },
-            {
-                "edge_id": "edge:soft-b-a",
-                "from_node_id": "s:later",
-                "to_node_id": "s:earlier",
-                "layer": "discourse",
-                "kind": "relates_to",
-                "order_kind": "adjacency_preferred",
-                "confidence": 0.8,
-            },
-        ]
-
-        ordered_ids, cycle_detected, relaxed_edges = (
-            prose_graph.priority_topological_order(
-                source_anchors,
-                ordering_edges,
-                "report",
-                {},
-            )
-        )
-
-        self.assertEqual(ordered_ids, ["s:earlier", "s:later"])
-        self.assertFalse(cycle_detected)
-        self.assertEqual(relaxed_edges, [])
-
-    def test_selected_ordering_soft_edge_can_override_source_tie_break(self) -> None:
-        """Soft adjacency should rank before confidence/source order tie-breaks."""
-        source_anchors = [
-            prose_graph.Node(
-                node_id="s:later",
-                document_id="doc",
-                layer="form",
-                kind="sentence",
-                label="later",
-                text="Soft-preferred predecessor.",
-                payload={},
-                source_start=10,
-                source_end=20,
-            ),
-            prose_graph.Node(
-                node_id="s:earlier",
-                document_id="doc",
-                layer="form",
-                kind="sentence",
-                label="earlier",
-                text="Source-first soft successor.",
-                payload={},
-                source_start=0,
-                source_end=9,
-            ),
-        ]
-        ordering_edges: list[dict[str, object]] = [
-            {
-                "edge_id": "edge:soft-later-earlier",
-                "from_node_id": "s:later",
-                "to_node_id": "s:earlier",
-                "layer": "discourse",
-                "kind": "relates_to",
-                "order_kind": "adjacency_preferred",
-                "confidence": 0.9,
-            }
-        ]
-
-        ordered_ids, cycle_detected, relaxed_edges = (
-            prose_graph.priority_topological_order(
-                source_anchors,
-                ordering_edges,
-                "report",
-                {},
-            )
-        )
-
-        self.assertLess(ordered_ids.index("s:later"), ordered_ids.index("s:earlier"))
-        self.assertFalse(cycle_detected)
-        self.assertEqual(relaxed_edges, [])
-
-    def test_selected_ordering_hard_cycle_becomes_diagnostic(self) -> None:
-        """Hard ordering cycles should be visible in diagnostics."""
+    def test_check_document_preserves_missing_manifest_severity(self) -> None:
+        """A missing dependency annotation remains informational in the CLI import."""
         with tempfile.TemporaryDirectory() as tmp_dir:
-            db = Path(tmp_dir) / "graph.sqlite"
-            with graph_runtime(Path(tmp_dir)), prose_graph.connect(db) as connection:
-                prose_graph.initialize_schema(connection)
-                connection.execute(
-                    """
-                    INSERT INTO documents(id, path, title, kind, created_at)
-                    VALUES (?, ?, ?, ?, ?)
-                    """,
-                    ("doc", "cycle.md", "Cycle", "document", "2026-06-08T00:00:00Z"),
-                )
-                prose_graph.insert_node(
-                    connection,
-                    "s:a",
-                    "doc",
-                    "form",
-                    "sentence",
-                    "a",
-                    "Sentence A.",
-                    0,
-                    10,
-                    payload={"span_kind": "sentence"},
-                )
-                prose_graph.insert_node(
-                    connection,
-                    "s:b",
-                    "doc",
-                    "form",
-                    "sentence",
-                    "b",
-                    "Sentence B.",
-                    11,
-                    20,
-                    payload={"span_kind": "sentence"},
-                )
-                prose_graph.insert_edge(
-                    connection,
-                    "edge:a-b",
-                    "presentation",
-                    "precedes",
-                    "s:a",
-                    "s:b",
-                    order_kind="hard_before",
-                )
-                prose_graph.insert_edge(
-                    connection,
-                    "edge:b-a",
-                    "presentation",
-                    "precedes",
-                    "s:b",
-                    "s:a",
-                    order_kind="hard_before",
-                )
-
-                prose_graph.add_selected_ordering_cycle_diagnostic(connection, "report")
-                diagnostics = prose_graph.fetch_diagnostics(connection)
-
-            cycle_diagnostic = next(
-                item for item in diagnostics if item.rule == "selected_ordering_cycle"
+            root = Path(tmp_dir)
+            source = root / "document.md"
+            inventory = root / "inventory.json"
+            db = root / "graph.sqlite"
+            out_dir = root / "out"
+            source.write_text("# Document\n\nA short sentence.\n", encoding="utf-8")
+            inventory.write_text(
+                json.dumps(
+                    {
+                        "documents": [
+                            {"path": "document.md", "title": "Document", "responsibility": "Document"}
+                        ],
+                        "findings": [
+                            {
+                                "path": "document.md",
+                                "kind": "missing_dependency_manifest",
+                                "canonical_path": "document.md",
+                                "action": "informational",
+                                "reason": "No dependency annotation is required.",
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
             )
-            self.assertEqual(cycle_diagnostic.layer, "projection")
-            self.assertEqual(
-                cycle_diagnostic.action["verification_route"],
-                "ordering_cycle_verification",
+            result = run_graph(
+                "check-document",
+                str(source),
+                "--repo-root",
+                str(root),
+                "--structured-inventory-json",
+                str(inventory),
+                "--db",
+                str(db),
+                "--out-dir",
+                str(out_dir),
             )
-
-    def test_selected_ordering_cycle_relaxes_only_cyclic_hard_edges(self) -> None:
-        """Cycle relaxation should preserve hard edges outside the cycle."""
-        source_anchors = [
-            prose_graph.Node(
-                node_id="s:a",
-                document_id="doc",
-                layer="form",
-                kind="sentence",
-                label="a",
-                text="Sentence A.",
-                payload={},
-                source_start=0,
-                source_end=10,
-            ),
-            prose_graph.Node(
-                node_id="s:c",
-                document_id="doc",
-                layer="form",
-                kind="sentence",
-                label="c",
-                text="Sentence C.",
-                payload={},
-                source_start=11,
-                source_end=20,
-            ),
-            prose_graph.Node(
-                node_id="s:b",
-                document_id="doc",
-                layer="form",
-                kind="sentence",
-                label="b",
-                text="Sentence B.",
-                payload={},
-                source_start=21,
-                source_end=30,
-            ),
-        ]
-        ordering_edges: list[dict[str, object]] = [
-            {
-                "edge_id": "edge:a-b",
-                "from_node_id": "s:a",
-                "to_node_id": "s:b",
-                "order_kind": "hard_before",
-            },
-            {
-                "edge_id": "edge:b-a",
-                "from_node_id": "s:b",
-                "to_node_id": "s:a",
-                "order_kind": "hard_before",
-            },
-            {
-                "edge_id": "edge:b-c",
-                "from_node_id": "s:b",
-                "to_node_id": "s:c",
-                "order_kind": "hard_before",
-            },
-        ]
-
-        ordered_ids, cycle_detected, relaxed_edges = (
-            prose_graph.priority_topological_order(
-                source_anchors,
-                ordering_edges,
-                "report",
-                {},
-            )
-        )
-
-        self.assertTrue(cycle_detected)
-        self.assertLess(ordered_ids.index("s:b"), ordered_ids.index("s:c"))
-        self.assertEqual(
-            {str(edge["edge_id"]) for edge in relaxed_edges},
-            {"edge:a-b", "edge:b-a"},
-        )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            with sqlite3.connect(db) as connection:
+                severity = connection.execute(
+                    "SELECT severity FROM diagnostics WHERE layer='document-canon' AND rule='missing_dependency_manifest'"
+                ).fetchone()[0]
+            self.assertEqual(severity, "info")
 
     def test_ingest_defaults_db_to_external_runtime(self) -> None:
         """DB-creating commands should use the explicit external runtime."""
@@ -1400,7 +1102,7 @@ class ProseReasoningGraphTest(unittest.TestCase):
                     <!--
                     @dependency-start
                     responsibility Documents prose graph usage and contract.
-                    upstream implementation tools/analysis/documents/prose_reasoning_graph.py builds prose graph usage.
+                    upstream implementation tools/runtime/dispatch/agent-canon/src/prose_reasoning_graph.rs builds prose graph usage.
                     @dependency-end
                     -->
 

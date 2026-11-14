@@ -10,9 +10,11 @@
 
 use serde::Serialize;
 use std::fs;
-use std::io;
+use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Command, ExitStatus};
+use std::process::{Command, ExitStatus, Stdio};
+use std::thread;
+use std::time::{Duration, Instant};
 
 use crate::path_resolution::resolve_non_strict;
 
@@ -582,6 +584,17 @@ fn write_generated(path: &Path, text: &str) -> io::Result<bool> {
 }
 
 fn run_command(parts: &[String], cwd: &Path) -> io::Result<CommandResult> {
+    run_command_with_input(parts, cwd, None, None).map(|(result, _)| result)
+}
+
+/// Run one existing native command with optional stdin and a bounded timeout.
+/// The recursive proof-search consumer reuses this Lean process boundary.
+pub(crate) fn run_command_with_input(
+    parts: &[String],
+    cwd: &Path,
+    input: Option<&str>,
+    timeout_seconds: Option<f64>,
+) -> io::Result<(CommandResult, bool)> {
     let Some((program, arguments)) = parts.split_first() else {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
@@ -589,28 +602,95 @@ fn run_command(parts: &[String], cwd: &Path) -> io::Result<CommandResult> {
         ));
     };
     let command = shell_join(parts);
-    let output = Command::new(program)
+    let mut child = Command::new(program)
         .args(arguments)
         .current_dir(cwd)
-        .output()
+        .stdin(if input.is_some() {
+            Stdio::piped()
+        } else {
+            Stdio::null()
+        })
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
         .map_err(|error| {
             io::Error::new(
                 error.kind(),
                 format!("failed to execute native command {command}: {error}"),
             )
         })?;
-    Ok(CommandResult {
-        command,
-        returncode: process_returncode(output.status),
-        stdout: normalize_text_output(
-            String::from_utf8(output.stdout)
-                .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?,
-        ),
-        stderr: normalize_text_output(
-            String::from_utf8(output.stderr)
-                .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?,
-        ),
-    })
+    let mut stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| io::Error::other("native command stdout pipe is unavailable"))?;
+    let mut stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| io::Error::other("native command stderr pipe is unavailable"))?;
+    let stdout_reader = thread::spawn(move || {
+        let mut bytes = Vec::new();
+        stdout.read_to_end(&mut bytes).map(|_| bytes)
+    });
+    let stderr_reader = thread::spawn(move || {
+        let mut bytes = Vec::new();
+        stderr.read_to_end(&mut bytes).map(|_| bytes)
+    });
+    let stdin_writer = input.map(|input| {
+        let mut stdin = child
+            .stdin
+            .take()
+            .expect("stdin was configured as a pipe for input");
+        let input = input.as_bytes().to_vec();
+        thread::spawn(move || stdin.write_all(&input))
+    });
+    let timeout = timeout_seconds.and_then(|value| {
+        if value.is_nan() || value.is_infinite() {
+            None
+        } else if value <= 0.0 {
+            Some(Duration::ZERO)
+        } else {
+            Duration::try_from_secs_f64(value).ok()
+        }
+    });
+    let started = Instant::now();
+    let mut timed_out = false;
+    let status = loop {
+        if let Some(status) = child.try_wait()? {
+            break status;
+        }
+        if timeout.is_some_and(|timeout| started.elapsed() >= timeout) {
+            timed_out = true;
+            let _ = child.kill();
+            break child.wait()?;
+        }
+        thread::sleep(Duration::from_millis(5));
+    };
+    if let Some(writer) = stdin_writer {
+        let _ = writer.join();
+    }
+    let stdout = stdout_reader
+        .join()
+        .map_err(|_| io::Error::other("native command stdout reader panicked"))??;
+    let stderr = stderr_reader
+        .join()
+        .map_err(|_| io::Error::other("native command stderr reader panicked"))??;
+    let stdout = String::from_utf8(stdout)
+        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
+    let stderr = String::from_utf8(stderr)
+        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
+    Ok((
+        CommandResult {
+            command,
+            returncode: if timed_out {
+                124
+            } else {
+                process_returncode(status)
+            },
+            stdout: normalize_text_output(stdout),
+            stderr: normalize_text_output(stderr),
+        },
+        timed_out,
+    ))
 }
 
 fn process_returncode(status: ExitStatus) -> i32 {
@@ -656,7 +736,7 @@ fn read_text(path: &Path) -> io::Result<String> {
     fs::read_to_string(path)
 }
 
-fn shell_join(parts: &[String]) -> String {
+pub(crate) fn shell_join(parts: &[String]) -> String {
     parts
         .iter()
         .map(|part| shell_quote(part))

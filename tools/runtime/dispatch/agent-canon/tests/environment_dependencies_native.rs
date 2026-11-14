@@ -2,7 +2,7 @@
 // contract test
 // responsibility Validates the public read-only environment dependency resolver against standalone manifest and receipt inputs.
 // upstream implementation ../src/environment_dependencies.rs owns full plan identity and verified executable resolution
-// downstream test ../../../../container/tests/test_devcontainer_dependencies.py remains the complete installer and receipt semantics baseline
+// downstream test ../../../../../tests/agent_tools/test_environment_dependencies_cli.py validates the native CLI boundary
 // @dependency-end
 
 use agent_canon::artifacts::artifact_identity::canonical_json_ascii_bytes;

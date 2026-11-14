@@ -10,7 +10,7 @@ upstream environment ../../agent-canon-environment.toml machine-readable environ
 upstream implementation ../../tools/runtime/dispatch/agent-canon/Cargo.toml AgentCanon Rust CLI crate license and dependency manifest
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/tool_catalog.rs validates catalog and docs consistency
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/tool_drift.rs validates tool and documentation trace links
-downstream implementation ../../tools/validation/semantic/convention/check_convention_compliance.py validates shared convention wiring
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/convention_compliance.rs validates shared convention wiring
 @dependency-end
 -->
 
@@ -106,7 +106,7 @@ license の `LICENSE` と、Rust crate については `tools/runtime/dispatch/a
 | `check-dependency-headers` | `tools/bin/agent-canon check-dependency-headers` | explicitly selected files の dependency manifest declaration と typed edge/path grammar を検証します。 | no | local: Apache-2.0 |
 | `check-dependency-graph` | `bash tools/analysis/dependencies/check_dependency_graph.sh` | dependency manifest graph、self reference、cycle、edit-scope expansion を検証します。 | no | local: Apache-2.0 |
 | `scip-index` | `tools/bin/agent-canon scip-index` | Runs a selected native SCIP indexer and projects bounded definitions, references, and implementations. | yes | local: Apache-2.0 |
-| `render-dependency-manifest-graph` | `python3 tools/analysis/dependencies/render_dependency_manifest_graph.py` | canonical dependency query から TSV / Graph IR / Markdown / DOT / HTML projection を生成します。 | yes | local: Apache-2.0 |
+| `render-dependency-manifest-graph` | `tools/bin/agent-canon render-dependency-manifest-graph` | canonical dependency query から TSV / Graph IR / Markdown / DOT / HTML projection を生成します。 | yes | local: Apache-2.0 |
 
 ## AgentCanon Runtime And Environment Tools
 
@@ -136,7 +136,7 @@ license の `LICENSE` と、Rust crate については `tools/runtime/dispatch/a
 | Chrome for Testing runtime libraries | Shared amd64/arm64 system libraries required by Puppeteer's image-owned browser. | `bootstrap/container/image/dependencies.toml` (`puppeteer-*` Ubuntu 24.04 package records) | Ubuntu archive package notices |
 | `npm` CLI | `@openai/codex` の install に使う JavaScript package manager。 | `.devcontainer/dependencies.toml` | upstream: Artistic-2.0 |
 | Codex CLI: `@openai/codex` | local Codex runtime entrypoint。 | `.devcontainer/dependencies.toml` | upstream: Apache-2.0 |
-| GitHub CLI: `gh` | GitHub repo 確認、branch publish、PR evidence 作成。 | `.devcontainer/dependencies.toml`, `tools/repository/github/github_publish.py` | upstream: MIT |
+| GitHub CLI: `gh` | GitHub repo 確認、branch publish、PR evidence 作成。 | `.devcontainer/dependencies.toml`, `tools/runtime/dispatch/agent-canon/src/github_publish.rs` | upstream: MIT |
 | `gitleaks` | secret scanning。 | `.devcontainer/dependencies.toml`, `tools/validation/ci/checks/scan_secrets.sh` | upstream: MIT |
 | `trufflehog` | secret discovery / verification。 | `.devcontainer/dependencies.toml`, `tools/validation/ci/checks/scan_secrets.sh` | upstream: AGPL-3.0 |
 | `detect-secrets` | current tree / baseline 型の secret scanning。 | `.devcontainer/dependencies.toml`, `tools/validation/ci/checks/scan_secrets.sh` | upstream: Apache-2.0 |

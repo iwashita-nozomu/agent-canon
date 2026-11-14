@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests AgentCanon improvement guide generation.
-# upstream implementation ../../eval/producers/generate_agent_improvement_guide.py generates guide reports
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/agent_runtime_dashboard.rs generates guide reports
 # upstream implementation ../../tools/runtime/dispatch/agent-canon/src/historical_skill_usage.rs supplies native historical skill-usage readback
 # @dependency-end
 
@@ -16,23 +16,15 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from types import SimpleNamespace
-from unittest.mock import patch
+from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "eval" / "producers" / "generate_agent_improvement_guide.py"
-sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-from tools.runtime.archive.runtime_log_paths import (  # noqa: E402
-    HOOK_ARCHIVE_DIR_ENV,
-    mounted_log_archive_root,
-)
-from eval.producers.generate_agent_improvement_guide import (  # noqa: E402
-    AgentImprovementGuide,
-    EvidenceSummary,
-    HookCounterState,
-    guidance,
-    latest_skill_source_epoch,
-)
+SCRIPT = "generate-agent-improvement-guide"
+HOOK_ARCHIVE_DIR_ENV = "AGENT_CANON_HOOK_ARCHIVE_DIR"
+
+
+def mounted_log_archive_root(_root: Path) -> Path:
+    return Path(os.environ["AGENT_CANON_RUNTIME_ROOT"]) / "archive" / "agent-canon-log"
 
 
 class GenerateAgentImprovementGuideTest(unittest.TestCase):
@@ -63,63 +55,96 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
             os.environ[HOOK_ARCHIVE_DIR_ENV] = self._previous_archive
         self._runtime_temp.cleanup()
 
-    def test_latest_skill_source_epoch_tolerates_unreadable_private_skill_view(
-        self,
-    ) -> None:
-        """A private shim permission error must not block canonical reset lookup."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            root = Path(temp_dir)
-            canonical = root / "agents" / "skills" / "oop-readability-check.md"
-            canonical.parent.mkdir(parents=True)
-            canonical.write_text("# canonical\n", encoding="utf-8")
-            original_exists = Path.exists
-
-            def exists_with_unreadable_private_view(path: Path) -> bool:
-                if ".codex/personal/skills/" in path.as_posix():
-                    raise PermissionError(13, "permission denied", path.as_posix())
-                return original_exists(path)
-
-            with (
-                patch.object(Path, "exists", exists_with_unreadable_private_view),
-                patch(
-                    "eval.producers.generate_agent_improvement_guide.subprocess.run",
-                    return_value=SimpleNamespace(returncode=0, stdout="123\n"),
-                ) as run,
-            ):
-                epoch = latest_skill_source_epoch(root, "oop-readability-check")
-
-        self.assertEqual(epoch, 123)
-        command = run.call_args.args[0]
-        self.assertIn("agents/skills/oop-readability-check.md", command)
-        self.assertNotIn(
-            ".codex/personal/skills/oop-readability-check/SKILL.md", command
-        )
+    def run_cli(
+        self, command: list[str], **kwargs: Any
+    ) -> subprocess.CompletedProcess[str]:
+        """Translate the old producer-shaped test argv to the native selector."""
+        command = list(command)
+        if command[:2] == [sys.executable, SCRIPT]:
+            native = os.environ.get("AGENT_CANON_NATIVE_BIN") or os.environ.get(
+                "AGENT_CANON_CLI"
+            )
+            if not native:
+                self.fail(
+                    "AGENT_CANON_NATIVE_BIN or AGENT_CANON_CLI must select the native executable"
+                )
+            command = [native, SCRIPT, *command[2:]]
+            if "--runtime-root" not in command:
+                command.extend(["--runtime-root", str(self.runtime_root)])
+            environment = os.environ.copy()
+            environment["AGENT_CANON_RUNTIME_ROOT"] = str(self.runtime_root)
+            environment["AGENT_CANON_LOG_ROOT"] = str(
+                self.runtime_root / "agent-canon-log"
+            )
+            environment.pop(HOOK_ARCHIVE_DIR_ENV, None)
+            kwargs["env"] = environment
+            kwargs.setdefault("check", False)
+            kwargs.setdefault("capture_output", True)
+            kwargs.setdefault("text", True)
+        return subprocess.run(command, check=kwargs.pop("check", False), **kwargs)
 
     def test_usage_counts_do_not_create_repair_obligations(self) -> None:
         """Overlapping or repeated candidate observations do not prove an omission."""
-        empty = EvidenceSummary((), {}, HookCounterState.empty().to_counts())
-        for selected, candidate, feedback in ((0, 1, 0), (1, 1, 1), (1, 20, 20)):
-            with self.subTest(
-                selected=selected, candidate=candidate, feedback=feedback
-            ):
-                counts = HookCounterState.empty()
-                counts.skills["agent-orchestration"] = selected
-                counts.candidate_skills["agent-orchestration"] = candidate
-                counts.feedback_targets["skill:agent-orchestration"] = feedback
-                observed = EvidenceSummary((), {}, counts.to_counts())
-                self.assertEqual(guidance(observed), guidance(empty))
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_skill_usage_fixture(
+                root,
+                {
+                    "event": "UserPromptSubmit",
+                    "status": "pass",
+                    "skills": ["agent-orchestration"],
+                    "candidate_skills": ["agent-orchestration"],
+                    "feedback_targets": ["skill:agent-orchestration"],
+                    "feedback_labels": ["quality_gap"],
+                    "skill_source_fields": ["prompt"],
+                },
+            )
+            output = self.runtime_root / "reports" / "guide.md"
+            result = self.run_cli(
+                [sys.executable, SCRIPT, "--root", str(root), "--out", str(output)]
+            )
+            guide = output.read_text(encoding="utf-8")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("Skill Routing Gaps", guide)
+        self.assertNotIn("Repair skill-selection routing", guide)
 
     def test_empty_guide_does_not_activate_recording_or_repair(self) -> None:
         """Reading a report with no evidence does not create a workflow obligation."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             (root / "eval" / "definitions").mkdir(parents=True)
-            summary = EvidenceSummary((), {}, HookCounterState.empty().to_counts())
-            guide = AgentImprovementGuide(root, self.runtime_root).render(summary)
+            output = self.runtime_root / "reports" / "empty-guide.md"
+            result = self.run_cli(
+                [sys.executable, SCRIPT, "--root", str(root), "--out", str(output)]
+            )
+            guide = output.read_text(encoding="utf-8")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertNotIn("required_tokens:", guide)
         self.assertNotIn("next_repair_branch:", guide)
         self.assertNotIn("github_issue_lookup_required", guide)
         self.assertNotIn("make the actual skill/workflow/tool edits", guide)
+
+    def test_output_mode_defaults_to_private_and_allows_explicit_644(self) -> None:
+        """Guide artifacts retain their private default and public opt-in mode."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            default = self.runtime_root / "reports" / "guide-private.md"
+            public = self.runtime_root / "reports" / "guide-public.md"
+            for output, options in ((default, []), (public, ["--output-mode", "644"])):
+                result = self.run_cli(
+                    [
+                        sys.executable,
+                        SCRIPT,
+                        "--root",
+                        str(root),
+                        "--out",
+                        str(output),
+                        *options,
+                    ]
+                )
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(default.stat().st_mode & 0o777, 0o600)
+            self.assertEqual(public.stat().st_mode & 0o777, 0o644)
 
     def test_observed_failure_keeps_evidence_without_claiming_its_cause(self) -> None:
         """A genuine hook failure remains visible with its affected input."""
@@ -154,16 +179,66 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
                 + "\n"
             )
             log.write_text(raw, encoding="utf-8")
-            reader = AgentImprovementGuide(root, self.runtime_root)
-            summary = reader.collect()
-            guide = reader.render(summary)
+            output = self.runtime_root / "reports" / "failure-guide.md"
+            result = self.run_cli(
+                [sys.executable, SCRIPT, "--root", str(root), "--out", str(output)]
+            )
+            guide = output.read_text(encoding="utf-8")
             self.assertEqual(log.read_text(encoding="utf-8"), raw)
-        self.assertEqual(summary.hook_counts.failures, {"current-failure": 1})
-        self.assertEqual(summary.hook_counts.failure_targets, {"src/product.py": 1})
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("current-failure", guide)
         self.assertIn("src/product.py", guide)
         self.assertIn("affected inputs, not established cause locations", guide)
         self.assertIn("locate the concrete cause", guide)
+
+    def test_native_oop_checker_failure_keeps_the_target_path(self) -> None:
+        """Retargeted native OOP commands still identify the affected source input."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_fixture(root)
+            target = "tools/runtime/lifecycle/bootstrap_agent_run.py"
+            log = (
+                mounted_log_archive_root(root)
+                / "hook-runs"
+                / "legacy-import"
+                / "test-container"
+                / "oop_readability_guard.jsonl"
+            )
+            log.write_text(
+                json.dumps(
+                    {
+                        "hook_run_id": "native-oop-failed",
+                        "hook_log_namespace": "test-container",
+                        "event": "PostToolUse",
+                        "status": "fail",
+                        "payload_fingerprint": "native-oop-input",
+                        "failure_fingerprint": "native-oop-failure",
+                        "commands": [
+                            {
+                                "command": [
+                                    "tools/bin/agent-canon",
+                                    "oop-python-readability",
+                                    "--root",
+                                    str(root),
+                                    target,
+                                ],
+                                "returncode": 1,
+                                "output_snippet": "readability review failed",
+                            }
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            output = self.runtime_root / "reports" / "native-oop-guide.md"
+            result = self.run_cli(
+                [sys.executable, SCRIPT, "--root", str(root), "--out", str(output)]
+            )
+            guide = output.read_text(encoding="utf-8")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("native-oop-failure", guide)
+        self.assertIn(target, guide)
 
     def test_generates_guidance_from_issues_knowledge_and_hook_logs(self) -> None:
         """The guide should summarize every evidence family."""
@@ -172,7 +247,7 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
             self.write_fixture(root)
             output = self.runtime_root / "reports" / "guide.md"
 
-            result = subprocess.run(
+            result = self.run_cli(
                 [
                     sys.executable,
                     str(SCRIPT),
@@ -243,7 +318,7 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
             self.write_cutover_fixture(root)
             output = self.runtime_root / "reports" / "guide.md"
 
-            result = subprocess.run(
+            result = self.run_cli(
                 [
                     sys.executable,
                     str(SCRIPT),
@@ -278,7 +353,7 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
             self.write_cutover_fixture(root, include_post_cutover=True)
             output = self.runtime_root / "reports" / "guide.md"
 
-            result = subprocess.run(
+            result = self.run_cli(
                 [
                     sys.executable,
                     str(SCRIPT),
@@ -304,6 +379,26 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
         )
         self.assertNotIn("Skill Routing Gaps", guide)
         self.assertNotIn("Repair skill-selection routing", guide)
+
+    def write_skill_usage_fixture(self, root: Path, record: dict[str, object]) -> None:
+        """Write one historical skill-usage event through the archive owner."""
+        skill = (
+            root / ".codex" / "personal" / "skills" / "agent-orchestration" / "SKILL.md"
+        )
+        skill.parent.mkdir(parents=True, exist_ok=True)
+        skill.write_text("# Agent orchestration\n", encoding="utf-8")
+        hook = (
+            mounted_log_archive_root(root)
+            / "hook-runs"
+            / "legacy-import"
+            / "test-container"
+            / "skill_usage.jsonl"
+        )
+        hook.parent.mkdir(parents=True, exist_ok=True)
+        record.setdefault("hook_run_id", "native-guide-fixture")
+        record.setdefault("hook_log_namespace", "test-container")
+        record.setdefault("timestamp", "2026-11-12T10:00:00Z")
+        hook.write_text(json.dumps(record) + "\n", encoding="utf-8")
 
     def write_fixture(self, root: Path) -> None:
         """Write a small AgentCanon-like evidence tree."""
@@ -368,8 +463,8 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
                     "commands": [
                         {
                             "command": [
-                                "python3",
-                                "tools/validation/code/oop/python/readability.py",
+                                "tools/bin/agent-canon",
+                                "oop-python-readability",
                                 "--root",
                                 str(root),
                                 "tools/runtime/lifecycle/bootstrap_agent_run.py",

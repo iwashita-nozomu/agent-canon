@@ -6,12 +6,11 @@ contract design
 responsibility Defines the optional GPU admission adapter; ordinary Docker execution is owned by the GPU skill.
 upstream design ./gpu-admission-r5-source-packet.md canonical GPU discovery, occupancy, reservation, and plan ownership
 upstream design ./gpu-admission-r5-nvidia-visibility.md strict NVIDIA topology and full UUID evidence boundary
-downstream implementation ../../tools/experiments/execution/execution_resource_plan.py canonical NVIDIA evidence, BUSY/UNKNOWN/FREE classification, UUID lock, and admission receipt owners
-downstream implementation ../../tools/experiments/execution/gpu_command_admission.py direct admission composition, immutable plan, exact environment, execution lifecycle, and release owner
-downstream implementation ../../tools/experiments/execution/run_gpu_command.py shell-free direct-command CLI adapter
-downstream implementation ../../tools/experiments/execution/run_managed_experiment.py optional managed provider adapter
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/execution_resource_plan.rs canonical NVIDIA evidence, BUSY/UNKNOWN/FREE classification, UUID lock, and admission receipt owners
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/gpu_command_admission.rs direct admission composition, immutable plan, exact environment, execution lifecycle, and release owner
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/managed_experiment.rs optional managed provider adapter
 downstream implementation ../../tools/validation/ci/runners/run_gpu_container.sh single-entry Docker injection adapter with internal CDI/all selection
-downstream implementation ../../tests/tools/test_run_gpu_command.py fake NVIDIA, race, environment, lifecycle, and provider-independence acceptance tests
+downstream implementation ../../tools/runtime/dispatch/agent-canon/tests/direct_gpu_native.rs fake NVIDIA, race, environment, lifecycle, and provider-independence acceptance tests
 downstream implementation ../../tests/tools/test_run_gpu_container.py Docker argv, route selection, and exact environment acceptance tests
 downstream design ../../agents/skills/gpu-execution.md route selection and operator workflow
 @dependency-end
@@ -32,7 +31,7 @@ not override the ordinary route or change the admission implementation.
 
 GPU admission is a resource-safety mechanism, not an ExperimentRunner feature. The canonical
 NVIDIA evidence, occupancy closure, and UUID lock owners remain in
-`execution_resource_plan.py`. A provider-independent adapter composes those owners and can run
+`execution_resource_plan.rs`. A provider-independent adapter composes those owners and can run
 an arbitrary argv without a managed provider, registry, topic, cases, source snapshot, artifact
 schema, or completion-coverage handshake.
 
@@ -45,13 +44,13 @@ When reservation is required for an arbitrary argv without a managed experiment
 lifecycle, use the provider-independent admission adapter:
 
 ```text
-python3 tools/experiments/execution/run_gpu_command.py \
+agent-canon run-gpu-command \
   --gpu-count 1 \
   --min-free-memory <bytes> \
   -- <argv...>
 ```
 
-Use `run_managed_experiment.py` only when the request needs managed topic/registry identity,
+Use `tools/bin/agent-canon run-managed-experiment` only when the request needs managed topic/registry identity,
 case expansion, source snapshotting, provider-owned artifact schemas, lifecycle result schemas,
 or completion coverage. Provider discovery and provider contract validation are therefore
 conditional on managed mode only.
@@ -216,14 +215,14 @@ Direct-mode evidence explicitly records `managed_provider_required=false`.
 Provider-independent fake tests:
 
 ```text
-python3 -m pytest tests/tools/test_run_gpu_command.py -q
+cargo test --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --test direct_gpu_native
 python3 -m pytest tests/tools/test_run_gpu_container.py -q
 ```
 
 Validation of this optional adapter imports JAX only inside the admitted child:
 
 ```text
-python3 tools/experiments/execution/run_gpu_command.py \
+agent-canon run-gpu-command \
   --gpu-count 1 \
   --min-free-memory 2147483648 \
   -- python3 -c \
@@ -234,7 +233,7 @@ A real Docker smoke of the optional adapter uses the same wrapper invocation on 
 CDI-capable and all-only hosts:
 
 ```text
-python3 tools/experiments/execution/run_gpu_command.py \
+agent-canon run-gpu-command \
   --gpu-count 1 \
   --min-free-memory 2147483648 \
   -- bash tools/validation/ci/runners/run_gpu_container.sh \
@@ -245,7 +244,7 @@ python3 tools/experiments/execution/run_gpu_command.py \
 A GPU-heavy test or benchmark requiring reservation uses the same adapter, for example:
 
 ```text
-python3 tools/experiments/execution/run_gpu_command.py \
+agent-canon run-gpu-command \
   --gpu-count 1 \
   --min-free-memory 8589934592 \
   -- python3 -m pytest tests/gpu/test_heavy_backend.py -q

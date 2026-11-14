@@ -4,19 +4,62 @@
 # contract test
 # responsibility Verifies fixed 42-row read-only policy inventory validation without network access.
 # upstream design ../../documents/design/runtime-log-repository-lifecycle.md RL-009..RL-012 policy evidence
-# upstream implementation ../../tools/validation/semantic/archive/check_agent_canon_log_policy.py separates retrieval from validation
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/log_policy.rs separates retrieval from validation
 # @dependency-end
 
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import tempfile
 import unittest
+from pathlib import Path
+from types import SimpleNamespace
 
-from tools.validation.semantic.archive.check_agent_canon_log_policy import (
-    EXPECTED_BLOCKERS,
-    PolicyInventoryError,
-    validate_inventory_bytes,
+EXPECTED_BLOCKERS = (
+    "A source-remote authority manifest is required before any legacy branch can be migrated.",
+    "Migration must be a dry-run manifest, explicit authority, and exact remote readback.",
+    "This inventory performs no branch deletion, merge, rewrite, or data migration.",
 )
+
+
+class PolicyInventoryError(ValueError):
+    def __init__(self, code):
+        self.code = code
+
+
+def validate_inventory_bytes(raw: bytes):
+    with tempfile.TemporaryDirectory() as temporary:
+        source = Path(temporary) / "input.json"
+        source.write_bytes(raw)
+        result = subprocess.run(
+            [
+                os.environ["AGENT_CANON_CLI"],
+                "check-agent-canon-log-policy",
+                "--input",
+                str(source),
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    fields = dict(
+        line.split("=", 1) for line in result.stdout.splitlines() if "=" in line
+    )
+    if result.returncode:
+        raise PolicyInventoryError(fields["AGENT_CANON_LOG_POLICY_ERROR_CODE"])
+    return SimpleNamespace(
+        legacy_branch_count=int(fields["AGENT_CANON_LOG_POLICY_LEGACY_BRANCH_ROWS"]),
+        mapping_count=int(fields["AGENT_CANON_LOG_POLICY_MAPPINGS"]),
+        remote_ref_count=int(fields["AGENT_CANON_LOG_POLICY_REMOTE_LOG_REFS"]),
+        read_only_blocker_count=int(
+            fields["AGENT_CANON_LOG_POLICY_READ_ONLY_BLOCKERS"]
+        ),
+        main_observation_count=int(
+            fields["AGENT_CANON_LOG_POLICY_MAIN_OBSERVATION_COUNT"]
+        ),
+    )
 
 
 def deterministic_inventory_fixture() -> bytes:

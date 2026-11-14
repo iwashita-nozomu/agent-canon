@@ -3,49 +3,45 @@
 # @dependency-start
 # contract test
 # responsibility Tests convention compliance verifier behavior.
-# upstream implementation ../../tools/validation/semantic/convention/check_convention_compliance.py verifier  # noqa: E501
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/convention_compliance.rs verifier  # noqa: E501
 # upstream design ../../documents/conventions/README.md convention index
 # @dependency-end
 
 from __future__ import annotations
 
 import json
+import os
 import subprocess
-import sys
 import tempfile
 import unittest
+import tomllib
 from pathlib import Path
 
-from tools.validation.semantic.convention.check_convention_compliance import (
-    HOOK_GUARDRAIL_POLICY_MARKERS,
-    MATHEMATICAL_NECESSITY_MARKERS,
-    REVIEW_ISSUE_ROUTING_MARKERS,
-    SOURCE_FILE_DEFINITION_ORDER_MARKERS,
-    STATIC_READ_VALIDATION_POLICY_MARKERS,
-    TOOL_GATES,
-    VALIDATION_FAILURE_RESPONSE_MARKERS,
-)
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-CHECKER = (
-    PROJECT_ROOT
-    / "tools"
-    / "validation"
-    / "semantic"
-    / "convention"
-    / "check_convention_compliance.py"
-)
+CONFIGURATION = tomllib.loads((PROJECT_ROOT / "tools/validation/semantic/convention/convention_compliance_contracts.toml").read_text(encoding="utf-8"))
+MARKER_CONTRACTS = {
+    contract["id"]: {surface["path"]: tuple(surface["markers"]) for surface in contract["surfaces"]}
+    for contract in CONFIGURATION["contracts"]
+}
+HOOK_GUARDRAIL_POLICY_MARKERS = MARKER_CONTRACTS["hook_guardrail_policy"]
+MATHEMATICAL_NECESSITY_MARKERS = MARKER_CONTRACTS["mathematical_necessity_gate"]
+REVIEW_ISSUE_ROUTING_MARKERS = MARKER_CONTRACTS["review_issue_routing"]
+SOURCE_FILE_DEFINITION_ORDER_MARKERS = MARKER_CONTRACTS["source_file_definition_order"]
+STATIC_READ_VALIDATION_POLICY_MARKERS = MARKER_CONTRACTS["static_read_validation_policy"]
+VALIDATION_FAILURE_RESPONSE_MARKERS = MARKER_CONTRACTS["validation_failure_response"]
+TOOL_GATES = {gate["id"]: (gate["path"], tuple(gate["owners"])) for gate in CONFIGURATION["checker"]["gates"]}
+NATIVE = os.environ.get("AGENT_CANON_NATIVE_BIN") or os.environ.get("AGENT_CANON_CLI") or "agent-canon"
 
 
 MINIMAL_REPO_FILES: dict[str, str] = {
     "tools/catalog.yaml": """
 path: tools/analysis/dependencies/run_repo_dependency_review.sh
 path: tools/runtime/dispatch/agent-canon/src/notebook_quality.rs
-path: tools/validation/code/oop/python/readability.py
-path: tools/validation/code/oop/cpp/readability.py
+path: tools/runtime/dispatch/agent-canon/src/oop/python/readability.rs
+path: tools/runtime/dispatch/agent-canon/src/oop/cpp/readability.rs
 path: tools/runtime/dispatch/agent-canon/src/run_evaluation.rs
 path: tools/runtime/dispatch/agent-canon/src/skill_frontmatter.rs
-path: tools/validation/semantic/convention/check_convention_compliance.py
+path: tools/runtime/dispatch/agent-canon/src/convention_compliance.rs
 path: tools/runtime/dispatch/agent-canon/src/catalog/tool_catalog.rs
 path: tools/runtime/dispatch/agent-canon/src/tool_drift.rs
 path: tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs
@@ -53,7 +49,7 @@ path: tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs
     "documents/runtime/bootstrap-runtime.md": "bootstrap runtime owner\n",
     "bootstrap/container/image/Dockerfile": "FROM scratch\n# bootstrap_runtime\n",
     "tests/tools/test_bootstrap_container_contract.py": "# bootstrap_runtime\ndef test_bootstrap_container_contract(): pass\n",
-    "tests/bootstrap/test_bootstrap_runtime.py": "# bootstrap_runtime\ndef test_bootstrap_runtime(): pass\n",
+    "tools/runtime/dispatch/agent-canon/tests/bootstrap_runtime_native.rs": "// bootstrap_runtime\n#[test] fn test_bootstrap_runtime() {}\n",
     "documents/conventions/README.md": "conventions\n",
     "documents/conventions/common/01_principles.md": "ruff-magic-values.toml\n",
     "documents/rule/naming.md": "naming\n",
@@ -70,7 +66,7 @@ path: tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs
     "documents/conventions/python/07_type_checker.md": "basedpyright-explicit-any.json\n",
     "documents/conventions/python/09_file_roles.md": (
         "roles 読者順序 依存順序 公開契約 公開入口 内部補助関数 "
-        "check_convention_compliance.py\n"
+        "check-convention-compliance\n"
     ),
     "documents/conventions/python/11_naming.md": "naming\n",
     "documents/conventions/python/15_jax_rules.md": "jax\n",
@@ -96,7 +92,7 @@ path: tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs
     "documents/conventions/object-oriented-design.md": "object-oriented design\n",
     "documents/experiments/experiment-registry.md": "experiment registry\n",
     "documents/conventions/REVIEW_PROCESS.md": (
-        "Review Finding Issue Routing issue_route github_issue issue_sync.py private packet\n"
+        "Review Finding Issue Routing issue_route github_issue agent-canon issue-sync private packet\n"
     ),
     "documents/runtime/runtime-profiles-and-check-matrix.md": (
         "Static analysis and reading evidence primary validation evidence "
@@ -212,7 +208,7 @@ path: tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs
         "| native coordination and actual route evidence | "
         "`agents/COMMUNICATION_PROTOCOL.md` |\n"
         "| skill selection | `agents/skills/catalog.yaml`; "
-        "`python3 tools/agent/orchestration/route.py --prompt` |\n"
+        "`tools/bin/agent-canon route --prompt` |\n"
         "| implementation guidance and closeout | "
         "`agents/skills/codex-task-workflow.md` |\n"
         "| active design packet schema | `agents/COMMUNICATION_PROTOCOL.md`; "
@@ -237,19 +233,19 @@ path: tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs
     "agents/skills/dependency-analysis.md": (
         "agent-canon scip-index query\n"
         "Before closeout, run "
-        "`python3 tools/validation/semantic/convention/check_convention_compliance.py`.\n"
+        "`agent-canon check-convention-compliance`.\n"
     ),
     "agents/skills/adaptive-improvement-loop.md": (
-        "check_convention_compliance.py\n"
+        "check-convention-compliance\n"
         "Before closeout, run "
-        "`python3 tools/validation/semantic/convention/check_convention_compliance.py`.\n"
+        "`agent-canon check-convention-compliance`.\n"
     ),
     "agents/skills/agent-canon-update.md": (
         "github_workflow_check.rs\n"
         "PR Essence problem / user request design intent canonical owner "
         "behavior or contract delta evidence route\n"
         "Before closeout, run "
-        "`python3 tools/validation/semantic/convention/check_convention_compliance.py`.\n"
+        "`agent-canon check-convention-compliance`.\n"
     ),
     ".github/PULL_REQUEST_TEMPLATE.md": (
         "## PR Essence\n"
@@ -267,14 +263,14 @@ path: tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs
     ),
     "tools/validation/ci/runners/run_all_checks.sh": (
         "run_python_quality_checks.sh "
-        "check_convention_compliance.py "
+        "check-convention-compliance "
         "check-skill-frontmatter "
         "tool_catalog.rs tool_drift.rs notebook-quality "
-        "github_workflow_check.rs bootstrap_runtime.py run_agent_canon docs check "
+        "github_workflow_check.rs bootstrap_runtime.rs run_agent_canon docs check "
         "run_agent_canon responsibility-scope\n"
     ),
     "tools/validation/ci/checks/check_agent_canon_pr.sh": (
-        'python3 "${WORKSPACE_ROOT}/tools/validation/semantic/convention/check_convention_compliance.py" --root "${WORKSPACE_ROOT}" --format json\n'
+        'run_agent_canon check-convention-compliance --root "${WORKSPACE_ROOT}" --format json\n'
         "tools/bin/agent-canon check-github-workflows\n"
     ),
     "tools/runtime/dispatch/agent-canon/src/docs.rs": "runtime profile inventory\n",
@@ -282,7 +278,7 @@ path: tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs
     "bootstrap.sh": "runtime boundary\n",
     "agents/skills/environment-maintenance.md": (
         "tests/tools/test_bootstrap_container_contract.py "
-        "tests/bootstrap/test_bootstrap_runtime.py bootstrap_runtime.py\n"
+        "tools/runtime/dispatch/agent-canon/tests/bootstrap_runtime_native.rs bootstrap_runtime.rs\n"
     ),
     ".codex/README.md": (
         "active events active/inactive legacy `Stop` fail-open bounded redacted\n"
@@ -293,7 +289,7 @@ path: tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs
         "validate_projection_bytes record_hook_invocation HookLogContext "
         "\n"
     ),
-    "tools/runtime/authority/hook_safety.py": (
+    "tools/runtime/dispatch/agent-canon/src/hook_safety.rs": (
         "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY "
         "AGENT_CANON_BRANCH_WORKTREE_REASON AGENT_CANON_DESTRUCTIVE_GIT_REASON "
         "explicit_user_approval user_request agent_canon_workflow same-segment "
@@ -307,7 +303,7 @@ path: tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs
         "| -------- | ------------- | ------------------ |\n"
         "| workflow family and role candidates | "
         "`vendor/agent-canon/agents/task_catalog.yaml` | "
-        "`check_agent_runtime_alignment.py` |\n"
+        "`tools/bin/agent-canon check-agent-runtime-alignment` |\n"
         "| task bootstrap and CLI entrypoints | "
         "`vendor/agent-canon/agents/canonical/CLI_ENTRYPOINTS.md` | "
         "`bootstrap_agent_run.py` |\n"
@@ -316,10 +312,10 @@ path: tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs
         "`workflow_monitor.py` |\n"
         "| role behavior and stage conditions | "
         "`vendor/agent-canon/.codex/agents/*.toml` | "
-        "`check_agent_runtime_alignment.py` |\n"
+        "`tools/bin/agent-canon check-agent-runtime-alignment` |\n"
         "| skill routing and public skill surface | "
         "`vendor/agent-canon/agents/skills/catalog.yaml` | "
-        "`python3 tools/agent-canon/agent_tools/route.py --prompt` |\n"
+        "`tools/bin/agent-canon route --prompt` |\n"
         "| report and closeout structure | `agents/canonical/CODEX_COMPLETION.md` | Completion Review |\n"
     ),
     "AGENTS.md": (
@@ -332,12 +328,12 @@ path: tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs
         "| root runtime entrypoint | `ROOT_AGENTS.md` | "
         "`bash bootstrap.sh --help` |\n"
         "| workflow family and role candidates | "
-        "`agents/task_catalog.yaml` | `check_agent_runtime_alignment.py` |\n"
+        "`agents/task_catalog.yaml` | `tools/bin/agent-canon check-agent-runtime-alignment` |\n"
         "| public skill registry | `agents/skills/catalog.yaml` | "
-        "`check_agent_runtime_alignment.py` |\n"
+        "`tools/bin/agent-canon check-agent-runtime-alignment` |\n"
         "| AgentCanon update transaction | "
         "`documents/agent-canon/agent-canon-update-route.md` | "
-        "`update_lifecycle_contract.py` |\n"
+        "`update_lifecycle_contract.rs` |\n"
     ),
 }
 
@@ -354,7 +350,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
     def run_checker(self, root: Path, *args: str) -> subprocess.CompletedProcess[str]:
         """Run the checker against a root."""
         return subprocess.run(
-            [sys.executable, str(CHECKER), "--root", str(root), *args],
+            [NATIVE, "check-convention-compliance", "--root", str(root), *args],
             cwd=PROJECT_ROOT,
             check=False,
             capture_output=True,
@@ -438,7 +434,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
                 / "check_agent_canon_pr.sh"
             )
             workflow.write_text(
-                "#!/usr/bin/env bash\n# Mention check_convention_compliance.py only.\n",
+                "#!/usr/bin/env bash\n# Mention check-convention-compliance only.\n",
                 encoding="utf-8",
             )
 
@@ -465,7 +461,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
             )
             workflow.write_text(
                 "#!/usr/bin/env bash\n"
-                'python3 "${WORKSPACE_ROOT}/tools/validation/semantic/convention/check_convention_compliance.py"'
+                'run_agent_canon check-convention-compliance'
                 ' --root "${WORKSPACE_ROOT}" --format json\n',
                 encoding="utf-8",
             )
@@ -492,7 +488,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
             )
             workflow.write_text(
                 "#!/usr/bin/env bash\n"
-                'python3 "${CANON_TOOLS_ROOT}/agent_tools/check_convention_compliance.py"'
+                'run_agent_canon check-convention-compliance'
                 ' --root "${WORKSPACE_ROOT}" --format json \n',
                 encoding="utf-8",
             )
@@ -520,8 +516,8 @@ class CheckConventionComplianceTest(unittest.TestCase):
             )
             workflow.write_text(
                 "#!/usr/bin/env bash\n"
-                "python3 tools/validation/semantic/convention/check_convention_compliance.py\n"
-                "# Do not run check_convention_compliance.py for quick tasks.\n",
+                "agent-canon check-convention-compliance\n"
+                "# Do not run check-convention-compliance for quick tasks.\n",
                 encoding="utf-8",
             )
 
@@ -634,7 +630,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            (root / "tools" / "runtime" / "authority" / "hook_safety.py").write_text(
+            (root / "tools" / "runtime" / "dispatch" / "agent-canon" / "src" / "hook_safety.rs").write_text(
                 "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY "
                 "explicit_user_approval\n",
                 encoding="utf-8",
@@ -644,7 +640,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn(
-                "hook_guardrail_policy:tools/runtime/authority/hook_safety.py",
+                "hook_guardrail_policy:tools/runtime/dispatch/agent-canon/src/hook_safety.rs",
                 result.stdout,
             )
             self.assertIn("missing-marker:operation", result.stdout)
@@ -880,7 +876,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("review_issue_routing", result.stdout)
-            self.assertIn("missing-marker:issue_sync.py", result.stdout)
+            self.assertIn("missing-marker:agent-canon issue-sync", result.stdout)
 
     def test_minimal_fixture_covers_review_issue_routing_surfaces(self) -> None:
         """The minimal test fixture includes every review issue route surface."""

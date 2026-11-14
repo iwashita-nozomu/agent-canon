@@ -79,17 +79,15 @@ if [ -d python ]; then
     )
   fi
 else
-  AGENT_CANON_W2_OWNER_PATHS=(
-    "${WORKSPACE_ROOT}/tools/runtime/artifacts/artifact_identity.py" \
-    "${WORKSPACE_ROOT}/tools/runtime/artifacts/report_artifact_checks.py" \
+  AGENT_CANON_W2_TEST_PATHS=(
     tests/agent_tools/test_artifact_identity.py \
     tests/agent_tools/test_codex_hooks.py \
   )
-  for candidate_path in "${AGENT_CANON_W2_OWNER_PATHS[@]}"; do
+  for candidate_path in "${AGENT_CANON_W2_TEST_PATHS[@]}"; do
     if [ -f "${candidate_path}" ]; then
       PYTHON_SOURCE_PATHS+=("${candidate_path}")
     else
-      echo "Missing canonical AgentCanon W2 owner path: ${candidate_path}" >&2
+      echo "Missing selected AgentCanon Python test path: ${candidate_path}" >&2
       exit 1
     fi
   done

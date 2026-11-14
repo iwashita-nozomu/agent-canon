@@ -1252,6 +1252,23 @@ fn validate_receipt(value: &Value, raw: &[u8]) -> Result<(), GraphError> {
     Ok(())
 }
 
+pub(crate) fn validate_runtime_publication_receipt(raw: &[u8]) -> Result<Value, String> {
+    let value = serde_json::from_slice(raw)
+        .map_err(|error| format!("runtime publication receipt JSON: {error}"))?;
+    validate_receipt(&value, raw).map_err(|error| error.to_string())?;
+    Ok(value)
+}
+
+pub(crate) fn validate_runtime_publication_observation(raw: &[u8]) -> Result<Value, String> {
+    let value = serde_json::from_slice(raw)
+        .map_err(|error| format!("runtime publication observation JSON: {error}"))?;
+    validate_observation(&value).map_err(|error| error.to_string())?;
+    if observation_canonical_bytes(&value, false).map_err(|error| error.to_string())? != raw {
+        return Err("runtime publication observation canonical bytes differ".to_owned());
+    }
+    Ok(value)
+}
+
 fn load_latest_receipt(
     root: &Path,
     artifact_path: &Path,
@@ -1864,7 +1881,7 @@ fn runtime_evidence_producer(snapshot: &RuntimeEvidenceSnapshot) -> ProducerArti
     ProducerArtifact {
         producer_id: "runtime-event-materializer".to_string(),
         version: "agent_canon.runtime_event.v1".to_string(),
-        command: "tools/runtime/archive/runtime_log_archive_git.py materialize-runtime-event"
+        command: "tools/bin/agent-canon runtime-log-archive-git materialize-runtime-event"
             .to_string(),
         root: snapshot.rollout_path.clone(),
         content_sha256: sha256(&snapshot.artifact_bytes),
@@ -3556,7 +3573,9 @@ pub(crate) fn run(args: &[String]) -> i32 {
         }
     };
     if matches!(command.as_str(), "help" | "--help" | "-h") {
-        eprintln!("graph <build|status|query|context> [--root PATH] [--runtime-root PATH] [--format json]");
+        eprintln!(
+            "graph <build|status|query|context> [--root PATH] [--runtime-root PATH] [--format json]"
+        );
         return 2;
     }
     let result = dispatch_command(command, &parsed);

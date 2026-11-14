@@ -258,8 +258,8 @@ Targeted commands:
 
 ```bash
 python3 -m pytest -q tests/tools/test_experiment_template_contracts.py
-python3 -m pytest -q tests/tools/test_run_managed_experiment.py
-python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py
+cargo test --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --test managed_experiment_native
+tools/bin/agent-canon check-agent-runtime-alignment
 ```
 
 ## Design-to-Implementation Trace

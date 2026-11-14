@@ -5,28 +5,24 @@
 # responsibility Verifies dependency identity decoration over the generic repository topic lifecycle.
 # upstream design ../../documents/rule/repository-topic-clone.md generic repository topic lifecycle
 # upstream design ../../documents/rule/dependency-module-changes.md dependency adapter responsibility
-# downstream implementation ../../tools/repository/workspace/dependency_module_change.py applies dependency policy
-# downstream implementation ../../tools/repository/workspace/repository_topic_clone.py owns clone lifecycle behavior
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/dependency_module_change.rs applies dependency policy
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/repository_topic_clone.rs owns clone lifecycle behavior
 # @dependency-end
 
 from __future__ import annotations
 
 import os
-import shutil
 import subprocess
-import sys
 from pathlib import Path
 
 import pytest
 
 TOPIC = "dependency-module-change"
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-
-TOOL = (
-    PROJECT_ROOT / "tools" / "repository" / "workspace" / "dependency_module_change.py"
-)
-GENERIC_TOOL = (
-    PROJECT_ROOT / "tools" / "repository" / "workspace" / "repository_topic_clone.py"
+NATIVE = (
+    os.environ.get("AGENT_CANON_NATIVE_BIN")
+    or os.environ.get("AGENT_CANON_CLI")
+    or str(PROJECT_ROOT / "tools" / "bin" / "agent-canon")
 )
 
 
@@ -117,78 +113,33 @@ def create_parent(
 
 def invoke(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
     """Run the dependency module adapter with provided command arguments."""
-    env = os.environ.copy()
-    env.pop("PYTHONPATH", None)
     return subprocess.run(
-        [sys.executable, str(TOOL), "--root", str(root), *args],
+        [NATIVE, "dependency-module-change", "--root", str(root), *args],
         check=False,
         capture_output=True,
         text=True,
-        env=env,
     )
 
 
-def install_public_cli_surface(root: Path, *, derived: bool) -> Path:
-    """Install the canonical CLI/library pair in one fresh source surface."""
-    tools_root = root / "tools"
-    source_tools = root / "vendor" / "agent-canon" / "tools" if derived else tools_root
-    workspace_tools = source_tools / "repository" / "workspace"
-    workspace_tools.mkdir(parents=True)
-    shutil.copy2(TOOL, workspace_tools / TOOL.name)
-    shutil.copy2(GENERIC_TOOL, workspace_tools / GENERIC_TOOL.name)
-    shutil.copy2(
-        TOOL.parent / "parent_root_side_effects.py",
-        workspace_tools / "parent_root_side_effects.py",
-    )
-    authority_tools = source_tools / "runtime" / "authority"
-    authority_tools.mkdir(parents=True)
-    for name in ("checkout_identity.py", "writer_target.py"):
-        shutil.copy2(
-            PROJECT_ROOT / "tools" / "runtime" / "authority" / name,
-            authority_tools / name,
-        )
-    artifacts_tools = source_tools / "runtime" / "artifacts"
-    artifacts_tools.mkdir(parents=True)
-    shutil.copy2(
-        PROJECT_ROOT / "tools" / "runtime" / "artifacts" / "runtime_artifacts.py",
-        artifacts_tools / "runtime_artifacts.py",
-    )
-    if derived:
-        tools_root.mkdir(parents=True)
-        (tools_root / "agent-canon").symlink_to(
-            Path("../vendor/agent-canon/tools"),
-            target_is_directory=True,
-        )
-        source_tools = tools_root / "agent-canon"
-    return source_tools / "repository" / "workspace" / TOOL.name
-
-
-@pytest.mark.parametrize("derived", (False, True))
 def test_public_cli_help_and_status_from_fresh_source_surfaces(
     tmp_path: Path,
-    derived: bool,
 ) -> None:
-    """Run public help and status without ambient package context."""
-    root = tmp_path / ("derived" if derived else "standalone")
+    """Run the native public command from a fresh repository root."""
+    root = tmp_path / "source"
     root.mkdir()
     subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
-    executable = install_public_cli_surface(root, derived=derived)
     (root / ".gitmodules").write_text(
         '[submodule "dependency-0"]\n'
         "\tpath = vendor/dep\n"
         "\turl = https://example.invalid/dep.git\n",
         encoding="utf-8",
     )
-    env = os.environ.copy()
-    env.pop("PYTHONPATH", None)
-
     help_result = subprocess.run(
-        [sys.executable, str(executable), "--help"],
+        [NATIVE, "dependency-module-change", "--help"],
         cwd=root,
         check=False,
         capture_output=True,
         text=True,
-        env=env,
     )
     assert help_result.returncode == 0, help_result.stderr
     assert "prepare" in help_result.stdout
@@ -196,8 +147,8 @@ def test_public_cli_help_and_status_from_fresh_source_surfaces(
 
     status_result = subprocess.run(
         [
-            sys.executable,
-            str(executable),
+            NATIVE,
+            "dependency-module-change",
             "--root",
             str(root),
             "status",
@@ -210,7 +161,6 @@ def test_public_cli_help_and_status_from_fresh_source_surfaces(
         check=False,
         capture_output=True,
         text=True,
-        env=env,
     )
     assert status_result.returncode == 0, status_result.stderr
     assert "MODULE=vendor/dep STATE=absent" in status_result.stdout

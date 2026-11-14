@@ -17,6 +17,7 @@ mod pipeline;
 mod query;
 mod relations;
 mod report;
+pub(crate) mod semantic_provider_html_report;
 mod source;
 mod storage;
 

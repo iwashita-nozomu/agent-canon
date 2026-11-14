@@ -5,7 +5,7 @@
 # upstream design ../../../documents/runtime/bootstrap-runtime.md active standalone source and runtime boundary.
 # upstream design ../../../documents/design/rust-agent-tool-migration.md compiled CLI provenance format.
 # downstream implementation ../../../bootstrap/container/lifecycle/entrypoint.sh container CLI publication.
-# downstream implementation ../../../tests/agent_tools/test_devcontainer_dependencies.py identity-focused regression fixtures.
+# downstream test ../../../tests/agent_tools/test_environment_dependencies_cli.py identity and validator command oracles.
 # @dependency-end
 
 agent_canon_source_identity() {
@@ -50,21 +50,6 @@ agent_canon_receipt_matches_identity() {
   local receipt_path="$1"
   local expected_identity="$2"
 
-  python3 - "$receipt_path" "$expected_identity" <<'PY'
-import json
-import sys
-
-receipt_path, expected_identity = sys.argv[1:]
-try:
-    with open(receipt_path, encoding="utf-8") as stream:
-        payload = json.load(stream)
-except (OSError, json.JSONDecodeError) as exc:
-    raise SystemExit(f"AgentCanon source identity receipt is unavailable: {receipt_path}: {exc}")
-observed_identity = payload.get("source_identity")
-if observed_identity != expected_identity:
-    raise SystemExit(
-        "AgentCanon receipt source identity mismatch: "
-        f"{observed_identity}!={expected_identity}"
-    )
-PY
+  "${AGENT_CANON_NATIVE_BIN:-${AGENT_CANON_CLI:-agent-canon}}" runtime-paths receipt-identity \
+    --input "$receipt_path" --expected-identity "$expected_identity" || return 1
 }

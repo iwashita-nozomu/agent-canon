@@ -51,7 +51,7 @@ const IDENTITY_KEYS: [&str; 19] = [
     "materialization_order_index",
     "identity_record_body_sha256",
 ];
-const OWNER_PATH: &str = "tools/runtime/artifacts/artifact_identity.py";
+const OWNER_PATH: &str = "tools/runtime/dispatch/agent-canon/src/artifacts/artifact_identity.rs";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ArtifactIdentityError {
@@ -808,6 +808,137 @@ pub fn verify_artifact_identity(workspace: &Path, record_path: &Path) -> Result<
         ArtifactIdentityError::with_detail("artifact_identity:record_invalid", error.to_string())
     })?;
     verify_identity_record(&root, &record)
+}
+
+const CLI_USAGE: &str =
+    "usage: agent-canon artifact-identity [--root ROOT] <materialize ARTIFACT|verify RECORD>";
+
+fn print_cli_usage(message: &str) -> i32 {
+    eprintln!("{CLI_USAGE}\n{message}");
+    2
+}
+
+fn python_json_default_bytes(value: &Value) -> Result<Vec<u8>> {
+    let compact = serde_json::to_vec(value).map_err(|error| {
+        ArtifactIdentityError::with_detail("artifact_identity:json_invalid", error.to_string())
+    })?;
+    let mut output = Vec::with_capacity(compact.len() + compact.len() / 8);
+    let mut in_string = false;
+    let mut escaped = false;
+    for byte in compact {
+        if in_string {
+            output.push(byte);
+            if escaped {
+                escaped = false;
+            } else if byte == b'\\' {
+                escaped = true;
+            } else if byte == b'"' {
+                in_string = false;
+            }
+        } else {
+            match byte {
+                b'"' => {
+                    in_string = true;
+                    output.push(byte);
+                }
+                b',' => output.extend_from_slice(b", "),
+                b':' => output.extend_from_slice(b": "),
+                _ => output.push(byte),
+            }
+        }
+    }
+    Ok(output)
+}
+
+/// Read-only low-level identity command retained for shell and test callers.
+pub fn run(args: &[String]) -> i32 {
+    let mut root = PathBuf::from(".");
+    let mut index = 0;
+    while let Some(argument) = args.get(index) {
+        if matches!(argument.as_str(), "-h" | "--help") {
+            println!("{CLI_USAGE}\n\nMaterialize or verify an artifact identity record.\n\noptions:\n  -h, --help       show this help message and exit\n  --root ROOT      repository root (default: current directory)");
+            return 0;
+        }
+        if !argument.starts_with('-') {
+            break;
+        }
+        if let Some(value) = argument.strip_prefix("--root=") {
+            root = PathBuf::from(value);
+        } else if argument == "--root"
+            || argument != "--"
+                && argument.starts_with("--")
+                && "--root".starts_with(argument.as_str())
+        {
+            index += 1;
+            let Some(value) = args.get(index) else {
+                return print_cli_usage("--root: expected one argument");
+            };
+            root = PathBuf::from(value);
+        } else {
+            return print_cli_usage(&format!("unrecognized argument: {argument}"));
+        }
+        index += 1;
+    }
+    let Some(action) = args.get(index) else {
+        return print_cli_usage("the following arguments are required: action");
+    };
+    if matches!(action.as_str(), "-h" | "--help") {
+        println!("{CLI_USAGE}\n\nMaterialize or verify an artifact identity record.");
+        return 0;
+    }
+    if !matches!(action.as_str(), "materialize" | "verify") {
+        return print_cli_usage(&format!(
+            "invalid choice: {action:?} (choose from 'materialize', 'verify')"
+        ));
+    }
+    if args[index + 1..]
+        .iter()
+        .any(|argument| matches!(argument.as_str(), "-h" | "--help"))
+    {
+        let positional = if action == "materialize" {
+            "ARTIFACT"
+        } else {
+            "RECORD"
+        };
+        println!(
+            "usage: agent-canon artifact-identity {action} [-h] {positional}\n\noptions:\n  -h, --help  show this help message and exit"
+        );
+        return 0;
+    }
+    let Some(path) = args.get(index + 1) else {
+        return print_cli_usage(&format!(
+            "the following arguments are required: {}",
+            if action == "materialize" {
+                "artifact_path"
+            } else {
+                "identity_record_path"
+            }
+        ));
+    };
+    if args.get(index + 2).is_some() {
+        return print_cli_usage(&format!(
+            "unrecognized arguments: {}",
+            args[index + 2..].join(" ")
+        ));
+    }
+    let result = if action == "materialize" {
+        materialize_artifact_identity(&root, Path::new(path))
+    } else {
+        verify_artifact_identity(&root, Path::new(path))
+    };
+    match result {
+        Ok(value) => {
+            let json = python_json_default_bytes(&value)
+                .expect("JSON identity serializes with Python default separators");
+            println!("ARTIFACT_IDENTITY=pass");
+            println!("{}", String::from_utf8(json).expect("JSON is valid UTF-8"));
+            0
+        }
+        Err(error) => {
+            println!("ARTIFACT_IDENTITY=fail\nARTIFACT_IDENTITY_FINDING={error}");
+            1
+        }
+    }
 }
 
 #[cfg(test)]

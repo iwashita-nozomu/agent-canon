@@ -116,9 +116,9 @@ Docstring の意味契約へ混ぜません。
 
 OOP / SOLID の起動は [オブジェクト指向設計方針の適用条件](./object-oriented-design.md#この文書の読み方)
 に従います。object contract が実質的に変わる場合だけ、Python 固有の
-`tools/validation/code/oop/python/readability.py` を SOLID principle signal の primary OOP evidence route にします。
+`tools/runtime/dispatch/agent-canon/src/oop/readability.rs` を SOLID principle signal の primary OOP evidence route にします。
 class や型の存在、意味を変えない annotation 修正だけでは追加検査を起動しません。
-`tools/validation/code/oop/shared/readability_core.py` の `SOLID_PRINCIPLES_BY_KIND` が finding kind から
+`tools/runtime/dispatch/agent-canon/src/oop/readability.rs` の `SOLID_PRINCIPLES_BY_KIND` が finding kind から
 SOLID 見出しへの機械投影を所有します。
 `check-solid-evidence` は SOLID-sensitive な Python 差分と
 OOP readability report の `scanned_paths` coverage を照合します。

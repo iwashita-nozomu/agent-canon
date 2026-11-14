@@ -1,28 +1,30 @@
 # @dependency-start
 # contract test
 # responsibility Tests C++ source-canonical IR extraction into the shared thin operational IR.
-# upstream implementation ../../tools/analysis/code/cpp_source_canonical_ir.py extracts C++ source IR.
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/cpp_source_canonical_ir.rs extracts C++ source IR.
 # upstream design ../../documents/tools/cpp_source_canonical_ir.md documents the wrapper schema.
-# upstream implementation ../../tools/analysis/proof/jit_canonical_ir.py defines the inner IR shape.
+# upstream design ../../documents/tools/jit_canonical_ir.md defines the inner IR shape.
 # @dependency-end
 """Tests for C++ source-canonical IR extraction."""
 
 from __future__ import annotations
 
 import json
+import os
 import subprocess
-import sys
 import textwrap
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "analysis" / "code" / "cpp_source_canonical_ir.py"
+AGENT_CANON_CLI = os.environ.get(
+    "AGENT_CANON_CLI", str(PROJECT_ROOT / "tools" / "bin" / "agent-canon")
+)
 
 
 def run_tool(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
     """Run the C++ source-canonical IR tool against one fixture root."""
     return subprocess.run(
-        [sys.executable, str(SCRIPT), "--root", str(root), *args],
+        [AGENT_CANON_CLI, "cpp-source-canonical-ir", "--root", str(root), *args],
         cwd=PROJECT_ROOT,
         check=False,
         capture_output=True,

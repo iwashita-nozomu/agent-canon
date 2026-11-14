@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # @dependency-start
 # contract agent-runtime
-# responsibility Owns the host-only Docker/Git adapter for the shared AgentCanon container. AgentCanon Python is invoked only through docker exec.
+# responsibility Owns the host-only Docker/Git adapter for the shared AgentCanon container. The resident controller runs through the native CLI.
 # upstream design ../../../documents/design/agent-canon-bootstrap-tool-runtime.md shared host/container bootstrap contract
 # upstream design ../../../documents/runtime/bootstrap-runtime.md source sync and global Codex config lifecycle
 # upstream implementation ../../../.codex/config.toml canonical managed context defaults
-# downstream implementation ../../../tools/runtime/container/bootstrap_runtime.py container-side runtime implementation
+# downstream implementation ../../../tools/runtime/dispatch/agent-canon/src/bootstrap_runtime.rs native container-side runtime implementation
 # downstream implementation ../../../tests/bootstrap/test_bootstrap_shell.py host lifecycle behavior tests
 # @dependency-end
 
@@ -348,10 +348,9 @@ _agent_canon_sync_operation() (
     fi
   fi
 
-  if [[ -f "$install_root/tools/runtime/archive/runtime_log_archive_git.py" &&
-        ! -L "$install_root/tools/runtime/archive/runtime_log_archive_git.py" ]] &&
-     command -v python3 >/dev/null 2>&1; then
-    python3 "$install_root/tools/runtime/archive/runtime_log_archive_git.py" \
+  local archive_cli=${AGENT_CANON_NATIVE_BIN:-${AGENT_CANON_CLI:-$install_root/tools/bin/agent-canon}}
+  if [[ -x "$archive_cli" ]] && "$archive_cli" --version >/dev/null 2>&1; then
+    "$archive_cli" runtime-log-archive-git \
       --source-root "$install_root" \
       --canon-root "$install_root" \
       --archive-root "$AGENT_CANON_PRIVATE_LOG_ROOT" \
@@ -2823,7 +2822,7 @@ _agent_canon_run_controller() {
   output_file=$(mktemp "$temporary_root/.bootstrap.stdout.XXXXXX")
   error_file=$(mktemp "$temporary_root/.bootstrap.stderr.XXXXXX")
   _agent_canon_container_exec "$container" \
-    python3 /opt/agent-canon/source/tools/runtime/container/bootstrap_runtime.py \
+    /var/lib/agent-canon/cache/bin/agent-canon bootstrap-runtime \
     --repository-root /opt/agent-canon/source \
     --control-parent-root /var/lib/agent-canon \
     --runtime-root /var/lib/agent-canon/runtime \
@@ -2845,7 +2844,7 @@ _agent_canon_restore_candidate_failure() {
   restore_error=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.bootstrap.restore.stderr.XXXXXX")
   if "$AGENT_CANON_DOCKER_CMD" container inspect "$container" >/dev/null 2>&1; then
     if _agent_canon_container_exec "$container" \
-      python3 /opt/agent-canon/source/tools/runtime/container/bootstrap_runtime.py \
+      /var/lib/agent-canon/cache/bin/agent-canon bootstrap-runtime \
       --repository-root /opt/agent-canon/source \
       --control-parent-root /var/lib/agent-canon \
       --runtime-root /var/lib/agent-canon/runtime \
@@ -4202,12 +4201,13 @@ _agent_canon_archive_eval_sync() {
     printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"warning","operation":"eval_sync","code":"host_adapter_deferred","execution_plane":"host_archive_adapter"}\n' >&2
     return 75
   }
-  if ! command -v python3 >/dev/null 2>&1; then
+  local archive_cli=${AGENT_CANON_NATIVE_BIN:-${AGENT_CANON_CLI:-$AGENT_CANON_REPOSITORY_ROOT/tools/bin/agent-canon}}
+  if ! "$archive_cli" --version >/dev/null 2>&1; then
     printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"warning","operation":"eval_sync","code":"host_adapter_deferred","execution_plane":"host_archive_adapter"}\n' >&2
     return 75
   fi
   local adapter_rc=0
-  python3 "$AGENT_CANON_REPOSITORY_ROOT/tools/runtime/archive/runtime_log_archive_git.py" \
+  "$archive_cli" runtime-log-archive-git \
     --source-root "$resolved_source" \
     --canon-root "$AGENT_CANON_REPOSITORY_ROOT" \
     --archive-root "$AGENT_CANON_PRIVATE_LOG_ROOT" \
@@ -4601,7 +4601,7 @@ _agent_canon_codex_hook() {
       printf '\0'
       printf '%s' "$payload"
     } | _agent_canon_container_exec "$container" --stdin \
-      python3 "$AGENT_CANON_SOURCE_DESTINATION/tools/runtime/container/bootstrap_runtime.py" \
+      /var/lib/agent-canon/cache/bin/agent-canon bootstrap-runtime \
       --repository-root "$AGENT_CANON_SOURCE_DESTINATION" \
       --control-parent-root /var/lib/agent-canon \
       --runtime-root /var/lib/agent-canon/runtime \
@@ -5199,7 +5199,7 @@ _agent_canon_exec_tool_route_locked() {
   error_file=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.bootstrap.stderr.XXXXXX")
   rc=0
   _agent_canon_container_exec "$container" \
-    python3 /opt/agent-canon/source/tools/runtime/container/bootstrap_runtime.py \
+    /var/lib/agent-canon/cache/bin/agent-canon bootstrap-runtime \
     --repository-root /opt/agent-canon/source \
     --control-parent-root /var/lib/agent-canon \
     --runtime-root /var/lib/agent-canon/runtime \
@@ -5599,7 +5599,7 @@ bootstrap_host_entrypoint() {
       error_file=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.bootstrap.stderr.XXXXXX")
       rc=0
       _agent_canon_container_exec "$container" \
-        python3 /opt/agent-canon/source/tools/runtime/container/bootstrap_runtime.py \
+        /var/lib/agent-canon/cache/bin/agent-canon bootstrap-runtime \
         --repository-root /opt/agent-canon/source \
         --control-parent-root /var/lib/agent-canon \
         --runtime-root /var/lib/agent-canon/runtime \

@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests flat-result variant-scoped latest pointer update behavior.
-# upstream implementation ../../tools/experiments/artifacts/update_latest_result.py helper under test
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/latest_result.rs helper under test
 # @dependency-end
 
 """Tests for flat-result variant-scoped latest pointers."""
@@ -9,25 +9,67 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
-import tools.experiments.artifacts.update_latest_result as latest_module
-from tools.experiments.lifecycle.experiment_identity import ExperimentIdentity
-from tools.experiments.artifacts.update_latest_result import (
-    latest_result_dir,
-    update_latest_result,
-)
+
+
+def invoke_latest(result_root: Path, variant: str, *options: str) -> Path:
+    result = subprocess.run(
+        [
+            os.environ["AGENT_CANON_CLI"],
+            "update-latest-result",
+            str(result_root),
+            "--variant",
+            variant,
+            *options,
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode:
+        raise ValueError(result.stderr.strip())
+    return Path(result.stdout.strip().removeprefix("latest_result_dir="))
+
+
+def latest_result_dir(result_root: Path, variant: str) -> Path:
+    return invoke_latest(result_root, variant, "--select-only")
+
+
+def update_latest_result(
+    result_root: Path, result_dir: Path | None, variant: str
+) -> Path:
+    options = ("--result-dir", str(result_dir)) if result_dir is not None else ()
+    return invoke_latest(result_root, variant, *options)
+
+
+def test_native_latest_entrypoint_help() -> None:
+    result = subprocess.run(
+        [os.environ["AGENT_CANON_CLI"], "update-latest-result", "--help"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "usage:" in result.stdout
 
 
 def write_run(root: Path, variant: str, run_name: str, created_at: str) -> Path:
     """Write one complete flat result fixture for LATEST discovery."""
     run_dir = root / "experiments" / "demo.topic" / "result" / run_name
     run_dir.mkdir(parents=True)
-    identity = ExperimentIdentity("demo.topic", variant, run_name)
+    identity = {
+        "schema": "agentcanon.experiment-run-identity/v2",
+        "topic": "demo.topic",
+        "variant": variant,
+        "run_name": run_name,
+    }
     (run_dir / "run_manifest.json").write_text(
-        json.dumps({**identity.to_dict(), "created_at_utc": created_at}) + "\n",
+        json.dumps({"identity": identity, "created_at_utc": created_at}) + "\n",
         encoding="utf-8",
     )
     (run_dir / "summary").mkdir()
@@ -188,28 +230,15 @@ def test_latest_pointer_concurrency_keeps_newest_json_and_markdown_consistent(
     assert payload["identity"]["run_name"] == "run.b"
     assert payload["latest_result"].endswith("/result/run.b")
     assert "run.b" in latest_markdown.read_text(encoding="utf-8")
-    assert latest_markdown.read_text(
-        encoding="utf-8"
-    ) == latest_module._latest_markdown(payload)
-
-
-def test_latest_pointer_pair_failure_rolls_back_without_temp_residue(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Rollback the first replacement when the second pointer cannot replace."""
-    result_root = tmp_path / "experiments" / "demo.topic" / "result"
-    run_dir = write_run(tmp_path, "smoke", "run.a", "2026-01-01T00:00:00Z")
-    original_replace = latest_module.os.replace
-
-    def fail_markdown_replace(source: str | bytes, destination: str | bytes) -> None:
-        if Path(destination).name == "LATEST.smoke.md":
-            raise OSError("injected markdown publication failure")
-        original_replace(source, destination)
-
-    monkeypatch.setattr(latest_module.os, "replace", fail_markdown_replace)
-    with pytest.raises(OSError, match="injected markdown"):
-        update_latest_result(result_root, run_dir, "smoke")
-
-    assert not (result_root / "LATEST.smoke.json").exists()
-    assert not (result_root / "LATEST.smoke.md").exists()
-    assert not list(result_root.glob(".*LATEST*"))
+    identity_text = json.dumps(
+        payload["identity"], sort_keys=True, separators=(",", ":")
+    )
+    assert latest_markdown.read_text(encoding="utf-8") == (
+        "# Latest Experiment Result\n\n"
+        f"- identity: `{identity_text}`\n"
+        "- result: `experiments/demo.topic/result/run.b`\n"
+        "- manifest: `experiments/demo.topic/result/run.b/run_manifest.json`\n"
+        "- report: `experiments/demo.topic/report/run.b.md`\n"
+        "- summary: `experiments/demo.topic/result/run.b/summary/summary.json`\n"
+        "- visual report: `experiments/demo.topic/result/run.b/summary/report.html`\n"
+    )

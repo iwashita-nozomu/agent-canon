@@ -5,8 +5,8 @@
 # upstream design ../../../documents/design/source-owned-dependency-validation.md source-derived graph projection authority
 # upstream design ../../../documents/design/dependency-manifest-design.md dependency graph semantics
 # upstream implementation ../../runtime/dispatch/agent-canon/src/source_dependency_graph.rs owns source parsing, canonical binding, and review export
-# upstream implementation ../../runtime/artifacts/runtime_artifacts.py owns external graph scratch and TSV publication
-# downstream implementation ./render_dependency_manifest_graph.py renders exported dependency TSV
+# upstream implementation ../../runtime/dispatch/agent-canon/src/runtime_boundary.rs owns external graph scratch and TSV publication
+# downstream implementation ../../runtime/dispatch/agent-canon/src/dependency_manifest_graph.rs renders exported dependency TSV
 # downstream implementation ../../../tests/agent_tools/test_dependency_manifest_tools.py verifies source-derived graph review
 # downstream implementation ../../../tests/agent_tools/test_dependency_graph_cycles.py verifies normalized full-topology SCC scope
 # @dependency-end
@@ -14,6 +14,7 @@ set -euo pipefail
 
 ROOT_DIR="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || pwd)"
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+CANON_SOURCE_ROOT="$(cd "$script_dir/../../.." && pwd -P)"
 RUNTIME_ROOT="${AGENT_CANON_RUNTIME_ROOT:-}"
 CONTROL_ROOT="${AGENT_CANON_CONTROL_PARENT_ROOT:-}"
 PRINT_EDGES=0
@@ -37,52 +38,26 @@ fail_runtime_boundary() {
 
 runtime_path() {
   local candidate="$1"
-  python3 - "$script_dir" "$ROOT_DIR" "$CONTROL_ROOT" "$RUNTIME_ROOT" "$candidate" <<'PY'
-from pathlib import Path
-import sys
-
-source, root, control, runtime, candidate = map(Path, sys.argv[1:])
-sys.path.insert(0, str(source.parents[2].resolve(strict=True)))
-from tools.runtime.artifacts.runtime_artifacts import RuntimeArtifactBoundary, RuntimeArtifactError
-
-try:
-    source_root = source.parents[2].resolve(strict=True)
-    target_root = root.resolve(strict=True)
-    control_root = control.resolve(strict=True)
-    boundary = RuntimeArtifactBoundary.for_source(source_root, runtime, create=True)
-    if boundary.root == target_root or boundary.root in target_root.parents:
-        raise RuntimeArtifactError("runtime root must be outside target repository")
-    try:
-        target_root.relative_to(control_root)
-    except ValueError as exc:
-        raise RuntimeArtifactError("target repository is outside control root") from exc
-    print(boundary.resolve(candidate))
-except (OSError, RuntimeArtifactError, ValueError) as exc:
-    print(f"runtime boundary invalid: {exc}", file=sys.stderr)
-    raise SystemExit(2)
-PY
+  local resolved
+  if ! resolved="$("${AGENT_CANON_NATIVE_BIN:-${AGENT_CANON_CLI:-${CANON_SOURCE_ROOT}/tools/bin/agent-canon}}" \
+    runtime-paths path --source-root "$CANON_SOURCE_ROOT" --target-root "$ROOT_DIR" \
+    --control-parent-root "$CONTROL_ROOT" --runtime-root "$RUNTIME_ROOT" --candidate "$candidate" 2>&1)"; then
+    printf 'runtime boundary invalid: %s\n' "$resolved" >&2
+    return 2
+  fi
+  printf '%s\n' "$resolved"
 }
 
 write_runtime_file() {
   local candidate="$1"
   local source_file="$2"
-  python3 - "$script_dir" "$RUNTIME_ROOT" "$candidate" "$source_file" <<'PY'
-from pathlib import Path
-import sys
-
-source, runtime, candidate, source_file = map(Path, sys.argv[1:])
-sys.path.insert(0, str(source.parents[2].resolve(strict=True)))
-from tools.runtime.artifacts.runtime_artifacts import RuntimeArtifactBoundary, RuntimeArtifactError
-
-try:
-    boundary = RuntimeArtifactBoundary.for_source(
-        source.parents[2].resolve(strict=True), runtime, create=True
-    )
-    boundary.atomic_write_bytes(boundary.resolve(candidate), source_file.read_bytes())
-except (OSError, RuntimeArtifactError, ValueError) as exc:
-    print(f"runtime boundary invalid: {exc}", file=sys.stderr)
-    raise SystemExit(2)
-PY
+  local diagnostic
+  if ! diagnostic="$("${AGENT_CANON_NATIVE_BIN:-${AGENT_CANON_CLI:-${CANON_SOURCE_ROOT}/tools/bin/agent-canon}}" \
+    runtime-paths write-file --source-root "$CANON_SOURCE_ROOT" --runtime-root "$RUNTIME_ROOT" \
+    --candidate "$candidate" --input "$source_file" 2>&1)"; then
+    printf 'runtime boundary invalid: %s\n' "$diagnostic" >&2
+    return 2
+  fi
 }
 
 require_runtime_boundary() {
@@ -326,68 +301,9 @@ while IFS=$'\t' read -r direction kind source target; do
 done < <(awk -F '\t' '$1 != "" && $2 != "" && $3 != "" && $4 != ""' "$edges_file")
 
 check_cycles() {
-  python3 - "$all_edges" "$selected_file" "$scoped" <<'PYTHON'
-import sys
-from collections import defaultdict
-from pathlib import Path
-
-edges_path, selected_path, scoped = sys.argv[1:]
-selected = set(Path(selected_path).read_text().splitlines()) if scoped == "1" else None
-adjacency = defaultdict(set)
-reverse = defaultdict(set)
-for row in Path(edges_path).read_text().splitlines():
-    direction, kind, source, target = row.split("\t")
-    if not all((direction, kind, source, target)):
-        continue  # The projection check above already records incomplete rows.
-    # Reference edges document evidence, not prerequisite ordering.
-    if kind == "reference":
-        continue
-    prerequisite, consumer = (target, source) if direction == "upstream" else (source, target)
-    adjacency[prerequisite].add(consumer)
-    reverse[consumer].add(prerequisite)
-nodes = sorted(adjacency.keys() | reverse.keys())
-
-# Iterative Kosaraju: finish the full topology before applying report scope.
-visited = set()
-finished = []
-for node in nodes:
-    if node in visited:
-        continue
-    visited.add(node)
-    stack = [(node, iter(sorted(adjacency[node])))]
-    while stack:
-        current, neighbors = stack[-1]
-        neighbor = next(neighbors, None)
-        if neighbor is None:
-            finished.append(current)
-            stack.pop()
-        elif neighbor not in visited:
-            visited.add(neighbor)
-            stack.append((neighbor, iter(sorted(adjacency[neighbor]))))
-
-visited.clear()
-cycles = []
-for node in reversed(finished):
-    if node in visited:
-        continue
-    component = set()
-    pending = [node]
-    visited.add(node)
-    while pending:
-        current = pending.pop()
-        component.add(current)
-        for neighbor in reverse[current]:
-            if neighbor not in visited:
-                visited.add(neighbor)
-                pending.append(neighbor)
-    if len(component) > 1 or node in adjacency[node]:
-        if selected is None or not component.isdisjoint(selected):
-            cycles.append(tuple(sorted(component)))
-for component in sorted(cycles):
-    print("dependency cycle includes " + ", ".join(component))
-# Keep interpreter/I/O failures distinct from report-only cycle findings.
-sys.exit(3 if cycles else 0)
-PYTHON
+  local -a cycle_args=(source-dependency-graph cycles --edges "$all_edges" --selected "$selected_file")
+  [[ "$scoped" -eq 1 ]] && cycle_args+=(--scoped)
+  "$NATIVE_CLI" "${cycle_args[@]}"
 }
 
 cycle_status=0

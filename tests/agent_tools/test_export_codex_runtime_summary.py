@@ -4,7 +4,7 @@
 # contract test
 # responsibility Tests Codex runtime summary export into the AgentCanon log archive.
 # upstream implementation ../../tools/runtime/dispatch/agent-canon/src/codex_runtime_summary.rs exports bounded Codex runtime summaries
-# upstream implementation ../../tools/runtime/archive/runtime_log_paths.py resolves codex-runtime archive paths
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/eval_archive_paths.rs resolves codex-runtime archive paths
 # upstream design ../../documents/runtime/runtime-log-archive.md documents runtime log archive ownership
 # upstream reference ../fixtures/codex_runtime_summary/python_golden.json freezes original CLI inputs and complete output
 # upstream reference ../fixtures/codex_runtime_summary/python_cli_arguments.json freezes help and argument errors
@@ -31,13 +31,39 @@ NATIVE_CLI = (
     or os.environ.get("AGENT_CANON_CLI")
     or str(PROJECT_ROOT / "tools" / "bin" / "agent-canon")
 )
-sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-from tools.runtime.archive.runtime_log_paths import (  # noqa: E402
-    codex_runtime_index_path,
-    codex_runtime_summary_path,
-    mounted_log_archive_root,
-    repo_log_key,
-)
+
+
+def mounted_log_archive_root(_canon_root: Path) -> Path:
+    return Path(os.environ["AGENT_CANON_RUNTIME_ROOT"]) / "archive" / "agent-canon-log"
+
+
+def repo_log_key(source_root: Path) -> str:
+    runtime = Path(os.environ["AGENT_CANON_RUNTIME_ROOT"])
+    result = subprocess.run(
+        [
+            NATIVE_CLI,
+            "runtime-log-archive-git",
+            "--source-root",
+            str(source_root),
+            "--canon-root",
+            str(PROJECT_ROOT),
+            "--runtime-root",
+            str(runtime),
+            "repo-key",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    prefix = "RUNTIME_LOG_ARCHIVE_REPO_KEY="
+    return next(line[len(prefix):] for line in result.stdout.splitlines() if line.startswith(prefix))
+
+
+def reported_path(result: subprocess.CompletedProcess[str], name: str) -> Path:
+    prefix = f"{name}="
+    value = next(line[len(prefix):] for line in result.stdout.splitlines() if line.startswith(prefix))
+    return Path(value)
 
 
 class ExportCodexRuntimeSummaryTest(unittest.TestCase):
@@ -251,7 +277,8 @@ class ExportCodexRuntimeSummaryTest(unittest.TestCase):
             self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
             self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
 
-            output = codex_runtime_summary_path(source, canon, thread_id)
+            output = reported_path(first, "CODEX_RUNTIME_SUMMARY_OUTPUT")
+            index_path = reported_path(first, "CODEX_RUNTIME_SUMMARY_INDEX")
             records = [
                 json.loads(line)
                 for line in output.read_text(encoding="utf-8").splitlines()
@@ -259,7 +286,7 @@ class ExportCodexRuntimeSummaryTest(unittest.TestCase):
             ]
             index = [
                 json.loads(line)
-                for line in codex_runtime_index_path(source, canon)
+                for line in index_path
                 .read_text(encoding="utf-8")
                 .splitlines()
                 if line.strip()
@@ -333,13 +360,14 @@ class ExportCodexRuntimeSummaryTest(unittest.TestCase):
                 text=True,
             )
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            output_dir = codex_runtime_index_path(source, canon).parent / "chats"
+            index_path = reported_path(result, "CODEX_RUNTIME_SUMMARY_INDEX")
+            output_dir = index_path.parent / "chats"
             exported = sorted(
                 path.name for path in output_dir.iterdir() if path.is_dir()
             )
             index_records = [
                 json.loads(line)
-                for line in codex_runtime_index_path(source, canon)
+                for line in index_path
                 .read_text(encoding="utf-8")
                 .splitlines()
                 if line.strip()

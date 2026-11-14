@@ -560,7 +560,6 @@ fn dispatcher_admits_edits_without_runtime_work_control_records() {
             if stale_records {
                 for path in [
                     "run/runtime/agent_identity.json",
-                    ".agent-canon/writer-target.json",
                     "hook-results/.event-spool/spawn.json",
                 ] {
                     let path = source.join(path);

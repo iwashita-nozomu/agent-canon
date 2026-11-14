@@ -5,7 +5,7 @@
 # upstream design ../runtime/SHARED_RUNTIME_SURFACES.md standalone runtime surface policy
 # upstream design ../runtime/shared-runtime-surfaces.toml machine-readable runtime inventory
 # upstream design ../../responsibility-scope.toml canonical path owner and class relation
-# downstream implementation ../../tools/validation/semantic/structure/repo_structure_contract.py compares observed trees against this contract
+# downstream implementation ../../tools/runtime/dispatch/agent-canon/src/repo_structure_contract.rs compares observed trees against this contract
 # downstream implementation ../../tests/agent_tools/test_repo_structure_contract.py tests structure contract validation
 # @dependency-end
 
@@ -139,7 +139,7 @@ path = "tools/agent"
 kind = "dir"
 
 [[profile.required]]
-path = "tools/runtime/lifecycle/update_lifecycle_contract.py"
+path = "tools/runtime/dispatch/agent-canon/src/update_lifecycle_contract.rs"
 kind = "file"
 
 [[profile.required]]

@@ -53,6 +53,33 @@ runtime_schema:
   # one-file catalog entry below. Keeping this inventory here prevents the
   # dispatcher from silently dropping a first-class Rust route.
   rust_public_commands:
+    - id: rust-bootstrap-runtime
+      selector: bootstrap-runtime
+      path: tools/runtime/dispatch/agent-canon/src/bootstrap_runtime.rs
+    - id: rust-github-status-lifecycle
+      selector: github-status-lifecycle
+      path: tools/runtime/dispatch/agent-canon/src/github_status_lifecycle.rs
+    - id: rust-skill-shim-evaluation
+      selector: skill-shim-evaluation
+      path: tools/runtime/dispatch/agent-canon/src/skill_shim_evaluation.rs
+    - id: rust-skill-shim-materializer
+      selector: skill-shim-materializer
+      path: tools/runtime/dispatch/agent-canon/src/catalog/skill_materialization.rs
+    - id: rust-render-code-template
+      selector: render-code-template
+      path: tools/runtime/dispatch/agent-canon/src/code_template_rendering.rs
+    - id: rust-skill-dependency-map
+      selector: skill-dependency-map
+      path: tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs
+    - id: rust-check-agent-canon-log-policy
+      selector: check-agent-canon-log-policy
+      path: tools/runtime/dispatch/agent-canon/src/log_policy.rs
+    - id: rust-parent-repository-audit
+      selector: parent-repository-audit
+      path: tools/runtime/dispatch/agent-canon/src/parent_repository_audit.rs
+    - id: rust-environment-dependencies
+      selector: environment-dependencies
+      path: tools/runtime/dispatch/agent-canon/src/environment_dependencies.rs
     - id: rust-workflow-selection-manifest
       selector: workflow-selection-manifest
       path: tools/runtime/dispatch/agent-canon/src/workflow_selection_eval.rs
@@ -129,7 +156,6 @@ family_values:
   - oop_cpp
   - data
   - hlo
-  - audit
   - experiments
   - validation
   - root
@@ -199,11 +225,6 @@ families:
     root: tools/analysis/hlo
     summary: HLO result summarization helpers.
     audience: agent
-    placement: support_library
-  audit:
-    root: tools/audit/logging
-    summary: Portable audit log schema and writer helpers.
-    audience: internal
     placement: support_library
   experiments:
     root: tools/experiments
@@ -391,28 +412,15 @@ entries:
 
   - id: checkout-identity
     summary: Reads the current cwd, Git root, branch state, HEAD, and normalized remote owner/repository for bounded workflow transitions.
-    path: tools/runtime/authority/checkout_identity.py
+    path: tools/runtime/dispatch/agent-canon/src/checkout_identity.rs
     family: agent_tools
     role: helper
     status: canonical
     audience: agent
     placement: workflow_helper
-    command: python3 tools/runtime/authority/checkout_identity.py --format lines
+    command: tools/bin/agent-canon checkout-identity --format lines
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "checkout-identity"]}
     writes: false
-    dispatch:
-      runtime: python
-      argv: [python3, tools/runtime/authority/checkout_identity.py]
-      execution_plane: tool-container
-      cwd: source-root
-      env: clean
-      stdin: inherited
-      stdout: captured
-      stderr: captured
-      exit: propagate
-      signal: propagate
-      side_effect: read-only
-      output_root: none
-      written_paths: []
     default_wiring:
       ci: false
       pr_check: false
@@ -467,12 +475,12 @@ entries:
   - id: render-dependency-manifest-graph
     public: true
     summary: Renders dependency manifest graph TSV artifacts into repo-local Graph IR JSON with directory containment, Markdown, DOT, and HTML projection reports under the shared Graph DSL Core projection contract.
-    path: tools/analysis/dependencies/render_dependency_manifest_graph.py
+    path: tools/runtime/dispatch/agent-canon/src/dependency_manifest_graph.rs
     family: agent_tools
     role: checker
     status: canonical
-    command: python3 tools/analysis/dependencies/render_dependency_manifest_graph.py --root . --scope full --bundle-dir reports/dependency-graph --format json
-    dispatch: {argv: ["python3", "tools/analysis/dependencies/render_dependency_manifest_graph.py", "--root", ".", "--scope", "full", "--bundle-dir", "reports/dependency-graph", "--format", "json"]}
+    command: tools/bin/agent-canon render-dependency-manifest-graph --root . --scope full --bundle-dir reports/dependency-graph --format json
+    dispatch: {argv: ["tools/bin/agent-canon", "render-dependency-manifest-graph", "--root", ".", "--scope", "full", "--bundle-dir", "reports/dependency-graph", "--format", "json"]}
     writes: true
     default_wiring:
       ci: false
@@ -565,14 +573,27 @@ entries:
   - id: formal-proof
     public: true
     summary: Builds natural-language or Python AST-sourced formal-proof scaffold plans, Python-package trace modules, existing-proof search queries, and checker commands.
-    path: tools/analysis/proof/formal_proof.py
+    path: tools/runtime/dispatch/agent-canon/src/formal_proof.rs
     family: agent_tools
     role: helper
     status: canonical
     audience: skill
     placement: skill_helper
-    command: python3 tools/analysis/proof/formal_proof.py
-    dispatch: {argv: ["python3", "tools/analysis/proof/formal_proof.py"]}
+    command: tools/bin/agent-canon formal-proof
+    dispatch:
+      runtime: rust
+      argv: [tools/bin/agent-canon, formal-proof]
+      execution_plane: tool-container
+      cwd: source-root
+      env: allowlisted
+      stdin: inherited
+      stdout: captured
+      stderr: captured
+      exit: propagate
+      signal: propagate
+      side_effect: external-artifact
+      output_root: external-runtime
+      written_paths: []
     writes: true
     default_wiring:
       ci: false
@@ -612,6 +633,41 @@ entries:
       - tests/agent_tools/test_lean_proof_env.py
       - tools/runtime/dispatch/agent-canon/tests/lean_proof_env_native.rs
 
+  - id: lean-recursive-proof-search
+    public: true
+    summary: Runs configured recursive Lean proof attempts and reports verified targets, suggested tactics, and unresolved goal frontiers.
+    path: tools/runtime/dispatch/agent-canon/src/lean_recursive_proof_search.rs
+    family: agent_tools
+    role: helper
+    status: canonical
+    audience: skill
+    placement: skill_helper
+    command: tools/bin/agent-canon lean-recursive-proof-search --config <config.json>
+    dispatch:
+      runtime: rust
+      argv: [tools/bin/agent-canon, lean-recursive-proof-search]
+      execution_plane: tool-container
+      cwd: target-root
+      env: allowlisted
+      stdin: inherited
+      stdout: captured
+      stderr: captured
+      exit: propagate
+      signal: propagate
+      side_effect: explicit-target-write
+      output_root: explicit-target
+      written_paths: []
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - documents/tools/lean_recursive_proof_search.md
+      - documents/tools/lean_capability_matrix.md
+      - agents/skills/formal-proof-workflow.md
+    tests:
+      - tests/agent_tools/test_lean_recursive_proof_search.py
+
   - id: tool-proof-coverage
     public: true
     summary: Reports behavior and performance proof-obligation coverage for every cataloged tool without claiming unverified Lean proofs.
@@ -639,14 +695,27 @@ entries:
   - id: jit-canonical-ir
     public: true
     summary: Extracts StableHLO-derived JIT-canonical IR records and backend traces from a JIT root.
-    path: tools/analysis/proof/jit_canonical_ir.py
+    path: tools/runtime/dispatch/agent-canon/src/jit_canonical_ir.rs
     family: agent_tools
     role: helper
     status: canonical
     audience: skill
     placement: skill_helper
-    command: python3 tools/analysis/proof/jit_canonical_ir.py
-    dispatch: {argv: ["python3", "tools/analysis/proof/jit_canonical_ir.py"]}
+    command: tools/bin/agent-canon jit-canonical-ir
+    dispatch:
+      runtime: rust
+      argv: [tools/bin/agent-canon, jit-canonical-ir]
+      execution_plane: tool-container
+      cwd: target-root
+      env: allowlisted
+      stdin: inherited
+      stdout: captured
+      stderr: captured
+      exit: propagate
+      signal: propagate
+      side_effect: explicit-target-write
+      output_root: explicit-target
+      written_paths: []
     writes: true
     default_wiring:
       ci: false
@@ -706,14 +775,27 @@ entries:
 
   - id: cpp-source-canonical-ir
     summary: Extracts source-only C++ records into the shared thin operational IR.
-    path: tools/analysis/code/cpp_source_canonical_ir.py
+    path: tools/runtime/dispatch/agent-canon/src/cpp_source_canonical_ir.rs
     family: agent_tools
     role: helper
     status: canonical
     audience: internal
     placement: support_library
-    command: python3 tools/analysis/code/cpp_source_canonical_ir.py
-    dispatch: {argv: ["python3", "tools/analysis/code/cpp_source_canonical_ir.py"]}
+    command: tools/bin/agent-canon cpp-source-canonical-ir
+    dispatch:
+      runtime: rust
+      argv: [tools/bin/agent-canon, cpp-source-canonical-ir]
+      execution_plane: tool-container
+      cwd: target-root
+      env: allowlisted
+      stdin: inherited
+      stdout: captured
+      stderr: captured
+      exit: propagate
+      signal: propagate
+      side_effect: explicit-target-write
+      output_root: explicit-target
+      written_paths: []
     writes: true
     default_wiring:
       ci: false
@@ -729,14 +811,27 @@ entries:
   - id: cpp-template-to-lean
     public: true
     summary: Fully expands C++ template source roots into complete Lean evidence definitions.
-    path: tools/analysis/proof/cpp_template_to_lean.py
+    path: tools/runtime/dispatch/agent-canon/src/cpp_template_to_lean.rs
     family: agent_tools
     role: helper
     status: canonical
     audience: skill
     placement: skill_helper
-    command: python3 tools/analysis/proof/cpp_template_to_lean.py
-    dispatch: {argv: ["python3", "tools/analysis/proof/cpp_template_to_lean.py"]}
+    command: tools/bin/agent-canon cpp-template-to-lean
+    dispatch:
+      runtime: rust
+      argv: [tools/bin/agent-canon, cpp-template-to-lean]
+      execution_plane: tool-container
+      cwd: target-root
+      env: allowlisted
+      stdin: inherited
+      stdout: captured
+      stderr: captured
+      exit: propagate
+      signal: propagate
+      side_effect: explicit-target-write
+      output_root: explicit-target
+      written_paths: []
     writes: true
     default_wiring:
       ci: false
@@ -753,14 +848,27 @@ entries:
 
   - id: operational-ir-to-lean
     summary: Renders shared thin operational IR records into Lean evidence definitions.
-    path: tools/analysis/proof/operational_ir_to_lean.py
+    path: tools/runtime/dispatch/agent-canon/src/operational_ir_to_lean.rs
     family: agent_tools
     role: helper
     status: canonical
     audience: internal
     placement: support_library
-    command: python3 tools/analysis/proof/operational_ir_to_lean.py
-    dispatch: {argv: ["python3", "tools/analysis/proof/operational_ir_to_lean.py"]}
+    command: tools/bin/agent-canon operational-ir-to-lean
+    dispatch:
+      runtime: rust
+      argv: [tools/bin/agent-canon, operational-ir-to-lean]
+      execution_plane: tool-container
+      cwd: target-root
+      env: allowlisted
+      stdin: inherited
+      stdout: captured
+      stderr: captured
+      exit: propagate
+      signal: propagate
+      side_effect: explicit-target-write
+      output_root: explicit-target
+      written_paths: []
     writes: true
     default_wiring:
       ci: false
@@ -799,14 +907,14 @@ entries:
   - id: check-proof-trace-alignment
     public: true
     summary: Checks package-retained proof trace contracts against implementation source paths, AST anchors, and retained checked theorem names.
-    path: tools/validation/semantic/proof/check_proof_trace_alignment.py
+    path: tools/runtime/dispatch/agent-canon/src/check_proof_trace_alignment.rs
     family: agent_tools
     role: checker
     status: canonical
     audience: skill
     placement: skill_helper
-    command: python3 tools/validation/semantic/proof/check_proof_trace_alignment.py
-    dispatch: {argv: ["python3", "tools/validation/semantic/proof/check_proof_trace_alignment.py"]}
+    command: tools/bin/agent-canon check-proof-trace-alignment
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "check-proof-trace-alignment"]}
     writes: false
     default_wiring:
       ci: false
@@ -822,12 +930,12 @@ entries:
   - id: repo-structure-contract
     public: true
     summary: Compares an observed repository tree with the AgentCanon structure contract.
-    path: tools/validation/semantic/structure/repo_structure_contract.py
+    path: tools/runtime/dispatch/agent-canon/src/repo_structure_contract.rs
     family: agent_tools
     role: checker
     status: canonical
-    command: python3 tools/validation/semantic/structure/repo_structure_contract.py
-    dispatch: {argv: ["python3", "tools/validation/semantic/structure/repo_structure_contract.py"]}
+    command: tools/bin/agent-canon repo-structure-contract
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "repo-structure-contract"]}
     writes: false
     default_wiring:
       ci: false
@@ -843,12 +951,12 @@ entries:
   - id: github-publish
     public: true
     summary: Publishes verified GitHub branches, pull requests, and PR checks through gh with explicit user-task evidence and verified remote policy.
-    path: tools/repository/github/github_publish.py
+    path: tools/runtime/dispatch/agent-canon/src/github_publish.rs
     family: agent_tools
     role: sync
     status: canonical
-    command: python3 tools/repository/github/github_publish.py --help
-    dispatch: {argv: ["python3", "tools/repository/github/github_publish.py", "--help"]}
+    command: tools/bin/agent-canon github-publish --help
+    dispatch: {runtime: rust, argv: ["{rust-cli}", "github-publish"]}
     writes: true
     default_wiring:
       ci: false
@@ -860,17 +968,17 @@ entries:
       - agents/skills/pr-processing.md
       - documents/agent-canon/agent-canon-github-remote.md
     tests:
-      - tests/agent_tools/test_github_publish.py
+      - tools/runtime/dispatch/agent-canon/tests/github_publish_native.rs
 
   - id: wiki-publish
     public: true
     summary: Publishes one markdown wiki page to the dedicated repo.wiki.git sidecar using default-branch-only clone, format gates, source commit binding, and exact readback identity.
-    path: tools/repository/github/wiki_publish.py
+    path: tools/runtime/dispatch/agent-canon/src/wiki_publish.rs
     family: agent_tools
     role: sync
     status: canonical
-    command: python3 tools/repository/github/wiki_publish.py --help
-    dispatch: {argv: ["python3", "tools/repository/github/wiki_publish.py", "--help"]}
+    command: tools/bin/agent-canon wiki-publish --help
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "wiki-publish", "--help"]}
     writes: true
     default_wiring:
       ci: false
@@ -1046,16 +1154,16 @@ entries:
     tests:
       - tests/agent_tools/test_tool_catalog.py
       - tests/agent_tools/test_tool_dispatch.py
-      - tests/tools/test_run_managed_experiment.py
+      - tools/runtime/dispatch/agent-canon/tests/managed_experiment_native.rs
 
   - id: run-accumulated-agent-evals
     summary: Runs registered AgentCanon eval producers with append-only accumulation before archive validation.
-    path: eval/producers/run_accumulated_agent_evals.py
+    path: tools/runtime/dispatch/agent-canon/src/eval_accumulation.rs
     family: agent_tools
     role: runner
     status: canonical
-    command: python3 eval/producers/run_accumulated_agent_evals.py --run-id <run-id>
-    dispatch: {argv: ["python3", "eval/producers/run_accumulated_agent_evals.py", "--run-id", "<run-id>"]}
+    command: tools/bin/agent-canon run-accumulated-agent-evals --run-id <run-id>
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "run-accumulated-agent-evals"]}
     writes: true
     default_wiring:
       ci: true
@@ -1071,12 +1179,12 @@ entries:
 
   - id: runtime-log-archive-git
     summary: Produces immutable native context certificates, materializes prepared runtime artifacts with confirmed outcome receipts, and checkpoints atomic hook-event spool files through one prepared archive transaction.
-    path: tools/runtime/archive/runtime_log_archive_git.py
+    path: tools/runtime/dispatch/agent-canon/src/runtime_log_archive.rs
     family: agent_tools
     role: sync
     status: canonical
-    command: python3 tools/runtime/archive/runtime_log_archive_git.py <append-context-discovery|materialize-runtime-event|sync>
-    dispatch: {argv: ["python3", "tools/runtime/archive/runtime_log_archive_git.py", "<append-context-discovery|materialize-runtime-event|sync>"]}
+    command: tools/bin/agent-canon runtime-log-archive-git <archive-command>
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "runtime-log-archive-git"]}
     writes: true
     default_wiring:
       ci: false
@@ -1281,12 +1389,12 @@ entries:
   - id: semantic-provider-html-report
     public: true
     summary: Renders semantic-index compare-providers JSON through Quarto as a static HTML projection report with the provider-delta-to-shared-candidate-logic SVG; local resources stay beside the HTML unless --embed-resources is requested.
-    path: tools/analysis/search/reporting/semantic_provider_html_report.py
+    path: tools/runtime/dispatch/agent-canon/src/semantic_index/semantic_provider_html_report.rs
     family: agent_tools
     role: docs
     status: canonical
-    command: python3 tools/analysis/search/reporting/semantic_provider_html_report.py --compare-json reports/agents/<run-id>/semantic_provider_compare.json --output reports/agents/<run-id>/semantic_provider_compare.html
-    dispatch: {argv: ["python3", "tools/analysis/search/reporting/semantic_provider_html_report.py", "--compare-json", "reports/agents/<run-id>/semantic_provider_compare.json", "--output", "reports/agents/<run-id>/semantic_provider_compare.html"]}
+    command: tools/bin/agent-canon semantic-provider-html-report --compare-json reports/agents/<run-id>/semantic_provider_compare.json --output reports/agents/<run-id>/semantic_provider_compare.html
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "semantic-provider-html-report", "--compare-json", "reports/agents/<run-id>/semantic_provider_compare.json", "--output", "reports/agents/<run-id>/semantic_provider_compare.html"]}
     writes: true
     default_wiring:
       ci: false
@@ -1371,12 +1479,12 @@ entries:
   - id: prose-reasoning-graph
     public: true
     summary: Builds SQLite-backed prose structure graphs and related projections in an explicit external runtime, with diagnostics, explanations, edit-operation plans, writing-skill handoff packets, and combined document checks with structured-analysis.
-    path: tools/analysis/documents/prose_reasoning_graph.py
+    path: tools/runtime/dispatch/agent-canon/src/prose_reasoning_graph.rs
     family: agent_tools
     role: workflow
     status: canonical
-    command: python3 tools/analysis/documents/prose_reasoning_graph.py --help
-    dispatch: {argv: ["python3", "tools/analysis/documents/prose_reasoning_graph.py", "--help"]}
+    command: tools/bin/agent-canon prose-reasoning-graph --help
+    dispatch: {argv: ["tools/bin/agent-canon", "prose-reasoning-graph", "--help"]}
     writes: true
     default_wiring:
       ci: false
@@ -1395,15 +1503,15 @@ entries:
   - id: route
     public: true
     summary: Maps long proposed tool/skill names to short task-routing areas and owns deterministic prompt skill routing.
-    path: tools/agent/orchestration/route.py
+    path: tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs
     family: agent_tools
     role: workflow
     status: canonical
-    command: python3 tools/agent/orchestration/route.py
+    command: tools/bin/agent-canon route
     writes: false
     dispatch:
-      runtime: python
-      argv: [python3, tools/agent/orchestration/route.py]
+      runtime: rust
+      argv: [tools/bin/agent-canon, route]
       execution_plane: tool-container
       cwd: target-root
       env: allowlisted
@@ -1428,12 +1536,12 @@ entries:
 
   - id: check-convention-compliance
     summary: Verifies convention sources and workflow gate wiring stay connected.
-    path: tools/validation/semantic/convention/check_convention_compliance.py
+    path: tools/runtime/dispatch/agent-canon/src/convention_compliance.rs
     family: agent_tools
     role: checker
     status: canonical
-    command: python3 tools/validation/semantic/convention/check_convention_compliance.py
-    dispatch: {argv: ["python3", "tools/validation/semantic/convention/check_convention_compliance.py"]}
+    command: tools/bin/agent-canon check-convention-compliance
+    dispatch: {argv: ["tools/bin/agent-canon", "check-convention-compliance"]}
     writes: false
     default_wiring:
       ci: true
@@ -1634,14 +1742,14 @@ entries:
 
   - id: orphan-lifecycle
     summary: Inventories semantic branch, PR-head, and worktree lifecycle state and authorizes exact cleanup candidates without performing mutation.
-    path: tools/repository/git/orphan_lifecycle.py
+    path: tools/runtime/dispatch/agent-canon/src/orphan_lifecycle.rs
     family: agent_tools
     role: inventory
     status: canonical
     audience: agent
     placement: workflow_helper
-    command: python3 tools/repository/git/orphan_lifecycle.py
-    dispatch: {argv: ["python3", "tools/repository/git/orphan_lifecycle.py"]}
+    command: tools/bin/agent-canon orphan-lifecycle
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "orphan-lifecycle"]}
     writes: true
     default_wiring:
       ci: false
@@ -1655,14 +1763,14 @@ entries:
   - id: repository-topic-clone
     public: true
     summary: Owns the generic workspace topic clone, branch reuse, origin/main merge, publication readback, and reconstructibility cleanup lifecycle.
-    path: tools/repository/workspace/repository_topic_clone.py
+    path: tools/runtime/dispatch/agent-canon/src/repository_topic_clone.rs
     family: agent_tools
     role: workflow
     status: canonical
     audience: skill
     placement: skill_helper
-    command: python3 tools/repository/workspace/repository_topic_clone.py
-    dispatch: {argv: ["python3", "tools/repository/workspace/repository_topic_clone.py"]}
+    command: tools/bin/agent-canon repository-topic-clone
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "repository-topic-clone"]}
     writes: true
     default_wiring:
       ci: false
@@ -1678,14 +1786,14 @@ entries:
   - id: dependency-module-change
     public: true
     summary: Decorates generic repository topic clones with .gitmodules, gitlink, pin, and projection policy.
-    path: tools/repository/workspace/dependency_module_change.py
+    path: tools/runtime/dispatch/agent-canon/src/dependency_module_change.rs
     family: agent_tools
     role: workflow
     status: canonical
     audience: skill
     placement: skill_helper
-    command: python3 tools/repository/workspace/dependency_module_change.py
-    dispatch: {argv: ["python3", "tools/repository/workspace/dependency_module_change.py"]}
+    command: tools/bin/agent-canon dependency-module-change
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "dependency-module-change"]}
     writes: true
     default_wiring:
       ci: false
@@ -1750,7 +1858,7 @@ entries:
       - agents/skills/agent-canon-update.md
     tests:
       - tools/runtime/dispatch/agent-canon/tests/generated_completeness_native.rs
-      - tests/agent_tools/test_github_publish.py
+      - tools/runtime/dispatch/agent-canon/tests/github_publish_native.rs
 
   - id: check-agent-canon-pr
     summary: Runs the standalone AgentCanon PR readiness checklist.
@@ -1829,12 +1937,12 @@ entries:
 
   - id: check-agent-runtime-alignment
     summary: Verifies runtime entrypoints and agent config mirrors stay aligned.
-    path: tools/validation/semantic/runtime/check_agent_runtime_alignment.py
+    path: tools/runtime/dispatch/agent-canon/src/runtime_alignment.rs
     family: agent_tools
     role: checker
     status: canonical
-    command: python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py
-    dispatch: {argv: ["python3", "tools/validation/semantic/runtime/check_agent_runtime_alignment.py"]}
+    command: tools/bin/agent-canon check-agent-runtime-alignment
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "check-agent-runtime-alignment"]}
     writes: false
     default_wiring:
       ci: false
@@ -1899,15 +2007,15 @@ entries:
 
   - id: issue-sync
     summary: Runs the body-free Issue publication receipt preflight and staging adapter in the resident AgentCanon tool container.
-    path: tools/repository/github/issue_sync.py
+    path: tools/runtime/dispatch/agent-canon/src/issue_sync.rs
     family: agent_tools
     role: sync
     status: canonical
     command: bootstrap.sh --control-parent-root <control-parent-root> tool run --root <registered-target-root> issue-sync -- --receipt-preflight
     writes: true
     dispatch:
-      runtime: python
-      argv: [python3, tools/repository/github/issue_sync.py]
+      runtime: rust
+      argv: [tools/bin/agent-canon, issue-sync]
       execution_plane: tool-container
       cwd: target-root
       env: allowlisted
@@ -1928,18 +2036,17 @@ entries:
       - agents/skills/issue-finding-report.md
       - documents/runtime/runtime-log-archive.md
     tests:
-      - tests/agent_tools/test_issue_sync.py
-      - tests/agent_tools/test_tool_calls.py
+      - tools/runtime/dispatch/agent-canon/tests/issue_sync_native.rs
       - tests/agent_tools/test_tool_dispatch.py
 
   - id: reference-materializer
     summary: Converts consulted PDF or HTML references into Markdown files under references/.
-    path: tools/analysis/documents/reference_materializer.py
+    path: tools/runtime/dispatch/agent-canon/src/reference_materializer.rs
     family: agent_tools
     role: sync
     status: canonical
-    command: python3 tools/analysis/documents/reference_materializer.py
-    dispatch: {argv: ["python3", "tools/analysis/documents/reference_materializer.py"]}
+    command: tools/bin/agent-canon reference-materializer
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "reference-materializer"]}
     writes: true
     default_wiring:
       ci: false
@@ -2071,12 +2178,12 @@ entries:
   - id: oop-python-readability
     public: true
     summary: Scores Python OOP readability risks.
-    path: tools/validation/code/oop/python/readability.py
+    path: tools/runtime/dispatch/agent-canon/src/oop/python/readability.rs
     family: oop_python
     role: checker
     status: canonical
-    command: python3 tools/validation/code/oop/python/readability.py
-    dispatch: {argv: ["python3", "tools/validation/code/oop/python/readability.py"]}
+    command: tools/bin/agent-canon oop-python-readability
+    dispatch: {runtime: rust, argv: [tools/bin/agent-canon, oop-python-readability]}
     writes: false
     default_wiring:
       ci: false
@@ -2109,12 +2216,12 @@ entries:
   - id: oop-cpp-readability
     public: true
     summary: Scores C++ OOP readability risks.
-    path: tools/validation/code/oop/cpp/readability.py
+    path: tools/runtime/dispatch/agent-canon/src/oop/cpp/readability.rs
     family: oop_cpp
     role: checker
     status: canonical
-    command: python3 tools/validation/code/oop/cpp/readability.py
-    dispatch: {argv: ["python3", "tools/validation/code/oop/cpp/readability.py"]}
+    command: tools/bin/agent-canon oop-cpp-readability
+    dispatch: {runtime: rust, argv: [tools/bin/agent-canon, oop-cpp-readability]}
     writes: false
     default_wiring:
       ci: false
@@ -2289,15 +2396,15 @@ entries:
 
   - id: generate-agent-improvement-guide
     summary: Generates PR and push-time guidance from memory, eval, hook, and issue evidence.
-    path: eval/producers/generate_agent_improvement_guide.py
+    path: tools/runtime/dispatch/agent-canon/src/agent_runtime_dashboard.rs
     family: agent_tools
     role: docs
     status: canonical
-    command: python3 eval/producers/generate_agent_improvement_guide.py
+    command: tools/bin/agent-canon generate-agent-improvement-guide
     writes: true
     dispatch:
-      runtime: python
-      argv: [python3, eval/producers/generate_agent_improvement_guide.py]
+      runtime: rust
+      argv: [tools/bin/agent-canon, generate-agent-improvement-guide]
       execution_plane: tool-container
       cwd: target-root
       env: allowlisted
@@ -2322,15 +2429,15 @@ entries:
 
   - id: generate-agent-runtime-dashboard
     summary: Generates read-only dashboards and compact token-light summaries for AgentCanon runtime logs and eval results.
-    path: eval/producers/generate_agent_runtime_dashboard.py
+    path: tools/runtime/dispatch/agent-canon/src/agent_runtime_dashboard.rs
     family: agent_tools
     role: docs
     status: canonical
-    command: python3 eval/producers/generate_agent_runtime_dashboard.py
+    command: tools/bin/agent-canon generate-agent-runtime-dashboard
     writes: true
     dispatch:
-      runtime: python
-      argv: [python3, eval/producers/generate_agent_runtime_dashboard.py]
+      runtime: rust
+      argv: [tools/bin/agent-canon, generate-agent-runtime-dashboard]
       execution_plane: tool-container
       cwd: target-root
       env: allowlisted
@@ -2441,50 +2548,14 @@ entries:
     tests:
       - tests/tools/test_result_log_tools.py
 
-  - id: audit-log-schema
-    summary: Defines the portable audit log schema.
-    path: tools/audit/logging/audit_log_schema.py
-    family: audit
-    role: audit
-    status: canonical
-    command: python3 tools/audit/logging/audit_log_schema.py
-    dispatch: {argv: ["python3", "tools/audit/logging/audit_log_schema.py"]}
-    writes: false
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-    tests: []
-    test_exempt_reason: Library-style schema support used by audit_logger.py.
-
-  - id: audit-logger
-    summary: Writes portable automation events to JSONL audit logs.
-    path: tools/audit/logging/audit_logger.py
-    family: audit
-    role: audit
-    status: canonical
-    command: python3 tools/audit/logging/audit_logger.py
-    dispatch: {argv: ["python3", "tools/audit/logging/audit_logger.py"]}
-    writes: true
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-    tests: []
-    test_exempt_reason: Portable helper; covered by repo-local audit use.
-
   - id: run-managed-experiment
     summary: Creates and tracks shared managed experiment runs.
-    path: tools/experiments/execution/run_managed_experiment.py
+    path: tools/runtime/dispatch/agent-canon/src/managed_experiment.rs
     family: experiments
     role: experiment
     status: canonical
-    command: python3 -m tools.experiments.execution.run_managed_experiment
-    dispatch: {argv: ["python3", "-m", "tools.experiments.execution.run_managed_experiment"]}
+    command: tools/bin/agent-canon run-managed-experiment
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "run-managed-experiment"]}
     writes: true
     default_wiring:
       ci: false
@@ -2494,17 +2565,17 @@ entries:
       - documents/tools/README.md
       - documents/experiments/experiment-registry.md
     tests:
-      - tests/tools/test_run_managed_experiment.py
+      - tools/runtime/dispatch/agent-canon/tests/managed_experiment_native.rs
 
   - id: html-artifact-access
     public: true
     summary: Prints SSH tunnel and static-server commands for remote HTML artifacts.
-    path: tools/experiments/artifacts/html_artifact_access.py
+    path: tools/runtime/dispatch/agent-canon/src/html_artifact_access.rs
     family: experiments
     role: helper
     status: canonical
-    command: python3 tools/experiments/artifacts/html_artifact_access.py
-    dispatch: {argv: ["python3", "tools/experiments/artifacts/html_artifact_access.py"]}
+    command: tools/bin/agent-canon html-artifact-access
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "html-artifact-access"]}
     writes: false
     default_wiring:
       ci: false
@@ -2519,12 +2590,12 @@ entries:
 
   - id: update-latest-result
     summary: Updates LATEST pointers for experiment result roots.
-    path: tools/experiments/artifacts/update_latest_result.py
+    path: tools/runtime/dispatch/agent-canon/src/latest_result.rs
     family: experiments
     role: experiment
     status: canonical
-    command: python3 -m tools.experiments.artifacts.update_latest_result
-    dispatch: {argv: ["python3", "-m", "tools.experiments.artifacts.update_latest_result"]}
+    command: tools/bin/agent-canon update-latest-result
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "update-latest-result"]}
     writes: true
     default_wiring:
       ci: false
@@ -2538,12 +2609,12 @@ entries:
 
   - id: save-experiment-result-annex
     summary: Saves one experiment result as one deterministic git-annex archive.
-    path: tools/experiments/artifacts/save_experiment_result_annex.py
+    path: tools/runtime/dispatch/agent-canon/src/annex_retention.rs
     family: experiments
     role: experiment
     status: canonical
-    command: python3 -m tools.experiments.artifacts.save_experiment_result_annex
-    dispatch: {argv: ["python3", "-m", "tools.experiments.artifacts.save_experiment_result_annex"]}
+    command: tools/bin/agent-canon save-experiment-result-annex
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "save-experiment-result-annex"]}
     writes: true
     default_wiring:
       ci: false

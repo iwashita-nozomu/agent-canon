@@ -4,7 +4,7 @@
 # contract test
 # responsibility Verifies target-removal phase ordering and ownership guards.
 # upstream implementation ../../bootstrap/host/lifecycle/entrypoint.sh target lifecycle
-# upstream implementation ../../tools/runtime/container/bootstrap_runtime.py controller target parser
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/bootstrap_runtime.rs native target command
 # @dependency-end
 
 from __future__ import annotations
@@ -16,8 +16,6 @@ from pathlib import Path
 
 import pytest
 
-from tools.runtime.container import bootstrap_runtime as runtime_module
-
 ROOT = Path(__file__).resolve().parents[2]
 ADAPTER = ROOT / "bootstrap/host/lifecycle/entrypoint.sh"
 
@@ -26,14 +24,11 @@ ADAPTER = ROOT / "bootstrap/host/lifecycle/entrypoint.sh"
     "arguments",
     [["--mode", "explicit-target-write"], ["--mutation-capability-json", "{}"]],
 )
-def test_controller_parser_does_not_advertise_unsupported_write(
-    arguments: list[str],
-) -> None:
-    from tools.runtime.container.bootstrap_runtime import build_parser
-
-    with pytest.raises(SystemExit) as result:
-        build_parser().parse_args(["target", "add", "--root", ".", *arguments])
-    assert result.value.code == 2
+def test_native_target_owner_rejects_unsupported_write_mode(arguments: list[str]) -> None:
+    source = (ROOT / "tools/runtime/dispatch/agent-canon/src/bootstrap_runtime.rs").read_text()
+    target_contract = source.split("fn target_record(", 1)[1].split("fn task_process_lease_path(", 1)[0]
+    assert 'mode != "read-only"' in target_contract
+    assert "unsupported target mode" in target_contract
 
 
 def test_git_metadata_failure_is_not_a_successful_empty_plan(tmp_path: Path) -> None:
@@ -298,89 +293,3 @@ bootstrap_host_entrypoint "$fixture" --control-parent-root "$fixture" \
     assert result.returncode == 2, result.stderr
     assert "container_ownership_mismatch" in result.stderr
     assert not (tmp_path / "mutations").exists()
-
-
-@pytest.mark.parametrize("registered", [False, True])
-@pytest.mark.parametrize("mounted", [False, True])
-def test_remove_checks_registration_before_mount_existence(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, registered: bool, mounted: bool
-) -> None:
-    """Unknown digests use state; registered digests retain mount validation."""
-    control = tmp_path / "control"
-    private_log = control / "private-log"
-    private_log.mkdir(parents=True)
-    monkeypatch.setattr(runtime_module, "PRIVATE_LOG_DESTINATION", str(private_log))
-    manager = runtime_module.BootstrapRuntime(
-        control, control / "runtime", repository_root=ROOT
-    )
-    manager._ensure_layout()
-    state = manager._new_state()
-    state["state"] = "ready"
-    state["current_generation"] = "generation-0"
-    state["resources"]["image"] = {
-        "id": "sha256:" + "a" * 64,
-        "tag": "agent-canon-tools:fixture",
-    }
-    state["targets"]["keep"] = {
-        "root": "/targets/keep",
-        "host_root": str(tmp_path / "keep"),
-        "mode": "read-only",
-        "digest": "keep",
-    }
-    digest = "missing-target"
-    host_root = str(tmp_path / "host-source")
-    container_root = f"/targets/{digest}"
-    if registered:
-        state["targets"][digest] = {
-            "root": container_root,
-            "host_root": host_root,
-            "mode": "read-only",
-            "digest": digest,
-        }
-    manager._write_state(state)
-    before = manager.paths.state.read_bytes()
-    monkeypatch.setattr(runtime_module, "_runtime_from_args", lambda _args: manager)
-    monkeypatch.setenv("AGENT_CANON_TARGET_HOST_ROOT", host_root)
-    monkeypatch.setenv("AGENT_CANON_TARGET_CONTAINER_ROOT", container_root)
-    monkeypatch.setenv("AGENT_CANON_TARGET_DIGEST", digest)
-    original = runtime_module._existing_no_symlink
-    mount_checks: list[Path] = []
-
-    def missing_mount(path: Path, *, field: str) -> Path:
-        if str(path) == container_root:
-            mount_checks.append(path)
-            if mounted:
-                return path
-            raise runtime_module.BootstrapError("path_missing", "fixture mount absent")
-        return original(path, field=field)
-
-    monkeypatch.setattr(runtime_module, "_existing_no_symlink", missing_mount)
-    args = runtime_module.build_parser().parse_args(
-        [
-            "--repository-root",
-            str(ROOT),
-            "--control-parent-root",
-            str(control),
-            "target",
-            "remove",
-            "--root",
-            container_root,
-        ]
-    )
-    if registered and mounted:
-        result = runtime_module._container_control_run(args)
-        assert result["code"] == "target_removed"
-        after = manager._read_state()
-        assert set(after["targets"]) == {"keep"}
-        previous = after["generations"][after["rollback_generation"]]
-        assert set(previous["targets"]) == {"keep", digest}
-        assert digest not in (manager.paths.container_runtime / "mounts.tsv").read_text(
-            encoding="utf-8"
-        )
-    else:
-        expected = "path_missing" if registered else "target_not_registered"
-        with pytest.raises(runtime_module.BootstrapError) as error:
-            runtime_module._container_control_run(args)
-        assert error.value.code == expected
-        assert manager.paths.state.read_bytes() == before
-    assert mount_checks == ([Path(container_root)] if registered else [])

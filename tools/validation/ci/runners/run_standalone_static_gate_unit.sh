@@ -4,7 +4,7 @@
 # responsibility Runs one standalone AgentCanon static-gate execution unit without selecting whether that unit is required.
 # upstream design ../../../../documents/runtime/runtime-profiles-and-check-matrix.md risk-based validation routing
 # upstream implementation ./run_all_checks.sh owns the full-confidence check body executed from a read-only target
-# upstream implementation ../../../../tools/runtime/archive/runtime_log_paths.py resolves the canonical eval archive destination
+# upstream implementation ../../../../tools/runtime/dispatch/agent-canon/src/eval_archive_paths.rs resolves the canonical eval archive destination
 # upstream implementation ../../../../tools/runtime/dispatch/agent-canon/src/eval_accumulation_check.rs validates accumulated hook and eval results
 # downstream implementation ../checks/check_agent_canon_pr.sh aggregates all units for the manual full-confidence route
 # downstream implementation ../../../../.github/workflows/agent-canon-static-gates.yml remote execution boundary
@@ -38,79 +38,21 @@ RUNTIME_ROOT="$(cd "${SCRIPT_DIR}/../../../.." && pwd -P)"
 TOOLS_ROOT="${RUNTIME_ROOT}/tools"
 
 assert_read_only_target() {
-  python3 - "${ROOT}" <<'PY'
-import json
-from pathlib import Path
-import subprocess
-import sys
-
-
-# libmount owns path decoding, nested mounts and visible overmount selection.
-# Query this process's namespace; only VFS flags authorize the read-only body.
-try:
-    target = Path(sys.argv[1]).resolve(strict=True)
-    result = subprocess.run(
-        [
-            "findmnt", "--kernel", "--first-only", "--direction", "backward",
-            "--list", "--target", str(target), "--json",
-            "--output", "TARGET,VFS-OPTIONS",
-        ],
-        check=True, capture_output=True, text=True,
-    )
-    payload = json.loads(result.stdout)
-except (OSError, subprocess.CalledProcessError, ValueError) as error:
-    raise SystemExit(
-        f"AGENT_CANON_STATIC_GATE=fail reason=target_mount_query_failed error={type(error).__name__}"
-    ) from error
-
-mounts = payload.get("filesystems") if isinstance(payload, dict) else None
-if not isinstance(mounts, list) or len(mounts) != 1 or not isinstance(mounts[0], dict):
-    raise SystemExit("AGENT_CANON_STATIC_GATE=fail reason=target_mount_missing")
-mount_point = mounts[0].get("target")
-vfs_options = mounts[0].get("vfs-options")
-if not isinstance(mount_point, str) or not mount_point or not isinstance(vfs_options, str):
-    raise SystemExit("AGENT_CANON_STATIC_GATE=fail reason=target_mount_columns_missing")
-options = set(vfs_options.split(","))
-if "ro" not in options or "rw" in options:
-    raise SystemExit(
-        f"AGENT_CANON_STATIC_GATE=fail reason=target_mount_not_read_only mount={mount_point}"
-    )
-print(f"AGENT_CANON_STATIC_GATE_TARGET_MOUNT=read-only mount={mount_point}")
-PY
+  "${AGENT_CANON_NATIVE_BIN:-${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}}" \
+    runtime-paths check-read-only --source-root "${ROOT}"
 }
 
 assert_read_only_target
 cd "${ROOT}"
 
 # Runtime artifacts belong to the caller-selected external runtime root.  Keep
-# the path resolver in runtime_artifacts.py as the single source of truth.
+# the path resolver in runtime_boundary.rs as the single source of truth.
 runtime_boundary_root() {
-  local candidate="$1"
-  PYTHONPATH="${RUNTIME_ROOT}${PYTHONPATH:+:${PYTHONPATH}}" \
-    python3 - "${ROOT}" "${candidate}" <<'PY'
-from pathlib import Path
-import sys
-
-from tools.runtime.artifacts.runtime_artifacts import runtime_artifact_boundary
-
-source_root = Path(sys.argv[1])
-runtime_root = Path(sys.argv[2])
-print(runtime_artifact_boundary(source_root, runtime_root, create=True).root)
-PY
+  "${AGENT_CANON_NATIVE_BIN:-${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}}" runtime-paths root --source-root "${ROOT}" --runtime-root "$1"
 }
 
 runtime_boundary_path() {
-  local candidate="$1"
-  PYTHONPATH="${RUNTIME_ROOT}${PYTHONPATH:+:${PYTHONPATH}}" \
-    python3 - "${ROOT}" "${AGENT_CANON_STATIC_RUNTIME_ROOT}" "${candidate}" <<'PY'
-from pathlib import Path
-import sys
-
-from tools.runtime.artifacts.runtime_artifacts import runtime_artifact_boundary
-
-boundary = runtime_artifact_boundary(Path(sys.argv[1]), Path(sys.argv[2]), create=True)
-print(boundary.resolve(Path(sys.argv[3])))
-PY
+  "${AGENT_CANON_NATIVE_BIN:-${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}}" runtime-paths path --source-root "${ROOT}" --runtime-root "${AGENT_CANON_STATIC_RUNTIME_ROOT}" --candidate "$1"
 }
 
 AGENT_CANON_STATIC_RUNTIME_ROOT="${AGENT_CANON_RUNTIME_ROOT}"
@@ -154,6 +96,11 @@ run_rust() {
   export CARGO_PROFILE_TEST_DEBUG=0
   local phase="${1:-all}"
   case "${phase}" in
+    controller-driver)
+      [[ "$#" -eq 1 ]] || return 2
+      cargo build --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --locked --offline --features controller-test-driver \
+        --bin agent-canon-controller-test-driver
+      ;;
     all|prepare)
       [[ "$#" -le 1 ]] || return 2
       cargo build --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --locked --offline
@@ -204,7 +151,6 @@ run_contracts() {
     tests.agent_tools.test_structured_document_inventory_cli \
     tests.agent_tools.test_classify_path_risk \
     tests.tools.test_standalone_static_gate_source_runtime_contract \
-    tests.agent_tools.test_source_root_failure_lifecycle \
     tests.agent_tools.test_check_convention_compliance \
     tests.agent_tools.test_check_dependency_headers \
     tests.agent_tools.test_check_algorithm_config_partition \
@@ -213,14 +159,12 @@ run_contracts() {
   AGENT_CANON_NATIVE_BIN="${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" \
     python3 -m pytest -p no:cacheprovider -q tests/agent_tools/test_evaluate_agent_run.py
   python3 -m pytest -p no:cacheprovider \
-    tests/agent_tools/test_prose_reasoning_graph.py::ProseReasoningGraphTest::test_missing_dependency_annotation_is_not_a_blocker
+    tests/agent_tools/test_prose_reasoning_graph.py::ProseReasoningGraphTest::test_check_document_preserves_missing_manifest_severity
   "${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" tool-catalog
   "${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" tool-proof-coverage
   "${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" responsibility-scope --root "${ROOT}"
-  AGENT_CANON_CLI="${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" \
-  PYTHONPATH="${ROOT}${PYTHONPATH:+:${PYTHONPATH}}" \
-    python3 "${ROOT}/tools/validation/semantic/runtime/check_agent_runtime_alignment.py"
-  python3 "${TOOLS_ROOT}/validation/semantic/convention/check_convention_compliance.py" \
+  "${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" check-agent-runtime-alignment --root "${ROOT}"
+  "${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" check-convention-compliance \
     --root "${ROOT}" --format json
 }
 
@@ -251,22 +195,7 @@ run_eval() (
   # Create the canonical archive's eval-results directory for CI readback,
   # using the archive owner's path resolver rather than a caller override.
   local eval_log_dir="${temp_root}/agent-eval-runs/agent-canon-pr-gate"
-  eval_results_parent="$(
-    env -u AGENT_CANON_HOOK_ARCHIVE_DIR -u AGENT_CANON_LOG_ROOT \
-      PYTHONPATH="${RUNTIME_ROOT}${PYTHONPATH:+:${PYTHONPATH}}" \
-      python3 - "${ROOT}" "${AGENT_CANON_STATIC_RUNTIME_ROOT}" <<'PY'
-from pathlib import Path
-import sys
-
-from tools.runtime.archive.runtime_log_paths import eval_results_dir
-
-print(
-    eval_results_dir(
-        Path(sys.argv[1]), "codex-agent-role", Path(sys.argv[2])
-    ).parent
-)
-PY
-  )"
+  eval_results_parent="${AGENT_CANON_STATIC_RUNTIME_ROOT}/archive/agent-canon-log/eval-results"
   mkdir -p "${eval_log_dir}" "${eval_results_parent}"
   env -u AGENT_CANON_HOOK_ARCHIVE_DIR -u AGENT_CANON_LOG_ROOT \
     AGENT_CANON_CLI="${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" \
@@ -275,7 +204,7 @@ PY
   set +e
   env -u AGENT_CANON_HOOK_ARCHIVE_DIR -u AGENT_CANON_LOG_ROOT \
     AGENT_CANON_NATIVE_BIN="${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" \
-    python3 "${RUNTIME_ROOT}/eval/producers/run_accumulated_agent_evals.py" \
+    "${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" run-accumulated-agent-evals \
       --run-id agent-canon-pr-gate \
       --root "${ROOT}" \
       --runtime-root "${AGENT_CANON_STATIC_RUNTIME_ROOT}" \
@@ -310,7 +239,16 @@ PY
 )
 
 run_workflow_container() {
+  local cargo_target_dir controller_test_driver
+  cargo_target_dir="${CARGO_TARGET_DIR:-${ROOT}/tools/runtime/dispatch/agent-canon/target}"
+  run_rust controller-driver
+  controller_test_driver="${cargo_target_dir}/debug/agent-canon-controller-test-driver"
+  [[ -x "${controller_test_driver}" ]] || {
+    echo "AGENT_CANON_CONTROLLER_TEST_DRIVER=fail" >&2
+    return 1
+  }
   AGENT_CANON_CLI="${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" \
+  AGENT_CANON_CONTROLLER_TEST_DRIVER="${controller_test_driver}" \
   python3 -m pytest -p no:cacheprovider -q \
     tests/tools/test_standalone_static_gate_units.py \
     tests/tools/test_read_only_full_check.py \
@@ -319,10 +257,10 @@ run_workflow_container() {
   AGENT_CANON_NATIVE_BIN="${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" \
     "${ROOT}/tools/bin/agent-canon" check-github-workflows --root "${ROOT}"
   AGENT_CANON_CLI="${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" \
+  AGENT_CANON_CONTROLLER_TEST_DRIVER="${controller_test_driver}" \
   python3 -m pytest -p no:cacheprovider -q \
     tests/tools/test_bootstrap_container_contract.py \
-    tests/tools/test_compile_cache.py \
-    tests/bootstrap/test_bootstrap_runtime.py
+    tests/tools/test_compile_cache.py
 }
 
 case "${UNIT}" in

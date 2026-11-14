@@ -108,12 +108,12 @@ def selected_units(*paths: str) -> tuple[str, ...]:
         ),
         (("bootstrap.sh",), ("eval", "workflow-container")),
         (
-            ("tools/runtime/container/bootstrap_runtime.py",),
-            ("contracts", "eval", "workflow-container"),
+            ("tools/runtime/dispatch/agent-canon/src/bootstrap_runtime.rs",),
+            ("rust", "contracts", "eval", "workflow-container"),
         ),
         (
-            ("tests/bootstrap/test_bootstrap_runtime.py",),
-            ("contracts", "workflow-container"),
+            ("tools/runtime/dispatch/agent-canon/tests/bootstrap_runtime_native.rs",),
+            ("rust", "workflow-container"),
         ),
         (
             ("tests/agent_tools/test_eval_accumulation_check.py",),
@@ -723,6 +723,7 @@ def test_workflow_unit_passes_selected_native_cli_to_source_wrapper(
 ) -> None:
     fixture_root = executable_fixture_root(tmp_path)
     root = fixture_root / "target with spaces"
+    root.mkdir()
     cache = fixture_root / "cache with spaces"
     wrapper = root / "tools/bin/agent-canon"
     wrapper.parent.mkdir(parents=True)
@@ -748,7 +749,12 @@ def test_workflow_unit_passes_selected_native_cli_to_source_wrapper(
     )
     setup = (
         'unset AGENT_CANON_NATIVE_BIN\npython3() { printf "pytest\\n" >> "$TRACE"; }\n'
+        'run_rust() { test "$*" = controller-driver; printf "driver-build\\n" >> "$TRACE"; }\n'
     )
+    driver = cache / "target/debug/agent-canon-controller-test-driver"
+    driver.parent.mkdir(parents=True)
+    driver.write_text("#!/bin/sh\nexit 0\n")
+    driver.chmod(0o755)
     if explicit_cli:
         setup += (
             "export AGENT_CANON_CLI="
@@ -764,6 +770,7 @@ def test_workflow_unit_passes_selected_native_cli_to_source_wrapper(
         ROOT=str(root),
         AGENT_CANON_SOURCE_ROOT=str(root),
         AGENT_CANON_CACHE_ROOT=str(cache),
+        CARGO_TARGET_DIR=str(cache / "target"),
         CHECKER_EXIT=str(checker_exit),
         CALLS=str(calls),
         TRACE=str(trace),
@@ -774,7 +781,11 @@ def test_workflow_unit_passes_selected_native_cli_to_source_wrapper(
         "--root",
         str(root),
     ]
-    expected_trace = ["pytest", "native:" + ("explicit" if explicit_cli else "default")]
+    expected_trace = [
+        "driver-build",
+        "pytest",
+        "native:" + ("explicit" if explicit_cli else "default"),
+    ]
     if checker_exit == 0:
         expected_trace.append("pytest")
     assert trace.read_text().splitlines() == expected_trace
@@ -787,16 +798,8 @@ def test_contract_unit_passes_selected_native_cli_to_alignment(
 ) -> None:
     fixture_root = executable_fixture_root(tmp_path)
     root = fixture_root / "target with spaces"
+    root.mkdir()
     cache = fixture_root / "cache with spaces"
-    alignment = (
-        root / "tools/validation/semantic/runtime/check_agent_runtime_alignment.py"
-    )
-    alignment.parent.mkdir(parents=True)
-    alignment.write_text(
-        "import os, subprocess, sys\n"
-        "result = subprocess.run([os.environ['AGENT_CANON_CLI'], 'codex-hook', '--contract'])\n"
-        "sys.exit(result.returncode)\n"
-    )
     (cache / "bin").mkdir(parents=True)
     for label, path in (
         ("default", cache / "bin/agent-canon"),
@@ -804,7 +807,7 @@ def test_contract_unit_passes_selected_native_cli_to_alignment(
     ):
         path.write_text(
             "#!/usr/bin/env bash\n"
-            'if [[ "$1" == codex-hook ]]; then\n'
+            'if [[ "$1" == check-agent-runtime-alignment ]]; then\n'
             '  printf "' + label + '\\n" > "$SELECTED"\n'
             '  printf "%s\\n" "$@" > "$CALLS"\n'
             '  exit "$CHECKER_EXIT"\n'
@@ -817,12 +820,7 @@ def test_contract_unit_passes_selected_native_cli_to_alignment(
         + text.split("run_contracts() {", 1)[1].split("\n}\n\nrun_eval()", 1)[0]
         + "\n}\n"
     )
-    setup = (
-        "unset AGENT_CANON_NATIVE_BIN\n"
-        "node() { :; }\n"
-        'python3() { if [[ "$1" == *check_agent_runtime_alignment.py ]]; then '
-        'command python3 "$@"; fi; }\n'
-    )
+    setup = "unset AGENT_CANON_NATIVE_BIN\nnode() { :; }\npython3() { :; }\n"
     if explicit_cli:
         setup += (
             "export AGENT_CANON_CLI="
@@ -844,7 +842,11 @@ def test_contract_unit_passes_selected_native_cli_to_alignment(
     )
     assert result.returncode == checker_exit, result.stderr
     assert selected.read_text().strip() == ("explicit" if explicit_cli else "default")
-    assert calls.read_text().splitlines() == ["codex-hook", "--contract"]
+    assert calls.read_text().splitlines() == [
+        "check-agent-runtime-alignment",
+        "--root",
+        str(root),
+    ]
 
 
 def test_runner_places_xdg_cache_under_the_task_runtime() -> None:
@@ -950,7 +952,7 @@ def test_units_do_not_duplicate_rust_or_full_wrapper_commands() -> None:
     for command in (
         "cargo build",
         "tool-catalog",
-        "run_accumulated_agent_evals.py",
+        "run-accumulated-agent-evals",
         "check-github-workflows",
     ):
         assert command not in wrapper

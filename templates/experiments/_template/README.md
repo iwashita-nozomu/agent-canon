@@ -5,7 +5,7 @@ responsibility Provides the canonical planning and provenance README for an expe
 upstream design ../../../documents/experiments/README.md experiment directory and registry route.
 upstream design ../../../documents/design/experiment-topic-template.md single-source topic scaffold and result layout.
 upstream design ../../../documents/operations/annex.md pointer/payload boundary and native annex operation readback.
-upstream implementation ../../../tools/experiments/artifacts/save_experiment_result_annex.py explicit raw retention owner.
+upstream implementation ../../../tools/runtime/dispatch/agent-canon/src/annex_retention.rs explicit raw retention owner.
 downstream implementation ./provenance.toml records machine-readable plan and provenance.
 downstream implementation ./run.py provides the runnable topic scaffold and atomic summary publication.
 downstream implementation ../../../tools/runtime/dispatch/agent-canon/src/experiment_registry/create_experiment_topic.rs materializes this topic pair.
@@ -59,7 +59,7 @@ experiments/<topic>/
 
 ## 実行契約
 
-topic は `tools/experiments/execution/run_managed_experiment.py` から呼び出します。topic の `run.py` を
+topic は `tools/bin/agent-canon run-managed-experiment` から呼び出します。topic の `run.py` を
 直接起動せず、caller が `EXPERIMENT_RUN_DIR`、`EXPERIMENT_RUN_MANIFEST`、
 `EXPERIMENT_VARIANT` を設定した managed route を使います。
 
@@ -119,7 +119,7 @@ cleanup policy は `provenance.toml` と summary snapshot の両方で読み戻�
 要約から再計算できるよう保持し、summary は比較・レビューに必要な最小証跡として保持します。
 
 `.gitignore` は未追跡 payload にだけ効きます。既に通常 Git で追跡された payload は、既存の
-[`save_experiment_result_annex.py`](../../tools/experiments/artifacts/save_experiment_result_annex.py)
+`agent-canon save-experiment-result-annex`
 owner で圧縮 archive を作り、manifest の source digest、annex key、archive digest を読み戻してから
 移行します。設定済みの special remote へ payload を保持する場合だけ、owner が指定した exact path に
 対して `git annex copy --to <remote>`、取得側では `git annex get` を行い、content availability と

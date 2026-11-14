@@ -6,11 +6,11 @@
 # upstream design documents/design/rust-agent-tool-migration.md Rust tool migration policy
 # upstream implementation bootstrap.sh installs and starts the shared tool runtime
 # downstream implementation tools/runtime/dispatch/agent-canon/src/structured_analysis.rs implements structured-analysis cache build tooling
-# downstream implementation tools/analysis/documents/prose_reasoning_graph.py creates prose graph DBs under the explicit external runtime
+# downstream implementation tools/runtime/dispatch/agent-canon/src/prose_reasoning_graph.rs creates prose graph DBs under the explicit external runtime
 # downstream environment agents/skills/gpu-execution.md routes the audited provider identity
 # downstream environment documents/tools/dependency-tools-and-licenses.md projects environment tool ownership for readers
-# downstream environment tests/tools/test_run_managed_experiment.py verifies provider identity binding
-# downstream environment tools/experiments/execution/run_managed_experiment.py binds the audited external provider identity
+# downstream environment tools/runtime/dispatch/agent-canon/tests/managed_experiment_native.rs verifies provider identity binding
+# downstream environment tools/runtime/dispatch/agent-canon/src/managed_experiment.rs binds the audited external provider identity
 # @dependency-end
 
 manifest_kind = "agent_canon_environment"
@@ -125,7 +125,7 @@ manual_analyze_command = "agent-canon structured-analysis analyze --db <cache-di
 
 [prose_reasoning_graph_cache]
 owner = "agent-canon"
-primary_cli = "python3 tools/analysis/documents/prose_reasoning_graph.py"
+primary_cli = "tools/bin/agent-canon prose-reasoning-graph"
 runtime_root_env = "AGENT_CANON_RUNTIME_ROOT"
 cache_root = "<AGENT_CANON_RUNTIME_ROOT>/prose-reasoning-graph"
 database_name = "prose_graph.sqlite"

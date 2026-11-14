@@ -6,7 +6,7 @@ responsibility Audits required repository path existence and filesystem kinds wi
 upstream design ../README.md owns the parent audit surface and tracked-tree evidence semantics
 upstream design ../../structure/repo-structure-contract.toml owns expected repository path existence and kinds
 upstream design ../../../responsibility-scope.toml owns the canonical path owner/class relation
-upstream implementation ../../../tools/analysis/code/parent_repository_audit.py enumerates semantic audit units
+upstream implementation ../../../tools/runtime/dispatch/agent-canon/src/parent_repository_audit.rs enumerates semantic audit units
 downstream implementation ../../../agents/skills/structure-refactor.md repairs structure ownership
 @dependency-end
 -->
@@ -21,7 +21,7 @@ repository structure contract と responsibility scope の別々の関係を読�
 
 `structure-refactor` が親 repository の root、directory、README、external source-clone 境界を
 所有します。`responsibility-scope.toml` が一般 path owner/class の唯一の source であり、
-`repo_structure_contract.py` は required/optional path の existence/kind だけを判定します。
+`repo-structure-contract` は required/optional path の existence/kind だけを判定します。
 
 ## Invariant
 
@@ -33,13 +33,13 @@ external source clone 内部は親 tree に混ぜず、generated report を sour
 
 - `documents/structure/repo-structure-contract.toml`
 - `responsibility-scope.toml`
-- `tools/validation/semantic/structure/repo_structure_contract.py`
+- `tools/runtime/dispatch/agent-canon/src/repo_structure_contract.rs`
 - `tools/runtime/dispatch/agent-canon/src/responsibility_scope.rs`
-- `tools/analysis/code/parent_repository_audit.py list`
+- `tools/runtime/dispatch/agent-canon/src/parent_repository_audit.rs list`
 
 ## Repair Route
 
-owner skill は `structure-refactor`、主 tool は `repo_structure_contract.py` と
+owner skill は `structure-refactor`、主 tool は `repo-structure-contract` と
 `tools/bin/agent-canon responsibility-scope`。missing/kind mismatch は structure contract を修正し、一般
 path owner の判断は responsibility scope に追加して readback します。audit unit の
 path pattern や all-tracked fallback は作りません。

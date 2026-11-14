@@ -5,7 +5,7 @@ responsibility Documents JIT-canonical algorithm Mermaid flowcharts for proof re
 upstream design algorithm-proof-exploration.md JIT-canonical IR and theorem graph workflow.
 upstream design formal-proof-workflow.md checker-backed proof workflow.
 upstream design code-visualization.md visualization selection and native renderer delegation.
-upstream implementation ../../tools/analysis/proof/jit_canonical_ir.py builds StableHLO-derived JIT-canonical IR and backend traces.
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/jit_canonical_ir.rs builds StableHLO-derived JIT-canonical IR and backend traces.
 upstream implementation ../../tools/runtime/dispatch/agent-canon/src/jit_ir_to_lean.rs lowers JIT-canonical IR into Lean evidence modules.
 downstream implementation ../../.codex/personal/skills/algorithm-flowchart/SKILL.md exposes the skill to Codex.
 downstream implementation ../../tests/tools/test_fix_mermaid.py checks syntax-only Mermaid formatting.
@@ -65,7 +65,9 @@ handoff. Proof and IR producers retain correctness authority.
 1. まだ IR がない場合は StableHLO lowering から生成します。
 
    ```bash
-   python3 tools/analysis/proof/jit_canonical_ir.py \
+   export AGENT_CANON_JIT_JAX_PLATFORM=cpu
+   export AGENT_CANON_JIT_BACKEND_TARGET=llvm-cpu
+   tools/bin/agent-canon jit-canonical-ir \
      --python-symbol lean/<topic>/main.py::main \
      --input-factory lean/<topic>/main.py::example_inputs \
      --out lean/<topic>/<root>_jit_canonical_ir.json \

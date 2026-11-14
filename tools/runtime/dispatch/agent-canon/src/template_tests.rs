@@ -87,7 +87,7 @@ roots = ["templates/agents"]
 roots = ["templates/documents"]
 
 [profiles.codex-user]
-roots = ["ROOT_AGENTS.md", ".codex/hooks.json", ".codex/personal/skills", "agents/skills", "bootstrap.sh", "bootstrap/host/lifecycle/entrypoint.sh", "tools/runtime/container/bootstrap_runtime.py", "LICENSE", "tools/agent/templates", "documents/runtime/runtime-profiles-and-check-matrix.json"]
+roots = ["ROOT_AGENTS.md", ".codex/hooks.json", ".codex/personal/skills", "agents/skills", "bootstrap.sh", "bootstrap/host/lifecycle/entrypoint.sh", "tools/runtime/dispatch/agent-canon/src/bootstrap_runtime.rs", "LICENSE", "tools/agent/templates", "documents/runtime/runtime-profiles-and-check-matrix.json"]
 
 [profiles.native-cli]
 roots = ["LICENSE"]
@@ -140,7 +140,7 @@ roots = ["templates/experiments"]
     );
     write(
         &source,
-        "tools/runtime/container/bootstrap_runtime.py",
+        "tools/runtime/dispatch/agent-canon/src/bootstrap_runtime.rs",
         b"# runtime\n",
     );
     write(

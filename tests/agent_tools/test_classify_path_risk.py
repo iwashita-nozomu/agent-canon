@@ -54,10 +54,14 @@ class ClassifyPathRiskTest(unittest.TestCase):
             "ROOT_AGENTS.md": ("docs", "eval"),
             ".codex/agents/worker.toml": ("contracts", "eval"),
             "agents/agents_config.json": ("contracts", "eval"),
-            "tools/agent/orchestration/route.py": ("contracts", "eval"),
+            "tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs": (
+                "rust",
+                "contracts",
+                "eval",
+            ),
             "documents/conventions/example.md": ("docs", "eval"),
             "bootstrap/host/manifest.toml": ("eval", "workflow-container"),
-            "tools/runtime/archive/github_eval_delivery.py": ("contracts", "eval"),
+            "tools/runtime/dispatch/agent-canon/src/runtime_log_archive/github_eval_delivery.rs": ("rust", "contracts", "eval"),
             ".github/workflows/other.yml": ("eval", "workflow-container"),
             "documents/design/example.md": ("docs",),
         }
@@ -105,20 +109,18 @@ class ClassifyPathRiskTest(unittest.TestCase):
                     "reason": "container_runtime_surface_changed",
                     "checks": [
                         "python3 -m pytest -q tests/tools/test_bootstrap_container_contract.py",
-                        "python3 -m pytest -q tests/bootstrap/test_bootstrap_runtime.py",
+                        "cargo test --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --test bootstrap_runtime_native",
                     ],
                 },
                 {
                     "profile": "github-automation",
                     "reason": "github_surface_changed",
-                    "checks": [
-                        "tools/bin/agent-canon check-github-workflows"
-                    ],
+                    "checks": ["tools/bin/agent-canon check-github-workflows"],
                 },
                 {
                     "profile": "agent-eval",
                     "reason": "eval_surface_changed",
-                    "checks": ["python3 eval/producers/run_accumulated_agent_evals.py"],
+                    "checks": ["tools/bin/agent-canon run-accumulated-agent-evals"],
                 },
                 {
                     "profile": "rust",

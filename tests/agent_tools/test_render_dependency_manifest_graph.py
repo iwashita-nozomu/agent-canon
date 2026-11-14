@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests native dependency graph source, labels, relations, and output checks.
-# upstream implementation ../../tools/analysis/dependencies/render_dependency_manifest_graph.py renders graph artifacts.
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/dependency_manifest_graph.rs renders graph artifacts.
 # upstream implementation ../../tools/analysis/dependencies/check_dependency_graph.sh produces graph TSV inputs.
 # upstream design ../../documents/tools/render_dependency_manifest_graph.md defines renderer bundle and Graph IR contracts.
 # @dependency-end
@@ -14,27 +14,20 @@ import hashlib
 import json
 import os
 import subprocess
-import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-RENDER_GRAPH = (
-    PROJECT_ROOT
-    / "tools"
-    / "analysis"
-    / "dependencies"
-    / "render_dependency_manifest_graph.py"
-)
-
-
 def run_renderer(
     *args: str, cwd: Path | None = None, env: dict[str, str] | None = None
 ) -> subprocess.CompletedProcess[str]:
     """Run the renderer CLI and capture text output."""
+    selected_env = env if env is not None else os.environ
+    selected_cli = selected_env.get("AGENT_CANON_CLI")
+    executable = [selected_cli] if selected_cli else ["agent-canon"]
     return subprocess.run(
-        [sys.executable, str(RENDER_GRAPH), *args],
+        [*executable, "render-dependency-manifest-graph", *args],
         cwd=cwd or PROJECT_ROOT,
         env=env,
         check=False,
@@ -100,34 +93,36 @@ class RenderDependencyManifestGraphTest(unittest.TestCase):
         env = os.environ.copy()
         selected_cli = env.pop("AGENT_CANON_CLI")
         env.pop("AGENT_CANON_NATIVE_BIN", None)
-        env["PATH"] = str(Path(selected_cli).parent) + os.pathsep + env["PATH"]
-        with tempfile.TemporaryDirectory() as temp_dir:
-            root = Path(temp_dir)
-            (root / "a.md").write_text("a\n", encoding="utf-8")
-            (root / "b.md").write_text("b\n", encoding="utf-8")
-            graph = root / "input.tsv"
-            write_graph(graph, [("upstream", "design", "a.md", "b.md")])
-            revision = initialize_git_fixture(root)
-            output = root / "graph.json"
-            result = run_renderer(
-                "--root",
-                str(root),
-                "--graph-tsv",
-                str(graph),
-                "--ir-out",
-                str(output),
-                "--format",
-                "json",
-                env=env,
-            )
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertEqual(
-                json.loads(output.read_text(encoding="utf-8"))["source"][
-                    "git_tree_revision"
-                ],
-                revision,
-            )
-            self.assertEqual(json.loads(result.stdout)["summary"]["edge_count"], 1)
+        with tempfile.TemporaryDirectory() as cli_dir:
+            Path(cli_dir, "agent-canon").symlink_to(selected_cli)
+            env["PATH"] = cli_dir + os.pathsep + env["PATH"]
+            with tempfile.TemporaryDirectory() as temp_dir:
+                root = Path(temp_dir)
+                (root / "a.md").write_text("a\n", encoding="utf-8")
+                (root / "b.md").write_text("b\n", encoding="utf-8")
+                graph = root / "input.tsv"
+                write_graph(graph, [("upstream", "design", "a.md", "b.md")])
+                revision = initialize_git_fixture(root)
+                output = root / "graph.json"
+                result = run_renderer(
+                    "--root",
+                    str(root),
+                    "--graph-tsv",
+                    str(graph),
+                    "--ir-out",
+                    str(output),
+                    "--format",
+                    "json",
+                    env=env,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(
+                    json.loads(output.read_text(encoding="utf-8"))["source"][
+                        "git_tree_revision"
+                    ],
+                    revision,
+                )
+                self.assertEqual(json.loads(result.stdout)["summary"]["edge_count"], 1)
 
     def test_bundle_preserves_native_graph_and_artifact_descriptors(self) -> None:
         """Bundle mode emits all native artifacts and source summaries."""
@@ -688,6 +683,34 @@ class RenderDependencyManifestGraphTest(unittest.TestCase):
             )
             self.assertEqual(missing_output.returncode, 2)
             self.assertIn("requires at least one named output", missing_output.stderr)
+
+    def test_named_projection_can_write_outside_the_selected_source_root(self) -> None:
+        """Explicit output paths remain independent of the graph source root."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            base = Path(temp_dir)
+            root = base / "source"
+            root.mkdir()
+            graph = root / "graph.tsv"
+            write_graph(graph, [("upstream", "design", "a.md", "b.md")])
+            initialize_git_fixture(root)
+            output = base / "reports" / "graph.json"
+
+            result = run_renderer(
+                "--root",
+                str(root),
+                "--graph-tsv",
+                str(graph),
+                "--ir-out",
+                str(output),
+                "--format",
+                "json",
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(
+                json.loads(output.read_text(encoding="utf-8"))["schema"],
+                "agent_canon.graph_ir.v2",
+            )
 
     def test_projection_rejects_duplicate_resolved_outputs(self) -> None:
         """Projection mode refuses aliases that resolve to one destination."""

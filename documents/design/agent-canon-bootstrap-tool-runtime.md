@@ -6,14 +6,14 @@ responsibility Defines the host bootstrap, shared AgentCanon tool runtime, exter
 upstream design ../../README.md standalone AgentCanon source entrypoint and user journey
 upstream design ../runtime/runtime-log-archive.md agent-canon-log publication and append-only archive policy
 upstream design ../../agents/skills/agent-canon-update.md AgentCanon source and parent integration workflow
-upstream implementation ../../tools/runtime/container/devcontainer_dependencies.py reusable dependency planning and image installation logic
-upstream implementation ../../tools/runtime/archive/runtime_log_archive_git.py existing archive publication owner
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/environment_dependencies.rs native dependency planning and image installation logic
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/runtime_log_archive.rs existing archive publication owner
 downstream implementation ../../bootstrap.sh host bootstrap entrypoint
 downstream implementation ../../bootstrap/container/image/Dockerfile shared Python, Rust, and native CLI tool image
-downstream implementation ../../tools/runtime/container/bootstrap_runtime.py resident container lifecycle and mount registry
-downstream implementation ../../tools/runtime/artifacts/runtime_artifacts.py external runtime artifact boundary
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/bootstrap_runtime.rs resident container lifecycle and mount registry
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/runtime_boundary.rs external runtime artifact boundary
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/tool_dispatch.rs native catalog-namespaced typed dispatcher
-downstream implementation ../../tests/bootstrap/test_bootstrap_runtime.py bootstrap lifecycle and compatibility tests
+downstream implementation ../../tools/runtime/dispatch/agent-canon/tests/bootstrap_runtime_native.rs bootstrap lifecycle and compatibility tests
 downstream implementation ../../.github/workflows/agent-canon-native-release.yml builds and publishes native CLI archives
 @dependency-end
 -->
@@ -115,7 +115,7 @@ Docker label readback で既存 owner を検出し、`shared_runtime_owned_elsew
 ```
 
 Bootstrap lifecycle codeだけが固定された `.runtime/` surfaces を直接管理します。
-`tools/runtime/artifacts/runtime_artifacts.py` は source-local artifact を例外なく拒否し、
+`tools/runtime/dispatch/agent-canon/src/runtime_boundary.rs` は source-local artifact を例外なく拒否し、
 分析 tool は source read-only、telemetry は external root、mutation tool は明示 target
 capability を受けた場合だけ source を変更します。
 
@@ -148,7 +148,7 @@ Docker の結果と一つの receipt に結合します。
 Bootstrap はホストの Python / Cargo install へ fallback しません。Host
 `bootstrap/host/lifecycle/entrypoint.sh` は Docker/Git の argv adapter だけを実行し、image を
 build/pull して resident container を起動した後、`docker exec` 経由で
-`bootstrap_runtime.py` を実行します。Docker が無い場合は Host Python を import せず
+native `bootstrap-runtime` operation を実行します。Docker が無い場合は Host Python を import せず
 typed `runtime_unavailable` を返します。
 
 container-side controller は Docker lifecycle を所有しません。Host shell が固定
@@ -202,7 +202,7 @@ target = "runtime-root/codex-home/skills"
 remote = "git@github.com:iwashita-nozomu/agent-canon-log.git"
 ```
 
-`tools/runtime/container/bootstrap_runtime.py` は container-side controller であり、Docker を
+`tools/runtime/dispatch/agent-canon/src/bootstrap_runtime.rs` は native container controller であり、Docker を
 起動・検証しません。Docker CLI/daemon の版、daemon mode、buildx、context、host
 architecture、rootless/rootful、UID/GID の扱いと Docker command failure は Host shell
 adapter の責務です。`bootstrap/container/image/Dockerfile` と
@@ -381,13 +381,13 @@ embedding.https.request
 
 Issue/PR/comment など GitHub 操作は Bootstrap の authority に含めず、Host workflow
 の GitHub owner が実行します。上記の Docker/Git 操作は Host shell が実行し、
-`tools/runtime/container/bootstrap_runtime.py` は Docker argv を発行しません。Host
-entrypoint はこの Python module を resident container の `docker exec` で起動し、
+`tools/runtime/dispatch/agent-canon/src/bootstrap_runtime.rs` は Docker argv を発行しません。Host
+entrypoint は `agent-canon bootstrap-runtime` を resident container の `docker exec` で起動し、
 shell fragment ではなく固定された Docker argv と exact path を扱います。
 receipt は operation、digest、byte count、exitだけを
 保存し、secret、header、raw embedding payload を保存しません。
 redaction test に canary secret を渡し、stdout/stderr/receipt/eval/spool の byte scan で
-非流出を `tests/bootstrap/test_bootstrap_runtime.py` で確認します。
+非流出を `tools/runtime/dispatch/agent-canon/tests/bootstrap_runtime_native.rs` で確認します。
 
 resident container は `network=none` を維持します。local embedding は container
 内で実行し、remote embedding は `embedding.https.request` だけを使います。
@@ -404,9 +404,9 @@ stale/replayed/mismatched response は受理しません。
 
 ## Mutation Capability
 
-`tools/runtime/container/bootstrap_runtime.py` は分析を read-only mount で実行します。docs / memory / materializer など
-意図的な mutation は target root、allowed paths、purpose、authority、before/after、
-receipt を `tools/runtime/container/bootstrap_runtime.py` で必須にします。runtime output を source mutation として扱いません。
+`tools/runtime/dispatch/agent-canon/src/bootstrap_runtime.rs` は分析を read-only mount で実行します。docs / memory / materializer など
+source target は read-only mount で実行します。tool output は宣言した runtime または
+target output root に限定し、runtime artifact を source mutation として扱いません。
 
 `RuntimeArtifactBoundary` は implicit output が source root 内なら拒否し、external
 rootへ atomic writeします。`__pycache__`、Cargo target、SQLite、event spool、eval、
@@ -436,7 +436,7 @@ cache、plugin、rule、MCP、TUI/trust はこの投影に含めません。公�
 通常更新は Git に任せ、正常なリンクの再作成、runtime での生成・転送・削除復元を行いません。
 異なるリンク先や既存の実ディレクトリは collision として保護します。uninstall は
 その AgentCanon-owned directory link だけを削除します。Host shell が global link を
-所有し、resident Python はこの投影を書きません。
+所有し、resident Rust controller はこの投影を書きません。
 
 `bootstrap.sh ... codex --project-root <path>` は process-local にこの isolated
 `CODEX_HOME` を指定して project root で Codex を起動します。Template に
@@ -445,14 +445,14 @@ Codex を起動することも要求しません。install/update 後は現在 s
 自動更新されないことを表示し、launcher が開く新 session で skill/agent/hook/config
 inventory と link target を readback します。
 
-`tools/runtime/container/bootstrap_runtime.py` は isolated Codex homeのskill/agent surfaceを cross-repository
+`tools/runtime/dispatch/agent-canon/src/bootstrap_runtime.rs` は isolated Codex homeのskill/agent surfaceを cross-repository
 discovery entry とし、project-local [AGENTS.md](../../AGENTS.md) は親 repository の責務のままと
 する Codex discovery model を前提にします。
 
 ## Eval Collection And agent-canon-log
 
-既存 producer、`run_accumulated_agent_evals.py`、`runtime_log_paths.py`、
-`runtime_log_archive_git.py` を再利用し、第二 publisher を作りません。
+既存 producer、`run_accumulated_agent_evals.py`、`eval_archive_paths.rs`、
+`runtime-log-archive-git` を再利用し、第二 publisher を作りません。
 
 `eval collect` は tool container で producer を実行し、外部 runtime root に
 `agent_canon.eval_collection.v1` receiptを作ります。run id、task id、source repository、
@@ -517,7 +517,7 @@ bootstrap install
 
 README / QUICK_START は target collision、skill collision、Docker unavailable、runtime
 unhealthy、archive publish failure、rollback、session restart、cleanup readbackを説明し、
-`tests/bootstrap/test_bootstrap_runtime.py` のfresh fixtureで同じcommand列を検証します。
+`tools/runtime/dispatch/agent-canon/tests/bootstrap_runtime_native.rs` のfresh fixtureで同じcommand列を検証します。
 
 ## Operation To State To Evidence
 
@@ -537,9 +537,9 @@ unhealthy、archive publish failure、rollback、session restart、cleanup readb
 | `gc` | exact stale owned Docker state absent; resident state/cache/lease GC complete | exact IDs/refs, foreign resources and active/rollback identities retained |
 | `uninstall` | owned runtime/skills absent | absence readback; user roots unchanged |
 
-## Side-Effect Map (`tools/runtime/container/bootstrap_runtime.py`)
+## Side-Effect Map (`tools/runtime/dispatch/agent-canon/src/bootstrap_runtime.rs`)
 
-| Surface (`tools/runtime/container/bootstrap_runtime.py`) | Owner | Allowed write |
+| Surface (`tools/runtime/dispatch/agent-canon/src/bootstrap_runtime.rs`) | Owner | Allowed write |
 | --- | --- | --- |
 | AgentCanon source | explicit mutation operation | allowed target only |
 | runtime root | Bootstrap | task state, receipts, spool, archive lease |
@@ -567,7 +567,7 @@ unhealthy、archive publish failure、rollback、session restart、cleanup readb
   が同一でcontainerが1個だけであるE2E。第二control rootからの作成は拒否。
 - task launch と target add を barrier で競合させ、maintenance admission close 後に
   task reservation が増えず、active zero/readback 前に old stop しない concurrency test。
-- `tests/bootstrap/test_bootstrap_runtime.py` でsource read-only mountとsource tree before/after byte/status一致。
+- `tools/runtime/dispatch/agent-canon/tests/bootstrap_runtime_native.rs` でsource read-only mountとsource tree before/after byte/status一致。
 - local bare `agent-canon-log` publication E2E。
 - install/start/status/codex/tool/eval/stop/gc/uninstall fresh journey。
 - container/image/lock/tmp cleanup、system prune不使用。
@@ -576,7 +576,7 @@ unhealthy、archive publish failure、rollback、session restart、cleanup readb
 
 | Kind | Statement | Evidence / disposition |
 | --- | --- | --- |
-| evidence | lifecycle and cleanup behavior | `tests/bootstrap/test_bootstrap_runtime.py` |
+| evidence | lifecycle and cleanup behavior | `tools/runtime/dispatch/agent-canon/tests/bootstrap_runtime_native.rs` |
 | evidence | image and typed entrypoint | `tests/tools/test_bootstrap_container_contract.py` |
 | evidence | eval archive publication | `tests/agent_tools/test_runtime_log_archive_git.py` |
 | boundary | Docker build/runtime capability | Docker CLI/daemon is a host capability; AgentCanon reports Docker exit/stderr and does not preflight host architecture or UID/GID |

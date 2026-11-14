@@ -264,6 +264,6 @@ and current source identity. Include a test-plan artifact only when the active
 workflow or unresolved runtime risk selected its creation. Consume the same
 `run.subagent_prompt_packet` and role prompt contract with the fresh context capsule.
 Activated design review and gate evidence must match the current artifact.
-Preserve disjoint writer targets, integration order, and the selected review owner.
+Preserve disjoint checkout/file ownership, integration order, and the selected review owner.
 After each assigned unit, continue from its actual result rather than restarting
 intake or expanding unselected work.

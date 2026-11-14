@@ -8,6 +8,7 @@
 // downstream implementation lib.rs owns the existing private-feedback command route
 // downstream implementation native_release.rs routes native release planning and publication
 // downstream implementation lib.rs exposes the shared native docs command API
+// downstream implementation artifacts/artifact_identity.rs exposes artifact identity materialize/verify CLI
 // downstream implementation check_algorithm_config_partition.rs checks algorithm config ownership and default policy
 // downstream implementation config.rs applies managed Codex context defaults while preserving TOML values
 // downstream implementation dependency_headers.rs checks selected dependency manifests and typed edge syntax
@@ -55,6 +56,7 @@
 // downstream implementation catalog/skill_routes.rs routes explicit skill capabilities
 // upstream implementation lib.rs exposes native SCIP index and Git dependency summary APIs
 // downstream implementation extract_docx.rs routes the native DOCX extraction command
+// downstream implementation lib.rs exports checkout-identity and native workspace lifecycle APIs
 // @dependency-end
 
 mod agent_search;
@@ -77,6 +79,7 @@ mod numeric_performance;
 mod python_algorithm_contract;
 mod python_ast;
 use agent_canon::python_cli_integer;
+mod prose_reasoning_graph;
 mod python_cli_options;
 mod python_helper_function_inventory;
 mod python_module_groups;
@@ -89,6 +92,7 @@ mod responsibility_scope;
 mod result_logs;
 mod rule_inventory;
 mod run_log_contract;
+mod runtime_log_archive;
 mod rust_migration_plan;
 mod semantic_index;
 mod semantic_responsibility;
@@ -105,29 +109,37 @@ mod tool_rejection_preflight;
 #[cfg(not(test))]
 use agent_canon::runtime_boundary;
 use agent_canon::{
-    catalog, codex_runtime_summary, compare_agent_run_paths, entrypoint_composer, extract_docx,
-    generated_completeness, native_release, report_artifact_checks, run_evaluation,
-    stablehlo_value_closure, template_bundle, theorem_graph_board, theorem_graph_circularity_check,
-    tool_dispatch, tool_proof_coverage,
+    catalog, codex_runtime_summary, compare_agent_run_paths, cpp_source_canonical_ir,
+    cpp_template_to_lean, entrypoint_composer, extract_docx, formal_proof, generated_completeness,
+    jit_canonical_ir, lean_recursive_proof_search, native_release, operational_ir_to_lean,
+    report_artifact_checks, run_evaluation, stablehlo_value_closure, template_bundle,
+    theorem_graph_board, theorem_graph_circularity_check, tool_dispatch, tool_proof_coverage,
 };
 use std::env;
 
 const HELP: &str = "AgentCanon's native command line interface.
 
 Usage: agent-canon <command> [arguments]
+  github-publish [--root ROOT] <push|pr|publish-pr|checks> --user-task TASK [options]
+  run-gpu-command [options] -- COMMAND ...
+  render-dependency-manifest-graph [--root ROOT] [--scope full|changed] [--bundle-dir DIR | --ir-out PATH] [--markdown-out PATH] [--dot-out PATH] [--html-out PATH]
+  run-managed-experiment [options] -- COMMAND ...
   experiment-registry [--repo-root ROOT] [--registry PATH]
 
 Commands:
   evaluate-codex-agent-roles [--root ROOT] [--runtime-root PATH] [--accumulate] [--format text|json]
+  check-agent-runtime-alignment [--root ROOT] [--format text|json]
   evaluate-workflow-selection [--root ROOT] [--manifest PATH] [--accumulate] [--runtime-root PATH]
   check-skill-tool-invocation-graph [--root ROOT]
+  skill-dependency-map <check|graph> [options]
   knowledge|k <search|read|add|status|sync|capture>
   feedback|f <add|status|sync|capture>
   graph <build|status|query|context> [options]
   graph-client <status|query|context> --root <repo-root> [options] [--format json]
-  source-dependency-graph [--root <repo-root> --edges-out PATH --manifests-out PATH] | resolve-targets --root ROOT --source FILE --target PATH
+  source-dependency-graph [--root <repo-root> --edges-out PATH --manifests-out PATH] | resolve-targets --root ROOT --source FILE --target PATH | cycles --edges PATH --selected PATH [--scoped]
   agent-search [search options]
   check-github-workflows [--root <repo-root>]\n  check-dependency-headers [--root <repo-root>] [--changed] [--surface <glob>]... [paths...]
+  artifact-identity [--root ROOT] <materialize ARTIFACT|verify RECORD>
   classify-path-risk [--path PATH]... [--paths-file PATH] [--format text|json|github-output] [--full-confidence]
   docs <check|format|find-redundant-designs|find-similar-designs|organize-designs|check-bootstrap|check-entrypoints> [options] [paths...]
   codex-config --source-config <path>
@@ -142,6 +154,10 @@ Commands:
   tool-rejection-preflight [paths...] [--root <repo-root>] [--changed] [--format text|json]
   check-merge-structure --source <ref> [--target <ref>] [--compare-commit <ref>] [--repo-root <path>]
   jit-ir-to-lean --jit-ir <path> --namespace <Lean.Namespace> --out <path>
+  operational-ir-to-lean --ir <path> --namespace <Lean.Namespace> [options]
+  jit-canonical-ir --python-symbol PATH::QUALNAME --input-factory PATH::QUALNAME --out PATH [options]
+  cpp-source-canonical-ir --root ROOT --cpp-symbol PATH::QUALNAME [--format json|markdown|text] [--out PATH]
+  cpp-template-to-lean --root ROOT --cpp-symbol PATH::QUALNAME --namespace NAMESPACE [options]
   log-surface-inventory [--root <repo-root>] [--format text|json] [--output <path>] [--check --baseline <path>]
   stablehlo-value-closure --ir <path> --function NAME --value SSA [--region-id ID] [--max-nodes N] [--format text|json]
   theorem-graph-circularity-check --graph <path> [--out <path>] [--format text|json|markdown] [--fail-on-finding]
@@ -152,6 +168,7 @@ Commands:
   tool-catalog [--root <repo-root>] [--format text|json|markdown]
   tool <run|inventory|rust-cli> [options]
   capability-route [--capability ID] [--mode routing-only|repo-changing] [--format text|json|markdown] [--root PATH]
+  route [--area AREA] [--prompt TEXT|--prompt-file PATH] [options]
   tool-drift [--root <repo-root>] [--contract NAME]... [--format text|json]
   tool-proof-coverage [--root <repo-root>] [--format text|json|markdown] [--tool-id ID]... [--require-lean-verified]
   theorem-graph-board --graph <path> [--out <path>] [--format json|markdown] [--fail-on-open] [--fail-on-unknown]
@@ -163,15 +180,42 @@ Commands:
   jsonl-to-md <input> <output>
   summarize-hlo-jsonl [--top N] [--only-case CASE] <jsonl>
   historical-skill-usage-read --path <skill_usage.jsonl>
+  generate-agent-improvement-guide [--root ROOT] [--runtime-root ROOT] [--out PATH] [--output-mode 600|644]
+  generate-agent-runtime-dashboard [--root ROOT] [--runtime-root ROOT] [--out PATH] [--compact-out PATH] [--api-out PATH] [--recent-days DAYS]
+  issue-sync [--repo OWNER/REPO] [--issue-url URL] [options]
+  checkout-identity [--cwd PATH] [--format json|lines]
+  repository-topic-clone <prepare|merge-main|finalize-merge|verify-publication|cleanup> [options]
+  dependency-module-change [--root ROOT] <prepare|merge-main|status|cleanup> [options]
   eval-accumulation-check [--root ROOT] [--runtime-root ROOT] [--family-registry PATH] [--format text|json] [--compact-out PATH]
   oop-python-rule-inventory|oop-cpp-rule-inventory [--root <repo-root>] [--format text|json|markdown]
+  oop-python-readability|oop-cpp-readability [paths...] [--root ROOT] [options]
   lean-proof-env <init|smoke|agent-smoke|counterexample-smoke|all-smoke|check-file> [options]
+  formal-proof (--claim CLAIM|--claim-file PATH|--python-symbol PATH::QUALNAME) [options]
+  lean-recursive-proof-search --config PATH [options]
   check-semantic-responsibility-contract [paths...] [--root ROOT] [--template TEMPLATE] [--instance INSTANCE] [--artifact-root ARTIFACT_ROOT] [--format text|json]
   check-solid-evidence [paths...] [--root ROOT] [--changed] [--base-ref BASE_REF] [--evidence EVIDENCE] [--exclude EXCLUDE] [--verbose] [--format text|json]
   rust-migration-audit --root <repo-root>
+  save-experiment-result-annex --raw-dir PATH [--annex-repo PATH] [options]
+  github-status-lifecycle --repo OWNER/REPO --issue NUMBER --facts-json PATH [options]
+  semantic-provider-html-report --compare-json PATH --output PATH [options]
+  check-proof-trace-alignment --trace-module PATH [options]
+  reference-materializer --url URL [--input PATH|--fetch] [options]
+  repo-structure-contract [--root ROOT] [--contract PATH] [options]
+  check-agent-canon-log-policy [--input PATH|--remote URL] [--commit SHA]
+  wiki-publish --wiki-root PATH --source-root PATH --source-commit SHA [options]
+  orphan-lifecycle <inventory|authorize-cleanup> [options]
+  render-code-template [--root SOURCE_ROOT] TEMPLATE
+  skill-shim-materializer <check|materialize|readback> [options]
+  skill-shim-evaluation [options]
+  run-accumulated-agent-evals [options]
+  update-latest-result RESULT_ROOT --variant VARIANT [--result-dir PATH]
+  parent-repository-audit <list|check> --root ROOT [options]
+  html-artifact-access REPORT_PATH [options]
   sync-experiment-registry-context --topic TOPIC [options]
   create-experiment-topic <topic> [options]
   server-readiness [--layout <layout.toml>]
+  environment-dependencies <validate|dry-run|install|boundary|project-install|image-install|image-verify> [options]
+  bootstrap-runtime --repository-root ROOT --control-parent-root ROOT --runtime-root ROOT <command> [options]
   check-skill-frontmatter [--root ROOT] [--format text|json]
   chatgpt-codex-route --input <packet.json|->
   rust-migration-plan --root <repo-root> [--limit N] [--format text|json]
@@ -180,6 +224,7 @@ Commands:
   extract-docx <input.docx> --output-dir <directory>
   semantic-index <operation>
   structured-analysis <operation>
+  prose-reasoning-graph <ingest|ingest-set|analyze|lint|project|outline|explain|integrate|rewrite-packet|skill-handoff|check-document> [options]
   python-structure-hash --root <repo-root> [paths...]
   python-structure-hash-report --input <path> [--output <path>]
   python-structure-hash-impact --before <path> --after <path> [--output <path>]
@@ -190,6 +235,7 @@ Commands:
   compose-consumer-entrypoint --base <path> --specific <path> --output <path> [--source-root <path>]
   template-bundle <export|committed-tree|verify|native-package|native-verify|native-version> [options]
   native-release <prepare|select-artifacts|publish|compare-reproducible> [options]
+  runtime-log-archive-git <archive command> [options]
 
 Options:
   -h, --help     Print help
@@ -232,6 +278,10 @@ fn main() {
         std::process::exit(run_evaluation::run_cli(&args[2..]));
     }
 
+    if args.len() >= 2 && args[1] == "runtime-log-archive-git" {
+        std::process::exit(runtime_log_archive::run(&args[2..]));
+    }
+
     if args.len() >= 2 && args[1] == agent_canon::eval_accumulation_check::SELECTOR {
         std::process::exit(agent_canon::eval_accumulation_check::run_cli(&args[2..]));
     }
@@ -264,15 +314,97 @@ fn main() {
         std::process::exit(stablehlo_value_closure::run(&args[2..]));
     }
 
+    if args.len() >= 2 && args[1] == jit_canonical_ir::SELECTOR {
+        std::process::exit(jit_canonical_ir::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == cpp_source_canonical_ir::SELECTOR {
+        std::process::exit(cpp_source_canonical_ir::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == cpp_template_to_lean::SELECTOR {
+        std::process::exit(cpp_template_to_lean::run(&args[2..]));
+    }
+
     if args.len() >= 2 && args[1] == theorem_graph_circularity_check::SELECTOR {
         std::process::exit(theorem_graph_circularity_check::run(&args[2..]));
     }
 
+    if args.len() >= 2 && args[1] == "github-publish" {
+        std::process::exit(agent_canon::github_publish::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "bootstrap-runtime" {
+        std::process::exit(agent_canon::bootstrap_runtime::run(&args[2..]));
+    }
+    if args.len() >= 2
+        && ["oop-python-readability", "oop-cpp-readability"].contains(&args[1].as_str())
+    {
+        std::process::exit(agent_canon::oop_readability::run(
+            &args[2..],
+            if args[1] == "oop-python-readability" {
+                "python"
+            } else {
+                "cpp"
+            },
+        ));
+    }
+    if args.len() >= 2 && args[1] == agent_canon::agent_runtime_dashboard::GUIDE_SELECTOR {
+        std::process::exit(agent_canon::agent_runtime_dashboard::run_guide_cli(
+            &args[2..],
+        ));
+    }
+    if args.len() >= 2 && args[1] == agent_canon::agent_runtime_dashboard::DASHBOARD_SELECTOR {
+        std::process::exit(agent_canon::agent_runtime_dashboard::run_dashboard_cli(
+            &args[2..],
+        ));
+    }
+    if args.len() >= 2 && args[1] == "issue-sync" {
+        std::process::exit(agent_canon::issue_sync::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "checkout-identity" {
+        std::process::exit(agent_canon::checkout_identity::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "repository-topic-clone" {
+        std::process::exit(agent_canon::repository_topic_clone::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "dependency-module-change" {
+        std::process::exit(agent_canon::dependency_module_change::run(&args[2..]));
+    }
     if args.len() >= 2 && args[1] == "tool-catalog" {
         std::process::exit(catalog::tool_catalog::run(&args[2..]));
     }
+    if args.len() >= 2 && args[1] == "save-experiment-result-annex" {
+        std::process::exit(agent_canon::annex_retention::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "render-code-template" {
+        std::process::exit(agent_canon::code_template_rendering::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "skill-shim-materializer" {
+        std::process::exit(catalog::skill_materialization::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "skill-shim-evaluation" {
+        std::process::exit(agent_canon::skill_shim_evaluation::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "run-accumulated-agent-evals" {
+        std::process::exit(agent_canon::eval_accumulation::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "update-latest-result" {
+        std::process::exit(agent_canon::latest_result::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "parent-repository-audit" {
+        std::process::exit(agent_canon::parent_repository_audit::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "html-artifact-access" {
+        std::process::exit(agent_canon::html_artifact_access::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "environment-dependencies" {
+        std::process::exit(agent_canon::environment_dependencies::run_cli(&args[2..]));
+    }
     if args.len() >= 2 && args[1] == "check-skill-tool-invocation-graph" {
         std::process::exit(catalog::skill_dependency_graph::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "skill-dependency-map" {
+        std::process::exit(catalog::skill_dependency_graph::run_graph_cli(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "tool" {
@@ -281,6 +413,9 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "capability-route" {
         std::process::exit(catalog::skill_routes::run_capability_route(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "route" {
+        std::process::exit(catalog::skill_routes::run_task_route(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "check-github-workflows" {
@@ -345,6 +480,12 @@ fn main() {
     if args.len() >= 2 && args[1] == agent_canon::lean_proof_env::SELECTOR {
         std::process::exit(agent_canon::lean_proof_env::run(&args[2..]));
     }
+    if args.len() >= 2 && args[1] == formal_proof::SELECTOR {
+        std::process::exit(formal_proof::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == lean_recursive_proof_search::SELECTOR {
+        std::process::exit(lean_recursive_proof_search::run(&args[2..]));
+    }
 
     if args.len() >= 2 && args[1] == check_solid_evidence::SELECTOR {
         std::process::exit(check_solid_evidence::run(&args[2..]));
@@ -372,6 +513,15 @@ fn main() {
             }
         }
     }
+    if args.len() >= 2 && args[1] == "run-gpu-command" {
+        std::process::exit(agent_canon::gpu_command_admission::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == agent_canon::dependency_manifest_graph::SELECTOR {
+        std::process::exit(agent_canon::dependency_manifest_graph::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == agent_canon::managed_experiment::SELECTOR {
+        std::process::exit(agent_canon::managed_experiment::run(&args[2..]));
+    }
     if args.len() >= 2 && args[1] == "sync-experiment-registry-context" {
         std::process::exit(agent_canon::experiment_registry::context::run(&args[2..]));
     }
@@ -383,8 +533,37 @@ fn main() {
     if args.len() >= 2 && args[1] == "rust-migration-audit" {
         std::process::exit(migration_audit::run(&args[2..]));
     }
+    if args.len() >= 2 && args[1] == "github-status-lifecycle" {
+        std::process::exit(agent_canon::github_status_lifecycle::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "semantic-provider-html-report" {
+        std::process::exit(semantic_index::semantic_provider_html_report::run(
+            &args[2..],
+        ));
+    }
+    if args.len() >= 2 && args[1] == "check-proof-trace-alignment" {
+        std::process::exit(agent_canon::check_proof_trace_alignment::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "reference-materializer" {
+        std::process::exit(agent_canon::reference_materializer::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "repo-structure-contract" {
+        std::process::exit(agent_canon::repo_structure_contract::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "check-agent-canon-log-policy" {
+        std::process::exit(agent_canon::log_policy::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "wiki-publish" {
+        std::process::exit(agent_canon::wiki_publish::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "orphan-lifecycle" {
+        std::process::exit(agent_canon::orphan_lifecycle::run(&args[2..]));
+    }
     if args.len() >= 2 && args[1] == agent_canon::codex_agent_role_eval::SELECTOR {
         std::process::exit(agent_canon::codex_agent_role_eval::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "check-agent-runtime-alignment" {
+        std::process::exit(agent_canon::runtime_alignment::run(&args[2..]));
     }
     if args.len() >= 2 && args[1] == agent_canon::server_readiness::SELECTOR {
         std::process::exit(agent_canon::server_readiness::run(&args[2..]));
@@ -458,6 +637,10 @@ fn main() {
         std::process::exit(jit_ir_to_lean::run(&args[2..]));
     }
 
+    if args.len() >= 2 && args[1] == operational_ir_to_lean::SELECTOR {
+        std::process::exit(operational_ir_to_lean::run(&args[2..]));
+    }
+
     if args.len() >= 2 && args[1] == "jsonl-to-md" {
         std::process::exit(result_logs::run_jsonl_to_md(&args[2..]));
     }
@@ -478,8 +661,36 @@ fn main() {
         std::process::exit(structured_analysis::run(&args[2..]));
     }
 
+    if args.len() >= 2 && args[1] == prose_reasoning_graph::SELECTOR {
+        std::process::exit(prose_reasoning_graph::run(&args[2..]));
+    }
+
     if args.len() >= 2 && args[1] == "test-design" {
         std::process::exit(test_design::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "check-convention-compliance" {
+        std::process::exit(agent_canon::convention_compliance::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "runtime-paths" {
+        std::process::exit(agent_canon::runtime_paths::run(&args[2..]));
+    }
+
+    if args.len() >= 2
+        && matches!(
+            args[1].as_str(),
+            "run-container-pack"
+                | "run-in-repo-container"
+                | "run-python-in-dockerfile"
+                | "run-repo-program"
+        )
+    {
+        std::process::exit(agent_canon::container_runtime::run(&args[1], &args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "artifact-identity" {
+        std::process::exit(agent_canon::artifacts::artifact_identity::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "notebook-quality" {

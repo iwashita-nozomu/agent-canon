@@ -282,19 +282,13 @@ def test_full_unit_preserves_body_status_without_target_mutation(
 
     fake_bin = executable_fixture_bin(tmp_path)
     fake_bin.mkdir(parents=True, exist_ok=True)
-    fake_python = fake_bin / "python3"
-    fake_python.write_text(
-        "#!/usr/bin/env bash\n"
-        "set -euo pipefail\n"
-        "payload=$(cat)\n"
-        "if [[ \"${payload}\" == *'runtime_artifact_boundary'* ]]; then\n"
-        '  if [[ "$#" -ge 4 ]]; then printf \'%s\\n\' "${4}"; else printf \'%s\\n\' "${3}"; fi\n'
-        "else\n"
-        "  exit 0\n"
-        "fi\n",
+    findmnt = fake_bin / "findmnt"
+    findmnt.write_text(
+        "#!/bin/sh\n"
+        "printf '%s\\n' '{\"filesystems\":[{\"target\":\"/fixture-target\",\"vfs-options\":\"ro\"}]}'\n",
         encoding="utf-8",
     )
-    fake_python.chmod(0o755)
+    findmnt.chmod(0o755)
 
     control = tmp_path / "home"
     runtime = control / "workspace" / "full-check"
@@ -317,6 +311,7 @@ def test_full_unit_preserves_body_status_without_target_mutation(
             "AGENT_CANON_TARGET_ROOT": str(target),
             "AGENT_CANON_CONTROL_PARENT_ROOT": str(control),
             "AGENT_CANON_RUNTIME_ROOT": str(runtime),
+            "TMPDIR": str(runtime / "tmp"),
             "AGENT_CANON_CACHE_ROOT": str(control / "cache"),
             "CARGO_HOME": str(control / "cache" / "cargo"),
             "RUSTUP_HOME": str(control / "image" / "rustup"),

@@ -3,10 +3,9 @@
 // responsibility Owns native immutable update-lifecycle records, binding, and gate-verdict mechanics.
 // upstream design ../../../../../documents/agent-canon/agent-canon-update-route.md owns update lifecycle meaning
 // upstream implementation artifacts/artifact_identity.rs owns canonical JSON bytes and body hashes
-// upstream implementation ../../../../../tools/runtime/lifecycle/update_lifecycle_contract.py remains the full lifecycle owner until later slices migrate
 // upstream implementation ../src/python_json.rs owns Python-compatible DSV text and byte payload parsing
 // downstream implementation ../../../../../tests/agent_tools/test_publication_integrator.py checks gate identity replay stability
-// downstream implementation ../../../../../tests/agent_tools/test_github_publish.py consumes G3 gate verdicts
+// downstream implementation ../tests/github_publish_native.rs consumes G3 gate verdicts
 // downstream implementation ../../../../../tests/agent_tools/test_bootstrap_and_close.py consumes gate chains at closeout
 // downstream test ../tests/update_lifecycle_dsv_native.rs freezes DSV envelope values, bytes, and errors
 // downstream test ../tests/update_lifecycle_records_native.rs freezes snapshot, evidence, and checkpoint record validation
@@ -1666,6 +1665,7 @@ pub fn materialize_fresh_clone_source_projection_packet<G2Error, G3Error>(
         "pr_essence": {
             "problem": "exercise standalone source publication from a fresh clone",
             "intent": "queue the observed AgentCanon source branch update",
+            // Retain the v1 acceptance fixture identity and its callback/hash bindings.
             "canonical_owner": "tools/repository/workspace/repository_topic_clone.py",
             "contract_delta": "fresh-clone source PR",
             "evidence_refs": [fresh_clone_projection_evidence(
@@ -5330,6 +5330,8 @@ fn gate_contract(gate_id: &str) -> Option<(&'static str, &'static [&'static str]
         "G4" => Some((
             "standalone_source_branch_integrity",
             &[
+                "repository_topic_clone.rs#ensure_independent_branch",
+                // Accept existing receipts produced before the Rust owner migration.
                 "repository_topic_clone.py#_ensure_branch",
                 "agents/skills/agent-canon-update.md",
             ],

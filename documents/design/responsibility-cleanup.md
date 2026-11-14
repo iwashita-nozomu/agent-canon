@@ -14,8 +14,8 @@ downstream implementation ../../agents/skills/code-cleanup.md code cleanup route
 downstream implementation ../../agents/skills/README.md AgentCanon-specific skill maintenance
 downstream implementation ../../agents/skills/catalog.yaml public skill registry
 downstream implementation ../../agents/skills/skill-dependencies.yaml public skill dependency DAG
-downstream implementation ../../tools/agent/skills/skill_shim_materializer.py generated shim materializer
-downstream implementation ../../tools/agent/skills/skill_dependency_map.py generated graph materializer
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_materialization.rs native generated shim materializer
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs generated graph materializer
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs graph readback checker
 @dependency-end
 -->
@@ -34,7 +34,7 @@ Skill の標準委譲と source 保守の分担を設計・見直しする場合
 責務単位として閉じるための共通設計です（[documents/design/responsibility-cleanup.md](responsibility-cleanup.md)）。repository cleanup 全体を扱う場合は責務境界を確認し、次に各
 cleanup skill の既存 owner route（[agents/skills/responsibility-cleanup.md](../../agents/skills/responsibility-cleanup.md)）、外部 tool の証拠、validation/rollback、統合と再レビュー
 の順に読みます（`agents/skills/catalog.yaml`）。公開 skill の discovery metadata と生成 shim の schema は既存の
-catalog/materializer owner（`agents/skills/catalog.yaml`、`tools/agent/skills/skill_shim_materializer.py`）を参照し、この文書へ複製しません。
+catalog/materializer owner（`agents/skills/catalog.yaml`、`tools/runtime/dispatch/agent-canon/src/catalog/skill_materialization.rs`）を参照し、この文書へ複製しません。
 
 ## Purpose and Target State
 
@@ -185,14 +185,14 @@ identity を保った候補だけを再レビューへ進めます。この全�
 
 ## Validation and Rollback
 
-validation は変更面の既存 checker（`tools/agent/skills/skill_shim_materializer.py`）を使い、necessary presence、forbidden presence、
-sufficient behavior を owner の契約に従って分類します（`tools/agent/skills/skill_shim_materializer.py`）。公開 skill surface では catalog、
+validation は変更面の既存 checker（`tools/bin/agent-canon check-skill-frontmatter`）を使い、necessary presence、forbidden presence、
+sufficient behavior を owner の契約に従って分類します（`tools/runtime/dispatch/agent-canon/src/catalog/skill_materialization.rs`）。公開 skill surface では catalog、
 dependency map、materialized shim、host-wiring source/input の `.codex/config.toml`、generated graph（[documents/runtime/skill-dependency-graph.md](../runtime/skill-dependency-graph.md)）、graph readback を同じ
 source snapshot から検証します（[documents/runtime/skill-dependency-graph.md](../runtime/skill-dependency-graph.md)）。失敗は実装原因を分類して同じ owner route を修正し、
 checker の条件を弱めずに再実行します（`tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs`）。
 RC-09 の置換・廃止では、正本、不要な旧コードの除去、必要な利用側移行を検証し、廃止済み入口の負例と移行漏れを区別します。
 
-`tools/agent/skills/skill_shim_materializer.py` の生成 target は
+`tools/runtime/dispatch/agent-canon/src/catalog/skill_materialization.rs` の生成 target は
 `.codex/personal/skills/<skill>/SKILL.md` だけです。`.codex/config.toml` は materializer の
 出力ではなく、`.codex/config.toml` の catalog skill id に対する entry set、source order、
 path、enabled の readback input とします。
@@ -208,11 +208,11 @@ Git に未収録の変更・untracked の作業とユーザー/runtime データ
 
 | clause | implementation owner | target | reverse readback |
 | --- | --- | --- | --- |
-| RC-01 tree observation and boundary classification | `responsibility-cleanup` / `structure-refactor` | `tree -a -J --noreport`, `tools/validation/semantic/structure/repo_structure_contract.py`, `tools/runtime/dispatch/agent-canon/src/responsibility_scope.rs` | tree snapshot と owner/surface classification |
+| RC-01 tree observation and boundary classification | `responsibility-cleanup` / `structure-refactor` | `tree -a -J --noreport`, `tools/runtime/dispatch/agent-canon/src/repo_structure_contract.rs`, `tools/runtime/dispatch/agent-canon/src/responsibility_scope.rs` | tree snapshot と owner/surface classification |
 | RC-02 dependency closure and responsibility boundary | `responsibility-cleanup` / `dependency-analysis` | [documents/design/responsibility-cleanup.md](responsibility-cleanup.md) 責務境界と依存 | 依存と利用側を含む完成状態 |
 | RC-03 environment route | `environment-cleanup` | [agents/skills/dependency-design.md](../../agents/skills/dependency-design.md), [agents/skills/environment-maintenance.md](../../agents/skills/environment-maintenance.md) | dependency design と maintenance validation |
 | RC-04 code route | `code-cleanup` | [agents/skills/dependency-analysis.md](../../agents/skills/dependency-analysis.md), [agents/skills/refactor-loop.md](../../agents/skills/refactor-loop.md), [agents/skills/change-review.md](../../agents/skills/change-review.md) | impact、refactor、review の連続 evidence |
-| RC-05 skill route | `$skill-creator` / [Updating Skills](../../agents/skills/README.md#updating-skills) | `agents/skills/catalog.yaml`, `.codex/config.toml`, `agents/skills/skill-dependencies.yaml`, `tools/agent/skills/skill_shim_materializer.py`, `tools/agent/skills/skill_dependency_map.py` | 標準委譲、必要なsource保守とcaller移行、shim/graph・host inputのreadback、該当する独立評価 |
+| RC-05 skill route | `$skill-creator` / [Updating Skills](../../agents/skills/README.md#updating-skills) | `agents/skills/catalog.yaml`, `.codex/config.toml`, `agents/skills/skill-dependencies.yaml`, `tools/runtime/dispatch/agent-canon/src/catalog/skill_materialization.rs`, `tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs` | 標準委譲、必要なsource保守とcaller移行、shim/graph・host inputのreadback、該当する独立評価 |
 | RC-06 existing-owner reuse | `responsibility-cleanup` | [agents/skills/document-canon-cleanup.md](../../agents/skills/document-canon-cleanup.md), [agents/skills/worktree-health.md](../../agents/skills/worktree-health.md), [agents/skills/agent-log-analysis.md](../../agents/skills/agent-log-analysis.md), [agents/skills/runtime-log-repair.md](../../agents/skills/runtime-log-repair.md), [agents/skills/result-artifact-writeout.md](../../agents/skills/result-artifact-writeout.md) | reuse route と既存 receipt |
 | RC-07 external evidence and rollback | owner-selected specialist | unit `external_tools`, `rollback`、`handoff` | primary source/version/license/security と rollback readback |
 | RC-08 integration and re-review | `agent-orchestration` / `change-review` | generated projections、tree/commit readback、review packet | final owner/review/validation readback |

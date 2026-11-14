@@ -12,7 +12,7 @@
 // upstream design ../../../../../documents/tools/tool-docs.toml one-to-one tool documentation map
 // upstream implementation catalog/tool_catalog.rs validates catalog structure and resolves source paths
 // upstream implementation catalog/path_policy.rs owns retired tool path policy
-// upstream implementation ../../../../validation/semantic/convention/check_convention_compliance.py verifies skill-routing markers
+// upstream implementation convention_compliance.rs verifies skill-routing markers
 // upstream implementation graph_client.rs provides typed source-derived dependency facts
 // downstream implementation ../../../../validation/ci/runners/run_all_checks.sh runs the native drift checker
 // downstream implementation ../../../../../tests/agent_tools/test_tool_drift.py tests the CLI contract
@@ -211,7 +211,7 @@ const CONTRACTS: &[ToolContract] = &[
     },
     ToolContract {
         name: "run_accumulated_agent_evals",
-        tool: "eval/producers/run_accumulated_agent_evals.py",
+        tool: "tools/runtime/dispatch/agent-canon/src/eval_accumulation.rs",
         links: &[
             direct_link("eval/definitions/README.md"),
             direct_link("documents/runtime/runtime-log-archive.md"),
@@ -229,7 +229,7 @@ const CONTRACTS: &[ToolContract] = &[
         name: "generated_artifact_guard",
         tool: "tools/runtime/dispatch/agent-canon/src/report_artifact_checks.rs",
         links: &[
-            direct_link("tools/runtime/artifacts/report_artifact_checks.py"),
+            direct_link("tools/runtime/dispatch/agent-canon/src/report_artifact_checks.rs"),
             direct_link("documents/design/request-intent-and-update-relation.md"),
             direct_link("agents/canonical/ARTIFACT_PLACEMENT.md"),
             direct_link("templates/agents/closeout_gate.md"),
@@ -240,7 +240,9 @@ const CONTRACTS: &[ToolContract] = &[
             direct_link("tools/validation/ci/checks/check_agent_canon_pr.sh"),
             direct_link("tests/agent_tools/test_generated_artifact_guard.py"),
             direct_link("tests/agent_tools/test_tool_drift.py"),
-            direct_link("tools/runtime/dispatch/agent-canon/tests/generated_artifact_guard_native.rs"),
+            direct_link(
+                "tools/runtime/dispatch/agent-canon/tests/generated_artifact_guard_native.rs",
+            ),
         ],
         text_checks: &[],
         command_checks: &[CommandCheck {
@@ -257,20 +259,20 @@ const CONTRACTS: &[ToolContract] = &[
             direct_link("agents/skills/agent-canon-update.md"),
             direct_link(".github/PULL_REQUEST_TEMPLATE.md"),
             direct_link("tools/runtime/dispatch/agent-canon/src/report_artifact_checks.rs"),
-            direct_link("tools/validation/semantic/runtime/check_agent_runtime_alignment.py"),
-            direct_link("tools/validation/semantic/convention/check_convention_compliance.py"),
+            direct_link("tools/runtime/dispatch/agent-canon/src/runtime_alignment.rs"),
+            direct_link("tools/runtime/dispatch/agent-canon/src/convention_compliance.rs"),
             direct_link("tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs"),
         ],
         text_checks: &[TextCheck {
             path: "tools/validation/ci/checks/check_agent_canon_pr.sh",
-            snippet: "python3 \"${WORKSPACE_ROOT}/tools/validation/semantic/runtime/check_agent_runtime_alignment.py\"",
+            snippet: "run_agent_canon check-agent-runtime-alignment --root",
             detail: "missing-agent-runtime-alignment-check",
         }],
         command_checks: &[],
     },
     ToolContract {
         name: "convention_compliance",
-        tool: "tools/validation/semantic/convention/check_convention_compliance.py",
+        tool: "tools/runtime/dispatch/agent-canon/src/convention_compliance.rs",
         links: &[
             direct_link("documents/conventions/README.md"),
             direct_link("agents/canonical/CODEX_COMPLETION.md"),
@@ -278,7 +280,9 @@ const CONTRACTS: &[ToolContract] = &[
             direct_link("documents/conventions/coding-conventions-house-style.md"),
             direct_link(".codex/README.md"),
             direct_link("tools/catalog.yaml"),
-            direct_link("tools/validation/semantic/convention/convention_compliance_contracts.toml"),
+            direct_link(
+                "tools/validation/semantic/convention/convention_compliance_contracts.toml",
+            ),
             direct_link("tools/runtime/dispatch/agent-canon/src/skill_frontmatter.rs"),
             direct_link("tools/validation/ci/runners/run_all_checks.sh"),
             direct_link("tools/runtime/dispatch/agent-canon/src/tool_drift.rs"),
@@ -305,13 +309,13 @@ const CONTRACTS: &[ToolContract] = &[
     },
     ToolContract {
         name: "bootstrap_container_runtime",
-        tool: "tools/runtime/container/bootstrap_runtime.py",
+        tool: "tools/runtime/dispatch/agent-canon/src/bootstrap_runtime.rs",
         links: &[
             direct_link("documents/design/agent-canon-bootstrap-tool-runtime.md"),
-            direct_link("tools/runtime/source/agent_canon_source_root.py"),
+            direct_link("tools/runtime/dispatch/agent-canon/src/agent_canon_source_root.rs"),
             direct_link("bootstrap.sh"),
             direct_link("bootstrap/container/image/Dockerfile"),
-            direct_link("tests/bootstrap/test_bootstrap_runtime.py"),
+            direct_link("tools/runtime/dispatch/agent-canon/tests/bootstrap_runtime_native.rs"),
         ],
         text_checks: &[],
         command_checks: &[],

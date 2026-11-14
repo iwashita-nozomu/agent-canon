@@ -6,7 +6,7 @@ upstream design README.md structured analysis package index
 upstream design database-design.md defines SQLite tables and validation boundary
 upstream design code-analysis.md defines code dependency adapter scope
 upstream design ../design/dependency-manifest-design.md defines dependency manifest DSL and graph semantics
-upstream design ../../tools/analysis/dependencies/render_dependency_manifest_graph.py documents dependency graph report rendering
+upstream design ../../tools/runtime/dispatch/agent-canon/src/dependency_manifest_graph.rs documents dependency graph report rendering
 upstream implementation ../../tools/analysis/dependencies/check_dependency_graph.sh emits dependency manifest graph artifacts
 upstream implementation ../../tools/runtime/dispatch/agent-canon/src/graph.rs owns canonical graph storage and query projections
 upstream implementation ../../tools/runtime/dispatch/agent-canon/src/graph_client.rs exposes typed native graph responses
@@ -38,7 +38,7 @@ dependency header の整合を同じ検証面で扱えるようにすること�
 | Dependency manifest block | file header | human/agent が読むべき upstream/downstream context。 |
 | Canonical graph query | `agent-canon graph query --all --relation dependency --direction both --depth 0` | typed manifest facts with provenance。 |
 | Manifest context | `agent-canon graph context --path <repo-path>` | parser-owned present/contract/responsibility items。 |
-| Dependency graph report | `render_dependency_manifest_graph.py` | review-readable graph summary。 |
+| Dependency graph report | `render-dependency-manifest-graph` | review-readable graph summary。 |
 | SCIP code projection | `agent-canon scip-index query` | Selected standard index definitions/references。manifest graph とは別で、unsupported/unindexed targets are not absence evidence. |
 
 ## Adapter Boundary

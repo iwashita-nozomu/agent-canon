@@ -68,9 +68,9 @@ const EXPERIMENT_EXECUTION_SURFACE_PATHS: &[&str] = &[
     "documents/design/experiment_runner.md",
     "experiments/registry.toml",
     "tools/runtime/dispatch/agent-canon/src/experiment_registry.rs",
-    "tools/experiments/artifacts/save_experiment_result_annex.py",
+    "tools/runtime/dispatch/agent-canon/src/annex_retention.rs",
     "tools/runtime/dispatch/agent-canon/src/experiment_registry/store.rs",
-    "tools/experiments/execution/run_managed_experiment.py",
+    "tools/runtime/dispatch/agent-canon/src/managed_experiment.rs",
 ];
 const LIBRARY_SURFACE_PREFIXES: &[&str] = &[
     "vendor/",
@@ -115,7 +115,7 @@ const CAUSE_INVESTIGATION_GATE_TEMPLATES: &[GateTemplate] = &[GateTemplate {
 const PYTHON_GATE_TEMPLATES: &[GateTemplate] = &[
     GateTemplate {
         gate: "oop_readability_guard",
-        command_template: "python3 tools/validation/code/oop/python/readability.py --root . {path}",
+        command_template: "tools/bin/agent-canon oop-python-readability --root . {path}",
         handoff: "include OOP readability risk, repair plan, and the non-blocking review_oop_boundary_signal / OOP_READABILITY_REVIEW_SIGNAL_FINDINGS disposition before implementation edits",
     },
     GateTemplate {
@@ -126,7 +126,7 @@ const PYTHON_GATE_TEMPLATES: &[GateTemplate] = &[
 ];
 const CPP_GATE_TEMPLATES: &[GateTemplate] = &[GateTemplate {
     gate: "oop_readability_guard",
-    command_template: "python3 tools/validation/code/oop/cpp/readability.py --root . {path}",
+    command_template: "tools/bin/agent-canon oop-cpp-readability --root . {path}",
     handoff: "include C/C++ OOP readability risk before edits",
 }];
 const STYLE_CHECK_GATE_TEMPLATES: &[GateTemplate] = &[GateTemplate {
@@ -151,12 +151,12 @@ const GITHUB_GATE_TEMPLATES: &[GateTemplate] = &[GateTemplate {
 }];
 const HOOK_RUNTIME_GATE_TEMPLATES: &[GateTemplate] = &[GateTemplate {
     gate: "codex_hook_runtime_alignment",
-    command_template: "python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py && python3 -m pytest tests/agent_tools/test_codex_hooks.py -q",
+    command_template: "tools/bin/agent-canon check-agent-runtime-alignment && python3 -m pytest tests/agent_tools/test_codex_hooks.py -q",
     handoff: "include hook wiring, quiet-pass behavior, and runtime alignment evidence",
 }];
 const AGENT_PROTOCOL_GATE_TEMPLATES: &[GateTemplate] = &[GateTemplate {
     gate: "agent_protocol_convention",
-    command_template: "python3 tools/validation/semantic/convention/check_convention_compliance.py",
+    command_template: "agent-canon check-convention-compliance",
     handoff:
         "include whether workflow, skill-routing, and hook/tool feedback protocol checks still pass",
 }];
@@ -177,8 +177,8 @@ const AGENT_CANON_NEW_TOOL_SOURCE_ROUTE_GATE_TEMPLATES: &[GateTemplate] = &[Gate
 }];
 const EXPERIMENT_EXECUTION_SURFACE_GATE_TEMPLATES: &[GateTemplate] = &[GateTemplate {
     gate: "experiment_execution_surface_guard",
-    command_template: "if [ -e experiments/registry.toml ]; then tools/bin/agent-canon experiment-registry; else echo EXPERIMENT_REGISTRY_CHECK=skipped_no_project_registry; fi && python3 -m pytest tests/tools/test_run_managed_experiment.py -q",
-    handoff: "route planned edits through $experiment-lifecycle and $test-design; preserve the managed runner, registry checker, registry contract, and deterministic raw-only git-annex retention contract with lightweight registry and runner validation evidence",
+    command_template: "if [ -e experiments/registry.toml ]; then tools/bin/agent-canon experiment-registry; else echo EXPERIMENT_REGISTRY_CHECK=skipped_no_project_registry; fi && cargo test --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --test managed_experiment_native",
+    handoff: "route planned edits through $experiment-lifecycle and $test-design; preserve the native managed CLI, registry checker, registry contract, and deterministic raw-only git-annex retention contract with protocol fixture evidence",
 }];
 const LIBRARY_GATE_TEMPLATES: &[GateTemplate] = &[GateTemplate {
     gate: "library_implementation_guard",

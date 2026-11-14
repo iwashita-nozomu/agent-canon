@@ -4,34 +4,40 @@
 # contract test
 # responsibility Verifies parent audit unit schema, semantic surface selection, path safety, and receipt aggregation.
 # upstream design ../../documents/design/parent-repository-audit.md owns failure semantics and unit contract
-# upstream implementation ../../tools/analysis/code/parent_repository_audit.py owns enumeration and evidence selection
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/parent_repository_audit.rs owns enumeration and evidence selection
 # downstream implementation ../../documents/parent-repository-audit/README.md owns self-contained audit units
 # @dependency-end
 
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
-import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-TOOL = PROJECT_ROOT / "tools" / "analysis" / "code" / "parent_repository_audit.py"
-sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-
-from tools.analysis.code.parent_repository_audit import _load_units
 
 
 class ParentRepositoryAuditTests(unittest.TestCase):
     """Exercise the selected parent audit mechanism without runtime builds."""
 
-    def run_tool(self, parent_root: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    def run_tool(
+        self, parent_root: Path, *args: str
+    ) -> subprocess.CompletedProcess[str]:
         """Run the canonical audit tool from the AgentCanon source root."""
         return subprocess.run(
-            [sys.executable, str(TOOL), *args, "--root", str(parent_root), "--format", "json"],
+            [
+                os.environ["AGENT_CANON_CLI"],
+                "parent-repository-audit",
+                *args,
+                "--root",
+                str(parent_root),
+                "--format",
+                "json",
+            ],
             cwd=PROJECT_ROOT,
             check=False,
             capture_output=True,
@@ -59,10 +65,14 @@ class ParentRepositoryAuditTests(unittest.TestCase):
 
     def test_canonical_units_have_unique_migration_ids(self) -> None:
         """The nine surviving units expose semantic surfaces and unique migration IDs."""
-        units = _load_units(PROJECT_ROOT)
+        result = self.run_tool(PROJECT_ROOT, "list")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        units = json.loads(result.stdout)["unit_records"]
         self.assertEqual(len(units), 9)
-        self.assertTrue(all(unit.surfaces for unit in units))
-        migration_ids = [legacy_id for unit in units for legacy_id in unit.legacy_ids]
+        self.assertTrue(all(unit["surfaces"] for unit in units))
+        migration_ids = [
+            legacy_id for unit in units for legacy_id in unit["legacy_ids"]
+        ]
         self.assertEqual(len(migration_ids), len(set(migration_ids)))
         expected_ids = {
             *(f"PRA-M{index:02d}" for index in range(1, 9)),
@@ -78,17 +88,21 @@ class ParentRepositoryAuditTests(unittest.TestCase):
             r"\b(PRA-(?:M[0-9]{2}|[CX][0-9]{3}))\b.*"
             r"(documents/parent-repository-audit/audit-unit/[a-z-]+\.md)"
         )
-        design_path = PROJECT_ROOT / "documents" / "design" / "parent-repository-audit.md"
+        design_path = (
+            PROJECT_ROOT / "documents" / "design" / "parent-repository-audit.md"
+        )
         ledger: dict[str, str] = {}
         for line in design_path.read_text(encoding="utf-8").splitlines():
             match = row_pattern.search(line)
             if match:
                 self.assertNotIn(match.group(1), ledger)
                 ledger[match.group(1)] = match.group(2)
+        result = self.run_tool(PROJECT_ROOT, "list")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         unit_ids = {
-            legacy_id: unit.path
-            for unit in _load_units(PROJECT_ROOT)
-            for legacy_id in unit.legacy_ids
+            legacy_id: unit["path"]
+            for unit in json.loads(result.stdout)["unit_records"]
+            for legacy_id in unit["legacy_ids"]
         }
         self.assertEqual(ledger, unit_ids)
 
@@ -133,7 +147,9 @@ class ParentRepositoryAuditTests(unittest.TestCase):
             result = self.run_tool(parent, "list", "--scope", "../outside")
             self.assertNotEqual(result.returncode, 0)
             payload = json.loads(result.stdout)
-            self.assertEqual(payload["failure_code"], "parent_repository_audit_path_escape")
+            self.assertEqual(
+                payload["failure_code"], "parent_repository_audit_path_escape"
+            )
 
     def test_failed_or_deferred_unit_receipt_cannot_close_audit(self) -> None:
         """Failed and deferred unit receipts remain failed in the CLI packet."""
