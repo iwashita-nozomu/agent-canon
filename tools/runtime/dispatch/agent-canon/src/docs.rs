@@ -1974,7 +1974,7 @@ fn usage_text() -> &'static str {
 \n\
 commands:\n\
   check                   check Markdown lint, links, math, Mermaid, headings, and runtime-profile docs\n\
-  format                  format Markdown, then run the adjacent docs check\n\
+  format                  normalize Markdown whitespace using the native executable\n\
   find-redundant-designs  report exact duplicate design documents; --delete requires an exact source mutation capability\n\
   find-similar-designs    compare Markdown design documents and write an external runtime report\n\
   organize-designs        plan design-document placement; --apply requires an exact source mutation capability\n\
@@ -2415,7 +2415,7 @@ fn render_format(root: &Path, raw_paths: &[String]) -> i32 {
         "docs format: {} file(s), {} change(s)",
         summary.changed_files, summary.changes
     );
-    render_check(root, raw_paths)
+    0
 }
 
 fn run_link_audit(

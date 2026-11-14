@@ -105,6 +105,10 @@ context/evidence. The contracts below apply without an installed Skill/runtime.
 
 ## Task Entry
 
+- Incorporate additional user instructions into the active task, retaining its
+  objective and acceptance. After answering a question, reporting status, or
+  updating guidance, continue the next unfinished authorized step. Change or
+  pause the task for an explicit stop, cancellation, or incompatible new objective.
 - The selected workflow owns execution, delegation, and validation; activate
   specialists only when applicable. AgentCanon maintenance does not authorize
   edits to consumers' generated instructions.

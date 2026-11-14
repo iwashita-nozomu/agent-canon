@@ -33,11 +33,13 @@ contract choices. Resolve retrievable facts and continue independent work.
 
 ## Stages
 
-Start from the target code, diff, and current contract. Decide the complete
-repair unit before editing. Connect existing APIs/CLIs before adding capability;
-extend the existing owner for a demonstrated gap. Use
-[reuse feasibility](../../documents/conventions/software-engineering-principles.md#reuse-feasibility-support)
-for an unresolved reuse decision, [design admission](../canonical/CODEX_IMPLEMENTATION.md#design-integrity-gate)
+Start from the target code, diff, and current contract. Before editing, trace
+the existing caller path and shared components, then locate the owning change
+and requested execution through the
+[existing implementation route](../canonical/CODEX_IMPLEMENTATION.md#library-and-reuse-sweep).
+Decide the complete repair unit, connecting existing APIs/CLIs and extending
+the existing owner for a demonstrated gap. Use
+[design admission](../canonical/CODEX_IMPLEMENTATION.md#design-integrity-gate)
 for an unsettled mechanism, and [tool cooperation](agent-orchestration.md#skill-and-tool-cooperation)
 for an unresolved tool/result boundary.
 

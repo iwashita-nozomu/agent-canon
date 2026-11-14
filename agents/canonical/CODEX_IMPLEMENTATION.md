@@ -98,11 +98,16 @@ the common [Validation Routing](../../ROOT_AGENTS.md#validation-routing).
 
 ## Library And Reuse Sweep
 
-Before adding an implementation that could connect existing capabilities,
-construct its concrete call flow through [reuse
+For a change to existing functionality, trace the selected entrypoint through
+its shared components to the requested change. Modify the owning component and
+use that execution path to produce the requested result. A separate execution
+path requires a demonstrated gap in the existing implementation and prior
+agreement on the resulting scope or approach change.
+
+When the connection between existing capabilities is unresolved, construct its
+concrete call flow through [reuse
 feasibility support](../../documents/conventions/software-engineering-principles.md#reuse-feasibility-support)
-using the target contract and known providers. A missing all-in-one API does not
-establish a responsibility gap. Extend the investigation only for an unknown
+using the target contract and known providers. Extend the investigation only for an unknown
 entrypoint, failed invocation, or unmet behavior that could change the decision;
 reuse [prior failed attempts](../../documents/operations/notes-lifecycle.md#retrieve-before-deciding)
 when they bear on it. This does not require a repository-wide survey or new packet.
