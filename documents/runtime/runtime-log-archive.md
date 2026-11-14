@@ -163,6 +163,10 @@ existing unit execution route.
 For a main push, that eval unit calls `bootstrap.sh ... eval collect` once in
 the existing shared runtime. It uploads a dedicated
 `agent-canon-main-eval-<run>-<attempt>` artifact only after successful collection.
+Collection succeeds when each registered producer has one successful result,
+a nonempty Markdown report in its family directory, and both stdout/stderr
+logs in the exported spool. Missing reports or logs produce
+`eval_collection_incomplete`, a failed collection and a nonzero exit status.
 Failed and partial collections, including a bootstrap receipt when no spool
 could be created, stay in the existing static-validation diagnostic artifact.
 They do not enter the accumulated successful family directories.
