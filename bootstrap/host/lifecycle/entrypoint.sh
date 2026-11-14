@@ -791,8 +791,8 @@ _agent_canon_validate_codex_home() {
       continue
     }
     case "$target" in
-      "$expected") [ -e "$target" ] || printf 'invalid\n' ;;
-      *) printf 'invalid\n' ;;
+      ("$expected") [ -e "$target" ] || printf 'invalid\n' ;;
+      (*) printf 'invalid\n' ;;
     esac
   done)
   [[ -z "$invalid" ]]
