@@ -3278,8 +3278,8 @@ impl BootstrapRuntime {
             let target_container = registered.get("root").and_then(Value::as_str).unwrap_or_default();
             let log_root = format!("{exchange_runtime}/tasks/{run_id}/logs");
             let argv = vec![
-                "python3".to_string(),
-                format!("{TOOL_SOURCE_DESTINATION}/eval/producers/run_accumulated_agent_evals.py"),
+                env::var("AGENT_CANON_NATIVE_BIN").unwrap_or_else(|_| NATIVE_CLI_DESTINATION.to_string()),
+                "run-accumulated-agent-evals".to_string(),
                 "--root".to_string(), canon_root.to_string(),
                 "--target-root".to_string(), target_container.to_string(),
                 "--runtime-root".to_string(), exchange_runtime.clone(),
@@ -3719,12 +3719,11 @@ fn validate_tool_argv(argv: &[String]) -> Result<()> {
         ));
     }
     let executable = argv[0].as_str();
-    let agent_canon_script = argv.get(1).is_some_and(|script| {
-        script.starts_with("/opt/agent-canon/source/tools/")
-            || script == "/opt/agent-canon/source/eval/producers/run_accumulated_agent_evals.py"
-    });
+    let agent_canon_script = argv
+        .get(1)
+        .is_some_and(|script| script.starts_with("/opt/agent-canon/source/tools/"));
     if ["agent-canon", "agent-canon-tool"].contains(&executable)
-        || (["python3", "bash"].contains(&executable) && agent_canon_script)
+        || (executable == "bash" && agent_canon_script)
     {
         return Ok(());
     }
