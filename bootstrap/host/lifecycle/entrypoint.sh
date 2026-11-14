@@ -5446,6 +5446,21 @@ bootstrap_host_entrypoint() {
   else
     unset AGENT_CANON_LOCAL_BUILD
   fi
+  if [[ "$operation" == eval && "${command_args[1]:-}" == sync ]]; then
+    local eval_run_id=${command_args[3]:-} eval_index=2
+    while ((eval_index < ${#command_args[@]})); do
+      if [[ "${command_args[eval_index]}" == --run-id &&
+            $((eval_index + 1)) -lt ${#command_args[@]} ]]; then
+        eval_run_id=${command_args[eval_index+1]}
+        eval_index=$((eval_index + 1))
+      fi
+      eval_index=$((eval_index + 1))
+    done
+    [[ "$eval_run_id" =~ ^[A-Za-z0-9_.-]{1,128}$ ]] ||
+      _agent_canon_json_error argument_missing "eval sync requires a valid --run-id"
+    _agent_canon_with_replacement_lock _agent_canon_eval_sync_locked "$eval_run_id"
+    return $?
+  fi
   case "$operation" in
     gc)
       # Docker resource reconciliation is host-owned and serialized with
@@ -5641,24 +5656,6 @@ bootstrap_host_entrypoint() {
         "$codex_container" || feedback_rc=$?
       return "$feedback_rc"
       ;;
-    eval)
-      if [[ "${command_args[1]:-}" == sync ]]; then
-        local eval_run_id=${command_args[3]:-} eval_index=2
-        while ((eval_index < ${#command_args[@]})); do
-          if [[ "${command_args[eval_index]}" == --run-id &&
-                $((eval_index + 1)) -lt ${#command_args[@]} ]]; then
-            eval_run_id=${command_args[eval_index+1]}
-            eval_index=$((eval_index + 1))
-          fi
-          eval_index=$((eval_index + 1))
-        done
-        [[ "$eval_run_id" =~ ^[A-Za-z0-9_.-]{1,128}$ ]] ||
-          _agent_canon_json_error argument_missing "eval sync requires a valid --run-id"
-        _agent_canon_with_replacement_lock _agent_canon_eval_sync_locked \
-          "$eval_run_id"
-        return $?
-      fi
-      ;;&
     exec|tool)
       local exec_tool_rc=0
       set +e

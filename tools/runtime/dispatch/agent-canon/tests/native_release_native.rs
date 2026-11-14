@@ -1159,7 +1159,13 @@ esac
             .env("PATH", format!("{}:{}", tools.display(), std::env::var("PATH").unwrap_or_default()))
             .output().unwrap()
         };
-        assert!(run(&fixture.runtime).status.success());
+        let outside = run(&fixture.runtime);
+        assert!(
+            outside.status.success(),
+            "{}\n{}",
+            String::from_utf8_lossy(&outside.stdout),
+            String::from_utf8_lossy(&outside.stderr)
+        );
         assert_eq!(fs::read_link(&active).unwrap(), old);
         assert!(!calls.exists());
         let updated = run(&home);
