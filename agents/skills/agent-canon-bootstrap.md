@@ -116,6 +116,10 @@ evidence.
 - The same sync updates a managed host native CLI from the latest stable release.
   The [bootstrap lifecycle](../../documents/runtime/bootstrap-runtime.md#install-source-transition)
   owns its layout, existing package verification, atomic link switch, and timer.
+- Installation diagnostics follow the [warning policy](../../documents/runtime/bootstrap-runtime.md#installation-diagnostics).
+  Health metadata, profile differences, and optional Codex settings report
+  warnings while the resident setup continues. Preserve the existing entry when
+  an optional setting conflicts with user-owned content.
 - Eval collection is append-only and is handed to the repository-qualified
   `iwashita-nozomu/agent-canon-log` archive through the host adapter. Never
   write archive output back into the AgentCanon source tree.

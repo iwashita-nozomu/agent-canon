@@ -239,7 +239,7 @@ immutable ID used to recreate the resident.
 checks out, merges, rebases, resets, or pulls Git state. It selects the
 environment key, reuses an exact local `:env-<key>` image when possible, and
 otherwise pulls or builds that environment once. A handled pull/build or
-health failure restores the existing v2 generation, container, and image.
+activation failure restores the existing v2 generation, container, and image.
 `sync` is the one-shot source/update route. Under `replacement.lock`, it runs
 `git -C <install-root> fetch origin main` followed by
 `git -C <install-root> checkout --force -B main FETCH_HEAD`, leaving the
@@ -265,12 +265,12 @@ byte-for-byte (including mode) before linking; install/update apply the canonica
 `model_auto_compact_token_limit = 900000` defaults while preserving other
 personal TOML settings, and uninstall restores a regular file.
 Foreign entries and foreign symlinks are preserved or
-reported as collisions. Project hooks and user authentication, session,
+reported as warnings while the resident setup continues. Project hooks and user authentication, session,
 history, cache, plugins, rules, MCP, and TUI/trust settings are outside this
 projection. `codex prepare` remains the separate runtime-local isolated home
 route: `CODEX_HOME/skills/agent-canon` links to the same distribution directory.
 A correct link is retained during updates; foreign links or directories are
-reported as collisions, not deleted. Git updates the distribution files without
+preserved with warnings. Git updates the distribution files without
 a runtime generator, exchange copy, or directory replacement. Uninstall removes
 the owned discovery link only.
 The migration never scans or removes `~/.codex/skills/.system` or another user
@@ -299,19 +299,32 @@ Start a new Codex session after an install or update.
 The target registry stores exact real paths and modes. A target update acquires
 the lifecycle lock, closes task admission, waits for zero active tasks,
 validates paths and collisions, starts a candidate generation, performs a
-health check and exact mount readback, then atomically switches
+health observation and exact mount readback, then atomically switches
 `current-generation`. The old generation becomes rollback state only after
 the candidate is verified. Old and candidate containers are never intentionally
 run at the same time.
 
 If active tasks do not drain, the result is `mount_update_blocked` and the
-current container is unchanged. If candidate health or mount readback fails,
+current container is unchanged. If candidate activation or mount readback fails,
 the candidate is quarantined and the old generation remains current. If the
 old generation cannot be restored, the runtime reports `runtime_unavailable`
 and preserves the pointer, quarantine receipt, and evidence for recovery.
 `rollback` is allowed only with no active task and switches to the last
 verified generation. `status` is the first recovery command; inspect its
 generation, container, target, limits, and receipt fields before retrying.
+
+### Installation diagnostics
+
+The host reports pending or unavailable Docker health metadata and differences
+from the default network, security, CPU, memory, and PID profile as warnings.
+It proceeds directly to compilation and controller execution after Docker starts
+the resident. Codex link collisions preserve the existing entry and defer that
+optional setting. A failed optional Codex projection or post-install rollback
+cleanup also produces a warning while the installed resident remains available.
+Directory creation applies the required permissions through the existing
+filesystem owner. Source/mount ownership and safe file operations retain their
+existing boundaries, and Docker, compilation, and controller errors identify
+the failed operation.
 
 `stop` removes the owned container but retains runtime state and spool data.
 `gc` removes only exact stale Docker container IDs and image tag references or

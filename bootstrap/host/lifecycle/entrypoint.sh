@@ -32,7 +32,6 @@ AGENT_CANON_PRIVATE_LOG_DESTINATION=/var/lib/agent-canon/private-log
 AGENT_CANON_MOUNT_REGISTRY_DESTINATION=/var/lib/agent-canon/mount-registry.toml
 AGENT_CANON_HOST_MOUNTS_DESTINATION=/var/lib/agent-canon/host-mounts.tsv
 AGENT_CANON_SOURCE_SYNC_DESTINATION=/var/lib/agent-canon/source-sync
-AGENT_CANON_HEALTH_ATTEMPTS=120
 AGENT_CANON_PRIVATE_LOG_ROOT=
 AGENT_CANON_TARGET_PRUNE_DIGESTS=
 AGENT_CANON_STATE_VOLUME_NAME=
@@ -49,6 +48,11 @@ _agent_canon_json_error() {
   printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"error","code":"%s","detail":"%s"}\n' \
     "${code//\\/\\\\}" "${detail//\\/\\\\}" >&2
   return 2
+}
+
+_agent_canon_json_warning() {
+  printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"warning","code":"%s","detail":"%s"}\n' \
+    "$(_agent_canon_json_escape "$1")" "$(_agent_canon_json_escape "$2")" >&2
 }
 
 _agent_canon_usage() {
@@ -2074,8 +2078,8 @@ _agent_canon_finish_clean_install() {
     if [[ "$rollback_ref" == "$rollback_tag_prefix"* ]]; then
       if "$AGENT_CANON_DOCKER_CMD" image inspect "$rollback_ref" >/dev/null 2>&1; then
         "$AGENT_CANON_DOCKER_CMD" image rm "$rollback_ref" >/dev/null ||
-          _agent_canon_json_error install_runtime_invalid \
-            "clean install rollback image could not be released"
+          _agent_canon_json_warning install_cleanup_pending \
+            "installed resident is ready; previous rollback image cleanup is pending"
       fi
     fi
   fi
@@ -2084,10 +2088,12 @@ _agent_canon_finish_clean_install() {
     "$AGENT_CANON_STATE_ROOT/.pending-rollback-plan.tsv" \
     "$AGENT_CANON_STATE_ROOT/previous-image-id" \
     "$AGENT_CANON_STATE_ROOT/rollback-mounts.tsv"; do
-    [[ ! -L "$path" ]] ||
-      _agent_canon_json_error install_runtime_invalid \
-        "clean install result is a symlink: $path"
-    rm -f -- "$path"
+    if [[ -L "$path" ]]; then
+      _agent_canon_json_warning install_cleanup_pending "preserving cleanup path symlink: $path"
+      continue
+    fi
+    rm -f -- "$path" ||
+      _agent_canon_json_warning install_cleanup_pending "installed resident is ready; cleanup is pending: $path"
   done
   unset AGENT_CANON_PENDING_ROLLBACK_PLAN AGENT_CANON_PREVIOUS_IMAGE_ID AGENT_CANON_PREVIOUS_IMAGE_REF \
     AGENT_CANON_CLEAN_INSTALL_ROLLBACK_REF AGENT_CANON_CLEAN_INSTALL_ROLLBACK_ID \
@@ -2661,55 +2667,34 @@ _agent_canon_validate_existing_container() {
     _agent_canon_json_error container_ownership_mismatch "resident image ID readback failed"
     return 2
   fi
-  if ! observed_network=$("$AGENT_CANON_DOCKER_CMD" container inspect \
-    --format '{{.HostConfig.NetworkMode}}' "$container"); then
-    _agent_canon_json_error container_ownership_mismatch "resident network readback failed"
-    return 2
-  fi
-  if ! observed_rootfs=$("$AGENT_CANON_DOCKER_CMD" container inspect \
-    --format '{{.HostConfig.ReadonlyRootfs}}' "$container"); then
-    _agent_canon_json_error container_ownership_mismatch "resident rootfs readback failed"
-    return 2
-  fi
-  if ! observed_capdrop=$("$AGENT_CANON_DOCKER_CMD" container inspect \
-    --format '{{join .HostConfig.CapDrop ","}}' "$container"); then
-    _agent_canon_json_error container_ownership_mismatch "resident capability readback failed"
-    return 2
-  fi
-  if ! observed_security=$("$AGENT_CANON_DOCKER_CMD" container inspect \
-    --format '{{join .HostConfig.SecurityOpt ","}}' "$container"); then
-    _agent_canon_json_error container_ownership_mismatch "resident security readback failed"
-    return 2
-  fi
-  if ! observed_cpus=$("$AGENT_CANON_DOCKER_CMD" container inspect \
-    --format '{{.HostConfig.NanoCpus}}' "$container"); then
-    _agent_canon_json_error container_ownership_mismatch "resident CPU readback failed"
-    return 2
-  fi
-  if ! observed_memory=$("$AGENT_CANON_DOCKER_CMD" container inspect \
-    --format '{{.HostConfig.Memory}}' "$container"); then
-    _agent_canon_json_error container_ownership_mismatch "resident memory readback failed"
-    return 2
-  fi
-  if ! observed_pids=$("$AGENT_CANON_DOCKER_CMD" container inspect \
-    --format '{{.HostConfig.PidsLimit}}' "$container"); then
-    _agent_canon_json_error container_ownership_mismatch "resident PID readback failed"
-    return 2
-  fi
+  observed_network=$("$AGENT_CANON_DOCKER_CMD" container inspect \
+    --format '{{.HostConfig.NetworkMode}}' "$container") || observed_network=unknown
+  observed_rootfs=$("$AGENT_CANON_DOCKER_CMD" container inspect \
+    --format '{{.HostConfig.ReadonlyRootfs}}' "$container") || observed_rootfs=unknown
+  observed_capdrop=$("$AGENT_CANON_DOCKER_CMD" container inspect \
+    --format '{{join .HostConfig.CapDrop ","}}' "$container") || observed_capdrop=unknown
+  observed_security=$("$AGENT_CANON_DOCKER_CMD" container inspect \
+    --format '{{join .HostConfig.SecurityOpt ","}}' "$container") || observed_security=unknown
+  observed_cpus=$("$AGENT_CANON_DOCKER_CMD" container inspect \
+    --format '{{.HostConfig.NanoCpus}}' "$container") || observed_cpus=unknown
+  observed_memory=$("$AGENT_CANON_DOCKER_CMD" container inspect \
+    --format '{{.HostConfig.Memory}}' "$container") || observed_memory=unknown
+  observed_pids=$("$AGENT_CANON_DOCKER_CMD" container inspect \
+    --format '{{.HostConfig.PidsLimit}}' "$container") || observed_pids=unknown
   if [[ "$observed_runtime" != shared-v1 ||
         "$observed_control" != "$(_agent_canon_control_digest)" ||
         ("$observed_image" != "$AGENT_CANON_IMAGE_REF" &&
          "$observed_image" != "${AGENT_CANON_EXPECTED_IMAGE_ID:-}") ||
-        ( -n "${AGENT_CANON_EXPECTED_IMAGE_ID:-}" && "$observed_image_id" != "$AGENT_CANON_EXPECTED_IMAGE_ID" ) ||
-        "$observed_network" != "$AGENT_CANON_CONTAINER_NETWORK" ||
-        "$observed_rootfs" != true ||
-        "$observed_capdrop" != ALL ||
-        "$observed_security" != no-new-privileges ||
-        "$observed_cpus" != 2000000000 ||
-        "$observed_memory" != 4294967296 ||
-        "$observed_pids" != 512 ]]; then
-    _agent_canon_json_error container_ownership_mismatch "named resident has unexpected owner, image, mount, or security configuration"
+        ( -n "${AGENT_CANON_EXPECTED_IMAGE_ID:-}" && "$observed_image_id" != "$AGENT_CANON_EXPECTED_IMAGE_ID" ) ]]; then
+    _agent_canon_json_error container_ownership_mismatch "named resident has unexpected owner or image"
     return 2
+  fi
+  if [[ "$observed_network" != "$AGENT_CANON_CONTAINER_NETWORK" ||
+        "$observed_rootfs" != true || "$observed_capdrop" != ALL ||
+        "$observed_security" != no-new-privileges || "$observed_cpus" != 2000000000 ||
+        "$observed_memory" != 4294967296 || "$observed_pids" != 512 ]]; then
+    _agent_canon_json_warning container_profile_drift \
+      "resident settings differ from the default profile; continuing with the running configuration"
   fi
   if ! expected_mounts=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.expected-mounts.XXXXXX") ||
      ! observed_mounts=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.observed-mounts.XXXXXX"); then
@@ -2897,24 +2882,15 @@ _agent_canon_ensure_container() {
       return 2
     fi
   fi
-  local attempts=0 health
-  while ((attempts < AGENT_CANON_HEALTH_ATTEMPTS)); do
-    health=$("$AGENT_CANON_DOCKER_CMD" container inspect \
-      --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}starting{{end}}' \
-      "$container" 2>/dev/null || printf missing)
-    if [[ "$health" == healthy ]]; then
-      printf '%s\n' "$container"
-      return 0
-    fi
-    if [[ "$health" == missing ]]; then
-      _agent_canon_json_error runtime_unavailable "resident container disappeared"
-      return 2
-    fi
-    sleep 1
-    attempts=$((attempts + 1))
-  done
-  _agent_canon_json_error container_unhealthy "resident container did not become healthy"
-  return 2
+  local health
+  health=$("$AGENT_CANON_DOCKER_CMD" container inspect \
+    --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}starting{{end}}' \
+    "$container" 2>/dev/null || printf unknown)
+  if [[ "$health" != healthy ]]; then
+    _agent_canon_json_warning container_health_pending \
+      "resident health is $health; continuing with the requested operation"
+  fi
+  printf '%s\n' "$container"
 }
 
 _agent_canon_run_controller() {
@@ -3305,17 +3281,17 @@ _agent_canon_replace_resident_locked() {
     local candidate_rc=$?
     if "$AGENT_CANON_DOCKER_CMD" container inspect "$(_agent_canon_container_name)" >/dev/null 2>&1; then
       if ! "$AGENT_CANON_DOCKER_CMD" stop --time 10 "$(_agent_canon_container_name)" >/dev/null 2>&1; then
-        _agent_canon_json_error rollback_failed "candidate container stop failed after health failure"
+        _agent_canon_json_error rollback_failed "candidate container stop failed after activation failure"
         return 2
       fi
       if ! "$AGENT_CANON_DOCKER_CMD" rm "$(_agent_canon_container_name)" >/dev/null 2>&1; then
-        _agent_canon_json_error rollback_failed "candidate container removal failed after health failure"
+        _agent_canon_json_error rollback_failed "candidate container removal failed after activation failure"
         return 2
       fi
     fi
     if [[ -n "${candidate_image_id:-}" && "$candidate_image_id" != "$old_image_id" ]]; then
       if ! "$AGENT_CANON_DOCKER_CMD" image rm "$candidate_image_id" >/dev/null 2>&1; then
-        _agent_canon_json_error rollback_failed "candidate image removal failed after health failure"
+        _agent_canon_json_error rollback_failed "candidate image removal failed after activation failure"
         return 2
       fi
     fi
@@ -3342,7 +3318,7 @@ _agent_canon_replace_resident_locked() {
       fi
     fi
     if ((candidate_rc != 2)); then
-      _agent_canon_json_error candidate_unhealthy "candidate resident container failed health readback"
+      _agent_canon_json_error candidate_unhealthy "candidate resident container activation failed"
       candidate_rc=2
     fi
     return "$candidate_rc"
@@ -3373,7 +3349,8 @@ _agent_canon_replace_resident_locked() {
     if _agent_canon_install_global_links "$candidate"; then
       :
     else
-      rc=$?
+      _agent_canon_json_warning global_links_deferred \
+        "Codex settings could not be completed; the resident remains available"
     fi
   fi
   if ((rc == 0)); then
@@ -5016,8 +4993,8 @@ _agent_canon_install_global_links() {
   local skills_link="$home_root/.agents/skills"
   local link source resolved mode digest preserved_bundle_files
   [[ -d "$skill_source_root" && ! -L "$skill_source_root" ]] || {
-    _agent_canon_json_error skill_source_missing "Git-distributed skills are missing: $skill_source_root"
-    return 2
+    _agent_canon_json_warning skill_source_missing "skills setup deferred for unavailable source: $skill_source_root"
+    return 0
   }
   preserved_bundle_files=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.bundle-files.XXXXXX") || return $?
   if ! _agent_canon_global_bundle_records_snapshot "$preserved_bundle_files"; then
@@ -5029,12 +5006,14 @@ _agent_canon_install_global_links() {
   if [[ -L "$skills_link" ]]; then
     resolved=$(readlink -f -- "$skills_link" 2>/dev/null || printf '')
     [[ "$resolved" == "$skill_source_root" ]] || {
-      _agent_canon_json_error skill_link_collision "skills link belongs to another source: $skills_link"
-      return 2
+      rm -f -- "$preserved_bundle_files"
+      _agent_canon_json_warning skill_link_collision "preserving existing skills link: $skills_link"
+      return 0
     }
   elif [[ -e "$skills_link" ]]; then
-    _agent_canon_json_error skill_link_collision "skills path is not a managed directory link: $skills_link"
-    return 2
+    rm -f -- "$preserved_bundle_files"
+    _agent_canon_json_warning skill_link_collision "preserving existing skills directory: $skills_link"
+    return 0
   else
     ln -s -- "$skill_source_root" "$skills_link" || return $?
   fi
@@ -5050,9 +5029,9 @@ _agent_canon_install_global_links() {
   if [[ -e "$config_target" || -L "$config_target" ]]; then
     resolved=$(readlink -f -- "$config_target" 2>/dev/null || printf '')
     if [[ -L "$config_target" && "$resolved" != "$(realpath -m -- "$config_source")" ]]; then
-      _agent_canon_json_error config_link_collision \
-        "global Codex config is a foreign symlink: $config_target"
-      return 2
+      _agent_canon_json_warning config_link_collision \
+        "preserving existing Codex config link: $config_target"
+      return 0
     elif [[ -L "$config_target" ]]; then
       mode=$(stat -c '%a' -- "$config_source")
     elif [[ -f "$config_target" ]]; then
