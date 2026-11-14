@@ -168,6 +168,8 @@ For the planned repair or migration, follow this order:
    reference tools when text search cannot establish reachability. Remove
    missed code and migrate remaining callers before validation; explain retained
    old code by a current requirement in the existing task/PR context.
+   Complete the [post-implementation necessity review](../skills/change-review.md#procedure)
+   and delete unsupported stabilization and unnecessary added variables in this unit.
 4. Format the final state and run its selected tests and checks together.
 
 The final-state review catches code left behind when a new path works; tests of
