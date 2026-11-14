@@ -113,6 +113,9 @@ evidence.
   compiled by the container's generic `tools/**/Cargo.toml` scan into cache/bin.
   For caller compatibility, `sync` accepts and ignores `--remote` and `--branch`;
   the source remote and branch remain fixed to `origin main`.
+- The same sync updates a managed host native CLI from the latest stable release.
+  The [bootstrap lifecycle](../../documents/runtime/bootstrap-runtime.md#install-source-transition)
+  owns its layout, existing package verification, atomic link switch, and timer.
 - Eval collection is append-only and is handed to the repository-qualified
   `iwashita-nozomu/agent-canon-log` archive through the host adapter. Never
   write archive output back into the AgentCanon source tree.

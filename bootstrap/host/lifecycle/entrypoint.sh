@@ -275,13 +275,104 @@ _agent_canon_advance_source() {
     }
 }
 
+_agent_canon_host_native_cli() {
+  if [[ -n "${AGENT_CANON_NATIVE_BIN:-}" ]]; then
+    printf '%s\n' "$AGENT_CANON_NATIVE_BIN"
+  elif [[ -n "${AGENT_CANON_CLI:-}" ]]; then
+    printf '%s\n' "$AGENT_CANON_CLI"
+  elif [[ -x "$HOME/.local/bin/agent-canon" ]]; then
+    printf '%s\n' "$HOME/.local/bin/agent-canon"
+  else
+    printf '%s\n' "$AGENT_CANON_REPOSITORY_ROOT/tools/bin/agent-canon"
+  fi
+}
+
+_agent_canon_update_native_cli() (
+  set -euo pipefail
+  local home_root
+  home_root=$(CDPATH= cd -- "$HOME" && pwd -P)
+  [[ "${AGENT_CANON_CONTROL_ROOT:-}" == "$home_root" ]] || return 0
+  local managed_link="$home_root/.local/bin/agent-canon"
+  local native_root="$home_root/.local/share/agent-canon/native"
+  [[ -L "$managed_link" ]] || return 0
+  local current package current_version target binary_name
+  current=$(readlink "$managed_link")
+  case "$current" in
+    "$native_root"/v*/agent-canon-*/bin/agent-canon|"$native_root"/v*/agent-canon-*/bin/agent-canon.exe) ;;
+    *) return 0 ;;
+  esac
+  _agent_canon_validate_new_path "$native_root" "native install root"
+  _agent_canon_validate_new_path "${current%/*}" "installed native directory"
+  [[ -f "$current" && ! -L "$current" && -x "$current" ]] || { _agent_canon_json_error native_update_unavailable "installed native verifier is unavailable"; exit 2; }
+  package=${current%/bin/*}
+  current_version=${package%/*}
+  current_version=${current_version##*/}
+  current_version=${current_version#v}
+  package=${package##*/}
+  [[ "$package" == "agent-canon-${current_version}-"* ]] || return 0
+  target=${package#"agent-canon-${current_version}-"}
+  binary_name=${current##*/}
+  local tag version package_name destination
+  tag=$(curl --fail --silent --show-error --location --head \
+    --proto '=https' --proto-redir '=https' --output /dev/null \
+    --write-out '%{url_effective}' https://github.com/iwashita-nozomu/agent-canon/releases/latest)
+  tag=${tag#https://github.com/iwashita-nozomu/agent-canon/releases/tag/}
+  [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+    _agent_canon_json_error native_release_invalid "latest release did not resolve to a stable version"
+    exit 2
+  }
+  version=${tag#v}
+  package_name="agent-canon-${version}-${target}"
+  destination="$native_root/$tag/$package_name"
+  _agent_canon_validate_new_path "$destination" "native release destination"
+  if [[ "$current" == "$destination/bin/$binary_name" ]]; then
+    printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"ok","operation":"native_update","code":"up_to_date","version":"%s"}\n' "$version"
+    return 0
+  fi
+  if ! git -C "$AGENT_CANON_REPOSITORY_ROOT" rev-parse --verify --quiet "refs/tags/$tag^{commit}" >/dev/null; then
+    git -C "$AGENT_CANON_REPOSITORY_ROOT" fetch origin tag "$tag"
+  fi
+  local stage= link_stage= suffix observed_version
+  trap '[[ -z "$stage" || ! -d "$stage" ]] || rm -r -- "$stage"; [[ -z "$link_stage" || ! -d "$link_stage" ]] || rm -r -- "$link_stage"' EXIT
+  stage=$(mktemp -d "$native_root/.update.XXXXXX")
+  mkdir "$stage/assets" "$stage/unpacked"
+  for suffix in tar.gz tar.gz.sha256 zip zip.sha256; do
+    curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' \
+      --output "$stage/assets/$package_name.$suffix" \
+      "https://github.com/iwashita-nozomu/agent-canon/releases/download/$tag/$package_name.$suffix"
+  done
+  "$current" template-bundle native-verify \
+    --source-root "$AGENT_CANON_REPOSITORY_ROOT" --source-ref "refs/tags/$tag" \
+    --root "$stage/assets" --target "$target"
+  tar -xzf "$stage/assets/$package_name.tar.gz" -C "$stage/unpacked"
+  observed_version=$("$stage/unpacked/$package_name/bin/$binary_name" --version)
+  [[ "$observed_version" == "agent-canon $version" ]] || {
+    _agent_canon_json_error native_release_invalid "downloaded executable version differs from its release"
+    exit 2
+  }
+  if [[ -e "$destination" ]]; then
+    diff -qr -- "$stage/unpacked/$package_name" "$destination"
+  else
+    mkdir -p "$native_root/$tag"
+    mv -- "$stage/unpacked/$package_name" "$native_root/$tag/"
+  fi
+  [[ -L "$managed_link" && "$(readlink "$managed_link")" == "$current" ]] || {
+    _agent_canon_json_error native_install_changed "active native installation changed during download"
+    exit 2
+  }
+  link_stage=$(mktemp -d "${managed_link%/*}/.agent-canon-update.XXXXXX")
+  ln -s "$destination/bin/$binary_name" "$link_stage/agent-canon"
+  mv -f -- "$link_stage/agent-canon" "$managed_link"
+  printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"ok","operation":"native_update","code":"updated","version":"%s"}\n' "$version"
+)
+
 _agent_canon_sync_operation() (
   # The scheduler advances source and drains each existing archive owner in
   # one serialized host run.  A source-update failure does not suppress
   # delivery of already-pending runtime artifacts.
   set +e
   local install_root=${AGENT_CANON_REPOSITORY_ROOT:-}
-  local candidate_image_ref rc=0 source_rc=0 hook_rc=0 eval_rc=0 feedback_rc=0 archive_rc=0 container eval_request_ids eval_run_id
+  local candidate_image_ref rc=0 source_rc=0 native_rc=0 hook_rc=0 eval_rc=0 feedback_rc=0 archive_rc=0 container eval_request_ids eval_run_id
   local sync_index=1 sync_token
   while ((sync_index < ${#command_args[@]})); do
     sync_token=${command_args[sync_index]}
@@ -320,6 +411,8 @@ _agent_canon_sync_operation() (
       "source-sync install root is not a directory"
     source_rc=2
   fi
+  _agent_canon_update_native_cli
+  native_rc=$?
   if ((source_rc == 0)); then
     unset AGENT_CANON_LOCAL_BUILD
     unset AGENT_CANON_ALLOW_BUILD
@@ -352,7 +445,8 @@ _agent_canon_sync_operation() (
     fi
   fi
 
-  local archive_cli=${AGENT_CANON_NATIVE_BIN:-${AGENT_CANON_CLI:-$install_root/tools/bin/agent-canon}}
+  local archive_cli
+  archive_cli=$(_agent_canon_host_native_cli)
   if [[ -x "$archive_cli" ]] && "$archive_cli" --version >/dev/null 2>&1; then
     "$archive_cli" runtime-log-archive-git \
       --source-root "$install_root" \
@@ -406,6 +500,7 @@ _agent_canon_sync_operation() (
   ((eval_rc == 0)) || { ((archive_rc == 0)) && archive_rc=$eval_rc; }
   ((feedback_rc == 0)) || { ((archive_rc == 0)) && archive_rc=$feedback_rc; }
   ((source_rc == 0)) || exit "$source_rc"
+  ((native_rc == 0)) || exit "$native_rc"
   exit "$archive_rc"
 )
 
@@ -4205,7 +4300,8 @@ _agent_canon_archive_eval_sync() {
     printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"warning","operation":"eval_sync","code":"host_adapter_deferred","execution_plane":"host_archive_adapter"}\n' >&2
     return 75
   }
-  local archive_cli=${AGENT_CANON_NATIVE_BIN:-${AGENT_CANON_CLI:-$AGENT_CANON_REPOSITORY_ROOT/tools/bin/agent-canon}}
+  local archive_cli
+  archive_cli=$(_agent_canon_host_native_cli)
   if ! "$archive_cli" --version >/dev/null 2>&1; then
     printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"warning","operation":"eval_sync","code":"host_adapter_deferred","execution_plane":"host_archive_adapter"}\n' >&2
     return 75

@@ -193,6 +193,16 @@ followed by `git -C <install-root> checkout --force -B main FETCH_HEAD`. Git
 command or network failure is the only source transition failure; the final
 HEAD and tree values in the source-sync receipt are telemetry.
 
+Every sync also checks the latest stable native release when the explicit control
+root is the user's home and `~/.local/bin/agent-canon` points into the managed
+`~/.local/share/agent-canon/native/` layout. The updater inherits the installed
+target, downloads with host `curl`, and uses the current CLI's existing
+`template-bundle native-verify` to check source tag, provenance and checksums.
+It runs the candidate CLI before atomically switching the link and retains prior
+versions. The existing 15-minute timer performs this check on every sync,
+including runs whose source is already current. Native update and source/runtime
+update results remain separate from archive delivery results.
+
 After a successful source transition, sync selects the `:env-<key>` image and reuses the
 resident when its environment and source/cache mounts are current. Image
 unavailability is reported before the old resident is stopped; later resident

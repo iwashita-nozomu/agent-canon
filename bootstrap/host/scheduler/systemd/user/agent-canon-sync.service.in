@@ -1,5 +1,5 @@
 [Unit]
-Description=AgentCanon one-shot source and runtime sync
+Description=AgentCanon one-shot source, native CLI and runtime sync
 After=network-online.target
 Wants=network-online.target
 

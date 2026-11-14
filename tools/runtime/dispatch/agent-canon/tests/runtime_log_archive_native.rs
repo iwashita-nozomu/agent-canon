@@ -347,6 +347,71 @@ fn sync_publishes_to_the_selected_local_archive_branch_and_reads_back_clean_stat
         String::from_utf8_lossy(&sync.stdout).contains("RUNTIME_LOG_ARCHIVE_PUSH_STATUS=committed")
     );
 
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let tools = root.join("tools");
+        let calls = root.join("github-calls");
+        fs::create_dir(&tools).unwrap();
+        let gh = tools.join("gh");
+        fs::write(
+            &gh,
+            r#"#!/bin/sh
+set -eu
+printf '%s\n' "$4" >> "$GH_CALLS"
+case "$4" in
+  repos/example/source) printf '{"id":42}\n';;
+  repos/example/source/actions/workflows/agent-canon-static-gates.yml)
+    printf '{"id":19,"path":".github/workflows/agent-canon-static-gates.yml"}\n';;
+  repos/example/source/actions/artifacts\?*) printf '{"artifacts":[]}\n';;
+  *) exit 2;;
+esac
+"#,
+        )
+        .unwrap();
+        fs::set_permissions(&gh, fs::Permissions::from_mode(0o700)).unwrap();
+        fs::create_dir_all(canon.join("bootstrap/host")).unwrap();
+        fs::write(
+            canon.join("bootstrap/host/manifest.toml"),
+            include_bytes!("../../../../../bootstrap/host/manifest.toml"),
+        )
+        .unwrap();
+        let result = Command::new(NATIVE)
+            .args(["runtime-log-archive-git", "--source-root"])
+            .arg(&source)
+            .arg("--canon-root")
+            .arg(&canon)
+            .arg("--archive-root")
+            .arg(&archive)
+            .arg("--runtime-root")
+            .arg(&runtime)
+            .arg("--remote")
+            .arg(&remote)
+            .args(["sync", "--no-agent-reports", "--include-main-evals"])
+            .env(
+                "PATH",
+                format!(
+                    "{}:{}",
+                    tools.display(),
+                    std::env::var("PATH").unwrap_or_default()
+                ),
+            )
+            .env("GH_CALLS", &calls)
+            .output()
+            .unwrap();
+        assert!(
+            result.status.success(),
+            "{}\n{}",
+            String::from_utf8_lossy(&result.stdout),
+            String::from_utf8_lossy(&result.stderr)
+        );
+        assert!(fs::read_to_string(calls)
+            .unwrap()
+            .lines()
+            .any(|line| line
+                == "repos/example/source/actions/workflows/agent-canon-static-gates.yml"));
+    }
+
     let status = archive_command(
         &source,
         &canon,

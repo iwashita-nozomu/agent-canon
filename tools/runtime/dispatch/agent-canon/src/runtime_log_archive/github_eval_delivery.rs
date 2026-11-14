@@ -728,7 +728,13 @@ pub(super) fn deliver_main_evals(
         .filter(|value| *value > 0)
         .ok_or_else(|| github_error("github_eval_repository_invalid"))?;
     let workflow = github_json(
-        &format!("repos/{repository}/actions/workflows/{WORKFLOW_PATH}"),
+        &format!(
+            "repos/{repository}/actions/workflows/{}",
+            Path::new(WORKFLOW_PATH)
+                .file_name()
+                .unwrap()
+                .to_string_lossy()
+        ),
         &context.source_root,
     )?;
     let workflow_id = workflow

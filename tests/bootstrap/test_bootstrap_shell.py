@@ -3777,7 +3777,8 @@ source {str(ADAPTER)!r}
 AGENT_CANON_DOCKER={str(fake_docker)!r}
 PATH={str(fake_bin)!r}:$PATH
 GIT_LOG={str(git_log)!r}
-export AGENT_CANON_DOCKER PATH GIT_LOG
+AGENT_CANON_NATIVE_BIN={str(archive_cli)!r}
+export AGENT_CANON_DOCKER PATH GIT_LOG AGENT_CANON_NATIVE_BIN
 _agent_canon_validate_roots() {{
   AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}
   AGENT_CANON_PRIVATE_LOG_ROOT={str(tmp_path / "private-log")!r}
@@ -3794,7 +3795,6 @@ _agent_canon_ensure_container() {{ printf 'fixture-container'; }}
 _agent_canon_init_state_volume() {{ return 0; }}
 _agent_canon_volume_copy() {{ return 0; }}
 _agent_canon_private_feedback_sync() {{ return 0; }}
-python3() {{ return 0; }}
 bootstrap_host_entrypoint {str(repository)!r} --control-parent-root {str(tmp_path)!r} \
   sync --install-root {str(repository)!r} {shell_args}
 """
@@ -5760,10 +5760,8 @@ def test_gpu006_stale_source_sync_mount_is_recreated_by_public_route(
     stop_index = next(
         index for index, call in enumerate(calls) if call.startswith("stop\t")
     )
-    if operation == "install":
-        assert stop_index < pull_index
-    else:
-        assert pull_index < stop_index
+    # The image is prepared before an existing resident is stopped (#1853).
+    assert pull_index < stop_index
     assert resident["id"] in calls[stop_index]
     assert any(old_image_id in call for call in calls if call.startswith("tag\t"))
     if operation == "install":
@@ -6718,6 +6716,7 @@ _agent_canon_volume_copy() {{
 _agent_canon_archive_eval_sync() {{ printf 'eval-publish\\n' >> {str(phases)!r}; return 0; }}
 _agent_canon_private_feedback_sync() {{ printf 'feedback\\n' >> {str(phases)!r}; return 0; }}
 AGENT_CANON_REPOSITORY_ROOT={str(install)!r}
+AGENT_CANON_NATIVE_BIN={str(archive_cli)!r}
 AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}
 AGENT_CANON_STATE_ROOT={str(runtime / "container-state")!r}
 AGENT_CANON_PRIVATE_LOG_ROOT={str(tmp_path / "agent-canon-log")!r}
