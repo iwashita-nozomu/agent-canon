@@ -347,6 +347,7 @@ impl RuntimeDirectory {
         mode: u32,
     ) -> std::io::Result<std::fs::File> {
         use cap_fs_ext::{FollowSymlinks, OpenOptionsFollowExt};
+        use std::os::fd::AsRawFd;
         let (parent, name) = self.parent(relative, false)?;
         let descriptor = rustix::fs::openat(
             &parent.directory,
@@ -357,12 +358,17 @@ impl RuntimeDirectory {
         let mut file = std::fs::File::from(descriptor);
         file.write_all(bytes)?;
         file.sync_all()?;
+        // open(2)'s O_TMPFILE publication route for callers without
+        // CAP_DAC_READ_SEARCH: https://man7.org/linux/man-pages/man2/open.2.html
+        // The live descriptor pins the source inode; the destination stays
+        // descriptor-relative and linkat keeps its no-replace semantics.
+        let source = format!("/proc/self/fd/{}", file.as_raw_fd());
         rustix::fs::linkat(
-            &file,
-            "",
+            rustix::fs::CWD,
+            source,
             &parent.directory,
             &name,
-            rustix::fs::AtFlags::EMPTY_PATH,
+            rustix::fs::AtFlags::SYMLINK_FOLLOW,
         )?;
         parent.sync_directory()?;
         let mut options = cap_std::fs::OpenOptions::new();
@@ -1953,6 +1959,33 @@ pub fn root_capability_environment(
 mod tests {
     use super::*;
     use std::fs;
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn anonymous_publication_keeps_complete_bytes_and_existing_destination() {
+        use std::os::unix::fs::PermissionsExt;
+        let temporary = tempfile::tempdir().unwrap();
+        let root = temporary.path().canonicalize().unwrap();
+        let directory = RuntimeDirectory::open_nofollow(&root, false).unwrap();
+        directory
+            .publish_anonymous_once(Path::new("result"), b"complete", 0o600)
+            .unwrap();
+        assert_eq!(fs::read(root.join("result")).unwrap(), b"complete");
+        assert_eq!(
+            fs::metadata(root.join("result"))
+                .unwrap()
+                .permissions()
+                .mode()
+                & 0o777,
+            0o600
+        );
+        let error = directory
+            .publish_anonymous_once(Path::new("result"), b"replacement", 0o600)
+            .unwrap_err();
+        assert_eq!(error.kind(), std::io::ErrorKind::AlreadyExists);
+        assert_eq!(fs::read(root.join("result")).unwrap(), b"complete");
+        assert_eq!(fs::read_dir(root).unwrap().count(), 1);
+    }
 
     #[test]
     fn expands_only_explicit_current_home_paths() {
