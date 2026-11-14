@@ -514,8 +514,9 @@ _agent_canon_install_global_links
     result = subprocess.run(
         ["bash", "-c", script], check=False, capture_output=True, text=True
     )
-    assert result.returncode == 2
+    assert result.returncode == 0
     assert "skill_link_collision" in result.stderr
+    assert json.loads(result.stderr)["status"] == "warning"
     assert not legacy.is_symlink()
     assert (legacy / "stale/SKILL.md").read_text() == "stale\n"
 
@@ -551,10 +552,38 @@ _agent_canon_install_global_links
     result = subprocess.run(
         ["bash", "-c", script], check=False, capture_output=True, text=True
     )
-    assert result.returncode == 2
+    assert result.returncode == 0
     assert json.loads(result.stderr)["code"] == "config_link_collision"
+    assert json.loads(result.stderr)["status"] == "warning"
     assert config.is_symlink() and config.resolve() == foreign.resolve()
     assert not (repository / ".codex" / "personal" / "config.toml").exists()
+
+
+def test_install_cleanup_warns_and_preserves_a_symlink(tmp_path: Path) -> None:
+    runtime = tmp_path / "runtime"
+    state = runtime / "container-state"
+    state.mkdir(parents=True)
+    foreign = tmp_path / "keep.txt"
+    foreign.write_text("keep\n", encoding="utf-8")
+    plan = state / "rollback-plan.tsv"
+    plan.symlink_to(foreign)
+    result = subprocess.run(
+        [
+            "bash",
+            "-c",
+            f"source {str(ADAPTER)!r}\n"
+            f"AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}\n"
+            f"AGENT_CANON_STATE_ROOT={str(state)!r}\n"
+            "_agent_canon_finish_clean_install\n",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stderr)["code"] == "install_cleanup_pending"
+    assert plan.is_symlink()
+    assert foreign.read_text(encoding="utf-8") == "keep\n"
 
 
 def test_shell_install_applies_only_canonical_context_defaults(tmp_path: Path) -> None:
@@ -5360,6 +5389,7 @@ exit "$rc"
     ("control_label", "mounts", "expected_rc", "expected_code", "expect_teardown"),
     [
         ("owned", "", 0, None, True),
+        ("owned", "", 0, "global_links_deferred", True),
         ("foreign", "", 2, "container_ownership_mismatch", False),
         (
             "owned",
@@ -5429,7 +5459,7 @@ _agent_canon_write_rollback_plan() {{ :; }}
 _agent_canon_ensure_container() {{ printf 'candidate\\n'; }}
     _agent_canon_run_controller() {{ :; }}
     _agent_canon_record_active_container() {{ :; }}
-    _agent_canon_install_global_links() {{ :; }}
+    _agent_canon_install_global_links() {{ return {23 if expected_code == "global_links_deferred" else 0}; }}
     _agent_canon_publish_controller_projection() {{ :; }}
     _agent_canon_replace_resident candidate
 rc=$?
@@ -5799,14 +5829,22 @@ def test_gpu006_stale_source_sync_mount_is_recreated_by_public_route(
 
 
 @pytest.mark.parametrize(
-    ("install_args", "pull_fails"),
-    [((), False), (("--local-build",), False), ((), True)],
+    ("install_args", "pull_fails", "health_polls", "profile_drift"),
+    [
+        ((), False, "0", ""),
+        (("--local-build",), False, "0", ""),
+        ((), True, "0", ""),
+        ((), False, "1000", ""),
+        ((), False, "0", "network"),
+    ],
 )
 def test_public_clean_install_uses_tracked_skills_and_first_target(
     tmp_path: Path,
     native_cli_input: Path,
     install_args: tuple[str, ...],
     pull_fails: bool,
+    health_polls: str,
+    profile_drift: str,
 ) -> None:
     """Install from empty state, then reconstruct over stale runtime residue."""
     home = tmp_path / "home"
@@ -5846,6 +5884,8 @@ def test_public_clean_install_uses_tracked_skills_and_first_target(
         "FAKE_DOCKER_STATE": str(fake_state),
         "FAKE_DOCKER_VALID_IMAGE_IDS": "1",
         "FAKE_DOCKER_FAIL_PULL": "1" if pull_fails else "0",
+        "FAKE_DOCKER_HEALTH_POLLS": health_polls,
+        "FAKE_DOCKER_DRIFT_ON_HEALTH": profile_drift,
         "FAKE_DOCKER_CALLS": str(docker_calls),
     }
     common = [
@@ -5867,6 +5907,8 @@ def test_public_clean_install_uses_tracked_skills_and_first_target(
         env=environment,
     )
     assert installed.returncode == 0, installed.stderr
+    if health_polls == "1000":
+        assert '"code":"container_health_pending"' in installed.stderr
     operations = [
         line.split("\t", 1)[0] for line in docker_calls.read_text().splitlines()
     ]
@@ -5915,6 +5957,8 @@ def test_public_clean_install_uses_tracked_skills_and_first_target(
         [*common, "start"], check=False, capture_output=True, text=True, env=environment
     )
     assert started.returncode == 0, started.stderr
+    if profile_drift:
+        assert '"code":"container_profile_drift"' in started.stderr
     added = subprocess.run(
         [
             *common,

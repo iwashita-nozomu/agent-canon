@@ -23,8 +23,6 @@ use std::env;
 use std::ffi::OsString;
 use std::fs;
 use std::io::{Read, Write};
-#[cfg(unix)]
-use std::os::unix::fs::PermissionsExt as StdPermissionsExt;
 use std::path::{Component, Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -1121,19 +1119,6 @@ impl BootstrapRuntime {
             &self.paths.container_runtime,
         ] {
             self.fs.ensure_directory(path, 0o700)?;
-        }
-        #[cfg(unix)]
-        {
-            let metadata =
-                fs::symlink_metadata(&self.paths.container_runtime).map_err(|error| {
-                    BootstrapError::new("exchange_directory_invalid", error.to_string())
-                })?;
-            if metadata.permissions().mode() & 0o777 != 0o700 {
-                return Err(BootstrapError::new(
-                    "exchange_directory_invalid",
-                    "container runtime exchange mode is not 0700",
-                ));
-            }
         }
         self.fs.ensure_new_file(&self.paths.lock, 0o600)?;
         if let Ok(metadata) = fs::symlink_metadata(&self.paths.private_log) {
@@ -4753,6 +4738,7 @@ mod tests {
     use super::*;
     #[cfg(unix)]
     use std::os::unix::fs::MetadataExt as StdMetadataExt;
+    use std::os::unix::fs::PermissionsExt as StdPermissionsExt;
     use std::sync::{Mutex, MutexGuard};
 
     static ENV_LOCK: Mutex<()> = Mutex::new(());
