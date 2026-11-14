@@ -322,7 +322,10 @@ the resident. Codex link collisions preserve the existing entry and defer that
 optional setting. A failed optional Codex projection or post-install rollback
 cleanup also produces a warning while the installed resident remains available.
 Directory creation applies the required permissions through the existing
-filesystem owner. Source/mount ownership and safe file operations retain their
+filesystem owner. The controller validates its task limits from the manifest;
+the host owns Docker profile settings and observed ownership. Unused health
+timings and duplicate host-profile checks are removed from the controller's
+manifest requirements. Source/mount ownership and safe file operations retain their
 existing boundaries, and Docker, compilation, and controller errors identify
 the failed operation.
 
