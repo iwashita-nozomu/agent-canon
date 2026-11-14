@@ -4935,7 +4935,7 @@ mod tests {
 
     #[test]
     fn manifest_accepts_runtime_limits_without_host_profile_duplicates() {
-        let temporary = tempfile::tempdir().unwrap();
+        let temporary = tempfile::tempdir_in(std::env::temp_dir().canonicalize().unwrap()).unwrap();
         let path = temporary.path().join("manifest.toml");
         fs::write(&path, "[container]\nmax_parallel_tasks = 2\ntask_state_quota_bytes = 1024\ntask_log_quota_bytes = 1024\n").unwrap();
         let (manifest, _) = load_manifest(&path).expect("host profile metadata is optional");
