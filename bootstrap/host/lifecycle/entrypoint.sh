@@ -775,15 +775,15 @@ _agent_canon_validate_codex_home() {
   invalid=$(find "$path" -type l -print | while IFS= read -r link; do
     relative_link=${link#"$path"/}
     case "$relative_link" in
-      config.toml|agents/*|hooks/*|skills/*) ;;
-      *) printf 'invalid\n'; continue ;;
+      (config.toml|agents/*|hooks/*|skills/*) ;;
+      (*) printf 'invalid\n'; continue ;;
     esac
     case "$relative_link" in
-      *//*|../*|*/../*|*/..|./*|*/./*|.) printf 'invalid\n'; continue ;;
-      config.toml) expected="$allowed/config.toml" ;;
-      agents/*|hooks/*) expected="$allowed/$relative_link" ;;
-      skills/agent-canon) expected="$allowed/personal/skills" ;;
-      skills/*) expected="$allowed/personal/skills/${relative_link#skills/}" ;;
+      (*//*|../*|*/../*|*/..|./*|*/./*|.) printf 'invalid\n'; continue ;;
+      (config.toml) expected="$allowed/config.toml" ;;
+      (agents/*|hooks/*) expected="$allowed/$relative_link" ;;
+      (skills/agent-canon) expected="$allowed/personal/skills" ;;
+      (skills/*) expected="$allowed/personal/skills/${relative_link#skills/}" ;;
     esac
     target=$(readlink -f "$link" 2>/dev/null || true)
     [[ "$target" != *$'\n'* && "$target" != *$'\r'* && "$target" != *$'\t'* ]] || {
@@ -1505,20 +1505,20 @@ validate_codex_links() {
   invalid=$(find "$1" -type l -print | while IFS= read -r link; do
     relative_link=${link#"$1"/}
     case "$relative_link" in
-      config.toml|agents/*|hooks/*|skills/*) ;;
-      *) printf "invalid\n"; continue ;;
+      (config.toml|agents/*|hooks/*|skills/*) ;;
+      (*) printf "invalid\n"; continue ;;
     esac
     case "$relative_link" in
-      *//*|../*|*/../*|*/..|./*|*/./*|.) printf "invalid\\n"; continue ;;
-      config.toml) expected="$allowed/config.toml" ;;
-      agents/*|hooks/*) expected="$allowed/$relative_link" ;;
-      skills/agent-canon) expected="$allowed/personal/skills" ;;
-      skills/*) expected="$allowed/personal/skills/${relative_link#skills/}" ;;
+      (*//*|../*|*/../*|*/..|./*|*/./*|.) printf "invalid\\n"; continue ;;
+      (config.toml) expected="$allowed/config.toml" ;;
+      (agents/*|hooks/*) expected="$allowed/$relative_link" ;;
+      (skills/agent-canon) expected="$allowed/personal/skills" ;;
+      (skills/*) expected="$allowed/personal/skills/${relative_link#skills/}" ;;
     esac
     target=$(readlink -- "$link" 2>/dev/null || true)
     case "$target" in
-      /*) [ "$target" = "$expected" ] || printf "invalid\\n" ;;
-      *) printf "invalid\\n" ;;
+      (/*) [ "$target" = "$expected" ] || printf "invalid\\n" ;;
+      (*) printf "invalid\\n" ;;
     esac
   done)
   [ -z "$invalid" ]
