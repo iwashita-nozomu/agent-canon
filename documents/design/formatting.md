@@ -28,7 +28,7 @@ checklist into every Skill.
 | Python | [`ruff.toml`](../../ruff.toml) | `ruff format <edited Python paths...>` |
 | C, C++, CUDA | [`.clang-format`](../../.clang-format) | `clang-format -i --style=file <edited paths...>` |
 | Rust | [`rustfmt.toml`](../../rustfmt.toml) | Owning crate's existing formatting command, or `rustfmt` on edited files using its declared edition |
-| Markdown | [AgentCanon docs tool](../tools/agent-canon.md) | `agent-canon docs format --root . <edited Markdown paths...>` through the shared runtime |
+| Markdown | [AgentCanon docs tool](../tools/agent-canon.md) | `agent-canon docs format --root . <edited Markdown paths...>` |
 | VS Code integration | [Settings](../../.vscode/settings.json), [recommendations](../../.vscode/extensions.json) | Format on save for Python, C/C++/CUDA and Rust using the selected native formatter |
 
 Run commands from the repository's existing working context and name the edited
@@ -37,19 +37,22 @@ command, not a new runtime selector or a value copied into the shared style.
 A crate-wide command is appropriate only within the repository's accepted scope;
 do not expand a bounded edit to a whole-workspace reformat.
 
-### Markdown through the shared runtime
+### Markdown execution
 
-Markdown uses AgentCanon's existing `docs format` operation. Registered source
-targets are read-only. Through the
-[shared runtime](../../agents/skills/agent-canon-bootstrap.md#command-shape),
-copy the edited source into a writable task directory under
-`AGENT_CANON_RUNTIME_ROOT/tasks`, keeping the repository-relative paths and
-local link targets. Run `agent-canon docs format --root <snapshot> <edited paths...>`
-there. The docs command manages temporary provider output under `TMPDIR`, which
-bootstrap sets to its external task directory. Inspect the changes and copy
-only the selected formatted files back through the host editing route.
-This preserves the source mount boundary while formatting the content that
-will be submitted. Remove the task snapshot after its selected use ends.
+Run the installed native CLI's `agent-canon docs format --root . <edited paths...>`
+in the writable work checkout. Formatting uses the native executable alone.
+It does not start Docker or run document checks.
+
+Select `agent-canon docs check` when validation of lint, links, math or diagrams
+is required and its standard providers are available in the selected environment.
+The [command owner](../tools/agent-canon.md#commands) lists those providers.
+A missing image or provider does not block formatting or the remaining task;
+report the selected checks that could not run.
+
+If the already selected environment is a shared resident with read-only source
+mounts, format a writable task snapshot and copy back only the selected files.
+Preserve local link targets for any selected checks and remove the snapshot
+when its use ends. This conditional route preserves the source mount boundary.
 
 ## Engineering rationale
 
