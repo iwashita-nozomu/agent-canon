@@ -344,7 +344,9 @@ def _run_source_free_resident_native(
     source_container = Path("/opt/agent-canon/source")
     volume_root = Path(state_mount["Source"])
     controller_command = len(command) > 1 and command[1] == "bootstrap-runtime"
-    native = os.environ.get("FAKE_DOCKER_NATIVE_BIN") or os.environ.get("AGENT_CANON_CLI", "")
+    native = os.environ.get("FAKE_DOCKER_NATIVE_BIN") or os.environ.get(
+        "AGENT_CANON_CLI", ""
+    )
     driver = os.environ.get("FAKE_DOCKER_CONTROLLER_TEST_DRIVER", "")
     binary = Path(driver if controller_command and driver else native)
     if not binary.is_file() or binary.is_symlink() or not os.access(binary, os.X_OK):
@@ -415,15 +417,29 @@ def _run_source_free_resident_native(
     environment["AGENT_CANON_RUNTIME_TOOLS_ROOT"] = str(source_root)
     for key, value in exec_environment.items():
         if key in {
-            "AGENT_CANON_IMAGE_REF", "AGENT_CANON_IMAGE_ID", "AGENT_CANON_CONTAINER_ID",
-            "AGENT_CANON_CONTROL_ROOT_DIGEST", "AGENT_CANON_CONTAINER_NAME", "AGENT_CANON_IMAGE_OWNED",
-            "AGENT_CANON_SOURCE_HEAD", "AGENT_CANON_HOST_INSTALL_ROOT", "AGENT_CANON_TARGET_HOST_ROOT",
-            "AGENT_CANON_TARGET_CONTAINER_ROOT", "AGENT_CANON_TARGET_DIGEST", "AGENT_CANON_PREVIOUS_IMAGE_ID",
-            "AGENT_CANON_PREVIOUS_IMAGE_REF", "AGENT_CANON_RESTORE_IMAGE_ID", "AGENT_CANON_RESTORE_IMAGE_REF",
-            "AGENT_CANON_CURRENT_IMAGE_ID", "AGENT_CANON_CURRENT_IMAGE_REF",
+            "AGENT_CANON_IMAGE_REF",
+            "AGENT_CANON_IMAGE_ID",
+            "AGENT_CANON_CONTAINER_ID",
+            "AGENT_CANON_CONTROL_ROOT_DIGEST",
+            "AGENT_CANON_CONTAINER_NAME",
+            "AGENT_CANON_IMAGE_OWNED",
+            "AGENT_CANON_SOURCE_HEAD",
+            "AGENT_CANON_HOST_INSTALL_ROOT",
+            "AGENT_CANON_TARGET_HOST_ROOT",
+            "AGENT_CANON_TARGET_CONTAINER_ROOT",
+            "AGENT_CANON_TARGET_DIGEST",
+            "AGENT_CANON_PREVIOUS_IMAGE_ID",
+            "AGENT_CANON_PREVIOUS_IMAGE_REF",
+            "AGENT_CANON_RESTORE_IMAGE_ID",
+            "AGENT_CANON_RESTORE_IMAGE_REF",
+            "AGENT_CANON_CURRENT_IMAGE_ID",
+            "AGENT_CANON_CURRENT_IMAGE_REF",
         }:
             environment[key] = value
-        elif key in {"AGENT_CANON_ROLLBACK_MOUNTS_FILE", "AGENT_CANON_RESTORE_TARGETS_FILE"}:
+        elif key in {
+            "AGENT_CANON_ROLLBACK_MOUNTS_FILE",
+            "AGENT_CANON_RESTORE_TARGETS_FILE",
+        }:
             environment[key] = str(volume_root / "host-mounts.tsv")
     Path(environment["HOME"]).mkdir(parents=True, exist_ok=True)
     Path(environment["AGENT_CANON_PRIVATE_LOG_ROOT"]).mkdir(parents=True, exist_ok=True)
@@ -588,6 +604,8 @@ def main(argv: list[str]) -> int:
         print("\n".join(rows))
         return 0
     if argv[:1] == ["build"]:
+        if os.environ.get("FAKE_DOCKER_FAIL_BUILD") == "1":
+            return 1
         tag = argv[argv.index("--tag") + 1]
         previous = state["images"].get(tag)
         if previous is not None:
@@ -612,6 +630,8 @@ def main(argv: list[str]) -> int:
         save(state)
         return 0
     if argv[:1] == ["pull"]:
+        if os.environ.get("FAKE_DOCKER_FAIL_PULL") == "1":
+            return 1
         ref = argv[-1]
         previous = state["images"].get(ref)
         if previous is not None:
@@ -1410,7 +1430,9 @@ def main(argv: list[str]) -> int:
             sys.stdout.write(content)
             return 0
         if command and (command[0] == "/var/lib/agent-canon/cache/bin/agent-canon"):
-            failed_operation = os.environ.get("FAKE_DOCKER_FAIL_CONTROLLER_OPERATION", "")
+            failed_operation = os.environ.get(
+                "FAKE_DOCKER_FAIL_CONTROLLER_OPERATION", ""
+            )
             if failed_operation and failed_operation in command:
                 return int(os.environ.get("FAKE_DOCKER_FAIL_CONTROLLER_RC", "41"))
             return _run_source_free_resident_native(
