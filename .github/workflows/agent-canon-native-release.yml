@@ -4,6 +4,7 @@
 # upstream implementation ../../tools/runtime/dispatch/agent-canon/Cargo.toml native executable crate
 # upstream implementation ../../tools/runtime/dispatch/agent-canon/src/template_bundle.rs source-bound archive producer
 # upstream implementation ../../tools/runtime/dispatch/agent-canon/src/native_release.rs verified draft publication
+# upstream implementation ../../bootstrap/host/lifecycle/entrypoint.sh host update adapter
 # downstream implementation ../../tests/agent_tools/test_native_cli_distribution.py source-free package smoke
 # downstream implementation ../../tools/runtime/dispatch/agent-canon/tests/native_release_native.rs integrity and recovery contracts
 # @dependency-end
@@ -153,6 +154,7 @@ jobs:
           set -euo pipefail
           rustc -V
           cargo -V
+          bash -n bootstrap/host/lifecycle/entrypoint.sh
           python -V
           python -m pip show PyYAML
 
