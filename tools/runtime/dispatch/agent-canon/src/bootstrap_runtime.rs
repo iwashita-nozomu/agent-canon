@@ -4,6 +4,7 @@
 // responsibility Owns resident lifecycle state, registered target control, bounded tool execution, template export, and eval spool operations after the Host performs Docker changes.
 // upstream implementation ../../../../../bootstrap/host/lifecycle/entrypoint.sh dispatches native controller operations
 // upstream implementation ../../../../../tools/runtime/dispatch/agent-canon/src/runtime_boundary.rs owns no-follow external runtime boundaries
+// upstream implementation eval_archive_paths.rs resolves the producer archive within the runtime
 // upstream implementation ../../../../../tools/runtime/dispatch/agent-canon/src/tool_dispatch.rs owns catalog command execution
 // upstream implementation ../../../../../tools/runtime/dispatch/agent-canon/src/log_repository_identity.rs owns canonical source identity
 // downstream test ../tests/bootstrap_runtime_native.rs validates native controller lifecycle and command behavior
@@ -3297,7 +3298,7 @@ impl BootstrapRuntime {
             let timeout = self.manifest.pointer("/container/task_timeout_seconds").and_then(Value::as_u64).unwrap_or(3600);
             let process_argv = self.target_namespace.map_process_argv(&argv);
             let process_environment = self.target_namespace.map_process_environment(&environment);
-            let command = run_tool_process(&process_argv, Path::new(canon_root), &process_environment, Duration::from_secs(timeout), &lease);
+            let command = run_tool_process(&process_argv, &self.target_namespace.physical_path(Path::new(canon_root)), &process_environment, Duration::from_secs(timeout), &lease);
             let (stdout, stderr, exit) = match command {
                 Ok(output) => (String::from_utf8_lossy(&output.stdout).into_owned(), String::from_utf8_lossy(&output.stderr).into_owned(), output.status.code().unwrap_or(128)),
                 Err(error) => {
@@ -3328,7 +3329,10 @@ impl BootstrapRuntime {
             for producer in &matrix {
                 if let (Some(name), Some(status)) = (producer.get("name").and_then(Value::as_str), producer.get("status")) { family_status.insert(name.to_string(), status.clone()); }
             }
-            let eval_export_source = exchange.join("eval-results");
+            let eval_export_source = crate::eval_archive_paths::mounted_log_archive_root(
+                &self.paths.repository_root,
+                Some(&exchange),
+            ).map_err(|error| BootstrapError::new("eval_archive_path_invalid", error))?.join("eval-results");
             let logs_export_source = exchange.join("tasks").join(run_id).join("logs");
             let eval_export = spool.join("eval-results");
             let logs_export = spool.join("producer-logs");
@@ -4693,6 +4697,7 @@ mod tests {
 
     static ENV_LOCK: Mutex<()> = Mutex::new(());
     const TEST_ENV: &[&str] = &[
+        "AGENT_CANON_NATIVE_BIN",
         "AGENT_CANON_PRIVATE_LOG_ROOT",
         "AGENT_CANON_HOST_CODEX_HOME_ROOT",
         "AGENT_CANON_HOST_SPOOL_ROOT",
@@ -5333,6 +5338,118 @@ mod tests {
         assert_eq!(matrix.len(), 1);
         assert_eq!(matrix[0]["name"], "one");
         assert_eq!(metrics["overall"], "pass");
+    }
+
+    #[test]
+    fn eval_collect_spools_reports_from_the_producer_archive() {
+        use std::os::unix::fs::PermissionsExt;
+        let targets = tempfile::tempdir_in(std::env::temp_dir().canonicalize().unwrap()).unwrap();
+        let target = targets.path().join("target");
+        fs::create_dir(&target).unwrap();
+        fs::write(target.join("README.md"), "# Target\n").unwrap();
+        for args in [
+            vec!["init", "--quiet", "-b", "main"],
+            vec!["add", "README.md"],
+            vec![
+                "-c",
+                "user.name=Fixture",
+                "-c",
+                "user.email=fixture@example.invalid",
+                "commit",
+                "--quiet",
+                "-m",
+                "fixture",
+            ],
+        ] {
+            assert!(Command::new("git")
+                .current_dir(&target)
+                .args(args)
+                .status()
+                .unwrap()
+                .success());
+        }
+        let digest = sha256_text(&target.to_string_lossy());
+        let logical = PathBuf::from("/targets").join(&digest);
+        let mut fixture = Fixture::new_with_target_mounts([(logical.clone(), target.clone())]);
+        fixture.install();
+        fixture.runtime.target_namespace = fixture
+            .runtime
+            .target_namespace
+            .clone()
+            .with_runtime_roots(
+                &fixture.runtime.paths.control_parent_root,
+                &fixture.runtime.paths.runtime_root,
+            )
+            .unwrap()
+            .with_source_root(&fixture.runtime.paths.repository_root)
+            .unwrap();
+        env::set_var("AGENT_CANON_TARGET_HOST_ROOT", &target);
+        env::set_var("AGENT_CANON_TARGET_DIGEST", &digest);
+        fixture
+            .runtime
+            .target_add(&BTreeMap::from([
+                ("--root".into(), logical.to_string_lossy().into_owned()),
+                ("--mode".into(), "read-only".into()),
+            ]))
+            .unwrap();
+        let producer = fixture.runtime.paths.runtime_root.join("collector.sh");
+        fs::write(&producer, r#"#!/bin/sh
+set -eu
+shift
+runtime= run_id= log_dir=
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --runtime-root) runtime=$2;;
+    --run-id) run_id=$2;;
+    --log-dir) log_dir=$2;;
+  esac
+  shift 2
+done
+mkdir -p "$log_dir"
+for family in codex-agent-role workflow-selection; do
+  report="$runtime/archive/agent-canon-log/eval-results/$family/report.md"
+  mkdir -p "$(dirname "$report")"
+  printf 'fixture:%s\n' "$family" > "$report"
+  printf 'producer:%s\n' "$family" > "$log_dir/$family.stdout.txt"
+  : > "$log_dir/$family.stderr.txt"
+  printf 'ACCUMULATED_AGENT_EVAL_PRODUCER=%s:pass:stdout=%s/%s.stdout.txt:stderr=%s/%s.stderr.txt\n' "$family" "$log_dir" "$family" "$log_dir" "$family"
+done
+printf 'ACCUMULATED_AGENT_EVAL_PRODUCERS=2\nACCUMULATED_AGENT_EVAL=pass\n'
+"#).unwrap();
+        fs::set_permissions(&producer, fs::Permissions::from_mode(0o700)).unwrap();
+        env::set_var(
+            "AGENT_CANON_NATIVE_BIN",
+            format!("{CONTAINER_RUNTIME_DESTINATION}/collector.sh"),
+        );
+        let receipt = fixture
+            .runtime
+            .eval_collect(&BTreeMap::from([
+                ("--root".into(), logical.to_string_lossy().into_owned()),
+                ("--run-id".into(), "native-delivery".into()),
+            ]))
+            .unwrap();
+        let collection = &receipt["details"]["collection"];
+        assert_eq!(collection["exported_files"]["eval_results"], 2);
+        assert_eq!(collection["exported_files"]["producer_logs"], 4);
+        for family in ["codex-agent-role", "workflow-selection"] {
+            assert_eq!(
+                fs::read(
+                    fixture
+                        .runtime
+                        .paths
+                        .spool
+                        .join("native-delivery/eval-results")
+                        .join(family)
+                        .join("report.md")
+                )
+                .unwrap(),
+                format!("fixture:{family}\n").as_bytes(),
+            );
+        }
+        assert_eq!(
+            fs::read_to_string(target.join("README.md")).unwrap(),
+            "# Target\n"
+        );
     }
 
     #[test]
