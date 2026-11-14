@@ -51,6 +51,11 @@ AgentCanon checkout, Cargo, or Docker. codex-config is an example of a
 standalone Rust operation; commands that call external tools keep their
 command-specific requirements.
 
+Linux GNU releases are built on Ubuntu 22.04 (glibc 2.35) for x86_64 and arm64.
+The build host selects the glibc symbol baseline, including weak references
+used by Rust's standard library. Building on that baseline keeps the published
+CLI usable on Ubuntu 22.04 and newer glibc environments.
+
 The archive supplies AgentCanon itself. Commands that invoke external CLIs need
 those providers on PATH; the shared-runtime installation below supplies the
 repository's configured providers through its `exec` and catalog routes.
