@@ -49,6 +49,8 @@ Implement complete units in dependency order: move callers to the retained API,
 delete superseded code and exclusive support, inspect the final diff and old
 references, then format and run the selected validation together. Preserve tests
 of retained guarantees and shared support. Removal belongs to this work unit.
+Complete the [post-implementation necessity review](change-review.md#procedure)
+and delete unsupported stabilization and unnecessary added variables before validation.
 Use the [implementation sequence](../canonical/CODEX_IMPLEMENTATION.md#5-implementation)
 or [RC-09](../../documents/design/responsibility-cleanup.md#duplicate-implementation-retirement)
 only for an unresolved deletion boundary; passing replacement tests alone does

@@ -25,18 +25,26 @@ requirement; Skill selection alone does not require a second review.
    governs conflicts, while compatible earlier requirements remain active. Use
    implementation rationale and target evidence to assess findings; history
    explains changes but does not define correctness.
-2. For overlap or missed retirement, compare reachable behavior across names,
+2. After implementation, the owning reviewer must compare added numerical
+   corrections and variables with the agreed equations and specification.
+   The implementation owner must delete unsupported stabilization and unnecessary
+   added state, parameters, and intermediate variables before final validation
+   and closeout. Use the existing
+   [stabilization removal procedure](computational-optimization.md#remove-unsupported-stabilization)
+   for numerical corrections. Preserve the agreed computation, input/output
+   behavior, and memory and filesystem safety while simplifying the implementation.
+3. For overlap or missed retirement, compare reachable behavior across names,
    locations, wrappers, and branches; identify the retained owner and obsolete
    contribution. A rename or move does not retire equivalent behavior. RC-09
    owns retirement; an alias or wrapper is not the default repair.
-3. Derive findings from reachable effects and current guarantees, not symptoms
+4. Derive findings from reachable effects and current guarantees, not symptoms
    or reviewer wording; validate reviewer hypotheses against source or direct
    static proof. Unreachable branches and upstream-guaranteed checks are deletion
    candidates, not speculative test triggers.
-4. Check generated views against their source. Reuse applicable validation;
+5. Check generated views against their source. Reuse applicable validation;
    select a language, numerical, or
    document specialist only for unresolved risk in that changed surface.
-5. Report concrete findings with location, reachable effect, and evidence. Keep
+6. Report concrete findings with location, reachable effect, and evidence. Keep
    uncertain causes explicit and route durable unresolved work to its owner; a
    local finding alone creates no extra Issue or gate.
 
