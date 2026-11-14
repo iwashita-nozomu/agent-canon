@@ -332,37 +332,39 @@ _agent_canon_update_native_cli() (
   if ! git -C "$AGENT_CANON_REPOSITORY_ROOT" rev-parse --verify --quiet "refs/tags/$tag^{commit}" >/dev/null; then
     git -C "$AGENT_CANON_REPOSITORY_ROOT" fetch origin tag "$tag"
   fi
-  local stage= link_stage= suffix observed_version
-  trap '[[ -z "$stage" || ! -d "$stage" ]] || rm -r -- "$stage"; [[ -z "$link_stage" || ! -d "$link_stage" ]] || rm -r -- "$link_stage"' EXIT
-  stage=$(mktemp -d "$native_root/.update.XXXXXX")
-  mkdir "$stage/assets" "$stage/unpacked"
+  local suffix observed_version
+  # Subshell-owned paths remain available to Bash 3's EXIT handler.
+  native_update_stage= native_update_link_stage=
+  trap '[[ -z "$native_update_stage" || ! -d "$native_update_stage" ]] || rm -r -- "$native_update_stage"; [[ -z "$native_update_link_stage" || ! -d "$native_update_link_stage" ]] || rm -r -- "$native_update_link_stage"' EXIT
+  native_update_stage=$(mktemp -d "$native_root/.update.XXXXXX")
+  mkdir "$native_update_stage/assets" "$native_update_stage/unpacked"
   for suffix in tar.gz tar.gz.sha256 zip zip.sha256; do
     curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' \
-      --output "$stage/assets/$package_name.$suffix" \
+      --output "$native_update_stage/assets/$package_name.$suffix" \
       "https://github.com/iwashita-nozomu/agent-canon/releases/download/$tag/$package_name.$suffix"
   done
   "$current" template-bundle native-verify \
     --source-root "$AGENT_CANON_REPOSITORY_ROOT" --source-ref "refs/tags/$tag" \
-    --root "$stage/assets" --target "$target"
-  tar -xzf "$stage/assets/$package_name.tar.gz" -C "$stage/unpacked"
-  observed_version=$("$stage/unpacked/$package_name/bin/$binary_name" --version)
+    --root "$native_update_stage/assets" --target "$target"
+  tar -xzf "$native_update_stage/assets/$package_name.tar.gz" -C "$native_update_stage/unpacked"
+  observed_version=$("$native_update_stage/unpacked/$package_name/bin/$binary_name" --version)
   [[ "$observed_version" == "agent-canon $version" ]] || {
     _agent_canon_json_error native_release_invalid "downloaded executable version differs from its release"
     exit 2
   }
   if [[ -e "$destination" ]]; then
-    diff -qr -- "$stage/unpacked/$package_name" "$destination"
+    diff -qr -- "$native_update_stage/unpacked/$package_name" "$destination"
   else
     mkdir -p "$native_root/$tag"
-    mv -- "$stage/unpacked/$package_name" "$native_root/$tag/"
+    mv -- "$native_update_stage/unpacked/$package_name" "$native_root/$tag/"
   fi
   [[ -L "$managed_link" && "$(readlink "$managed_link")" == "$current" ]] || {
     _agent_canon_json_error native_install_changed "active native installation changed during download"
     exit 2
   }
-  link_stage=$(mktemp -d "${managed_link%/*}/.agent-canon-update.XXXXXX")
-  ln -s "$destination/bin/$binary_name" "$link_stage/agent-canon"
-  mv -f -- "$link_stage/agent-canon" "$managed_link"
+  native_update_link_stage=$(mktemp -d "${managed_link%/*}/.agent-canon-update.XXXXXX")
+  ln -s "$destination/bin/$binary_name" "$native_update_link_stage/agent-canon"
+  mv -f -- "$native_update_link_stage/agent-canon" "$managed_link"
   printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"ok","operation":"native_update","code":"updated","version":"%s"}\n' "$version"
 )
 

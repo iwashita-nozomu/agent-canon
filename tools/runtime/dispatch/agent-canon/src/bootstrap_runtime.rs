@@ -3372,6 +3372,10 @@ impl BootstrapRuntime {
                 collection["status"] = json!("failed");
                 collection["failure"] = json!("source_tree_changed");
                 failure = Some(BootstrapError::new("source_tree_changed", "eval producer changed the registered source tree"));
+            } else if let Err(error) = eval_export_complete(&self.fs, &eval_export, &logs_export, &matrix) {
+                collection["status"] = json!("failed");
+                collection["failure"] = json!(error.code);
+                failure = Some(error);
             } else if state_quota > 0 && exported_bytes > state_quota {
                 collection["status"] = json!("failed");
                 collection["failure"] = json!("task_state_quota_exceeded");
@@ -4105,6 +4109,62 @@ fn collect_regular_files(root: &Path, directory: &Path, output: &mut Vec<PathBuf
                 ));
             }
             output.push(path);
+        }
+    }
+    Ok(())
+}
+
+fn eval_export_complete(
+    filesystem: &RuntimeFs,
+    reports: &Path,
+    logs: &Path,
+    matrix: &[Value],
+) -> Result<()> {
+    let incomplete = |detail| BootstrapError::new("eval_collection_incomplete", detail);
+    if matrix.len() != crate::eval_accumulation::PRODUCER_SELECTORS.len() {
+        return Err(incomplete(
+            "registered Eval producer output is incomplete".to_string(),
+        ));
+    }
+    for (family, _) in crate::eval_accumulation::PRODUCER_SELECTORS {
+        let mut rows = matrix.iter().filter(|row| row["name"] == *family);
+        let row = rows
+            .next()
+            .ok_or_else(|| incomplete(format!("missing producer result for {family}")))?;
+        if rows.next().is_some() {
+            return Err(incomplete(format!(
+                "expected one producer result for {family}"
+            )));
+        }
+        let directory = reports.join(family);
+        let names = filesystem
+            .entries(&directory)
+            .map_err(|_| incomplete(format!("missing report directory for {family}")))?;
+        let mut report_present = false;
+        for name in names {
+            let path = directory.join(name);
+            if path.extension().is_some_and(|extension| extension == "md")
+                && filesystem
+                    .read(&path, "Eval report")?
+                    .is_some_and(|bytes| !bytes.is_empty())
+            {
+                report_present = true;
+            }
+        }
+        if !report_present {
+            return Err(incomplete(format!("missing nonempty report for {family}")));
+        }
+        for stream in ["stdout", "stderr"] {
+            let name = row[stream]
+                .as_str()
+                .and_then(|path| Path::new(path).file_name())
+                .ok_or_else(|| incomplete(format!("missing {stream} path for {family}")))?;
+            if filesystem
+                .read(&logs.join(name), "Eval producer log")?
+                .is_none()
+            {
+                return Err(incomplete(format!("missing {stream} log for {family}")));
+            }
         }
     }
     Ok(())
@@ -5342,6 +5402,22 @@ mod tests {
 
     #[test]
     fn eval_collect_spools_reports_from_the_producer_archive() {
+        eval_collect_export_case("complete", 2);
+    }
+
+    #[test]
+    fn eval_collect_retains_incomplete_exports_as_failed_collections() {
+        for (missing, reports) in [
+            ("all", 0),
+            ("workflow-selection", 1),
+            ("empty", 2),
+            ("stderr", 2),
+        ] {
+            eval_collect_export_case(missing, reports);
+        }
+    }
+
+    fn eval_collect_export_case(missing: &str, expected_reports: u64) {
         use std::os::unix::fs::PermissionsExt;
         let targets = tempfile::tempdir_in(std::env::temp_dir().canonicalize().unwrap()).unwrap();
         let target = targets.path().join("target");
@@ -5408,29 +5484,75 @@ done
 mkdir -p "$log_dir"
 for family in codex-agent-role workflow-selection; do
   report="$runtime/archive/agent-canon-log/eval-results/$family/report.md"
-  mkdir -p "$(dirname "$report")"
-  printf 'fixture:%s\n' "$family" > "$report"
+  if [ "$MISSING_EVAL_EXPORT" != all ] && [ "$MISSING_EVAL_EXPORT" != "$family" ]; then
+    mkdir -p "$(dirname "$report")"
+    if [ "$MISSING_EVAL_EXPORT" = empty ]; then
+      : > "$report"
+    else
+      printf 'fixture:%s\n' "$family" > "$report"
+    fi
+  fi
   printf 'producer:%s\n' "$family" > "$log_dir/$family.stdout.txt"
-  : > "$log_dir/$family.stderr.txt"
+  if [ "$MISSING_EVAL_EXPORT" != stderr ]; then
+    : > "$log_dir/$family.stderr.txt"
+  fi
   printf 'ACCUMULATED_AGENT_EVAL_PRODUCER=%s:pass:stdout=%s/%s.stdout.txt:stderr=%s/%s.stderr.txt\n' "$family" "$log_dir" "$family" "$log_dir" "$family"
 done
 printf 'ACCUMULATED_AGENT_EVAL_PRODUCERS=2\nACCUMULATED_AGENT_EVAL=pass\n'
 "#).unwrap();
+        let producer_source = fs::read_to_string(&producer)
+            .unwrap()
+            .replace("$MISSING_EVAL_EXPORT", missing);
+        fs::write(&producer, producer_source).unwrap();
         fs::set_permissions(&producer, fs::Permissions::from_mode(0o700)).unwrap();
         env::set_var(
             "AGENT_CANON_NATIVE_BIN",
             format!("{CONTAINER_RUNTIME_DESTINATION}/collector.sh"),
         );
-        let receipt = fixture
-            .runtime
-            .eval_collect(&BTreeMap::from([
-                ("--root".into(), logical.to_string_lossy().into_owned()),
-                ("--run-id".into(), "native-delivery".into()),
-            ]))
-            .unwrap();
-        let collection = &receipt["details"]["collection"];
-        assert_eq!(collection["exported_files"]["eval_results"], 2);
-        assert_eq!(collection["exported_files"]["producer_logs"], 4);
+        let result = fixture.runtime.eval_collect(&BTreeMap::from([
+            ("--root".into(), logical.to_string_lossy().into_owned()),
+            ("--run-id".into(), "native-delivery".into()),
+        ]));
+        let spool = fixture.runtime.paths.spool.join("native-delivery");
+        let collection: Value =
+            serde_json::from_slice(&fs::read(spool.join("collection.json")).unwrap()).unwrap();
+        assert_eq!(
+            collection["exported_files"]["eval_results"],
+            expected_reports
+        );
+        assert_eq!(
+            collection["exported_files"]["producer_logs"],
+            if missing == "stderr" { 2 } else { 4 }
+        );
+        assert_eq!(collection["source_tree_unchanged"], true);
+        if missing != "complete" {
+            let error = result.expect_err("incomplete export fails collection");
+            assert_eq!(error.code, "eval_collection_incomplete");
+            assert_eq!(collection["status"], "failed");
+            assert_eq!(collection["failure"], "eval_collection_incomplete");
+            assert!(error.evidence["receipt_path"].as_str().is_some());
+            assert!(fixture
+                .runtime
+                .paths
+                .runtime_root
+                .join("exchange/tasks/eval-native-delivery")
+                .join(collection["exchange_nonce"].as_str().unwrap())
+                .is_dir());
+            assert_eq!(
+                fixture
+                    .runtime
+                    .eval_sync_prepare(&BTreeMap::from([(
+                        "--run-id".into(),
+                        "native-delivery".into()
+                    )]))
+                    .unwrap_err()
+                    .code,
+                "eval_collection_failed"
+            );
+            return;
+        }
+        assert_eq!(result.unwrap()["status"], "ok");
+        assert_eq!(collection["status"], "collected");
         for family in ["codex-agent-role", "workflow-selection"] {
             assert_eq!(
                 fs::read(
