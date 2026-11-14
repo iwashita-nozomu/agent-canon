@@ -6682,8 +6682,9 @@ def test_sync_never_projects_links_from_staging() -> None:
     assert 'git -C "$install_root" merge' not in sync
 
 
+@pytest.mark.parametrize("auth_available", [True, False])
 def test_scheduled_sync_attempts_pending_archives_after_source_failure(
-    tmp_path: Path,
+    tmp_path: Path, auth_available: bool,
 ) -> None:
     """A failed source refresh does not strand already-pending archive inputs."""
     install = tmp_path / "agent-canon"
@@ -6692,6 +6693,7 @@ def test_scheduled_sync_attempts_pending_archives_after_source_failure(
     archive_cli.write_text(
         "#!/usr/bin/env bash\n"
         "if [[ ${1:-} == --version ]]; then exit 0; fi\n"
+        f"printf '%s\\n' \"$*\" > {str(tmp_path / 'archive-args.txt')!r}\n"
         f"printf 'hook\\n' >> {str(tmp_path / 'phases.txt')!r}\n",
         encoding="utf-8",
     )
@@ -6701,6 +6703,7 @@ def test_scheduled_sync_attempts_pending_archives_after_source_failure(
     phases = tmp_path / "phases.txt"
     script = f"""
 source {str(ADAPTER)!r}
+_agent_canon_main_eval_api_available() {{ return {0 if auth_available else 1}; }}
 _agent_canon_advance_source() {{ printf 'source\\n' >> {str(phases)!r}; return 2; }}
 _agent_canon_json_error() {{ return 2; }}
 _agent_canon_container_name() {{ printf 'resident\\n'; }}
@@ -6728,6 +6731,10 @@ _agent_canon_sync_operation
         ["bash", "-c", script], check=False, capture_output=True, text=True
     )
     assert result.returncode == 2
+    assert ("--include-main-evals" in (
+        tmp_path / "archive-args.txt"
+    ).read_text(encoding="utf-8")) is auth_available
+    assert ("github_main_eval_api_deferred" in result.stderr) is not auth_available
     assert phases.read_text(encoding="utf-8").splitlines() == [
         "source",
         "hook",
@@ -6738,6 +6745,37 @@ _agent_canon_sync_operation
         "eval-publish",
         "feedback",
     ]
+
+
+def test_main_eval_api_probe_uses_execution_host_credentials(tmp_path: Path) -> None:
+    """Scheduled main-Eval fetch uses the current host's gh API context."""
+    gh = tmp_path / "gh"
+    calls = tmp_path / "calls"
+    gh.write_text(
+        "#!/bin/sh\n"
+        'printf "%s\\n" "$*" > "$GH_CALLS"\n'
+        'exit "$GH_PROBE_STATUS"\n',
+        encoding="utf-8",
+    )
+    gh.chmod(0o755)
+    script = f"source {str(ADAPTER)!r}; _agent_canon_main_eval_api_available"
+    for status in (0, 1):
+        result = subprocess.run(
+            ["bash", "-c", script],
+            check=False,
+            capture_output=True,
+            text=True,
+            env={
+                **os.environ,
+                "PATH": f"{tmp_path}:{os.environ.get('PATH', '')}",
+                "GH_CALLS": str(calls),
+                "GH_PROBE_STATUS": str(status),
+            },
+        )
+        assert result.returncode == status
+        assert calls.read_text(encoding="utf-8").strip() == (
+            "api --hostname github.com user --jq .login"
+        )
 
 
 def test_target_generation_uses_reversible_shared_rollback_plan() -> None:
