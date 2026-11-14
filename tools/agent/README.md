@@ -10,12 +10,10 @@ downstream implementation ../runtime/dispatch/agent-canon/src/catalog/tool_catal
 
 # Internal Tool Areas
 
-This directory contains internal orchestration, skill, and template helpers.
+This directory documents skill helper ownership. Runtime orchestration and template rendering now live in the native CLI.
 For the implementation being maintained, use its existing owner:
 
 - [Skill helpers](skills/README.md): skill routing, document reading, and materialization.
-- [Orchestration](orchestration/): task routing, handoff, team, and review helpers.
-- [Templates](templates/): template source ownership; native Rust APIs render bounded views.
 
 Public command identity, audience, and placement remain owned by
 [the tool catalog](../catalog.yaml); a directory name does not make an internal
