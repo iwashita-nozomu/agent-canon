@@ -33,9 +33,9 @@ def test_host_entrypoint_has_no_python_fallback() -> None:
     assert "docker.sock" not in text
     assert "AGENT_CANON_CONTAINER_NETWORK" in text
     assert "docker-rpc" not in text
-    controller = (ROOT / "tools/runtime/dispatch/agent-canon/src/bootstrap_runtime.rs").read_text(
-        encoding="utf-8"
-    )
+    controller = (
+        ROOT / "tools/runtime/dispatch/agent-canon/src/bootstrap_runtime.rs"
+    ).read_text(encoding="utf-8")
     assert "AGENT_CANON_DOCKER_RPC" not in controller
 
 
@@ -4020,9 +4020,9 @@ def test_uninstall_preserves_foreign_links_and_restores_owned_config() -> None:
 
 def test_container_controller_routes_non_docker_public_operations() -> None:
     """Documented non-Docker operations enter the resident Rust owner."""
-    controller = (ROOT / "tools/runtime/dispatch/agent-canon/src/bootstrap_runtime.rs").read_text(
-        encoding="utf-8"
-    )
+    controller = (
+        ROOT / "tools/runtime/dispatch/agent-canon/src/bootstrap_runtime.rs"
+    ).read_text(encoding="utf-8")
     for marker in (
         '"tool" => self.tool_run(&args)',
         '"template" => self.template_export(&args.options)',
@@ -5800,9 +5800,15 @@ def test_gpu006_stale_source_sync_mount_is_recreated_by_public_route(
         )
 
 
+@pytest.mark.parametrize(
+    ("install_args", "pull_fails"),
+    [((), False), (("--local-build",), False), ((), True)],
+)
 def test_public_clean_install_uses_tracked_skills_and_first_target(
     tmp_path: Path,
     native_cli_input: Path,
+    install_args: tuple[str, ...],
+    pull_fails: bool,
 ) -> None:
     """Install from empty state, then reconstruct over stale runtime residue."""
     home = tmp_path / "home"
@@ -5833,6 +5839,7 @@ def test_public_clean_install_uses_tracked_skills_and_first_target(
     )
     fake_state = tmp_path / "docker-state.json"
     fake_docker = ROOT / "tests" / "bootstrap" / "fake_docker.py"
+    docker_calls = tmp_path / "docker-calls.tsv"
     environment = {
         **os.environ,
         "HOME": str(home),
@@ -5840,6 +5847,8 @@ def test_public_clean_install_uses_tracked_skills_and_first_target(
         "AGENT_CANON_DOCKER": str(fake_docker),
         "FAKE_DOCKER_STATE": str(fake_state),
         "FAKE_DOCKER_VALID_IMAGE_IDS": "1",
+        "FAKE_DOCKER_FAIL_PULL": "1" if pull_fails else "0",
+        "FAKE_DOCKER_CALLS": str(docker_calls),
     }
     common = [
         str(BOOTSTRAP),
@@ -5853,13 +5862,30 @@ def test_public_clean_install_uses_tracked_skills_and_first_target(
     assert list(personal_skills.glob("*/SKILL.md"))
 
     installed = subprocess.run(
-        [*common, "install"],
+        [*common, "install", *install_args],
         check=False,
         capture_output=True,
         text=True,
         env=environment,
     )
     assert installed.returncode == 0, installed.stderr
+    operations = [
+        line.split("\t", 1)[0] for line in docker_calls.read_text().splitlines()
+    ]
+    assert ("build" in operations) == bool(install_args or pull_fails)
+    assert ("pull" in operations) == (not install_args)
+    if pull_fails:
+        prior = json.loads(fake_state.read_text())
+        failed = subprocess.run(
+            [*common, "install", "--image-ref", "ghcr.io/example/unavailable:fixture"],
+            check=False,
+            capture_output=True,
+            text=True,
+            env={**environment, "FAKE_DOCKER_FAIL_BUILD": "1"},
+        )
+        assert failed.returncode == 2
+        assert '"code":"candidate_image_build_failed"' in failed.stderr
+        assert json.loads(fake_state.read_text())["containers"] == prior["containers"]
     assert (home / ".runtime").is_dir()
     assert personal_skills.is_dir()
     assert list(personal_skills.glob("*/SKILL.md"))
@@ -6717,9 +6743,9 @@ _agent_canon_sync_operation
 
 def test_target_generation_uses_reversible_shared_rollback_plan() -> None:
     """Target-only generations keep the same host rollback protocol."""
-    controller = (ROOT / "tools/runtime/dispatch/agent-canon/src/bootstrap_runtime.rs").read_text(
-        encoding="utf-8"
-    )
+    controller = (
+        ROOT / "tools/runtime/dispatch/agent-canon/src/bootstrap_runtime.rs"
+    ).read_text(encoding="utf-8")
     assert controller.count("self.materialize_rollback_plan(&state)?") >= 2
     assert '"image_ref": image.get("tag")' in controller
     rollback = (
@@ -6818,9 +6844,9 @@ def test_archive_and_codex_crossings_are_host_owned() -> None:
     )[0]
     assert "if ((exec_tool_rc == 0))" in exec_tool_route
     assert "_agent_canon_private_feedback_sync_current_locked" in exec_tool_route
-    controller = (ROOT / "tools/runtime/dispatch/agent-canon/src/bootstrap_runtime.rs").read_text(
-        encoding="utf-8"
-    )
+    controller = (
+        ROOT / "tools/runtime/dispatch/agent-canon/src/bootstrap_runtime.rs"
+    ).read_text(encoding="utf-8")
     assert '"source-identity"' in controller
     assert "normalize_remote" in controller
     assert "runtime_log_archive_git" not in controller

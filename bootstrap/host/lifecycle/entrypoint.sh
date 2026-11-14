@@ -73,6 +73,9 @@ usage: bootstrap.sh $operation [OPTIONS]
 AgentCanon $operation operation. Use bootstrap.sh --help for the complete
 host adapter command list.
 USAGE
+  if [[ "$operation" == install || "$operation" == update ]]; then
+    printf '\n  --local-build  Build a missing environment image directly from source.\n'
+  fi
 }
 
 _agent_canon_sha256() {
@@ -319,6 +322,7 @@ _agent_canon_sync_operation() (
   fi
   if ((source_rc == 0)); then
     unset AGENT_CANON_LOCAL_BUILD
+    unset AGENT_CANON_ALLOW_BUILD
     _agent_canon_image_reference ""
     candidate_image_ref=$AGENT_CANON_IMAGE_REF
     if _agent_canon_image ""; then
@@ -2157,29 +2161,31 @@ _agent_canon_image_reference() {
 
 _agent_canon_image() {
   local requested_ref=${1:-}
-  _agent_canon_image_reference "$requested_ref"
+  _agent_canon_image_reference "$requested_ref" || return $?
   # An environment image is content-addressed by the controlled Dockerfile
   # inputs. A local exact tag is reusable across source checkouts, including
   # when a caller requested the optional local-build route.
   if "$AGENT_CANON_DOCKER_CMD" image inspect "$AGENT_CANON_IMAGE_REF" >/dev/null 2>&1; then
     return 0
   fi
-  if [[ "${AGENT_CANON_LOCAL_BUILD:-0}" == 1 ]]; then
-    local control_digest
-    control_digest=$(_agent_canon_control_digest)
-    if ! "$AGENT_CANON_DOCKER_CMD" build \
-      --file "$AGENT_CANON_REPOSITORY_ROOT/bootstrap/container/image/Dockerfile" \
-      --tag "$AGENT_CANON_IMAGE_REF" \
-      --label io.agent-canon.runtime=shared-v1 \
-      --label "io.agent-canon.control-root-digest=$control_digest" \
-      "$AGENT_CANON_REPOSITORY_ROOT"; then
-      _agent_canon_json_error candidate_image_build_failed "candidate image build failed"
+  if [[ "${AGENT_CANON_LOCAL_BUILD:-0}" != 1 ]]; then
+    if "$AGENT_CANON_DOCKER_CMD" pull "$AGENT_CANON_IMAGE_REF"; then
+      return 0
+    fi
+    if [[ "${AGENT_CANON_ALLOW_BUILD:-0}" != 1 ]]; then
+      _agent_canon_json_error candidate_image_pull_failed "candidate image could not be pulled"
       return 2
     fi
-    return 0
   fi
-  if ! "$AGENT_CANON_DOCKER_CMD" pull "$AGENT_CANON_IMAGE_REF"; then
-    _agent_canon_json_error candidate_image_pull_failed "candidate image could not be pulled"
+  local control_digest
+  control_digest=$(_agent_canon_control_digest) || return $?
+  if ! "$AGENT_CANON_DOCKER_CMD" build \
+    --file "$AGENT_CANON_REPOSITORY_ROOT/bootstrap/container/image/Dockerfile" \
+    --tag "$AGENT_CANON_IMAGE_REF" \
+    --label io.agent-canon.runtime=shared-v1 \
+    --label "io.agent-canon.control-root-digest=$control_digest" \
+    "$AGENT_CANON_REPOSITORY_ROOT"; then
+    _agent_canon_json_error candidate_image_build_failed "candidate image build failed"
     return 2
   fi
 }
@@ -3732,11 +3738,13 @@ _agent_canon_gc() {
 }
 
 _agent_canon_install_locked() {
-  # Clean install owns one serialized transition.  Capture and remove only the
-  # named resident after ownership readback, then clear generated state before
-  # building the candidate.  The EXIT trap restores the captured state if any
-  # later phase fails.
+  # Prepare the image before stopping the owned resident. The subsequent
+  # state transition restores captured state if candidate activation fails.
   _agent_canon_advance_source "$AGENT_CANON_REPOSITORY_ROOT" || return $?
+  AGENT_CANON_ALLOW_BUILD=1
+  export AGENT_CANON_ALLOW_BUILD
+  _agent_canon_image "${1:-}" || return $?
+  local candidate_image_ref=$AGENT_CANON_IMAGE_REF
   local old_container=$(_agent_canon_container_name)
   local old_container_id= old_image_ref= old_image_id=
   local old_container_present=0
@@ -3789,10 +3797,6 @@ _agent_canon_install_locked() {
   fi
   _agent_canon_prepare_clean_install
 
-  AGENT_CANON_ALLOW_BUILD=1
-  export AGENT_CANON_ALLOW_BUILD
-  _agent_canon_image "${1:-}"
-  local candidate_image_ref=$AGENT_CANON_IMAGE_REF
   _agent_canon_replace_resident_locked "$candidate_image_ref" install 1
 }
 
@@ -5336,8 +5340,8 @@ bootstrap_host_entrypoint() {
       local_build=1
     fi
   done
-  if ((local_build == 1)) && [[ "$operation" != update ]]; then
-    _agent_canon_json_error local_build_update_only "--local-build is valid only for update"
+  if ((local_build == 1)) && [[ "$operation" != install && "$operation" != update ]]; then
+    _agent_canon_json_error local_build_operation_invalid "--local-build is valid for install and update"
     return 2
   fi
   if ((local_build == 1)); then

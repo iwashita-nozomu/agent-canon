@@ -661,18 +661,6 @@ impl RuntimeFs {
             })?;
         #[cfg(not(unix))]
         let _ = directory;
-        let observed = directory
-            .metadata(".")
-            .map_err(|error| BootstrapError::new("runtime_directory_invalid", error.to_string()))?;
-        #[cfg(not(unix))]
-        let _ = observed;
-        #[cfg(unix)]
-        if observed.permissions().mode() & 0o777 != mode {
-            return Err(BootstrapError::new(
-                "runtime_directory_mode_mismatch",
-                format!("directory mode is not {mode:o}: {}", path.display()),
-            ));
-        }
         Ok(())
     }
 
@@ -4874,6 +4862,21 @@ mod tests {
                 .transition("install")
                 .expect("install state transition")
         }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn exchange_directory_keeps_the_requested_sticky_permissions() {
+        let temporary = tempfile::tempdir().unwrap();
+        let exchange = temporary.path().join("exchange");
+        RuntimeFs::new()
+            .unwrap()
+            .ensure_directory(&exchange, 0o1733)
+            .unwrap();
+        assert_eq!(
+            fs::metadata(exchange).unwrap().permissions().mode() & 0o7777,
+            0o1733
+        );
     }
 
     #[test]

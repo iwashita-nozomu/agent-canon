@@ -201,10 +201,13 @@ sync. Foreign or unlabeled Docker resources remain untouched.
 
 ## What is installed and where
 
-`install` creates the runtime state directories and adopts the published GHCR
-image when the source was installed by the distribution route. Development
-and CI checkouts may build from `bootstrap/container/image/Dockerfile`; live `sync`
-never builds locally. The image
+`install` creates the runtime state directories and reuses an exact local image
+or pulls the published GHCR image. If the image cannot be pulled, install and
+update build it from `bootstrap/container/image/Dockerfile`. `install --local-build`
+and `update --local-build` select that build directly when no exact local image
+exists. Image preparation completes before install stops an existing resident;
+a pull/build failure leaves that resident running. Live `sync` only pulls.
+The image
 is one OCI index for `linux/amd64` and `linux/arm64`; Docker selects the native
 variant without a user platform selector. `start` creates or starts at most
 one manifest-owned container. The image contains the Rust CLI, Python tools,
