@@ -43,10 +43,6 @@ const PRIVATE_LOG_DESTINATION: &str = "/var/lib/agent-canon/private-log";
 const REGISTRY_DESTINATION: &str = "/var/lib/agent-canon/mount-registry.toml";
 const TOOL_SOURCE_DESTINATION: &str = "/opt/agent-canon/source";
 const CODEX_SESSION_ROOT_ENV: &str = "AGENT_CANON_CODEX_SESSION_ROOT";
-const REQUIRED_LABELS: [&str; 2] = [
-    "io.agent-canon.runtime=shared-v1",
-    "io.agent-canon.control-root-digest",
-];
 
 const TOOL_ENVIRONMENT_KEYS: &[&str] = &[
     "PATH",
@@ -4516,36 +4512,7 @@ fn load_manifest(path: &Path) -> Result<(Value, String)> {
         .ok_or_else(|| {
             BootstrapError::new("manifest_invalid", "manifest.container must be a table")
         })?;
-    let labels = container
-        .get("labels")
-        .and_then(Value::as_array)
-        .ok_or_else(|| {
-            BootstrapError::new(
-                "manifest_invalid",
-                "manifest.container.labels must be an array",
-            )
-        })?
-        .iter()
-        .filter_map(Value::as_str)
-        .collect::<BTreeSet<_>>();
-    if REQUIRED_LABELS.iter().any(|label| !labels.contains(label)) {
-        return Err(BootstrapError::new(
-            "manifest_invalid",
-            "manifest is missing required ownership labels",
-        ));
-    }
-    if container.get("max_instances").and_then(Value::as_i64) != Some(1)
-        || container.get("network").and_then(Value::as_str) != Some("none")
-    {
-        return Err(BootstrapError::new(
-            "manifest_invalid",
-            "shared runtime requires one network=none container",
-        ));
-    }
     for key in [
-        "cpus",
-        "memory_bytes",
-        "pids_limit",
         "max_parallel_tasks",
         "task_state_quota_bytes",
         "task_log_quota_bytes",
@@ -4558,22 +4525,6 @@ fn load_manifest(path: &Path) -> Result<(Value, String)> {
             return Err(BootstrapError::new(
                 "manifest_invalid",
                 format!("container.{key} must be a positive integer"),
-            ));
-        }
-    }
-    for key in [
-        "health_start_period_seconds",
-        "health_timeout_seconds",
-        "health_poll_interval_seconds",
-    ] {
-        if container
-            .get(key)
-            .and_then(Value::as_f64)
-            .is_none_or(|value| value <= 0.0)
-        {
-            return Err(BootstrapError::new(
-                "manifest_invalid",
-                format!("container.{key} must be positive"),
             ));
         }
     }
@@ -4980,6 +4931,15 @@ mod tests {
         );
         assert_eq!(restored["state"], "ready");
         assert!(fixture.runtime.paths.owner.is_file());
+    }
+
+    #[test]
+    fn manifest_accepts_runtime_limits_without_host_profile_duplicates() {
+        let temporary = tempfile::tempdir().unwrap();
+        let path = temporary.path().join("manifest.toml");
+        fs::write(&path, "[container]\nmax_parallel_tasks = 2\ntask_state_quota_bytes = 1024\ntask_log_quota_bytes = 1024\n").unwrap();
+        let (manifest, _) = load_manifest(&path).expect("host profile metadata is optional");
+        assert_eq!(manifest["container"]["max_parallel_tasks"], 2);
     }
 
     #[test]
