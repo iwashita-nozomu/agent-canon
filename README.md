@@ -62,6 +62,13 @@ repository's configured providers through its `exec` and catalog routes.
 Docs commands include their default Markdown/link settings. Existing project
 settings take precedence, so a fresh project needs no AgentCanon config tree.
 
+The shared-runtime sync timer also updates the managed native installation at
+`~/.local/bin/agent-canon`, pointing into `~/.local/share/agent-canon/native/`.
+It selects the latest stable release, verifies the archives through the existing
+native package verifier, and atomically switches the link after the new CLI runs.
+The [bootstrap lifecycle](documents/runtime/bootstrap-runtime.md#install-source-transition)
+owns this automatic update.
+
 The source checkout wrapper at tools/bin/agent-canon directly executes an
 existing native binary from the crate's target/release or target/debug
 directory, then uses the installed `agent-canon` on PATH. A normal native CLI

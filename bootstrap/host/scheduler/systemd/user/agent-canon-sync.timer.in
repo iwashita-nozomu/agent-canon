@@ -1,5 +1,5 @@
 [Unit]
-Description=AgentCanon periodic source and runtime sync
+Description=AgentCanon periodic source, native CLI and runtime sync
 
 [Timer]
 OnBootSec=@ON_BOOT@s

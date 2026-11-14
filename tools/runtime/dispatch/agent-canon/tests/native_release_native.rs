@@ -1047,3 +1047,168 @@ fn missing_or_expired_artifact_targets_fail() {
     let error = select_native_artifacts(&[], &["alpha".to_owned()]).unwrap_err();
     assert!(error.to_string().contains("missing or expired"));
 }
+
+#[cfg(unix)]
+#[test]
+fn managed_native_update_verifies_release_before_switching_the_active_link() {
+    use std::os::unix::fs::{symlink, PermissionsExt};
+    let adapter = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../../bootstrap/host/lifecycle/entrypoint.sh")
+        .canonicalize()
+        .unwrap();
+    for mode in ["valid", "existing", "checksum", "version", "changed"] {
+        let fixture = fixture(mode);
+        git(&fixture.source, &["tag", "v0.1.0"]);
+        write(&fixture.source, "CHANGE", b"next release\n");
+        git(&fixture.source, &["add", "CHANGE"]);
+        git(&fixture.source, &["commit", "-qm", "next release"]);
+        git(&fixture.source, &["tag", "v0.1.1"]);
+        git(
+            &fixture.source,
+            &["update-ref", "refs/remotes/origin/main", "HEAD"],
+        );
+        let candidate = fixture._temporary.path().join("candidate");
+        fs::write(
+            &candidate,
+            if mode == "version" {
+                b"#!/bin/sh\nprintf 'agent-canon 0.1.9\\n'\n".as_slice()
+            } else {
+                b"#!/bin/sh\nprintf 'agent-canon 0.1.1\\n'\n".as_slice()
+            },
+        )
+        .unwrap();
+        let assets = fixture.runtime.join("updated-packages");
+        let package = format!("agent-canon-0.1.1-{TARGET}");
+        let output = Command::new(NATIVE)
+            .args(["template-bundle", "native-package", "--source-root"])
+            .arg(&fixture.source)
+            .args(["--source-ref", "HEAD", "--binary"])
+            .arg(&candidate)
+            .args(["--target", TARGET, "--output"])
+            .arg(&assets)
+            .args(["--toolchain", "fixture"])
+            .env("AGENT_CANON_RUNTIME_ROOT", &fixture.runtime)
+            .output()
+            .unwrap();
+        assert_cli_success(&output, "package updater input");
+        if mode == "checksum" {
+            fs::write(
+                assets.join(format!("{package}.tar.gz.sha256")),
+                format!("{}  {package}.tar.gz\n", "0".repeat(64)),
+            )
+            .unwrap();
+        }
+        let home = fixture._temporary.path().join("home");
+        let native_root = home.join(".local/share/agent-canon/native");
+        let old = native_root.join(format!("v0.1.0/agent-canon-0.1.0-{TARGET}/bin/agent-canon"));
+        fs::create_dir_all(old.parent().unwrap()).unwrap();
+        fs::write(&old, "#!/bin/sh\nexec \"$UPDATE_TEST_NATIVE\" \"$@\"\n").unwrap();
+        fs::set_permissions(&old, fs::Permissions::from_mode(0o700)).unwrap();
+        let bin = home.join(".local/bin");
+        fs::create_dir_all(&bin).unwrap();
+        let active = bin.join("agent-canon");
+        symlink(&old, &active).unwrap();
+        let destination = native_root.join("v0.1.1");
+        if mode == "existing" {
+            fs::create_dir(&destination).unwrap();
+            TarArchive::new(GzDecoder::new(
+                File::open(assets.join(format!("{package}.tar.gz"))).unwrap(),
+            ))
+            .unpack(&destination)
+            .unwrap();
+        }
+        let tools = fixture._temporary.path().join("tools");
+        fs::create_dir(&tools).unwrap();
+        let curl = tools.join("curl");
+        fs::write(
+            &curl,
+            r#"#!/bin/sh
+set -eu
+output= url=
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --output) output=$2; shift 2;;
+    --write-out|--proto|--proto-redir) shift 2;;
+    --*) shift;;
+    *) url=$1; shift;;
+  esac
+done
+printf '%s\n' "$url" >> "$UPDATE_TEST_CALLS"
+case "$url" in
+  */releases/latest) printf 'https://github.com/iwashita-nozomu/agent-canon/releases/tag/v0.1.1';;
+  */releases/download/v0.1.1/*)
+    cp "$UPDATE_TEST_ASSETS/${url##*/}" "$output"
+    if [ "$UPDATE_TEST_MODE" = changed ] && [ "${url##*.}" = sha256 ]; then
+      ln -sfn "$UPDATE_TEST_NATIVE" "$HOME/.local/bin/agent-canon"
+    fi;;
+  *) exit 2;;
+esac
+"#,
+        )
+        .unwrap();
+        fs::set_permissions(curl, fs::Permissions::from_mode(0o700)).unwrap();
+        let calls = fixture._temporary.path().join("curl-calls");
+        let run = |control: &Path| {
+            Command::new("bash").args(["-c", "source \"$UPDATE_TEST_ADAPTER\"; AGENT_CANON_REPOSITORY_ROOT=$UPDATE_TEST_SOURCE; AGENT_CANON_CONTROL_ROOT=$UPDATE_TEST_CONTROL; _agent_canon_update_native_cli; [[ $(_agent_canon_host_native_cli) == \"$HOME/.local/bin/agent-canon\" ]]"])
+            .env("HOME", &home).env("UPDATE_TEST_NATIVE", NATIVE)
+            .env("UPDATE_TEST_ADAPTER", &adapter).env("UPDATE_TEST_SOURCE", &fixture.source)
+            .env("UPDATE_TEST_ASSETS", &assets).env("UPDATE_TEST_CALLS", &calls)
+            .env("UPDATE_TEST_CONTROL", control)
+            .env("UPDATE_TEST_MODE", mode)
+            .env_remove("AGENT_CANON_NATIVE_BIN").env_remove("AGENT_CANON_CLI")
+            .env("PATH", format!("{}:{}", tools.display(), std::env::var("PATH").unwrap_or_default()))
+            .output().unwrap()
+        };
+        assert!(run(&fixture.runtime).status.success());
+        assert_eq!(fs::read_link(&active).unwrap(), old);
+        assert!(!calls.exists());
+        let updated = run(&home);
+        if ["valid", "existing"].contains(&mode) {
+            assert!(
+                updated.status.success(),
+                "mode={mode}: {}\n{}",
+                String::from_utf8_lossy(&updated.stdout),
+                String::from_utf8_lossy(&updated.stderr)
+            );
+            assert_eq!(
+                fs::read_link(&active).unwrap(),
+                destination.join(&package).join("bin/agent-canon")
+            );
+            assert_eq!(
+                Command::new(&active)
+                    .arg("--version")
+                    .output()
+                    .unwrap()
+                    .stdout,
+                b"agent-canon 0.1.1\n"
+            );
+            let unchanged = run(&home);
+            assert!(unchanged.status.success());
+            assert!(String::from_utf8_lossy(&unchanged.stdout).contains("up_to_date"));
+            assert_eq!(fs::read_to_string(&calls).unwrap().lines().count(), 6);
+        } else {
+            assert!(!updated.status.success(), "mode={mode}");
+            assert_eq!(
+                fs::read_link(&active).unwrap(),
+                if mode == "changed" {
+                    PathBuf::from(NATIVE)
+                } else {
+                    old
+                }
+            );
+            if mode != "changed" {
+                assert!(!destination.exists());
+            }
+        }
+        assert!(!fs::read_dir(&native_root).unwrap().any(|entry| entry
+            .unwrap()
+            .file_name()
+            .to_string_lossy()
+            .starts_with(".update.")));
+        assert!(!fs::read_dir(&bin).unwrap().any(|entry| entry
+            .unwrap()
+            .file_name()
+            .to_string_lossy()
+            .starts_with(".agent-canon-update.")));
+    }
+}
