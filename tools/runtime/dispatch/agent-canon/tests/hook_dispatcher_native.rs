@@ -7,10 +7,10 @@
 // upstream reference ../../../../../tests/fixtures/hook_dispatcher/python_golden.json freezes the old CLI outputs
 // @dependency-end
 
-use agent_canon::hook_dispatcher::{HookCliResult, run_with_input};
-use agent_canon::python_json::{JsonArray, JsonValue, canonical_json_ascii_bytes, parse_json};
-use base64::Engine as _;
+use agent_canon::hook_dispatcher::{run_with_input, HookCliResult};
+use agent_canon::python_json::{canonical_json_ascii_bytes, parse_json, JsonArray, JsonValue};
 use base64::engine::general_purpose::STANDARD;
+use base64::Engine as _;
 use std::collections::BTreeMap;
 use std::fs;
 use std::io::Write;
