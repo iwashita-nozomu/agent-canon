@@ -73,7 +73,6 @@ convention_sources = [
     "agents/canonical/CODEX_IMPLEMENTATION.md",
     "agents/canonical/CODEX_BOOTSTRAP.md",
     "agents/canonical/CODEX_COMPLETION.md",
-    "agents/canonical/CODEX_INTAKE.md",
     "agents/canonical/CODEX_ROUTING.md",
 ]
 workflow_consumers = ["tools/validation/ci/checks/check_agent_canon_pr.sh"]
