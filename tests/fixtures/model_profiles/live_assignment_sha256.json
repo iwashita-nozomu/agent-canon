@@ -12,7 +12,7 @@
   "experiment_runner": "fefd4aff69d650ca4819da7375868d6c6d153b71e386ad72334f143413fecd7a",
   "explorer": "bf7b1c5f8c7c50ffe4798f75e4522049c68172ed1c2b8db0f734c09dd5241be2",
   "fair_data_reviewer": "357530ed2dfbe4ba5a188d5e723c7b1981cfea1c4bf772659c97df1f2fc76e0c",
-  "integration_executor": "fae66c9052981953e23a7b9acee1773dda3f16fcdce013d7ebe7d2a914e6589e",
+  "integration_executor": "33ce3469adf092173b65749b7d54762481881a4ef4263257c0f5127828e7d11a",
   "literature_researcher": "316b1516963153b77ec7e031a047441c7f6e0271e2a2eb06c817e7b6dfc5d286",
   "logic_gap_reviewer": "e7eefb3eb100d36372eed4ac07d1b66db8dc077e41185700dd3d1c400ea5dce3",
   "long_form_writer": "38ef915f2fcff7f8ca83ce0b8fdae93c34309ad5504785b23130a5246abebd7c",
@@ -32,8 +32,8 @@
   "scientific_computing_reviewer": "21a786de98608e2c84167f40f59f220558b4c9b7fa0cd3ad1d103b923f3e90e6",
   "ship_reviewer": "056c24ad290b0f4e1ac16bf7b745264eeba43f18f5eb4ee02829b3a765ae2395",
   "skill_evaluator": "c3206750087d18bbddefa92972723148c993160ff645a2bb518518fba9cd5e0e",
-  "spark_worker": "e6765cc54e381eae1f3fc3ef37ecd2b9616476bd97a0ac6c20f46b27eb5448a2",
+  "spark_worker": "43a843d35c2e8f474362c4a1c73295e27e83565a3b59772eb7520e9d36cd8a32",
   "terra": "7ceeaf0987ebf490ebfefd72b5c11a6be552d59260442b00847ab442d6fe8377",
   "test_designer": "8e2cc56d5dcd2f06f08159fd22266dc85585a404a825957750072661d28c3c1c",
-  "worker": "fc2d8c2e35bd1a9ceb1b69355654705f35020e87ebe636f3b0cc284599055e08"
+  "worker": "fdc0be36c1b1bd950a9d5f2479e13ba2b7343f51ec142fa98aa5cf0ba21fb959"
 }
