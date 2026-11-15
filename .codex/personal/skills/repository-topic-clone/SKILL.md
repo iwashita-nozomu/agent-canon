@@ -1,8 +1,8 @@
 ---
 name: repository-topic-clone
-description: "Use for any parent, dependency, or standalone repository topic checkout under workspace/{topic}/{repo}; linked-worktree or independent-clone mode is selected by repository relationship, and repository kind is a post-checkout policy decorator."
+description: "Use standard Git to create or reuse a task checkout, merge current main, and remove an unused worktree or clone while preserving existing work."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"f5286a0e4fb67aac6bf8d8c396c8da0394b2c842c3bd400169df688b366128ac"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"6284dd030cf0236f7046d0ea26ad5461b599bd7ba945c3d3b42a3f39b8f9aaba"} -->
 
 <!--
 @dependency-start

@@ -4625,7 +4625,7 @@ _agent_canon_codex_hook() {
     return 2
   }
   case "$event" in
-    UserPromptSubmit|PreToolUse|PostToolUse) ;;
+    UserPromptSubmit|PostToolUse) ;;
     *) _agent_canon_json_error unsupported_hook_event "unsupported active Codex hook event"; return 2 ;;
   esac
   # Codex hook JSON is text. Retain it in-process so the same bytes reach the
@@ -5341,6 +5341,10 @@ bootstrap_host_entrypoint() {
         return 0
         ;;
     esac
+  fi
+  if [[ "${command_args[0]:-}" == codex && "${command_args[1]:-}" == hook &&
+        "${command_args[2]:-}" == PreToolUse ]]; then
+    return 0
   fi
   if ! AGENT_CANON_REPOSITORY_ROOT=$(CDPATH= cd -- "$repository_request" && pwd -P); then
     _agent_canon_json_error repository_root_invalid "repository root is not an existing directory"

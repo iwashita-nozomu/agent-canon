@@ -542,7 +542,7 @@ configuration reference owns the operator-facing routing policy.
 Template-specific hook behavior:
 
 - `hooks.json` registers one `bootstrap.sh codex hook <event>` command for each
-  of `UserPromptSubmit`, `PreToolUse`, and `PostToolUse`. The command resolves
+  of `UserPromptSubmit` and `PostToolUse`. The command resolves
   `bootstrap.sh` from the current Git worktree, so it also works when the hook
   runs from a repository subdirectory. The host adapter hands the original
   event to the existing shared resident and its canonical
@@ -552,9 +552,8 @@ Template-specific hook behavior:
   events, matchers, failure semantics, and telemetry. Read it with
   `agent-canon hook-dispatcher --contract`.
 - `UserPromptSubmit` uses the pure `hook_safety.rs` leaf for high-confidence
-  secret matching. `PreToolUse` uses the same leaf for destructive Git intent;
-  a blocked payload exposes only `operation` and `command_sha256` as command
-  information.
+  secret matching. Git operations use standard Git and the agreed work scope.
+  Retired `PreToolUse` invocations return an empty result before runtime work.
 - `PostToolUse` forwards only a validator-approved exact execution-resource
   projection from the managed producer. Invalid or malformed input is quiet
   and fail-open. The producer uses only the coarse error constants

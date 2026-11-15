@@ -1,8 +1,8 @@
 ---
 name: worktree-health
-description: "Use this skill to review current checkout authority, run-bundle drift, legacy worktree cleanup evidence, and cleanup readiness."
+description: "Use standard Git to inspect a checkout, preserve existing changes, resolve its worktree state, or remove an unused checkout after preserving needed content."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"43aa937b447514612d05c9e954c0a13bed5b0326be0c55c3bfd639d65a50451f"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"dfee884f9b5a6a57b4fd5dc785ccbcc89f1bd34a43dc7ed072b68a1f3afdd88b"} -->
 
 <!--
 @dependency-start

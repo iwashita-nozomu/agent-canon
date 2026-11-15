@@ -18,19 +18,35 @@ import tomllib
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-CONFIGURATION = tomllib.loads((PROJECT_ROOT / "tools/validation/semantic/convention/convention_compliance_contracts.toml").read_text(encoding="utf-8"))
+CONFIGURATION = tomllib.loads(
+    (
+        PROJECT_ROOT
+        / "tools/validation/semantic/convention/convention_compliance_contracts.toml"
+    ).read_text(encoding="utf-8")
+)
 MARKER_CONTRACTS = {
-    contract["id"]: {surface["path"]: tuple(surface["markers"]) for surface in contract["surfaces"]}
+    contract["id"]: {
+        surface["path"]: tuple(surface["markers"]) for surface in contract["surfaces"]
+    }
     for contract in CONFIGURATION["contracts"]
 }
 HOOK_GUARDRAIL_POLICY_MARKERS = MARKER_CONTRACTS["hook_guardrail_policy"]
 MATHEMATICAL_NECESSITY_MARKERS = MARKER_CONTRACTS["mathematical_necessity_gate"]
 REVIEW_ISSUE_ROUTING_MARKERS = MARKER_CONTRACTS["review_issue_routing"]
 SOURCE_FILE_DEFINITION_ORDER_MARKERS = MARKER_CONTRACTS["source_file_definition_order"]
-STATIC_READ_VALIDATION_POLICY_MARKERS = MARKER_CONTRACTS["static_read_validation_policy"]
+STATIC_READ_VALIDATION_POLICY_MARKERS = MARKER_CONTRACTS[
+    "static_read_validation_policy"
+]
 VALIDATION_FAILURE_RESPONSE_MARKERS = MARKER_CONTRACTS["validation_failure_response"]
-TOOL_GATES = {gate["id"]: (gate["path"], tuple(gate["owners"])) for gate in CONFIGURATION["checker"]["gates"]}
-NATIVE = os.environ.get("AGENT_CANON_NATIVE_BIN") or os.environ.get("AGENT_CANON_CLI") or "agent-canon"
+TOOL_GATES = {
+    gate["id"]: (gate["path"], tuple(gate["owners"]))
+    for gate in CONFIGURATION["checker"]["gates"]
+}
+NATIVE = (
+    os.environ.get("AGENT_CANON_NATIVE_BIN")
+    or os.environ.get("AGENT_CANON_CLI")
+    or "agent-canon"
+)
 
 
 MINIMAL_REPO_FILES: dict[str, str] = {
@@ -289,13 +305,6 @@ path: tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs
         "validate_projection_bytes record_hook_invocation HookLogContext "
         "\n"
     ),
-    "tools/runtime/dispatch/agent-canon/src/hook_safety.rs": (
-        "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY "
-        "AGENT_CANON_BRANCH_WORKTREE_REASON AGENT_CANON_DESTRUCTIVE_GIT_REASON "
-        "explicit_user_approval user_request agent_canon_workflow same-segment "
-        "branch_block_payload operation command_sha256 DESTRUCTIVE_GIT_GUARD=block "
-        "BRANCH_WORKTREE_CREATION_GUARD=block\n"
-    ),
     "ROOT_AGENTS.md": (
         "Current user request controls scope; preserve unknown state and user data.\n"
         "## Runtime Owner Map\n\n"
@@ -461,7 +470,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
             )
             workflow.write_text(
                 "#!/usr/bin/env bash\n"
-                'run_agent_canon check-convention-compliance'
+                "run_agent_canon check-convention-compliance"
                 ' --root "${WORKSPACE_ROOT}" --format json\n',
                 encoding="utf-8",
             )
@@ -488,7 +497,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
             )
             workflow.write_text(
                 "#!/usr/bin/env bash\n"
-                'run_agent_canon check-convention-compliance'
+                "run_agent_canon check-convention-compliance"
                 ' --root "${WORKSPACE_ROOT}" --format json \n',
                 encoding="utf-8",
             )
@@ -625,26 +634,6 @@ class CheckConventionComplianceTest(unittest.TestCase):
                     result.stdout,
                 )
 
-    def test_hook_safety_policy_marker_fails(self) -> None:
-        """Safety leaf policy must keep destructive-git authority and redaction context."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.copy_minimal_repo(root)
-            (root / "tools" / "runtime" / "dispatch" / "agent-canon" / "src" / "hook_safety.rs").write_text(
-                "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY "
-                "explicit_user_approval\n",
-                encoding="utf-8",
-            )
-
-            result = self.run_checker(root)
-
-            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn(
-                "hook_guardrail_policy:tools/runtime/dispatch/agent-canon/src/hook_safety.rs",
-                result.stdout,
-            )
-            self.assertIn("missing-marker:operation", result.stdout)
-
     def test_parent_repo_can_keep_shared_docs_only_in_vendor_canon(self) -> None:
         """A parent repo may keep AgentCanon docs out of root documents."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -684,7 +673,9 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            (root / "documents" / "conventions" / "coding-conventions-python.md").write_text(
+            (
+                root / "documents" / "conventions" / "coding-conventions-python.md"
+            ).write_text(
                 "# Python\n\n- 公開関数には型注釈が必須です。\n"
                 "\n## 検証\n\nagent-canon check-convention-compliance で確認します。\n",
                 encoding="utf-8",

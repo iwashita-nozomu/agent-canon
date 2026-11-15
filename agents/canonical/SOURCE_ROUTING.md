@@ -58,7 +58,7 @@ The reader map is neither a startup packet nor an execution checklist.
 | root runtime entrypoint | `bootstrap.sh` | `bash bootstrap.sh --help` |
 | workflow family and role candidates | `agents/task_catalog.yaml` | `agent-canon check-agent-runtime-alignment` |
 | public skill registry | `agents/skills/catalog.yaml` | `agent-canon check-agent-runtime-alignment` |
-| AgentCanon source publication | [agents/skills/agent-canon-update.md](../skills/agent-canon-update.md) | repository-topic-clone and PR checks |
+| AgentCanon source publication | [agents/skills/agent-canon-update.md](../skills/agent-canon-update.md) | Git merge and PR readback |
 | entrypoint responsibility grammar | [documents/design/entrypoint-owner-map.md](../../documents/design/entrypoint-owner-map.md) | `agent-canon docs check-entrypoints` |
 | implementation decision precedence | [engineering principles](../../documents/conventions/software-engineering-principles.md) | selected implementation/review evidence |
 

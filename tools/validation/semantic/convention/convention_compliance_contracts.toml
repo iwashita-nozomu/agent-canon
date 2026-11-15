@@ -156,9 +156,6 @@ id = "hook_guardrail_policy"
 path = "tools/runtime/dispatch/agent-canon/src/hook_dispatcher.rs"
 markers = ["HOOK_EVENT_CONTRACTS", "HookEventContract", "ACTIVE_HOOK_HANDLERS", "UserPromptSubmit", "PreToolUse", "PostToolUse", "Stop", "hook_safety", "validate_projection_bytes", "record_hook_invocation", "HookLogContext"]
 [[contracts.surfaces]]
-path = "tools/runtime/dispatch/agent-canon/src/hook_safety.rs"
-markers = ["AGENT_CANON_BRANCH_WORKTREE_AUTHORITY", "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY", "branch_block_payload", "command_sha256", "operation", "same-segment", "DESTRUCTIVE_GIT_GUARD=block", "BRANCH_WORKTREE_CREATION_GUARD=block"]
-[[contracts.surfaces]]
 path = ".codex/README.md"
 markers = ["active events", "active/inactive", "legacy `Stop`", "fail-open", "bounded", "redacted"]
 [[contracts.surfaces]]

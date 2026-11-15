@@ -146,7 +146,7 @@ roots = ["templates/experiments"]
     write(
         &source,
         ".codex/hooks.json",
-        br#"{"hooks":{"UserPromptSubmit":[{"hooks":[{"type":"command","command":"old"}]}],"PreToolUse":[{"hooks":[{"type":"command","command":"old"}]}],"PostToolUse":[{"hooks":[{"type":"command","command":"old"}]}]}}"#,
+        br#"{"hooks":{"UserPromptSubmit":[{"hooks":[{"type":"command","command":"old"}]}],"PostToolUse":[{"hooks":[{"type":"command","command":"old"}]}]}}"#,
     );
     write(
         &source,
@@ -554,7 +554,7 @@ fn profile_and_codex_exports_are_commit_bound_source_free_and_verifiable() {
     assert!(!paths.contains(&"tests/unrelated.py"));
     let hook: serde_json::Value =
         serde_json::from_slice(&fs::read(first.join("hooks/hooks.json")).unwrap()).unwrap();
-    for event in ["UserPromptSubmit", "PreToolUse", "PostToolUse"] {
+    for event in ["UserPromptSubmit", "PostToolUse"] {
         assert!(hook["hooks"][event][0]["hooks"][0]["command"]
             .as_str()
             .unwrap()

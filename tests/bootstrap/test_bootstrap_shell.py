@@ -39,6 +39,28 @@ def test_host_entrypoint_has_no_python_fallback() -> None:
     assert "AGENT_CANON_DOCKER_RPC" not in controller
 
 
+def test_retired_pretooluse_hook_returns_before_runtime_setup(tmp_path: Path) -> None:
+    result = subprocess.run(
+        [
+            str(BOOTSTRAP),
+            "--control-parent-root",
+            str(tmp_path / "missing"),
+            "codex",
+            "hook",
+            "PreToolUse",
+        ],
+        input='{"tool_name":"Bash","tool_input":{"command":"git worktree add -b topic path"}}',
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "AGENT_CANON_DOCKER": str(tmp_path / "missing-docker")},
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == ""
+    assert result.stderr == ""
+    assert not (tmp_path / "missing").exists()
+
+
 def test_shell_uninstall_removes_only_managed_skill_link(tmp_path: Path) -> None:
     """Uninstall removes one directory link, not sibling or system entries."""
     home = tmp_path / "home"

@@ -184,8 +184,6 @@ Commands:
   generate-agent-runtime-dashboard [--root ROOT] [--runtime-root ROOT] [--out PATH] [--compact-out PATH] [--api-out PATH] [--recent-days DAYS]
   issue-sync [--repo OWNER/REPO] [--issue-url URL] [options]
   checkout-identity [--cwd PATH] [--format json|lines]
-  repository-topic-clone <prepare|merge-main|finalize-merge|verify-publication|cleanup> [options]
-  dependency-module-change [--root ROOT] <prepare|merge-main|status|cleanup> [options]
   eval-accumulation-check [--root ROOT] [--runtime-root ROOT] [--family-registry PATH] [--format text|json] [--compact-out PATH]
   oop-python-rule-inventory|oop-cpp-rule-inventory [--root <repo-root>] [--format text|json|markdown]
   oop-python-readability|oop-cpp-readability [paths...] [--root ROOT] [options]
@@ -363,12 +361,6 @@ fn main() {
     }
     if args.len() >= 2 && args[1] == "checkout-identity" {
         std::process::exit(agent_canon::checkout_identity::run(&args[2..]));
-    }
-    if args.len() >= 2 && args[1] == "repository-topic-clone" {
-        std::process::exit(agent_canon::repository_topic_clone::run(&args[2..]));
-    }
-    if args.len() >= 2 && args[1] == "dependency-module-change" {
-        std::process::exit(agent_canon::dependency_module_change::run(&args[2..]));
     }
     if args.len() >= 2 && args[1] == "tool-catalog" {
         std::process::exit(catalog::tool_catalog::run(&args[2..]));

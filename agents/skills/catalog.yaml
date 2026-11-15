@@ -528,12 +528,12 @@ skill_families:
         - ["AgentCanon", "ツール", "コンテナ"]
         - ["AgentCanon", "評価", "収集"]
   - id: repository-topic-clone
-    purpose: Prepare, reuse, merge, publish-readback, and reconstructibly clean one generic repository topic checkout before repository-kind policy decoration.
+    purpose: Create, reuse, merge, publish, and clean task checkouts with standard Git.
     canonical_doc: agents/skills/repository-topic-clone.md
     shim: .codex/personal/skills/repository-topic-clone/SKILL.md
     discovery:
       name: repository-topic-clone
-      description: "Use for any parent, dependency, or standalone repository topic checkout under workspace/{topic}/{repo}; linked-worktree or independent-clone mode is selected by repository relationship, and repository kind is a post-checkout policy decorator."
+      description: "Use standard Git to create or reuse a task checkout, merge current main, and remove an unused worktree or clone while preserving existing work."
     routing:
       stage_policy: active
       reason: a requested repository clone, branch reuse, origin/main merge, or reconstructibility cleanup operation is in scope
@@ -549,15 +549,15 @@ skill_families:
         - ["repository", "クローン"]
         - ["topic", "clone"]
   - id: dependency-module-change
-    purpose: Decorate the generic repository topic checkout lifecycle with .gitmodules, gitlink, pin, and projection policy.
+    purpose: Change dependencies through standard Git and the consumer's existing dependency and pin declarations.
     canonical_doc: agents/skills/dependency-module-change.md
     shim: .codex/personal/skills/dependency-module-change/SKILL.md
     discovery:
       name: dependency-module-change
-      description: "Use when a dependency source change, independent topic checkout, or reconstructibility-based checkout cleanup is required."
+      description: "Use standard Git to change dependency source, publish its PR, and adopt the selected commit through the consumer's existing dependency declarations."
     routing:
       stage_policy: active
-      reason: dependency module identity, gitlink, pin, or projection policy decorates a generic repository topic clone lifecycle
+      reason: dependency source, gitlink, or consumer pin changes are in scope
       triggers:
         - ["dependency", "module", "change"]
         - ["dependency", "source", "clone"]
@@ -1021,12 +1021,12 @@ skill_families:
       name: dependency-analysis
       description: "Use when checking, validating, or diagnosing repository dependency manifests, expanding code/header/search dependencies into a change-impact packet, or preparing repair-planning and subagent handoff context before editing, review, or closeout."
   - id: worktree-health
-    purpose: Review worktree scope, drift, and cleanup readiness.
+    purpose: Use standard Git to inspect checkout state and safely remove unused worktrees or clones.
     canonical_doc: agents/skills/worktree-health.md
     shim: .codex/personal/skills/worktree-health/SKILL.md
     discovery:
       name: worktree-health
-      description: "Use this skill to review current checkout authority, run-bundle drift, legacy worktree cleanup evidence, and cleanup readiness."
+      description: "Use standard Git to inspect a checkout, preserve existing changes, resolve its worktree state, or remove an unused checkout after preserving needed content."
   - id: retention
     purpose: Plan retention, archive, externalization, or deletion of existing experiment results without owning execution or serialization.
     canonical_doc: agents/skills/retention.md

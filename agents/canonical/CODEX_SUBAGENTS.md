@@ -527,13 +527,13 @@ require another read.
 
 - parent は current task handoff で repository、branch、責務 path を指定し、作業者は編集前に checkout identity と Git state を読みます
 - 同じ file、directory owner、Git index、public surface を同時に変更せず、衝突する作業は直列化します
-- `repository-topic-clone.prepare` は selected checkout path と branch を用意します
+- checkoutは標準の `git worktree add` または `git clone` で用意し、既存の作業場所を再利用します
 - 選択済みの実行 owner が合意済み範囲を編集します。委譲した reviewer と artifact-only role は read-only、IssueWorker の `publisher` は外部 GitHub publication 専用とします。
 - 同一 path、同一 directory ownership、同一 public API surface、shared Git index/HEAD、generated output、formatter output は順序制約つきの writer に割り当てます
 - write-capable subagent instance を並行させる場合は、checkout roots と write targets の衝突を避けます
 - same directory / same file / same canonical surface を同時に変更せず、衝突する作業は必要に応じて順に行います
 - 独立した writer は checkout owner が用意した distinct checkout roots を使えます
-- checkout の分離は通常の衝突回避を手動で行うためではなく、repository-topic lifecycle が親/同一 repository の `linked-worktree` または dependency repository の `independent-clone` として選択した独立 workstream に限ります
+- 同じrepositoryの独立作業にはGit worktree、別の依存repositoryには独立cloneを使います
 - review role は常に read-only とし、parent-managed write-scope discipline と writer-instance separation の確認は `plan_reviewer` と `project_reviewer` の固定責務です
 
 Git status and readback establish the current branch and preserve unknown state. Shared checkout mutation follows the assigned responsibility and existing Git authority; the current conversation supplies work scope, without a manager packet or writer registry.

@@ -69,7 +69,7 @@ const CONTRACTS: &[EntrypointContract] = &[
             &[
                 "AgentCanon source publication",
                 "agents/skills/agent-canon-update.md",
-                "repository-topic-clone and PR checks",
+                "Git merge and PR readback",
             ],
             &[
                 "entrypoint responsibility grammar",

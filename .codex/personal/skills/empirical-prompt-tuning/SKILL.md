@@ -2,7 +2,7 @@
 name: empirical-prompt-tuning
 description: "Use when a reusable instruction has an observed or consequential behavior question that needs evidence-based evaluation and revision."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"815c337c54503525f43543e3b8e707dd0a3e6d6c6ebc5676415a8a43e9cbee51"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"5ae49160ac6d1708d41501d625bcb37a3779bf688378cf2061ec366667b2dd58"} -->
 
 <!--
 @dependency-start

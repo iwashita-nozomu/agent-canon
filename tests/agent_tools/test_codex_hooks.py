@@ -25,7 +25,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 HOOKS_JSON = PROJECT_ROOT / ".codex" / "hooks.json"
 
-ACTIVE_EVENTS = ("UserPromptSubmit", "PreToolUse", "PostToolUse")
+ACTIVE_EVENTS = ("UserPromptSubmit", "PostToolUse")
 
 
 def codex_hook_command(*arguments: str) -> list[str]:
@@ -210,27 +210,8 @@ class CodexHooksTest(unittest.TestCase):
             "dict[str, object]", json.loads(paths[0].read_text(encoding="utf-8"))
         )
 
-    def _run_shared_checkout_guard(
-        self, command: str, *, extra_env: dict[str, str] | None = None
-    ) -> dict[str, object] | None:
-        """Run the active PreToolUse dispatcher for one shared-checkout command."""
-        result = self._run_hook(
-            "PreToolUse",
-            {
-                "hookEventName": "PreToolUse",
-                "tool_name": "Bash",
-                "tool_input": {"cmd": command},
-            },
-            extra_env=extra_env,
-        )
-        return (
-            cast("dict[str, object]", json.loads(result.stdout))
-            if result.stdout
-            else None
-        )
-
-    def test_active_hook_config_has_exact_three_events(self) -> None:
-        """Project config and hooks JSON expose only the three active dispatcher events."""
+    def test_active_hook_config_has_exact_two_events(self) -> None:
+        """Project config registers prompt safety and execution-resource events."""
         hooks = cast(
             "dict[str, object]", json.loads(HOOKS_JSON.read_text(encoding="utf-8"))
         )
@@ -242,7 +223,7 @@ class CodexHooksTest(unittest.TestCase):
         prompt_group = cast("list[dict[str, object]]", hook_groups["UserPromptSubmit"])[
             0
         ]
-        pre_tool_group = cast("list[dict[str, object]]", hook_groups["PreToolUse"])[0]
+        self.assertNotIn("PreToolUse", hook_groups)
         post_tool_group = cast("list[dict[str, object]]", hook_groups["PostToolUse"])[0]
         self.assertEqual(
             [
@@ -251,16 +232,6 @@ class CodexHooksTest(unittest.TestCase):
             ],
             [
                 'bash "$(git rev-parse --show-toplevel)/bootstrap.sh" --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT:-$HOME}" codex hook UserPromptSubmit'
-            ],
-        )
-        self.assertEqual(pre_tool_group["matcher"], "Bash|apply_patch|python|python3")
-        self.assertEqual(
-            [
-                hook["command"]
-                for hook in cast("list[dict[str, object]]", pre_tool_group["hooks"])
-            ],
-            [
-                'bash "$(git rev-parse --show-toplevel)/bootstrap.sh" --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT:-$HOME}" codex hook PreToolUse'
             ],
         )
         post_matcher = cast(str, post_tool_group["matcher"])
@@ -300,14 +271,14 @@ class CodexHooksTest(unittest.TestCase):
             active_handlers,
             {
                 "UserPromptSubmit.secret_safety",
-                "PreToolUse.destructive_git_safety",
                 "PostToolUse.execution_resource_projection",
             },
         )
-        self.assertEqual(inactive_events, ["Stop"])
-        self.assertEqual(set(events), set((*ACTIVE_EVENTS, "Stop")))
+        self.assertEqual(inactive_events, ["PreToolUse", "Stop"])
+        self.assertEqual(set(events), set((*ACTIVE_EVENTS, "PreToolUse", "Stop")))
         for event, expected_active in (
             *((event, True) for event in ACTIVE_EVENTS),
+            ("PreToolUse", False),
             ("Stop", False),
         ):
             with self.subTest(event=event):
@@ -574,25 +545,21 @@ class CodexHooksTest(unittest.TestCase):
                 self.assertEqual(result.stdout, "")
                 self.assertEqual(result.stderr, "")
 
-    def test_dispatcher_branch_payload_is_redacted(self) -> None:
-        """Destructive Git output contains only the operation and command fingerprint."""
-        command = "git -C vendor/agent-canon restore --worktree ."
-        result = self._run_hook(
-            "PreToolUse",
-            {
-                "hookEventName": "PreToolUse",
-                "tool_name": "Bash",
-                "tool_input": {"cmd": command},
-            },
-        )
-        payload = cast("dict[str, object]", json.loads(result.stdout))
-        self.assertEqual(payload["decision"], "block")
-        self.assertEqual(payload["operation"], "destructive_git:restore")
-        self.assertEqual(
-            payload["command_sha256"], hashlib.sha256(command.encode()).hexdigest()
-        )
-        self.assertNotIn(command, result.stdout)
-        self.assertNotIn("cmd", payload)
+    def test_retired_pretooluse_is_quiet_for_git_commands(self) -> None:
+        for command in [
+            "git worktree add -b topic path",
+            "git switch topic",
+            "git worktree remove path",
+            "git reset --hard",
+        ]:
+            with self.subTest(command=command):
+                result = self._run_hook(
+                    "PreToolUse",
+                    {"tool_name": "Bash", "tool_input": {"command": command}},
+                )
+                self.assertEqual(result.returncode, 0)
+                self.assertEqual(result.stdout, "")
+                self.assertEqual(result.stderr, "")
 
     def test_dispatcher_hot_path_has_no_child_process_or_network_calls(self) -> None:
         """The native dispatcher keeps direct process and network calls out."""
@@ -608,251 +575,6 @@ class CodexHooksTest(unittest.TestCase):
             "reqwest::",
         ):
             self.assertNotIn(operation, source)
-
-    def test_shared_checkout_guard_blocks_destructive_git_parser_table(self) -> None:
-        """Protected Git stays visible through prefixes, wrappers, options, and grouping."""
-        commands = [
-            "git -C vendor/agent-canon restore --worktree .",
-            "git --no-pager reset --mixed HEAD",
-            "git -P restore --staged file.py",
-            "git -p checkout -- file.py",
-            "git --exec-path=/tmp reset HEAD",
-            "env -u HOME git restore .",
-            "env --unset=HOME git reset HEAD",
-            "command -- git clean -f",
-            "command -p git stash push -m save",
-            "( git checkout main )",
-            "! git switch main",
-            "time -p git worktree prune",
-            "bash -lc 'git restore --worktree .'",
-            "eval 'git reset --mixed HEAD'",
-            "true && git clean --force -d",
-            "git branch -Dtopic",
-            "git branch -mtopic",
-        ]
-        for command in commands:
-            with self.subTest(command=command):
-                payload = self._run_shared_checkout_guard(command)
-                self.assertIsNotNone(payload)
-                self.assertEqual(
-                    cast("dict[str, object]", payload)["decision"], "block"
-                )
-                self.assertIn(
-                    "DESTRUCTIVE_GIT_GUARD=block",
-                    cast("str", cast("dict[str, object]", payload)["reason"]),
-                )
-
-    def test_shared_checkout_guard_authority_is_same_segment_and_one_shot(self) -> None:
-        """Ambient, incomplete, and earlier-segment authority never leaks to Git."""
-        destructive = (
-            "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval "
-            "AGENT_CANON_DESTRUCTIVE_GIT_REASON=approved"
-        )
-        for command in (
-            f"{destructive} git restore file.py",
-            f"env {destructive} git reset HEAD",
-        ):
-            self.assertIsNone(self._run_shared_checkout_guard(command))
-        self.assertIsNotNone(
-            self._run_shared_checkout_guard(
-                "git restore file.py",
-                extra_env={
-                    "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY": "explicit_user_approval",
-                    "AGENT_CANON_DESTRUCTIVE_GIT_REASON": "ambient must not count",
-                },
-            )
-        )
-        self.assertIsNotNone(
-            self._run_shared_checkout_guard(
-                "AGENT_CANON_DESTRUCTIVE_GIT_REASON=approved git restore file.py"
-            )
-        )
-        self.assertIsNotNone(
-            self._run_shared_checkout_guard(
-                f"{destructive} git restore file.py && git reset HEAD"
-            )
-        )
-        self.assertIsNotNone(
-            self._run_shared_checkout_guard(f"{destructive}; git restore file.py")
-        )
-
-    def test_shared_checkout_guard_checks_opaque_protected_git_per_segment(
-        self,
-    ) -> None:
-        """A parsed safe Git segment never hides opaque protected Git elsewhere."""
-        commands = [
-            "git status && sudo git reset --hard",
-            "git status; nice git restore file.py",
-            "git status && ( sudo git checkout main )",
-            "sudo git " + "-A " * 2000 + "reset --hard HEAD",
-        ]
-        for command in commands:
-            with self.subTest(command=command):
-                payload = self._run_shared_checkout_guard(command)
-                self.assertIsNotNone(payload)
-                self.assertEqual(
-                    cast("dict[str, object]", payload)["operation"],
-                    "destructive_git:opaque",
-                )
-        self.assertIsNotNone(
-            self._run_shared_checkout_guard(
-                "git --config-env=core.editor=EDITOR reset --hard HEAD"
-            )
-        )
-
-    def test_shared_checkout_guard_classifies_backtick_substitutions(self) -> None:
-        """Executable or uncertain protected Git backticks block without broad matches."""
-        blocked = (
-            "echo `git reset --hard`",
-            'echo "`git reset --hard`"',
-            "echo `git reset --hard",
-        )
-        for command in blocked:
-            with self.subTest(command=command):
-                payload = self._run_shared_checkout_guard(command)
-                self.assertIsNotNone(payload)
-                self.assertEqual(
-                    cast("dict[str, object]", payload)["operation"],
-                    "destructive_git:reset",
-                )
-        benign = (
-            "echo `date`",
-            'echo "`date`"',
-            "echo '`git reset --hard`'",
-            "echo `git status`",
-            "echo `date",
-            "echo \\`git reset --hard\\`",
-        )
-        for command in benign:
-            with self.subTest(command=command):
-                self.assertIsNone(self._run_shared_checkout_guard(command))
-
-    def test_shared_checkout_guard_ignores_backticks_in_shell_comments(self) -> None:
-        """Only unquoted shell-comment boundaries suppress backtick execution."""
-        comments = (
-            "echo safe # `git reset --hard`",
-            "echo safe # `git reset --hard",
-            "echo safe;# `git reset --hard`",
-            "echo '# `git reset --hard`'",
-        )
-        for command in comments:
-            with self.subTest(command=command):
-                self.assertIsNone(self._run_shared_checkout_guard(command))
-
-        executable = (
-            "echo safe#`git reset --hard`",
-            'echo "# `git reset --hard`"',
-            "echo \\#`git reset --hard`",
-            "echo safe # `date`\necho `git reset --hard`",
-        )
-        for command in executable:
-            with self.subTest(command=command):
-                payload = self._run_shared_checkout_guard(command)
-                self.assertIsNotNone(payload)
-                self.assertEqual(
-                    cast("dict[str, object]", payload)["operation"],
-                    "destructive_git:reset",
-                )
-
-    def test_shared_checkout_guard_allows_explicit_read_only_table(self) -> None:
-        """Read-only diagnostics and combined clean dry-run forms stay quiet."""
-        commands = [
-            "git status --short",
-            "git diff --stat",
-            "git branch",
-            "git branch --show-current",
-            "git branch --list 'topic/*'",
-            "git branch --edit-description topic",
-            "git branch --set-upstream-to=origin/main topic",
-            "git branch --set-upstream-to origin/main topic",
-            "git branch --unset-upstream topic",
-            "git branch -u origin/main topic",
-            "git branch -uorigin/main topic",
-            "git worktree list --porcelain",
-            "git worktree lock ../topic",
-            "git worktree lock --reason maintenance ../topic",
-            "git worktree lock --reason=maintenance ../topic",
-            "git worktree unlock ../topic",
-            "git stash list",
-            "git stash show stash@{0}",
-            "git clean -n",
-            "git clean --dry-run -f",
-            "git clean -fnx",
-            "git clean -nfx",
-            "git switch --help",
-            "git checkout -h",
-        ]
-        for command in commands:
-            with self.subTest(command=command):
-                self.assertIsNone(self._run_shared_checkout_guard(command))
-
-    def test_shared_checkout_guard_enforces_overlap_authority_matrix(self) -> None:
-        """Creation needs its grant; forced replacement also needs destructive approval."""
-        commands = [
-            "git switch -ctopic",
-            "git checkout -btopic",
-            "git checkout --orphan topic",
-            "git branch -ctopic main",
-            "git branch topic",
-            "git branch --track topic origin/main",
-            "git branch --track=direct topic origin/main",
-            "git branch --no-track topic origin/main",
-            "git branch --create-reflog topic origin/main",
-            "git worktree add -b topic ../topic",
-            "git worktree add --orphan topic ../topic",
-        ]
-        forced_commands = [
-            "git switch -Ctopic",
-            "git checkout -Btopic",
-            "git branch -Ctopic main",
-            "git branch -ftopic main",
-            "git worktree add -B topic ../topic",
-            "git worktree add -f ../topic topic",
-            "git worktree add --force ../topic topic",
-        ]
-        for command in commands:
-            with self.subTest(command=command):
-                self.assertIsNone(
-                    self._run_shared_checkout_guard(
-                        "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request "
-                        "AGENT_CANON_BRANCH_WORKTREE_REASON=requested " + command
-                    )
-                )
-        for command in forced_commands:
-            with self.subTest(command=command):
-                authority = (
-                    "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request "
-                    "AGENT_CANON_BRANCH_WORKTREE_REASON=requested "
-                )
-                payload = self._run_shared_checkout_guard(authority + command)
-                self.assertIsNotNone(payload)
-                self.assertEqual(
-                    cast("dict[str, object]", payload)["decision"], "block"
-                )
-                self.assertIsNone(
-                    self._run_shared_checkout_guard(
-                        authority
-                        + "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval "
-                        "AGENT_CANON_DESTRUCTIVE_GIT_REASON=approved " + command
-                    )
-                )
-
-    def test_shared_checkout_guard_blocks_generic_branch_worktree_mutation(
-        self,
-    ) -> None:
-        """Only explicit branch/worktree read-only allowlists stay quiet."""
-        commands = [
-            "git branch -Mtopic",
-            "git branch --set-upstream-to --delete topic",
-            "git worktree remove ../topic",
-            "git worktree move ../old ../new",
-            "git worktree repair ../topic",
-            "git worktree lock --reason --force ../topic",
-            "git worktree unlock --force ../topic",
-        ]
-        for command in commands:
-            with self.subTest(command=command):
-                self.assertIsNotNone(self._run_shared_checkout_guard(command))
 
 
 def test_hook_report_requires_parent_capability() -> None:

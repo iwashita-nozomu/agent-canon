@@ -29,11 +29,10 @@ prebuilt artifact build/distribution. Do not place local lifecycle work under
 
 ## Source checkout and workspace
 
-Edit the AgentCanon repository itself or a repository-topic checkout prepared by
-the canonical lifecycle. For a Template or derived parent, use
-`<anchor>/workspace/<topic>/agent-canon`; select `linked-worktree` for a
-parent/same-repository branch and `independent-clone` for a dependency
-repository. Do not restore a submodule, vendor checkout, root projection,
+Edit the AgentCanon repository itself or an existing task checkout. For a
+Template or derived parent, the preferred new path is
+`<anchor>/workspace/<topic>/agent-canon`. Use standard `git worktree add` for
+the same repository and `git clone` for another repository. Do not restore a submodule, vendor checkout, root projection,
 source symlink, `notes/`, or AgentCanon test/eval directory in the parent. The
 prepared checkout is task-owned. Remove it once no active work needs it and
 the selected publication/evidence obligations preserve its state; do not retain
@@ -202,8 +201,8 @@ archive state into the AgentCanon source checkout.
 
 Resolve the owning Issue, current remote `main`, relevant PRs, and checkout
 identity from the task. Keep #841 and #821 with their separate owners. Reuse or
-create an Issue-qualified topic branch through `repository-topic-clone` in the
-qualified standalone source checkout; choose checkout mode from the repository
+create an Issue-qualified topic branch with standard Git in the
+standalone source checkout; choose worktree or clone from the repository
 relationship and use `$agent-update-branch` for lane selection. The parent does
 not become the AgentCanon source checkout.
 

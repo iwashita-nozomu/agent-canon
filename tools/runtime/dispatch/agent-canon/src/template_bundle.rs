@@ -1301,7 +1301,7 @@ fn codex_skill_body(source: &str, destination: &str, content: &[u8]) -> BundleRe
 }
 
 fn codex_hook_configuration(source: &[u8]) -> BundleResult<Vec<u8>> {
-    const EVENTS: [&str; 3] = ["UserPromptSubmit", "PreToolUse", "PostToolUse"];
+    const EVENTS: [&str; 2] = ["UserPromptSubmit", "PostToolUse"];
     let mut value: Value = serde_json::from_slice(source)
         .map_err(|_| bundle_error("canonical hook configuration is invalid"))?;
     let hooks = value
