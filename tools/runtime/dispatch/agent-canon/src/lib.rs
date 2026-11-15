@@ -51,8 +51,6 @@
 // downstream implementation scip_index.rs owns the native generated-index reader and SCIP command
 // downstream implementation git_dependency_diff_summary.rs owns native Git dependency summaries
 // downstream implementation checkout_identity.rs reads bounded checkout identity
-// downstream implementation repository_topic_clone.rs owns native topic checkout lifecycle
-// downstream implementation dependency_module_change.rs decorates lifecycle with .gitmodules identity
 // downstream implementation main.rs consumes the shared runtime and CLI library APIs
 // downstream implementation ../tests/owner_guarantee_native.rs validates Python packet and projection oracles
 // downstream implementation ../tests/artifacts_native.rs validates the shared artifact API
@@ -108,7 +106,6 @@ pub mod agent_canon_source_root;
 pub mod annex_retention;
 pub mod behavior_event_assembly;
 pub mod bootstrap_runtime;
-pub mod dependency_module_change;
 pub mod environment_dependencies;
 pub mod eval_accumulation;
 pub mod eval_accumulation_check;
@@ -153,7 +150,6 @@ pub mod python_text;
 pub mod reference_materializer;
 pub mod repo_structure_contract;
 pub mod report_artifact_checks;
-pub mod repository_topic_clone;
 pub mod run_evaluation;
 pub mod runtime_alignment;
 pub mod runtime_boundary;

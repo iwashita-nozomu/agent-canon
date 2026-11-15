@@ -34,7 +34,7 @@ downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates 
 
 | artifact owner | caller path | write/projection policy |
 | --- | --- | --- |
-| `.codex/hooks/hook_dispatcher.py` | finalized `UserPromptSubmit`/`PreToolUse`/`PostToolUse` path | one `record_hook_invocation` call; one `HookLogContext.append` for every active invocation; merge an eligible behavior record into that base event |
+| `tools/runtime/dispatch/agent-canon/src/hook_dispatcher.rs` | finalized `UserPromptSubmit`/`PostToolUse` path | one `record_hook_invocation` call; one `HookLogContext.append` for every active invocation; merge an eligible behavior record into that base event |
 | `tools/runtime/dispatch/agent-canon/src/behavior_event_assembly.rs` | direct import from dispatcher | returns `BehaviorEventRecord | None`; no I/O |
 | `tools/runtime/dispatch/agent-canon/src/hook_event_log.rs` | direct import from dispatcher | no-replace per-event spool append (`<spool>/<namespace>/<hook_name>/<hook_run_id>.json`) with `spooled|duplicate|failed` result |
 
@@ -119,17 +119,25 @@ The read-only consumers may not emit an independent B7/B9 decision, approval, or
 
 ## Positive target state
 
-### Three active dispatcher events and inactive Stop
+### Two active dispatcher events
 
-`.codex/hooks.json` registers only these three event groups, each invoking `.codex/hooks/hook_dispatcher.py` once. `Stop` is a contract row with `active=false`, is not registered, reads no stdin, emits no output and no telemetry, and remains an inactive no-op forever.
+`.codex/hooks.json` registers `UserPromptSubmit` and `PostToolUse`, each invoking
+the native dispatcher through the existing host adapter. Retired `PreToolUse`
+and `Stop` return empty successful results with zero telemetry.
 
 | event | matcher | active owner call | post-result caller action | success output | failure semantics |
 | --- | --- | --- | --- | --- | --- |
 | `UserPromptSubmit` | none | `hook_safety.secret_kind` then `secret_block_payload` | after the safety result is final, call `behavior_event_assembly.record_hook_invocation(parts)` exactly once | no output on pass; official redacted block on match | secret match block; malformed input and spool failure fail-open |
-| `PreToolUse` | `Bash\|apply_patch\|python\|python3` | `hook_safety.first_block` then `branch_block_payload` | after the safety result is final, call `behavior_event_assembly.record_hook_invocation(parts)` exactly once | no output on pass; operation/hash-only block | unauthorized destructive Git block; malformed input and spool failure fail-open |
 | `PostToolUse` | current ten-tool matcher set | normalize six fields, then `execution_resource_projection.validate_projection_bytes` | after the projection result is final, call `behavior_event_assembly.record_hook_invocation(parts)` exactly once | validated successful Bash projection as official `additionalContext` | malformed input, non-Bash, unsuccessful response, invalid projection, spool failure fail-open |
 
-The active handler set is exactly `UserPromptSubmit.secret_safety`, `PreToolUse.destructive_git_safety`, `PostToolUse.execution_resource_projection`. The dispatcher is the sole caller of `record_hook_invocation`; `behavior_event_assembly.rs` is the sole pure owner for eligibility, event-id, and snapshot assembly. The dispatcher imports the owner directly and calls it after, never before, the existing handler result is finalized. The call is exactly once per active handler invocation, including a finalized block/fail-open result; `Stop` is inactive and calls it zero times. The official output schema remains `agent-canon.posttooluse-stop.v1`; contract readback schema remains `agent-canon.hook-contract.v1` with `active_events` length 3 and `inactive_events=["Stop"]`.
+The active handlers are `UserPromptSubmit.secret_safety` and
+`PostToolUse.execution_resource_projection`. The dispatcher calls
+`record_hook_invocation` once after each active handler result is final.
+`behavior_event_assembly.rs` owns eligibility, event identity, and snapshot
+assembly. Retired events produce zero calls. The output schema remains
+`agent-canon.posttooluse-stop.v1`; contract readback uses
+`agent-canon.hook-contract.v1` with two active events and
+`inactive_events=["PreToolUse","Stop"]`.
 
 ### Dispatcher caller contract for `record_hook_invocation`
 
@@ -137,7 +145,7 @@ The dispatcher imports `record_hook_invocation` directly from `tools/runtime/dis
 
 ```text
 HookInvocationParts = frozen {
-  hook_event_name: "UserPromptSubmit" | "PreToolUse" | "PostToolUse",
+  hook_event_name: "UserPromptSubmit" | "PostToolUse",
   hook_invocation_id: non-empty str,                 # current hook_run_id
   hook_payload: Mapping[str, JSONValue] | None,       # parsed hook payload; raw text is never copied
   payload_status: "parsed" | "malformed_payload",
@@ -186,7 +194,11 @@ Dispatcher parts-preparation remains I/O-free for artifact writes. Caller-side t
 
 ### Transport hook name, semantic event kind, cardinality, and identity
 
-`hook_event_name` is transport metadata and is never used as the semantic event kind. It is exactly one of `UserPromptSubmit`, `PreToolUse`, or `PostToolUse` on an active invocation. `event_kind` is the behavior meaning and is independent of the transport name: `behavior_snapshot`, `prompt_intake`, `tool_selection`, `subagent_selection`, `workflow_attribution`, or `skill_lane`. The canonical replacement record uses `event_kind="behavior_snapshot"` and carries the other semantic dimensions as fields; the dimension names are not aliases for `hook_event_name`. The old ambiguous `event` field is removed from the target behavior schema and has no compatibility alias.
+`hook_event_name` identifies the transport: current active invocations use
+`UserPromptSubmit` or `PostToolUse`, while archived metadata may include retired
+`PreToolUse`. `event_kind` identifies the behavior meaning, such as
+`behavior_snapshot`, `prompt_intake`, `tool_selection`, `subagent_selection`,
+`workflow_attribution`, or `skill_lane`.
 
 Transport status is emitted only by `HookLogContext.append`, and telemetry cardinality is:
 
@@ -195,7 +207,6 @@ Transport status is emitted only by `HookLogContext.append`, and telemetry cardi
 | ineligible invocation | 0 behavior record candidate → 1 base append attempt (`HookLogContext.append`) with no behavior fields | `hook_invocation_id`/current `hook_run_id` plus `hook_event_name` |
 | eligible behavior invocation | exactly 1 behavior record candidate merged into the one base append | one `event_id` for the snapshot; no per-field or per-dimension duplicate rows |
 | blocked_secret | 0 behavior record candidate → 1 base append; telemetry fields include `safety_decision` only | same as invocation id + event name, with safety telemetry context |
-| blocked_destructive_git | 0 behavior record candidate → 1 base append; telemetry fields include `safety_decision`, `operation` | same as invocation id + event name, with safety telemetry context |
 | malformed_payload | 0 behavior record candidate → 1 base append; telemetry fields include base status/fingerprint only | same as invocation id + event name, with safety telemetry context |
 | append result (spooled/duplicate/failed) | status is owned by `HookLogContext.append`; it never creates another event or changes the finalized handler result | the base event retains one `hook_run_id` and at most one merged `event_id` |
 
@@ -256,12 +267,11 @@ The following is copied from the current implementation and is the parity oracle
 | --- | --- | --- | --- | --- |
 | raw stdin | `raw_payload` | bytes; UTF-8 decoded; parsed value must be an object, else nullable parse result `None` | `MAX_HOOK_PAYLOAD_BYTES=262144`; empty/whitespace becomes `{}`; duplicate keys, non-finite constants, invalid UTF-8/JSON, recursion, over-limit become `malformed_payload` | dispatcher parses once; no owner changes semantics |
 | prompt input | `prompt` | optional raw key; non-string becomes `""`; `secret_kind` returns `str | None` | four regex classes; first match wins; raw prompt never enters block payload or spool | `hook_safety.payload_prompt` and `secret_kind` |
-| pre-tool input | `tool_name`, `tool_input.command/cmd`, top-level `command/cmd` | strings when present, otherwise `""`; shell names exactly `Bash`/`bash` | command is parsed in memory; raw command is never output/telemetry | `hook_safety` payload extractors and Git classifier |
 | normalized PostToolUse | `hook_event_name`, `schema_version`, `tool_input_fingerprint`, `tool_name`, `tool_input`, `tool_response` | exact six-key object; fingerprint is 64 lowercase hex; `tool_input` object; response exact `{exit_code:int, stderr:str, stdout:str}`; `exit_code` rejects bool | schema `agent-canon-post-tool-use-input/v1`; extra/missing/wrong-type fields → `invalid_projection` | `execution_resource_projection.validate_normalized_input` |
 | projection | `admission`, `completion_coverage_path`, `error`, `exit_code`, `plan_fingerprint`, `plan_path`, `projection`, `run_id`, `schema_version` | exact nine keys; `admission` and `error` are nullable; hashes 64 lowercase hex; paths are derived from safe `run_id` | stdout max `MAX_PROJECTION_BYTES=65536`; exactly one LF, no CR, canonical sorted JSON, schema `execution-resource-plan/v1`, kind `post_tool_use` | same nine-key validator in new non-hook owner |
 | admission | `admission_fingerprint`, `guarantee`, `namespace_id`, `provision_receipt_fingerprint`, `selected_uuids` | nullable object or exact five-key object; namespace regex bounded 1–64; UUIDs match `GPU|MIG` opaque form | guarantee `run-level-opaque-uuid-admission`; wrong/null shape → invalid projection | unchanged |
 | projection error | `kind` | nullable object or exact one-key object | one of `managed_gpu_failure`, `managed_gpu_execution`, `see_execution_resource_plan` | unchanged |
-| safety block | `decision`, `reason`, `next_action`, `remediation`; Git adds `operation`, `command_sha256` | decision fixed `block`; reason/next_action strings; remediation list of strings; Git operation string and command hash 64 lowercase hex; prompt/command material absent | official wrapper adds `schema`, `hookSpecificOutput.{hookEventName,additionalContext}`; block status is `blocked_secret` or `blocked_destructive_git` | new `hook_safety`, same payload bytes/fields |
+| safety block | `decision`, `reason`, `next_action`, `remediation` | redacted prompt secret decision and guidance | official wrapper adds `schema`, `hookSpecificOutput.{hookEventName,additionalContext}`; status `blocked_secret` | retained prompt safety |
 | projection output | `schema`, `hookSpecificOutput.{hookEventName,additionalContext}` | strings; context is the already validated canonical projection stdout | official schema `agent-canon.posttooluse-stop.v1`; context max is bounded by 65536-byte projection | new projection owner, same wrapper |
 | spool base | `hook_run_id`, `timestamp`, `payload_fingerprint`, `status`, `hook_event_name` | all non-empty strings; payload hash 64 lowercase hex; timestamp UTC ISO string | no explicit spool event byte limit in current code; only bounded hashes/status/short telemetry are written | preserve no new input/raw text |
 | spool context | `source_repo_key`, `hook_log_namespace` | non-empty strings added by `HookLogContext`; optional `codex_trace_key`, `codex_thread_id` are non-empty strings when environment provides them | namespace slug max 80; no-replace per-event path; mode 0600 temp file | `hook_event_log.rs` remains sole transport owner |
@@ -270,7 +280,11 @@ The following is copied from the current implementation and is the parity oracle
 | telemetry | `safety_decision`, `operation` | optional non-empty strings; only block events emit them | UserPrompt block emits `safety_decision=block`; PreTool block additionally emits `operation`; no prompt, command, secret, stdout, stderr | field names and omission rules unchanged |
 | behavior JSONL | `event_id`, `hook_invocation_id`, `hook_event_name`, `event_kind`, timestamp, and the complete logger parity field union | required fields use the domains above; empty strings/lists/bools/counts are explicit; no JSON null for an absent parity field | current `skill_usage.jsonl` has no independent event-byte limit; target `behavior_events.jsonl` retains that absence, while prompt excerpt remains 600 characters and all canonical JSON is UTF-8/one-line | no file write owner in this table; readback is owned by dashboard/parser layer |
 
-Dispatcher status domain is exactly `malformed_payload`, `pass`, `blocked_secret`, `blocked_destructive_git`, `projection_forwarded`, `unsuccessful_tool_response`, and `invalid_projection`; `Stop` emits none. `spooled`, `duplicate`, `failed`, and error codes belong to `HookAppendResult`, not dispatcher safety status. Spool failure never changes a safety decision.
+Active dispatcher statuses are `malformed_payload`, `pass`, `blocked_secret`,
+`projection_forwarded`, `unsuccessful_tool_response`, and `invalid_projection`.
+Retired events return empty results. Archive readers retain historical event
+metadata; current emission follows the two active handlers. Append results
+remain owned by `HookAppendResult`.
 
 ## Skill logger replacement: classifier, lane emitter, dashboard, inventory
 
@@ -528,7 +542,6 @@ Reverse trace: the native dispatcher and event-log tests check handler output, o
 | boundary | fail-open | fail-closed |
 | --- | --- | --- |
 | UserPromptSubmit | malformed/empty payload, spool failure | high-confidence secret |
-| PreToolUse | malformed/empty payload, spool failure | unauthorized protected Git; normal creation requires creation authority, while force-create/ref overwrite requires creation and destructive authority |
 | PostToolUse | malformed input, non-Bash, nonzero response, invalid projection, spool failure | no hook transport block; producer owns execution failure |
 | Stop | inactive no-op | none |
 | behavior-event dashboard | no event rows report `missing`; malformed JSON/field/timestamp rows aggregate as `malformed` without aborting valid rows | never convert missing/malformed into `present` |
@@ -538,8 +551,8 @@ Reverse trace: the native dispatcher and event-log tests check handler output, o
 
 Exact fixture and test corpus:
 
-- active contract: 3 registrations, inactive Stop, aliases, official schema, no subprocess/Git/network; each `UserPromptSubmit`/`PreToolUse`/`PostToolUse` handler calls `record_hook_invocation(parts)` exactly once after the finalized result, and `Stop` calls it zero times;
-- safety: four secret classes, benign/malformed prompt, protected/read-only/authorized Git, operation-risk authority matrix (normal creation versus force-create/ref overwrite), shell wrapper/backtick/opaque cases, exact redaction and hash;
+- active contract: two registrations, inactive PreToolUse and Stop, aliases, official schema; each active handler calls `record_hook_invocation(parts)` once after its result; retired events produce zero calls;
+- safety: four secret classes, benign/malformed prompts, retained redaction; captured Git commands are inputs to retired-event empty-result tests;
 - projection: raw six-key normalization, exact nine-key projection, nested nullable admission/error, duplicate/extra/nonfinite/schema/path/byte/LF/unsuccessful matrices;
 - skill replacement: frozen workflow manifest, immutable injected `repo_root`/catalog/routing-rules classifier inputs, all eight `PromptIntakeSignals` fields, prompt capture/tool/feedback/candidate-reason/subagent/workflow-attribution fields with current empty-string/list/bool/int domains, structural lane observed/candidate/unmatched, one-snapshot-per-invocation cardinality, exact event-id preimage, canonical behavior-event JSON parse, duplicate/order/timestamp/escaping/malformed aggregation, historical `skill_usage.jsonl` read-only parsing, and missing/malformed dashboard readback against `oracle.json`;
 - dispatcher-to-assembly: three event-specific parts fixtures, finalized pass/block/projection/unsuccessful results, explicit cardinality oracle (`blocked_secret=1 append/0 projection`, `blocked_destructive_git=1 append/0 projection`, `malformed_payload=1 append/0 projection`, `eligible behavior=1 merged append/spooled=>1 projection`, `ineligible normal=1 append/0 projection`, `duplicate/failed=1 append attempt/0 projection`), eligible and `should_log` truth table, exactly-once post-result call assertions, merged-append policy with one transport write, and `record_hook_invocation_oracle.json`;

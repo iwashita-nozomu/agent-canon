@@ -4658,7 +4658,10 @@ fn hook_admission() -> Result<i32> {
 }
 
 fn run_codex_hook(event: &str) -> Result<i32> {
-    if !["UserPromptSubmit", "PreToolUse", "PostToolUse"].contains(&event) {
+    if event == "PreToolUse" {
+        return Ok(0);
+    }
+    if !["UserPromptSubmit", "PostToolUse"].contains(&event) {
         return Err(BootstrapError::new(
             "invalid_event",
             "unsupported Codex hook event",

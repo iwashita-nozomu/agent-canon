@@ -271,6 +271,19 @@ fn assert_case_result(result: HookCliResult, case: &JsonValue, name: &str) {
                 "retired_child_tombstones" | "moved_source_absences" | "counts" | "source_digest"
             )
         });
+        for (key, value) in &mut fields.0 {
+            match key.to_text().unwrap().as_str() {
+                "active_events" if text(field(case, "name").unwrap()) == "contract" => *value = parse_json(r#"["UserPromptSubmit","PostToolUse"]"#).unwrap(),
+                "inactive_events" if text(field(case, "name").unwrap()) == "contract" => *value = parse_json(r#"["PreToolUse","Stop"]"#).unwrap(),
+                "active_handlers" => *value = parse_json(r#"["PostToolUse.execution_resource_projection","UserPromptSubmit.secret_safety"]"#).unwrap(),
+                "events" if text(field(case, "name").unwrap()) == "contract" => {
+                    let JsonValue::Object(events) = value else { panic!("event contract object") };
+                    let (_, retired) = events.0.iter_mut().find(|(name, _)| name.equals_text("PreToolUse")).unwrap();
+                    *retired = parse_json(r#"{"active":false,"matchers":[],"failure":"legacy_event_inactive_no_op","telemetry":"no active hook telemetry"}"#).unwrap();
+                }
+                _ => {}
+            }
+        }
         let expected_contract = canonical_json_ascii_bytes(&JsonValue::Object(fields)).unwrap();
         assert_eq!(
             canonical_json_ascii_bytes(
@@ -280,27 +293,14 @@ fn assert_case_result(result: HookCliResult, case: &JsonValue, name: &str) {
             expected_contract,
             "current-event contract for {name}"
         );
-    } else if text(field(case, "name").expect("case name")) == "touch" {
-        assert!(result.stdout.is_empty(), "ordinary writes are admitted");
     } else {
         assert_eq!(result.stdout, expected_stdout, "stdout bytes for {name}");
     }
-    if text(field(case, "name").expect("case name")) == "surrogate-command" {
-        assert!(
-            !result.stderr.is_empty(),
-            "unencodable command is refused with a native diagnostic"
-        );
-        assert!(
-            !String::from_utf8_lossy(&result.stderr).contains("Traceback"),
-            "native diagnostic does not recreate a CPython traceback"
-        );
-    } else {
-        assert_eq!(
-            result.stderr,
-            text(field(case, "stderr_observed").expect("old stderr bytes")).into_bytes(),
-            "stderr for {name}"
-        );
-    }
+    assert_eq!(
+        result.stderr,
+        text(field(case, "stderr_observed").expect("old stderr bytes")).into_bytes(),
+        "stderr for {name}"
+    );
 }
 
 #[test]
@@ -331,6 +331,16 @@ fn native_hook_cli_matches_frozen_cpython_cases() {
         let values = environment(temp.path(), &results_dir);
 
         let result = run_with_input(&arguments, &input, &values, temp.path());
+        if arguments.first().is_some_and(|event| event == "PreToolUse") {
+            assert_eq!(result.exit_code, 0, "retired event: {name}");
+            assert!(result.stdout.is_empty(), "retired output: {name}");
+            assert!(result.stderr.is_empty(), "retired diagnostic: {name}");
+            assert!(
+                event_values(&results_dir).is_empty(),
+                "retired telemetry: {name}"
+            );
+            continue;
+        }
         assert_case_result(result, case, &name);
 
         let events = event_values(&results_dir);
@@ -517,15 +527,9 @@ fn missing_runtime_directory_does_not_change_safety_or_create_files() {
         missing_runtime.display().to_string(),
     );
     values.insert("AGENT_CANON_PARENT_ROOT".to_owned(), String::new());
-    for (payload, blocked) in [
-        (
-            br#"{"tool_name":"Bash","tool_input":{"command":"git status"}}"#.as_slice(),
-            false,
-        ),
-        (
-            br#"{"tool_name":"Bash","tool_input":{"command":"git reset --hard"}}"#.as_slice(),
-            true,
-        ),
+    for payload in [
+        br#"{"tool_name":"Bash","tool_input":{"command":"git status"}}"#.as_slice(),
+        br#"{"tool_name":"Bash","tool_input":{"command":"git reset --hard"}}"#.as_slice(),
     ] {
         let result = run_with_input(&["PreToolUse".to_owned()], payload, &values, &source);
         assert_eq!(
@@ -535,12 +539,7 @@ fn missing_runtime_directory_does_not_change_safety_or_create_files() {
             String::from_utf8_lossy(&result.stderr)
         );
         assert!(result.stderr.is_empty());
-        if blocked {
-            let output = parse_json(std::str::from_utf8(&result.stdout).unwrap()).unwrap();
-            assert_eq!(text(field(&output, "decision").unwrap()), "block");
-        } else {
-            assert!(result.stdout.is_empty());
-        }
+        assert!(result.stdout.is_empty());
         assert!(
             !missing_runtime.exists(),
             "path calculation creates no runtime directory"
@@ -576,6 +575,8 @@ fn dispatcher_admits_edits_without_runtime_work_control_records() {
                 source.join("run").display().to_string(),
             );
             values.insert("AGENT_CANON_RUNTIME_ROLE_ID".to_owned(), role.to_owned());
+            let spool_path = results.join(".event-spool/spawn.json");
+            let initial_event = fs::read(&spool_path).ok();
             for payload in [
                 br#"{"tool_name":"apply_patch","tool_input":{"patch":"*** Begin Patch\n*** Update File: src/owned.rs\n*** End Patch\n"}}"#.as_slice(),
                 br#"{"tool_name":"Write","tool_input":{"file_path":"src/new.rs","content":"pub fn answer() -> u32 { 42 }"}}"#.as_slice(),
@@ -586,16 +587,31 @@ fn dispatcher_admits_edits_without_runtime_work_control_records() {
                 assert!(result.stdout.is_empty(), "{role}: {}", String::from_utf8_lossy(&result.stdout));
                 assert!(result.stderr.is_empty());
             }
-            let events = event_values(&results);
-            let invocations: Vec<_> = events
-                .iter()
-                .filter(|event| field(event, "hook_event_name").is_some())
-                .collect();
-            assert_eq!(invocations.len(), 3);
-            for event in invocations {
-                assert_eq!(text(field(event, "status").unwrap()), "pass");
-                assert!(field(event, "mutation_control").is_none());
-            }
+            assert_eq!(fs::read(&spool_path).ok(), initial_event);
+            assert_eq!(event_values(&results).len(), usize::from(stale_records));
         }
     }
+}
+
+#[test]
+fn retired_git_guard_inputs_return_no_output_or_spool() {
+    let golden: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../../../tests/fixtures/hook_safety/python_golden.json"
+    ))
+    .unwrap();
+    let temp = TempDir::new();
+    let results = temp.path().join("results");
+    let values = environment(temp.path(), &results);
+    for case in golden["fixtures"]["retired_git_inputs"].as_array().unwrap() {
+        let command = case["synthetic_input"]["command"].as_str().unwrap();
+        let input = serde_json::to_vec(
+            &serde_json::json!({"tool_name":"Bash","tool_input":{"command":command}}),
+        )
+        .unwrap();
+        let result = run_with_input(&["PreToolUse".into()], &input, &values, temp.path());
+        assert_eq!(result.exit_code, 0, "{}", case["case_id"]);
+        assert!(result.stdout.is_empty(), "{}", case["case_id"]);
+        assert!(result.stderr.is_empty(), "{}", case["case_id"]);
+    }
+    assert!(event_values(&results).is_empty());
 }

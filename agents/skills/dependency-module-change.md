@@ -2,94 +2,26 @@
 
 <!--
 @dependency-start
-contract skill
-responsibility Documents the short human-facing route for dependency module changes.
-upstream design ../canonical/skills.md shared skill canon registry
-upstream design ../../documents/rule/dependency-module-changes.md detailed dependency module policy
-upstream design ../../documents/contracts/github-first-module-and-devcontainer-policy.md canonical topic workspace and VS Code workspace boundary
-upstream design ../../documents/design/request-intent-and-update-relation.md immediate dependency-checkout cleanup projection
-downstream implementation ../../tools/runtime/dispatch/agent-canon/src/dependency_module_change.rs native lifecycle command
-downstream implementation ../../tools/runtime/dispatch/agent-canon/src/runtime_alignment.rs validates skill registration
+contract workflow
+responsibility Uses Git dependency declarations and standard checkout operations for dependency changes.
+upstream design ../../documents/rule/dependency-module-changes.md dependency and pin owner
+upstream design ../../documents/rule/repository-topic-clone.md standard Git checkout procedure
+downstream implementation ./catalog.yaml public skill discovery
 @dependency-end
 -->
 
-## 目的
+## 手順
 
-依存 module の `.gitmodules` identity、gitlink、pin、projection を generic
-repository topic checkout lifecycle へ接続します。checkout path、checkout-mode、branch selection、
-`origin/main` merge、publication receipt、cleanup authority は
-`repository-topic-clone` が所有し、この skill は再定義しません。
+1. 既存のmanifest・lock・`.gitmodules` と、consumerが実際に読むcheckoutを確認します。
+   `.gitmodules` は `git config -f .gitmodules --get-regexp '^submodule\..*\.(path|url)$'`
+   で読みます。submoduleの初期化と相対URLの解決は `git submodule update --init -- <path>`
+   に任せ、必要なsource URLはそのcheckoutの `git remote get-url origin` で確認します。
+2. [標準Gitのcheckout手順](../../documents/rule/repository-topic-clone.md) で依存の作業branchを
+   作成・再利用し、最新mainを実マージします。既存の差分とpin用detached checkoutを保持します。
+3. 依存側の変更を検証してPRへ公開します。consumerがexact pinを使う場合は、採用する
+   commitをそのmanifest・lock・gitlinkへ反映し、実際の入力を照合してconsumerを検証します。
+4. Issue/PRへ依存PR、採用commit、変更pathと検証結果を残し、利用を終えた作業cloneを片付けます。
 
-## 使う route
-
-generic lifecycle は
-[`agents/skills/repository-topic-clone.md`](repository-topic-clone.md) と
-[`documents/rule/repository-topic-clone.md`](../../documents/rule/repository-topic-clone.md)
-を読みます。依存 module 固有の identity と AgentCanon parent state decision table は
-[`documents/rule/dependency-module-changes.md`](../../documents/rule/dependency-module-changes.md) を唯一の正本として読みます。
-topic workspace の filesystem / lifecycle、checkout mode、devcontainer mount、VS Code workspace
-運用の境界、
-`.vscode/` 共有面の境界は [`documents/contracts/github-first-module-and-devcontainer-policy.md`](../../documents/contracts/github-first-module-and-devcontainer-policy.md)
-だけを正本として参照します。`.gitmodules` の identity、`vendor/<module>` の clean
-pin/runtime projection、`workspace/<topic-slug>/<module-basename>` source checkout、
-results owner surface はそれぞれの owner に分けます。
-
-source edit では `.gitmodules` の module URL/name を generic request に写像し、
-`--checkout-mode independent-clone` を選びます。exact local/remote branch を再利用するか、
-不在 branch を最新 `origin/main` から作成します。
-specialized precondition が成立しない場合は dependency decorator だけを外し、user が
-要求した checkout/edit/update operation を generic owner へ戻します。manual clone や
-operation refusal は代替 route ではありません。
-
-`.gitmodules` identity と computed
-`workspace/<topic-slug>/<module-basename>` が一致する場合、canonical `prepare` と
-`merge-main` は operation-level の追加承認を要求しません。reuse は `prepare` に含まれます。
-`status` は dependency adapter の read-only command で、
-generic lifecycle または operation-level approval carve-out には含めません。ここで許可される
-のは canonical lifecycle tool が管理する repo-local independent checkout の作成・再利用・使用
-だけです。共有 checkout の raw `git checkout`、branch/worktree、reset/restore/clean/stash
-などは従来どおり protected Git route として明示 authority を必要とします。
-
-複数の involved Git roots / modules、または dependency repository consumer を含む
-変更では、decomposition、prototype、write handoff より前に
-`dependency-analysis` を選び、cross-module の dependency DAG、scope、repair
-batches、reuse survey、validation route、allowed paths を解決します。gitlink / pin
-と code / build / API edge を混同せず、source repository の変更・publication から
-dependent repository の更新・検証・publication、parent の pin / projection・検証へ
-topological order で進めます。未解決 edge / cycle は design / order issue として
-保持します。単一 module に dependency-repository consumer がない場合はこの分岐を
-起動せず、既存の independent checkout / gitlink / pin lifecycleだけを適用します。ここでの
-`prepare`、`merge-main`、`cleanup`、identity、publication、projection の挙動は
-変更しません。
-
-```bash
-tools/bin/agent-canon dependency-module-change --root <parent-root> prepare \
-  --topic <topic> --module <path> --branch <branch>
-```
-
-通常の closeout cleanup は canonical lifecycle artifact を materialize せず、manifest から
-計算した checkout path と Git remote-head の reconstructibility proof だけを使います。publication
-後または merge/readback 後に追加 evidence を渡す場合だけ、coherent lifecycle artifact を
-同じ call に渡します。dry-run も同じ選択された proof を検証し、pass 後だけ `--apply` します。
-
-```bash
-tools/bin/agent-canon dependency-module-change --root <parent-root> cleanup \
-  --topic <topic> --module <path> --branch <branch> \
-  [--candidate-cas <candidate-cas.json> --pr-lifecycle <pr-lifecycle.json> \
-  [--publication-readback <publication-readback.json>]] [--apply]
-```
-
-completion evidence は generic prepare/merge receipt、dependency identity readback、
-pin/projection validation、および必要に応じた canonical publication evidence と `CleanupProof`
-です。
-
-`prepare`、`merge-main`、`cleanup` は computed checkout path と selected Git identity を使います。
-caller は current task scope と Git diff を確認し、unknown state を保持します。
-
-completion ではこの skill が canonical `cleanup` を dispatch し、computed checkout path、owner
-evidence/marker、clean branch、および fetch した `origin/<branch>` の head/tree 一致を検証
-します。proof preflight が通るときだけ `CleanupProof` / cleanup receipt を closeout に保存
-して checkout/topic root を削除し、衝突・unknown dirty state・remote mismatch では typed hold
-を保存して状態を保持します。candidate CAS、PR lifecycle、publication readback は任意の
-追加 evidence ですが、いずれかを指定する場合は candidate CAS と PR lifecycle を一組で
-指定します。proof 不足時に blind deletion や手動 `rm` へ迂回しません。
+pinとconsumer検証の責務は
+[依存モジュール変更規約](../../documents/rule/dependency-module-changes.md) に従います。
+GitがcheckoutとURLを扱うため、専用のURL parser・形式marker・cleanup proofを省けます。

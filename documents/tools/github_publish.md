@@ -87,11 +87,9 @@ read-only and consumes native `gh pr checks` output.
 
 ## Hook Boundary
 
-GitHub publish and PR evidence are user task execution, not edit-time code
-quality checks. The hook dispatcher skips child guard hooks for `GitPush`,
-simple `git push`, safe `gh pr` create/edit/view/list/checks/comment commands,
-and this tool. Publish safety remains in the tool's explicit `gh` remote
-verification and the PR workflow gates.
+GitHub publication follows the current user task, standard Git state, and
+the selected GitHub connection. The Git-refusal hook is retired. This tool's
+explicit remote verification remains part of its own selected publication route.
 
 Non-critical hook, style, OOP, log-surface, planning, or closeout findings are
 recorded as warning or closeout evidence. They do not stop branch publication or

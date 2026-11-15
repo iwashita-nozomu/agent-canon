@@ -340,8 +340,7 @@ skill_dependencies:
     - pr-processing
   dependency-module-change:
     responsibility_group: lifecycle
-    required_prerequisites:
-    - repository-topic-clone
+    required_prerequisites: []
     routing_candidates:
     - repository-topic-clone
     - agent-canon-update

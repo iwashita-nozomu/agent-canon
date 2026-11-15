@@ -47,12 +47,10 @@ Resolve modify/delete conflicts in favor of an intentional deletion. Carry any
 still-required edits into the replacement owner, and remove the old path from
 the index with `git rm`. An older branch's edits do not restore a retired file.
 
-Run the merge in the current authorized integration checkout. If the selected
-repository-topic lifecycle prepared a `linked-worktree` or `independent-clone`,
-reuse that checkout; this skill does not manually create, move, or remove a
-worktree. `--no-ff` is not a default acceptance rule: use it only when the
-selected branch/commit contract requires a merge commit; otherwise the
-repository's normal fast-forward or merge route is sufficient.
+Run the merge in the current authorized checkout. Reuse an existing worktree or
+clone for the same task, using standard Git operations when a new checkout is
+needed. Use the repository's ordinary merge behavior; select `--no-ff` when
+the agreed history requires a merge commit.
 
 For a structural source diff, the changed-scope tree comparison is the
 semantic readback: compare every source-side path involved in an add, delete,
@@ -81,19 +79,8 @@ it does not prove behavior or replace the changed owner validation.
    owner/consumer edges. Confirm that required additions, renames, deletions,
    file types, and links match the source integration intent and that no
    conflict markers remain. Verify that retired paths have not reappeared.
-   When the source diff contains structural paths,
-   the existing targeted owner check may provide this comparison:
-
-   ```bash
-   tools/bin/agent-canon check-merge-structure \
-     --source <source-ref> \
-     --target <base-ref> \
-     --compare-commit <integration-commit> \
-     --repo-root <checkout-root>
-   ```
-
-   Do not run this command for a content-only merge, turn it into a full-tree
-   scan, or add a second checker.
+   Use scoped `git diff --name-status`, `git diff`, and `git ls-tree` to
+   compare the source and integrated paths, including intended deletions.
 6. After the planned integration and retirement review are complete, validate
    the affected final state. Reuse valid owner results; individual merge commits
    do not create separate test runs.

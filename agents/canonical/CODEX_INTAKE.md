@@ -59,39 +59,21 @@ AgentCanon の更新・再構築を要求しません。
 
 ## Branch Reuse Default
 
-既存 branch / PR が現在の task、追加 user instruction、または follow-up と同じ ownership surface を担える場合は、その branch / PR を継続します。通常の branch / worktree 作成 route は、作成前に creation authority と理由を記録します。force-create または ref overwrite を含む route だけが、creation と destructive の両方を要求します。
+同じ作業を担うbranch・PR・checkoutを継続します。作業場所、branch、目的と変更範囲は
+現在の会話・Issueで確認し、`git status`、対象差分、`git worktree list` で実状態を読みます。
+既存の差分・未公開commit・利用者ファイルを保持して進めます。
 
-- 同じ checkout は複数 chat/session が同時に使う場合があります。unknown dirty/staged/untracked state と branch/worktree state は user または別 chat 所有として保存します。`git restore`、`git reset`、forced `git clean`、mutating `git stash`、checkout/switch、branch/worktree create/delete/move/rename/prune は protected Git mutation として扱います。proven exact task ownership は approval request に含める path を限定し、explicit destructive approval は引き続き必須です。
-- Git authority は操作リスクで分けます。通常の branch create / worktree add は同じ command segment の creation authority/reason のみを要求し、force-create または ref overwrite は creation と destructive authority/reason の両方を要求します。既存 branch の checkout/switch、branch/worktree の delete/rename/prune、reset、restore、forced clean、mutating stash、およびその他の履歴/参照破壊操作は destructive authority/reason を要求します。`latest` / `apply` / merge update wrapper は実際に branch/worktree を作成する owner route でない限り destructive authority/reason のみを要求します。`branch --set-upstream-to`、`branch --unset-upstream`、`branch --edit-description` などの tracking/description metadata 操作と、reversible な `worktree lock/unlock` は ref、履歴、worktree を変更しないため protected destructive Git mutation ではありません。worktree の remove/move/repair/prune/force-add は protected operation です。ambient 変数や prior segment は authority になりません。
-- destructive Git safety は `tools/runtime/dispatch/agent-canon/src/hook_safety.rs` の pure owner を dispatcher が呼び出します。session 開始時に dispatcher registration を load 済みの session では次の tool call から更新後 script が効きます。hook table 自体が未 load の既存 session は session restart 後に保護対象になります。
-- 衝突時は current branch/worktree を維持し、status を保存して user の指示を待ちます。
-
-- `tools/bin/agent-canon repository-topic-clone` と
-  `tools/bin/agent-canon dependency-module-change` の canonical `prepare` / `merge-main` は、
-  computed `workspace/<topic-slug>/<repo-name>` path と
-  Git identity が揃う repo-local topic workspace に限り、
-  operation-level の追加承認なしで dispatch できます。reuse は `prepare` に含まれます。
-  これは lifecycle tool が管理する path の作成・再利用・使用だけを対象とし、shared
-  checkout の raw Git mutation や protected update wrapper の authority を免除しません。
-- `dependency-module-change status` は adapter-only の read-only command で、owner
-  evidence を要求せず、generic repository-topic lifecycle または operation-level approval
-  carve-out の権限を持ちません。
-- closeout は `repository-topic-clone` または `dependency-module-change` skill の
-  `cleanup` dispatch を経由します。computed clone identity、owner/marker evidence、
-  clean state、remote head/tree readback を渡し、ordinary `CleanupProof` / receipt が
-  返った場合だけ `--apply` を受理します。publication artifacts は存在する場合だけ
-  coherent enrichment として保持します。proof 不足、collision、unknown dirty state は
-  checkout/topic root を保持して typed hold として記録します。
-
-- 通常 task の authority は、user が別 branch を明示した場合の `user_request` です。AgentCanon source update の authority は、AgentCanon branch / PR workflow と canonical update tool が owner の `agent_canon_workflow` です。
-- 「fresh start」「dirty state 回避」「追記の分離」「task 途中の追加指示」「既存 PR の checklist 追記」は、既存 branch / PR 継続の理由として扱います。
-- branch / worktree の目的と対象は会話で保持し、Git の実状態を確認します。選択した lifecycle と既存の破壊的 Git 操作の安全境界に従います。
-- AgentCanon source 変更は standalone source checkout を source owner とし、branch / ahead / diverged / dirty state を evidence として collision-safe merge / review を続けます。親で作業する場合は repository-topic lifecycle の `<anchor>/workspace/<topic>/agent-canon` checkout を再利用します。親の pin や root projection は作成しません。
-- standalone source の writer placement は [Parallel Write Safety](CODEX_SUBAGENTS.md#parallel-write-safety)
-  に従い、同じ checkout root の競合する writes を直列化します。独立した責務は実際の
-  dependency と checkout ownership に基づいて並行できます。bounded route は child
-  handoff を必須にしません。
-- repository source は `repository-topic-clone` の一つの native prepare route で扱います。exact identity の既存 checkout と named local/remote branch は再利用し、branch が無い場合だけ最新 `origin/main` から作成します。parent または同一 repository の branch は `linked-worktree`、dependency repository は `independent-clone` を選び、どちらも同じ `<anchor>/workspace/<topic>/<repo>` placement にします。各 source branch は candidate review / PR 前に integration executor が最新 `origin/main` を通常 merge し、conflict はその owner が native Git index に残った実際の競合を source owner とレビューして解消します。解消後は canonical finalizer が `MERGE_HEAD` と resolved index tree に基づく commit parents/tree を確認します。`origin/main` の read/CAS だけでは merge 済みの代替になりません。
+- 新しいbranchや作業場所が必要なら、標準の `git worktree add`、`git clone`、
+  `git switch` を依頼された範囲で使います。新規配置の目安は `workspace/<topic>/<repo>`、
+  branch名にはIssue番号を含めます。作成済みの配置はそのまま使います。
+- 開始時とPR公開前に、作業branchで `git fetch origin main` と `git merge origin/main`
+  を実行します。競合はGitのindexと双方の内容を確認して解消します。
+- 衝突する書込みは同じcheckout内で順番に行い、既存の作業状態を保持します。
+  他者の変更の採否が必要な部分は保留し、合意済みの独立作業を続けます。
+- 利用を終えたcheckoutは、保持する内容の保存先と利用終了を確認し、
+  `git worktree remove` または対象cloneの削除を使います。
+- [標準Gitのcheckout手順](../../documents/rule/repository-topic-clone.md) を必要な操作に
+  適用します。Gitがbranch・worktree・merge状態を所有し、会話・Issueが作業範囲を保持します。
 
 ## Context Sweep
 

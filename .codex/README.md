@@ -108,9 +108,9 @@ waive workflow gates and do not authorize dropping decision-relevant context.
 ## Hook Context
 
 - project-local hook は `.codex/hooks.json` で宣言し、project config に stable feature flag を重ねません。
-- `hooks.json` は active event ごとに host shell adapter を起動し、hook cwd の Git worktree にある `bootstrap.sh` を解決して元の payload を共有 resident dispatcher へ渡します。active events は `UserPromptSubmit`、`PreToolUse`、`PostToolUse` だけです。legacy `Stop` は dispatcher が inactive no-op として受け付けますが、`hooks.json` には登録しません。
+- `hooks.json` のactive eventsは `UserPromptSubmit` と `PostToolUse` です。host shell adapterから共有resident dispatcherへpayloadを渡します。legacy `Stop` と `PreToolUse` はinactiveとして空の結果を返します。
 - `HOOK_EVENT_CONTRACTS` がイベント、matcher、failure semantics、telemetry を canonical typed table として所有します。`tools/bin/agent-canon codex-hook --contract` は active/inactive event、matcher、failure、telemetry、retired route table を readback します。
-- `UserPromptSubmit` は pure owner `tools/runtime/dispatch/agent-canon/src/hook_safety.rs` の secret matcher だけを使い、高確信の private key / API key を block します。`PreToolUse` は同じ owner の destructive Git parser だけを使い、block payload の command 情報は `operation` と `command_sha256` に限定します。
+- `UserPromptSubmit` は `tools/runtime/dispatch/agent-canon/src/hook_safety.rs` のsecret matcherで高確信のprivate key / API keyを扱います。Git操作は標準Gitと現在の作業範囲・利用者データの保持に従います。
 - `PostToolUse` は managed execution resource producer の成功した exact projection だけを in-process validator で forward します。malformed payload、validator failure、spool failure は fail-open です。
 - 各 active event は `HookLogContext` を一度だけ使い、payload は fingerprint、event、bounded かつ redacted decision telemetry だけを local spool へ no-replace で書きます。prompt、command、stdout、stderr は保存せず、spool failure は安全判定を変更しません。
 - 旧 log mount、cause、OOP、module、library、helper、style、notebook、review、goal、authority、role、reference、summary、auto-sync child は削除せず、`RETIRED_HOOK_ROUTES` と各 owner の explicit command / skill が移行先を示します。これらは active hook hot path ではありません。

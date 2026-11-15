@@ -37,7 +37,7 @@ legacy scope / action log の carry-over は [worktree-lifecycle.md](worktree-li
 - 1 branch = 1 topic に固定します。
 - topic は独立した設計単位として扱い、branch と PR の scope もこの単位に揃えます。
 - branch の責務が広がったら、追加編集前に branch の分割または current handoff の
-  write scope 更新を判断します。writer packet の更新は既存 checkout lifecycle に従います。
+  変更範囲の更新を判断し、現在の会話・Issueへ反映します。
 - 実装コードと長時間実験の生成物は、必要に応じて branch を分けます。
 - `main` は統合先であり、試行錯誤や途中生成物の置き場にはしません。実験 repository では、再利用する
   model/helper、共有 execution・regression infrastructure、完了済み `summary.md` と
@@ -135,9 +135,8 @@ private feedback の archive は、それぞれの owner 文書に従い、branc
 
 ## 3. Scope の固定
 
-- current handoff に branch の目的、dependency-expanded write scope、必要な carry-over 先を
-  固定します。分離が必要な場合の mode・配置・writer packet は
-  [checkout lifecycle](../rule/repository-topic-clone.md#clone-ライフサイクル) に従います。
+- branchの目的と変更範囲を現在の会話・Issueに保持します。作業場所は
+  [標準Gitのcheckout手順](../rule/repository-topic-clone.md) で作成・再利用します。
 - `WORKTREE_SCOPE.md` は新しい task の権限源にしません。既存 file の扱いは
   [legacy scope の確認](worktree-lifecycle.md#legacy-scope-の確認) に従います。
 - branch で experiment topic を継続的に触る場合は、`experiments/registry.toml` の
@@ -233,7 +232,7 @@ AgentCanon source と parent project の tracked changes は、それぞれの�
 - PR の公開・取り込みでは最新 main と実際に統合し、完成した差分と remote の
   source を確認します。未知のユーザー状態は reset / clean / stash で失わせません。
 - commit別の依存調査報告、関数一覧、証跡表、進捗記録を通常作業へ追加しません。
-- 初回 push と PR 作成は `agent-canon github-publish publish-pr --user-task "<current user task>" --repo <owner/name> --title "<title>" --body-file <body.md>` を使います。branch push だけなら `github_publish.py push` を使います。
+- branchの公開は `git push -u origin <branch>`、PR作成・更新は既存のGitHub接続を使います。
 - 選択した commit / push の実行結果は会話で報告します。実行していない操作や
   未確認の内容を完了とは説明しません。
 - 共有・引継ぎ・PR 公開が既存の権限と目的に含まれる場合は、追加の許可取りへ
@@ -242,9 +241,8 @@ AgentCanon source と parent project の tracked changes は、それぞれの�
 ## 5. Conflict 解決と merge / rebase
 
 - `main` 取り込みは、branch の目的に必要な最小限に留めます。
-- ローカル履歴整理の `rebase` は既存 owner が認可された route で判断します。
-  repository-topic writer は raw `git merge` / `git rebase` を実行せず、最新 main の取込みを
-  [merge-main / finalize-merge](../rule/repository-topic-clone.md#clone-ライフサイクル) の integration executor へ渡します。
+- 最新mainの取込みは、作業checkoutで標準の `git fetch origin main` と
+  `git merge origin/main` を実行します。
 - 統合時の安全性と文脈保持を優先する場合は `merge` を選びます。
 - 意図的に削除・置換したファイルの modify/delete 競合は削除を採用します。旧 branch の
   編集に必要な変更があれば移行先へ反映し、旧ファイルを復活させません。
@@ -253,14 +251,12 @@ AgentCanon source と parent project の tracked changes は、それぞれの�
 - file 追加、削除、rename、symlink 化、type 変更、ディレクトリ再編がある branch は、[agents/skills/integration.md](../../agents/skills/integration.md) の手順で統合します。
 - 構成変更がある branch は、`main` 側で file 単位に拾い直して close してはいけません。
   統合後は削除したファイルと旧呼び出しが復活していないことを確認します。
-- 以下は source branch を base へ統合する integration owner の手順です。
-  topic branch への最新 main 取込みとは区別し、writer の raw Git mutation 権限を追加しません。
-- 構成変更がある統合では、current checkout 上の integration branch で merge commit を作り、`tools/bin/agent-canon check-merge-structure --source <branch> --target origin/main --compare-commit HEAD` を通します。
-- integration branch が妥当なら、`main` へは `git merge --ff-only integrate/<topic>-YYYYMMDD` で持ち帰ります。
+- 構成変更は `git diff --name-status` と対象pathの `git diff` / `git ls-tree` で、
+  追加・削除・移動が統合後も意図どおりに残ることを確認します。
 
 ## 6. 削除前チェック
 
 作業用 checkout の利用終了時は [checkout cleanup](../rule/repository-topic-clone.md#クリーンアップ)、
-legacy branch / worktree の削除判断は [legacy cleanup](worktree-lifecycle.md#cleanup-前の確認) に従います。
+legacy branch / worktree の削除判断は [legacy cleanup](worktree-lifecycle.md#cleanup前の確認) に従います。
 branch の目的、持ち帰る知見・結果と保存先を既存 task / Issue / note から辿れるようにし、
 削除対象の exact ref/path を確認します。checkout の回収と branch の削除は別の authority です。

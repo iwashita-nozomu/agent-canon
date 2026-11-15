@@ -12,8 +12,8 @@ upstream implementation ../../bootstrap.sh owns installation, validation, and cl
 
 AgentCanon is one standalone source repository. A parent project uses an
 ignored repository-topic checkout under `<anchor>/workspace/<topic>/agent-canon`,
-selecting `linked-worktree` for a parent/same-repository branch or
-`independent-clone` for a dependency repository, and consumes a merged
+using `git worktree add` for the same repository or `git clone` for another
+repository, and consumes a merged
 AgentCanon `main` revision through its own workflow. This route does not create
 or update a vendor checkout, Git submodule, root projection, source symlink, or
 copied policy surface.
@@ -22,8 +22,8 @@ copied policy surface.
 
 1. Qualify the owning Issue as `iwashita-nozomu/agent-canon#<number>` and read
    the current remote `main`, open PRs, and the source clone state.
-2. Create or reuse one Issue-qualified source branch through
-   `repository-topic-clone` in the ignored development checkout. Keep unrelated
+2. Create or reuse one Issue-qualified source branch with standard Git
+   in the ignored development checkout. Keep unrelated
    dirty paths intact.
 3. Read the owner and dependency-expanded callers before editing. Implement the
    contract-complete source change and keep dependency headers/catalogs aligned.
@@ -50,8 +50,8 @@ ordinary standalone Git topic branch and pull request. The source checkout is
 never a vendor checkout, submodule worktree, root projection, or source
 symlink.
 
-For a source update, use the repository-topic-clone owner to create or reuse
-the qualified checkout and branch, selecting the mode from the repository
+For a source update, use standard Git to create or reuse
+the checkout and branch, selecting worktree or clone from the repository
 relationship, run the source checks, then use the PR
 processing owner to publish and merge the pull request. A parent repository
 does not import a pin or run a source synchronization wrapper after merge.

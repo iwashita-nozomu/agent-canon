@@ -5330,6 +5330,7 @@ fn gate_contract(gate_id: &str) -> Option<(&'static str, &'static [&'static str]
         "G4" => Some((
             "standalone_source_branch_integrity",
             &[
+                // Historical receipt identifiers; checkout operations use standard Git.
                 "repository_topic_clone.rs#ensure_independent_branch",
                 // Accept existing receipts produced before the Rust owner migration.
                 "repository_topic_clone.py#_ensure_branch",

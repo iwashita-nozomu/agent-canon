@@ -782,7 +782,10 @@ fn check_hooks(root: &Path, findings: &mut Vec<AlignmentFinding>) {
         ));
         return;
     };
-    for event in ["UserPromptSubmit", "PreToolUse", "PostToolUse"] {
+    for (event, _) in HOOK_EVENT_CONTRACTS
+        .into_iter()
+        .filter(|(_, contract)| contract.active)
+    {
         if hooks
             .get(event)
             .and_then(Value::as_array)

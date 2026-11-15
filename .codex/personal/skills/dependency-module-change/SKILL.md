@@ -1,8 +1,8 @@
 ---
 name: dependency-module-change
-description: "Use when a dependency source change, independent topic checkout, or reconstructibility-based checkout cleanup is required."
+description: "Use standard Git to change dependency source, publish its PR, and adopt the selected commit through the consumer's existing dependency declarations."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"7eddea69048719a9728e9f43469d58a5be79ad763f1caa60f2bb077bd34e7492"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"58e4f30ad55c50839b47713cdf4bf3f5a4dd339251731995393f4c9a9ce50a7e"} -->
 
 <!--
 @dependency-start

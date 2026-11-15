@@ -2,7 +2,7 @@
 // contract implementation
 // responsibility Dispatches the bounded active Hook contract through existing pure safety, authority, selection, assembly, and spool owners.
 // upstream reference ../../../../../tests/fixtures/hook_dispatcher/python_golden.json freezes the previous active CLI and event contract.
-// upstream implementation ./hook_safety.rs owns secret and protected-Git decisions.
+// upstream implementation ./hook_safety.rs owns prompt secret decisions.
 // upstream implementation ./hook_event_log.rs owns append-only hook event publication.
 // downstream implementation main.rs exposes the native codex-hook CLI route.
 // downstream implementation ../tests/hook_dispatcher_native.rs checks the captured CPython CLI corpus.
@@ -22,10 +22,7 @@ use crate::execution_resource_projection::{
     ProjectionError,
 };
 use crate::hook_event_log::{utc_now, HookLogContext};
-use crate::hook_safety::{
-    branch_block_payload, first_block, payload_prompt_json, payload_tool_command_json,
-    payload_tool_name_json, secret_block_payload, secret_kind_json, SHELL_TOOL_NAMES,
-};
+use crate::hook_safety::{payload_prompt_json, secret_block_payload, secret_kind_json};
 use crate::path_resolution::resolve_non_strict;
 use crate::prompt_classifier::PromptClassifierInputs;
 use crate::python_json::{
@@ -73,10 +70,10 @@ pub const HOOK_EVENT_CONTRACTS: [(&str, HookEventContract); 4] = [
     (
         "PreToolUse",
         HookEventContract {
-            active: true,
-            matchers: &["Bash|apply_patch|python|python3"],
-            failure: "unauthorized_destructive_git=block; malformed_payload=fail_open; spool_failure=fail_open",
-            telemetry: "one bounded fingerprint-only local spool event",
+            active: false,
+            matchers: &[],
+            failure: "legacy_event_inactive_no_op",
+            telemetry: "no active hook telemetry",
         },
     ),
     (
@@ -99,9 +96,8 @@ pub const HOOK_EVENT_CONTRACTS: [(&str, HookEventContract); 4] = [
     ),
 ];
 
-pub const ACTIVE_HOOK_HANDLERS: [&str; 3] = [
+pub const ACTIVE_HOOK_HANDLERS: [&str; 2] = [
     "PostToolUse.execution_resource_projection",
-    "PreToolUse.destructive_git_safety",
     "UserPromptSubmit.secret_safety",
 ];
 
@@ -743,7 +739,7 @@ fn dispatch_event(
     environment: &BTreeMap<String, String>,
     current_directory: Option<&Path>,
 ) -> Result<HookCliResult, String> {
-    if event == "Stop" {
+    if matches!(event, "PreToolUse" | "Stop") {
         return Ok(cli_success(Vec::new()));
     }
 
@@ -767,29 +763,6 @@ fn dispatch_event(
                 )?);
                 status = "blocked_secret".to_owned();
                 telemetry.insert("safety_decision".to_owned(), "block".to_owned());
-            }
-        } else if event == "PreToolUse" {
-            let tool_name = payload_tool_name_json(payload);
-            if SHELL_TOOL_NAMES
-                .iter()
-                .any(|shell_tool| tool_name.equals_text(shell_tool))
-            {
-                let command = payload_tool_command_json(payload);
-                let command_text = command
-                    .to_text()
-                    .ok_or_else(|| "Hook shell command cannot be UTF-8 encoded".to_owned())?;
-                if let Some(intent) = first_block(&command_text) {
-                    let safety = branch_block_payload(&command_text, &intent);
-                    let operation = safety
-                        .get("operation")
-                        .and_then(SerdeValue::as_str)
-                        .unwrap_or_default()
-                        .to_owned();
-                    output = Some(official_payload(event, serde_safety_payload(safety)?)?);
-                    status = "blocked_destructive_git".to_owned();
-                    telemetry.insert("safety_decision".to_owned(), "block".to_owned());
-                    telemetry.insert("operation".to_owned(), operation);
-                }
             }
         } else if event == "PostToolUse" {
             match normalize_post_tool_use_input(payload) {

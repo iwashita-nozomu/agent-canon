@@ -1,179 +1,87 @@
+# Gitで作業用checkoutを扱う
+
 <!--
 @dependency-start
 contract policy
-responsibility Defines the repository-topic clone lifecycle contract for generic topic/workspace clones.
-upstream design ../design/dependency-manifest-design.md repository-topic clone intent
-downstream design ../../agents/skills/repository-topic-clone.md operator-facing policy consumer
-downstream design ../tools/repository_topic_clone.md CLI reference consumer
-downstream implementation ../../tools/runtime/dispatch/agent-canon/src/repository_topic_clone.rs lifecycle implementation
-downstream implementation ../../tests/agent_tools/test_repository_topic_clone.py validates lifecycle and cleanup gates
+responsibility Owns standard Git checkout creation, reuse, main integration, and cleanup.
+upstream design ../operations/BRANCH_SCOPE.md branch scope and preservation
+downstream design ../../agents/skills/repository-topic-clone.md checkout procedure
+downstream design ../../agents/skills/dependency-module-change.md dependency checkout procedure
 @dependency-end
 -->
 
-# repository-topic clone ルール
+## 既存checkoutの再利用
 
-この規約は、`<topic>` と `<repo>` で識別される generic repository-topic checkout に対する
-一貫した規約です。対象は `workspace/<topic-slug>/<repo-name>` の単一 checkout と
-その merge/readback cleanup です。`.gitmodules` 配下以外の依存変更や `.gitignore`、
-差分サイズ判定を scope として使いません。スコープは構造、依存、差し替え可能単位で決めます。
+作業対象とbranchを会話・Issueで確認し、標準Gitで実状態を読みます。
 
-## 適用範囲
+```bash
+git status --short --branch
+git remote -v
+git worktree list --porcelain
+git diff
+git diff --cached
+```
 
-`tools/bin/agent-canon repository-topic-clone` が扱う repository checkout の
-一意復元と cleanup はこの規約の対象です。`dependency-module-change` 系統は
-gitlink/pin/projection の共有責務を担い、この文書の clone 実装責務を重複して
-所有しません。
+同じ作業を担うbranchとcheckoutがあれば、その場所を再利用します。Gitが認識する
+既存checkoutを、その実pathとbranchで扱います。作業中の差分、未公開commit、
+利用者のファイルを保持し、自分の変更を対象pathで区切って公開します。
 
-## 事前条件
+## 作成
 
-- `--url`、`--repo-name`、`--workspace-root`、`--topic`、`--branch` を指定します。
-- `--workspace-root` は selected repository の Git toplevel と一致し、root の regular な
-  tracked `.gitignore` が `workspace/` を repository-owned boundary として ignore する状態。
-- `prepare` と `merge-main` は workspace/topic directory を作る前に root、symlink、
-  `.gitignore` ownership、ignore probe を検証し、検証 receipt を残した後だけ clone lifecycle
-  に進みます。non-repository、nested root、missing/untracked `.gitignore`、global/info
-  exclude のみの ignore は typed failure として既存 state を保持します。
-- branch mutation、merge、cleanup は `git status` が clean かつ detached / merge-conflict
-  でないこと。marker、既存 branch の再利用、metadata-only refresh は
-  [clone ライフサイクル](#clone-ライフサイクル)、競合後の再開は [競合の再開](#競合の再開) に従います。
-- `main`/`origin/main` の branch は source owner にはせず、branch 起点・merge ベースとしてのみ扱う。
+同じrepositoryの並行作業には `git worktree add`、別の依存repositoryには
+`git clone` を使います。新規配置の目安は `workspace/<topic>/<repo>` です。
+既存の配置はそのまま使い、branch名には対応Issue番号を含めます。
 
-### Checkout mode
+同じrepositoryの新しい作業branchを作る例です。`<path>` は今回使うcheckout、
+`<branch>` はIssue番号入りのbranch名です。
 
-`prepare` は `--checkout-mode linked-worktree|independent-clone` を必須の選択値として
-受け取ります。parent または同一 repository の branch は `linked-worktree`、dependency
-repository の変更は `independent-clone` を使います。どちらも同じ
-`<anchor>/workspace/<topic>/<repo>` に配置し、branch ごとに topic 名を分けます。branch
-hash や group 階層を path に追加しません。
+```bash
+git fetch origin main
+git worktree add -b <branch> <path> origin/main
+```
 
-linked worktree は native Git の shared refs/config と per-worktree index を使います。
-新規 worktree の公開 root は anchor の access mode を引き継ぎます。task marker は
-checkout の Git metadata に属し、別 worktree の状態を共有・上書きしません。
-independent clone も同じ computed path、marker、branch identity の検証を通ります。
+作成済みbranchを別checkoutで使う場合は `git worktree add <path> <branch>` を
+使います。Gitがそのbranchの使用中checkoutを示したら、その実pathを確認して
+再利用します。別repositoryを用意する場合は次の標準操作を使います。
 
-mode の選択・作成は lifecycle command が行い、manual clone や手動 worktree 作成へ迂回しません。
+```bash
+git clone <url> <path>
+git -C <path> switch -c <branch> origin/main
+```
 
-## clone ライフサイクル
+## main取込みと競合解消
 
-- `prepare` は必ず `workspace/<topic-slug>/<repo-name>` の computed path を返す。
-- 既存 checkout の identity は computed path と実際の Git facts から照合します。remote URL、actual branch、
-  checkout mode を確認し、`linked-worktree` は selected workspace と同じ Git common dir に登録されていることも
-  検証します。canonical marker があれば repository/topic/URL/branch と facts の一致を要求し、partial/mismatch は
-  hold します。marker がないこと自体は collision ではなく、current request が指定した exact path と Git facts が
-  一致すれば `prepare` が canonical marker を materialize できます。
-- clean な exact checkout は local/remote named branch を再利用します。requested branch が
-  local/remote のどちらにも無い場合だけ、最新 `origin/main` から作ります。未知の Git facts、
-  partial/mismatch marker、symlinked path、escaped path は hold します。legacy module marker の
-  read-only compatibility は exact topic/module/URL/branch/placement が一致する場合に限ります。
-  `prepare` が行う Git metadata 更新は computed checkout の canonical identity marker に限ります。
-  tracked、untracked、ignored checkout content や Git index は編集せず、dirty state を clean と
-  報告しません。dirty checkout は保持して prepare/merge/cleanup を拒否します。
-- merge 前に PR/PR head 更新を前倒しせず、`merge-main` は通常 merge を要求する。
-- raw `git merge` / `git rebase` は repository-topic lifecycle route では直接使わず、integration executor が
-  `repository-topic-clone merge-main` と `finalize-merge` を通す。
-  これは選択した integration workflow の owner route です。runtime は一般の
-  `git commit` を integration executor に限定しません。path-scoped commit admission や
-  role id は、実競合レビューや finalizer の parent/tree readback の証明にはなりません。
-- computed path、remote、branch identity が一致する限り、canonical `prepare` と `merge-main` は
-  operation-level の追加承認なしで
-  実行できます。reuse は `prepare` に含まれます。これは repo-local workspace lifecycle
-  にだけ適用し、共有 checkout の raw Git mutation authority を変更しません。
+作業開始時とPR公開前に作業checkoutで最新mainを実マージします。
 
-  `dependency-module-change status` は adapter-only の read command であり、generic
-  lifecycle または operation-level approval carve-out には含めません。
+```bash
+git fetch origin main
+git merge origin/main
+```
 
-コマンドの引数と使用例は [CLI 参照の基本操作](../tools/repository_topic_clone.md#基本操作) を使います。
+競合時は `git status`、`git diff`、`git ls-files --unmerged` で双方の内容を確認し、
+解消したpathを `git add` または `git rm` で反映して `git merge --continue` を使います。
+意図した削除と旧branchの編集が競合した場合は削除を採用し、必要な編集を移行先へ
+反映します。既存の利用者差分と、自分が始めたGit操作の状態を保持して進めます。
 
-### 競合の再開
+## 公開
 
-競合で停止した merge は native Git の `MERGE_HEAD` と index に状態が残ります。
-integration executor は実際の unmerged paths を確認し、各競合をその source owner と
-レビューして解消します。意図的な削除・置換と旧 branch の編集が競合した場合は
-削除を採用し、必要な変更を移行先へ反映します。旧ファイルを復活させません。
-`finalize-merge` は未解決 index を `git write-tree` が拒否する
-場合は commit せず、解決済み index の tree と `MERGE_HEAD` を親とする commit を read back
-します。競合後に `origin/main` が進んでも、停止中 merge の相手は保存された
-`MERGE_HEAD` です。別 inventory / plan は lifecycle の前提ではありません。
-操作構文は [CLI 参照の競合の再開](../tools/repository_topic_clone.md#競合の再開) を使います。
+変更単位をpath指定でcommitし、`git push -u origin <branch>` と既存のGitHub接続で
+PRを公開します。実branch・HEAD・公開した差分を確認し、Issueへ結果を残します。
+詳しい公開責務は [pr-processing](../../agents/skills/pr-processing.md) に従います。
 
 ## クリーンアップ
 
-- task owner は作業用 clone が不要になり、以下の安全条件が成立した時点で既存の
-  cleanup authority に従って削除します。調査・検証・依存更新などの利用終了時に判断し、
-  タスク全体の完了、PR merge、定期掃除まで先送りしません。具体的な次工程がない
-  「また使うかもしれない」だけの保持はしません。失敗・中断した作業でも、必要な
-  診断資料を保全し、安全条件を満たした clone は同じ扱いにします。
-- tool 起動前に task owner が exact path の所有と利用終了を確認し、必要な内容を削除対象外へ保存・復元可能にします。別の agent、
-  process、container mount、実行時の依存解決先が使用中、または所有・使用状態が不明なら
-  保持します。必要な利用停止と mount 解除は既存 runtime / resource owner が完了を確認してから
-  削除へ進みます。未回収の変更、保持が必要な local-only refs/commits、stash、untracked/ignored
-  成果物、submodule/annex content が削除対象内にしかない場合も保持し、必要な内容と
-  復元方法を clone 外で確認してから再判定します。clean な `git status` や経過時間だけで
-  削除可能とは判定しません。既存 tool の proof を、この利用・保全確認の代わりにしません。
-  CLI の status preflight は ignored file を列挙せず、linked worktree の local head は superproject の
-  commit/tree の保持だけを示します。どちらも ignored file、submodule の per-worktree Git metadata/object、
-  annex-only content の保存・復元可能性を証明しません。これらの保持判断は既存 task owner の前提条件です。
-- 削除後は exact path の不存在を確認し、linked-worktree では worktree list からの消失も
-  確認します。未解決の保持対象と再開に必要な事実は会話で引き継ぎます。
-  cleanup の台帳は作りません。
-  clone の削除は remote branch、clone 外の local refs、無関係な checkout、workspace 全体の
-  削除を認可しません。
-- linked-worktree cleanup は proof preflight 後、exact path に対して `git worktree remove --force` を一度実行します。
-  force は native worktree removal の一様な実行方法であり、dirty / untracked / unknown Git state を許可するものでは
-  ありません。これらは先行する identity/clean preflight で hold します。caller が上記の保持前提を満たさず
-  `--apply` を呼んだ場合、この command は Git の ignored / submodule-object 状態から内容を救出しません。
-  local branch は保持し、削除後に path の不存在と `git worktree list` からの消失を readback します。
-- marker は canonical `repository-topic-clone.*` namespace の全項目が一致する状態を優先します。
-  canonical marker が完全に欠ける既存 dependency clone に限り、legacy
-  `agent-canon.topic.*` の topic、role=`module`、module basename、normalized URL、branch、
-  placement=`workspace-continuation` がすべて一致する場合だけ read-only
-  compatibility として ready を認めます。partial/mismatch/unknown role・placement は typed
-  hold とし、dry-run は Git config marker を書き換えません。
-- cleanup は上記の利用終了・内容保全確認後、または closeout の残存確認時に canonical tool を呼び、
-  selected Git toplevel、request から計算した exact clone path、actual Git URL、branch、
-  checkout mode、clean non-detached state を検証してから proof preflight に進みます。
-  root `.gitignore` の後続 drift だけでは停止せず、create の ignore ownership 条件と
-  cleanup の exact-root 条件を分離します。
-  canonical marker がある場合は identity の一致を要求し、marker の partial/mismatch は hold します。
-  marker がない場合も identity は current request と実際の Git facts から照合します。
-  linked-worktree の `linked-superproject-head` evidence は保持された local branch と共有 Git common objects から
-  superproject の commit/tree を再取得できることだけを示し、remote branch を要求しません。
-  `independent-clone` は fetch した `origin/<branch>` の
-  commit/tree と local `HEAD` の commit/tree が一致する external recoverability proof を要求します。
-  通常の cleanup は publication packet を作らず、proof が一致しないものは削除しません。
-- candidate CAS、PR lifecycle、publication readback は任意の追加 evidence です。いずれかを
-  渡す場合は candidate CAS と PR lifecycle を一組で渡し、publication readback を渡した merged
-  state では strict publication readback、merge commit/tree、`origin/main` containment を含む
-  canonical な coherent transition を検証します。
-- clone と topic root は同一 receipt で扱う。管理外 path へ退避しない。
-- preflight が通った `--apply` だけが `CleanupProof` / cleanup receipt を返して computed
-  clone と空の topic root を削除します。proof 不足、衝突、unknown dirty/staged/untracked
-  state は typed hold として保持し、manual deletion へ迂回しません。
+利用を終えたcheckoutは、必要な変更・結果の保存先と、他の処理が使用中かを確認して
+片付けます。Git statusに出る変更に加え、保持するignored成果物やsubmodule内の
+状態も対象に応じて確認します。
 
-削除の実行構文は [CLI 参照の基本操作](../tools/repository_topic_clone.md#基本操作) を使います。
-legacy branch / worktree を orphan として削除する判断は
-[orphan lifecycle](../operations/orphan-lifecycle.md) が所有します。この checkout 回収は
-branch 削除権限を持たず、通常の回収に orphan admission を追加しません。
+linked worktreeは `git worktree remove <path>`、独立cloneは保存・公開と利用終了を
+確認したexact directoryの削除を使います。Gitの拒否はそのpathの実状態から判断し、
+未知の内容を保持します。削除後はpathと `git worktree list` を読み戻します。
+local/remote branchの削除は、そのbranchの利用終了と保存を別に確認して行います。
 
-## 例外/フォールバック
+## 判断根拠
 
-specialized skill の precondition mismatch は adapter だけを外し、generic operation を
-続けます。generic lifecycle 自身が検出した branch/marker/evidence collision は current
-state を保持する typed failure であり、manual clone、別 path、暗黙 checkout へ迂回しません。
-`repository-kind post-clone decorator` は prepare/merge 後の owner check だけを持ち、
-path/base/branch/merge/cleanup authority を持ちません。
-repository-topic clone は依存モジュールの branch 特化パスを使わず、generic route の
-一貫結果を前提とします。
-
-## 関連正本
-
-- [documents/rule/dependency-module-changes.md](dependency-module-changes.md): gitlink/pin/projection の所有責務
-- [agents/skills/repository-topic-clone.md](../../agents/skills/repository-topic-clone.md): 実行ルート
-- [documents/tools/repository_topic_clone.md](../tools/repository_topic_clone.md): CLI 参照
-
-## Evidence And Assumption Ledger
-
-| kind | statement | evidence / owner | status |
-| --- | --- | --- | --- |
-| assumption | `workspace/` は selected repository root の regular/tracked `.gitignore` が所有する repository-owned boundary です。 | `tools/runtime/dispatch/agent-canon/src/repository_topic_clone.rs` の root/ignore gate、`tests/agent_tools/test_repository_topic_clone.py` の invalid-root regression | explicit |
-| evidence | `git check-ignore -v --no-index -- workspace/.agent-canon-workspace-probe` の source path が root `.gitignore` と一致します。 | create/merge precondition; global/info exclude source は拒否 | required |
+Gitがbranch・worktree・index・merge状態を所有します。標準操作と実状態を使うことで、
+作成済みcheckoutをそのまま継続し、独自の形式・marker・receiptによる停止を省けます。
+作業範囲と公開判断は既存の会話・Issue・PRに残します。

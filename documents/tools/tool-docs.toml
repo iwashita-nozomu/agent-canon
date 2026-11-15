@@ -183,14 +183,6 @@ language = "rust"
 summary = "Semantic responsibility contract schema, identity, and reference checker documentation."
 
 [[tool]]
-id = "repository-topic-clone"
-classification = "public"
-tool = "tools/runtime/dispatch/agent-canon/src/repository_topic_clone.rs"
-doc = "documents/tools/repository_topic_clone.md"
-language = "python"
-summary = "Generic repository topic checkout lifecycle and reconstructibility cleanup documentation."
-
-[[tool]]
 id = "compose-consumer-entrypoint"
 classification = "public"
 tool = "tools/runtime/dispatch/agent-canon/src/entrypoint_composer.rs"
@@ -205,14 +197,6 @@ tool = "tools/runtime/dispatch/agent-canon/src/experiment_registry/create_experi
 doc = "documents/tools/create_experiment_topic.md"
 language = "rust"
 summary = "Creates a selected Python or C++ experiment topic and registers it in an explicit parent target."
-
-[[tool]]
-id = "dependency-module-change"
-classification = "public"
-tool = "tools/runtime/dispatch/agent-canon/src/dependency_module_change.rs"
-doc = "documents/tools/dependency_module_change.md"
-language = "python"
-summary = "Dependency policy decorator for the generic repository topic clone lifecycle."
 
 [[tool]]
 id = "classify-path-risk"

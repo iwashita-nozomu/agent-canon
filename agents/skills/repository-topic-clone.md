@@ -2,51 +2,29 @@
 
 <!--
 @dependency-start
-contract skill
-responsibility Documents the short human-facing route for repository-topic checkout operations.
-upstream design ../canonical/skills.md skill canon registry
-upstream design ../internal-routines/design-implementation-correspondence.md design read/fingerprint/handoff route
-upstream design ../../documents/rule/repository-topic-clone.md repository-topic clone policy
-upstream design ../../documents/contracts/github-first-module-and-devcontainer-policy.md topic workspace boundary
-downstream implementation ../../tools/runtime/dispatch/agent-canon/src/repository_topic_clone.rs native lifecycle command
-downstream implementation ../../tools/runtime/dispatch/agent-canon/src/runtime_alignment.rs validates skill registration
+contract workflow
+responsibility Uses standard Git to create, reuse, integrate, and remove task checkouts.
+upstream design ../../documents/rule/repository-topic-clone.md standard Git procedure
+upstream design ../../documents/operations/BRANCH_SCOPE.md branch scope and preservation
+downstream implementation ./catalog.yaml public skill discovery
 @dependency-end
 -->
 
-## 目的
+## 手順
 
-repository-topic checkout の lifecycle、normal merge、receipted cleanup を
-`workspace/<topic-slug>/<repo-name>` の責務境界で扱います。
+1. [標準Gitのcheckout手順](../../documents/rule/repository-topic-clone.md) から必要な操作を選びます。
+2. `git status --short --branch`、対象差分、`git worktree list --porcelain` で既存の
+   作業場所とbranchを確認します。同じ作業を担うcheckoutを再利用し、既存差分を保持します。
+3. 新規作成には `git worktree add` または `git clone` を使います。branch名へIssue番号を
+   含め、最新mainを `git fetch` と `git merge origin/main` で取り込みます。
+4. 合意した変更と必要な削除を終えてから検証し、標準Gitと既存GitHub接続でPRを公開します。
+5. 利用を終えたcheckoutは必要な内容の保存先を確認し、標準Gitの削除手順で片付けます。
 
-## 使用 route
+依存repositoryのURL・gitlink・pinの更新は
+[dependency-module-change](dependency-module-change.md)、競合解消は
+[integration](integration.md)、GitHub公開は [pr-processing](pr-processing.md) が所有します。
 
-repository-topic checkout の操作を選び、
-[適用範囲](../../documents/rule/repository-topic-clone.md#適用範囲) と下表の該当規約を
-実行前に読みます。`.gitmodules` の gitlink/pin/projection 判断は
-[dependency-module-change](dependency-module-change.md) へ委譲します。
-この skill は操作選択を所有し、lifecycle の判断条件を再定義しません。
+## この手順を使う理由
 
-## 使う command
-
-共通入口は `tools/bin/agent-canon repository-topic-clone` です。
-選択した操作だけを実行し、引数は [CLI 参照](../../documents/tools/repository_topic_clone.md#基本操作)
-から組み立てます。対象 checkout の branch、HEAD、remote と current Git state を確認し、
-未知または dirty な state を保持します。操作は current request に示された repository、branch、責務の
-範囲で行います。
-`cleanup` は current Git identity と、必要に応じて復元可能性の proof を確認します。
-
-| 操作 | 実行前に読む正本 |
-| --- | --- |
-| `prepare` | [事前条件と Checkout mode](../../documents/rule/repository-topic-clone.md#事前条件)、[作成・再利用](../../documents/rule/repository-topic-clone.md#clone-ライフサイクル) |
-| `merge-main` | [事前条件](../../documents/rule/repository-topic-clone.md#事前条件)、[merge と authority](../../documents/rule/repository-topic-clone.md#clone-ライフサイクル) |
-| `finalize-merge` | [競合の再開条件](../../documents/rule/repository-topic-clone.md#競合の再開) と [確定コマンド](../../documents/tools/repository_topic_clone.md#競合の再開) |
-| `cleanup`（不要になった時点） | [起動・保持判断と復元可能性・削除条件](../../documents/rule/repository-topic-clone.md#クリーンアップ) |
-
-`linked-worktree` の `cleanup --apply` は request の exact worktree/topic path を回収しますが、
-local topic branch は保持します。実行前に task owner が ignored / untracked / submodule / annex-only content を
-削除対象外へ保存したことを確認します。CLI の status と local superproject head はその内容の復元可能性を証明しません。
-branch の削除権限をこの lifecycle に追加せず、既存の cleanup authority と復旧可能性の契約をそのまま適用します。
-
-操作結果を read back し、失敗時は
-[例外/フォールバック](../../documents/rule/repository-topic-clone.md#例外フォールバック)
-に従って次の操作または状態保持を判断します。
+Gitの実path・branch・indexを使い、作成済みの作業を継続します。独自の作成コマンドや
+形式確認を挟む手間と停止条件を削減します。
