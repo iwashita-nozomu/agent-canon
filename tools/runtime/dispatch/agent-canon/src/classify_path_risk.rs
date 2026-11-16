@@ -48,12 +48,17 @@ const CONTAINER_PATHS: &[&str] = &[
     "tests/tools/test_compile_cache.py",
 ];
 const GITHUB_PREFIXES: &[&str] = &[".github/"];
-const EVAL_PREFIXES: &[&str] = &["eval/", "reports/agent-runtime-dashboard/"];
+const EVAL_PREFIXES: &[&str] = &[
+    "eval/",
+    "reports/agent-runtime-dashboard/",
+    "tests/fixtures/model_profiles/",
+];
 const EVAL_SOURCE_PREFIXES: &[&str] = &[
     "agents/",
     ".codex/",
     "templates/agents/",
     "tools/agent/",
+    "tools/runtime/dispatch/agent-canon/src/codex_agent_role_eval/",
     ".github/workflows/",
     "tools/validation/ci/",
     "documents/conventions/",
@@ -75,7 +80,11 @@ const EVAL_PATHS: &[&str] = &[
     "tools/runtime/dispatch/agent-canon/src/eval_accumulation.rs",
     "tools/runtime/dispatch/agent-canon/src/skill_shim_evaluation.rs",
 ];
-const EVAL_TEST_PATHS: &[&str] = &["tests/agent_tools/test_eval_accumulation_check.py"];
+const EVAL_TEST_PATHS: &[&str] = &[
+    "tests/agent_tools/test_eval_accumulation_check.py",
+    "tests/agent_tools/test_evaluate_codex_agent_roles.py",
+    "tests/agent_tools/test_model_profile_registry.py",
+];
 const RUST_PREFIXES: &[&str] = &["tools/runtime/dispatch/agent-canon/"];
 const DEPENDENCY_PATHS: &[&str] = &[
     "agents/skills/catalog.yaml",

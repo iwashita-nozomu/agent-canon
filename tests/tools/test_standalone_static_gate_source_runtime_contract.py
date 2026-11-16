@@ -114,6 +114,11 @@ def test_eval_preserves_failed_producer_logs_until_ci_capture(
     calls = tmp_path / "calls.jsonl"
     regression = source / "tests/agent_tools/test_eval_accumulation_check.py"
     regression.parent.mkdir(parents=True)
+    for name in (
+        "test_evaluate_codex_agent_roles.py",
+        "test_model_profile_registry.py",
+    ):
+        (regression.parent / name).touch()
     regression.write_text(
         "import json, os\nfrom pathlib import Path\n"
         "def test_isolated_eval_regression_context():\n"
@@ -220,7 +225,8 @@ def test_eval_preserves_failed_producer_logs_until_ci_capture(
     assert [record[0] for record in records] == expected_names
     assert all(record[1:4] == [None, None, str(runtime)] for record in records)
     assert [record[4] for record in records] == [
-        str(native_cli) if record[0] == "producer" else "" for record in records
+        str(native_cli) if record[0] in ("regression", "producer") else ""
+        for record in records
     ]
     report_path = (
         runtime

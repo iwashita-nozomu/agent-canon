@@ -119,6 +119,21 @@ def selected_units(*paths: str) -> tuple[str, ...]:
             ("tests/agent_tools/test_eval_accumulation_check.py",),
             ("contracts", "eval"),
         ),
+        (
+            ("tests/agent_tools/test_evaluate_codex_agent_roles.py",),
+            ("contracts", "eval"),
+        ),
+        (
+            ("tests/agent_tools/test_model_profile_registry.py",),
+            ("contracts", "eval"),
+        ),
+        (("tests/fixtures/model_profiles/live_assignment_sha256.json",), ("eval",)),
+        (
+            (
+                "tools/runtime/dispatch/agent-canon/src/codex_agent_role_eval/model_profiles.rs",
+            ),
+            ("rust", "eval"),
+        ),
         (("documents/notes/example.yaml",), ("contracts",)),
         (("documents/example.rst",), ("contracts",)),
         (
