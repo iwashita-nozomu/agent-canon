@@ -70,3 +70,6 @@ results. [Completion readiness](../canonical/CODEX_COMPLETION.md#completion-read
 resolves an unfinished outcome; integration/publication follows the authorized
 owner and remote readback. Update the affected Skill when an operational
 procedure changes. Ordinary prose edits need no repository-wide Skill scan.
+
+When the requested work is complete, report the result and wait for the user's
+next instruction. Plan or begin a subsequent task only after the user requests it.
