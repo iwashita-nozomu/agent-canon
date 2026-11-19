@@ -16,15 +16,10 @@ upstream design ../README.md notes lifecycle index
 - worktree を閉じる前に、失敗の学びを `main` へ残したいとき
 - benchmark、experiment、CI、Docker、workflow の失敗パターンを次回 kickoff で検索したいとき
 
-## 各 note に最低限書くこと
+## 記録する内容
 
-- `Scope:` 何を試した失敗か
-- `Failure Kind:` timeout、OOM、compile error、design dead-end など
-- `Trigger:` どの条件で失敗したか
-- `Why It Matters:` なぜ再発防止が必要か
-- `Current Understanding:` 根本原因か、未確定仮説か
-- `Safe Alternative:` 次回どう避けるか
-- 関連する branch、worktree、note、result へのリンク
+観測結果、確認した原因、判断の根拠を記録します。再現情報は既存の検証結果や
+実行記録を参照します。
 
 ## ルール
 

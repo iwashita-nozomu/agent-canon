@@ -7,41 +7,14 @@ upstream design README.md notes lifecycle index
 @dependency-end
 -->
 
-## Goal And Candidate
+## 観測結果
 
-<Required outcome, candidate use/configuration/composition, and decision being tested.>
+<期待した性質と実際に観測した結果。>
 
-## Reproduction Conditions
+## 結論
 
-<Repository and source revision, input, relevant versions/configuration/environment,
-and the assumptions needed to reproduce the result.>
+<確認できた原因、判断、修正後の結果。>
 
-## Verification
+## 根拠
 
-<Owner's execution route and exact command/target, or specification/code locator
-and inspection steps. State the acceptance criterion before the observation.>
-
-| Expected result | Observed result | Evidence |
-| --- | --- | --- |
-| <Required property> | <Value, exit status, error, or counterexample> | <Durable locator> |
-
-## Established Conclusion
-
-<State what this verification establishes, the demonstrated cause where established,
-and the resulting adoption, correction, or rejection decision within these conditions.
-Update the same topic as decision-relevant investigation and verification proceeds.>
-
-## Verified Remedy
-
-<Successful alternative or correction, its verification, and supporting evidence
-when established. Link subsequent results and counterevidence to the original failure.>
-
-## Reuse And Recheck Conditions
-
-<Conditions under which this finding applies; changes in input, revision, configuration,
-or guarantees that require a new check. Reference this topic before repeating the attempt.>
-
-## References
-
-<Owning design, Issue/PR, previous topic observations, and durable evidence locators.
-Keep private data in its authorized storage.>
+<対応する Issue、検証結果、実行記録へのリンク。>

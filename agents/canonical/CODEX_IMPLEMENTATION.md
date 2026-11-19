@@ -51,7 +51,7 @@ decision to its design owner with `design_issue_blocker` evidence when it can
 change the agreed outcome or method, a boundary interface, valid input domain,
 state/ownership invariant, or required guarantee. Resolve local naming, placement,
 and edit order during implementation when they preserve that contract, using
-[necessary design conditions](ROOT_IMPLEMENTATION.md#contract-and-valid-domain).
+[the design contract](ROOT_IMPLEMENTATION.md#contract-and-valid-domain).
 When a contract
 blocks the agreed outcome, follow [Decision Order](../skills/agent-orchestration.md#decision-order)
 to expose the conflict and ask the user about a resolution not settled by the

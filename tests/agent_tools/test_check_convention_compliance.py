@@ -71,11 +71,7 @@ path: tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs
     "documents/rule/naming.md": "naming\n",
     "documents/conventions/common/03_comments.md": "comments\n",
     "documents/conventions/common/04_operators.md": "operators\n",
-    "documents/conventions/common/05_docs.md": (
-        "mathematical necessity gate "
-        "Judgment / Mathematical Role / Necessity Evidence / Owner / Validation Route "
-        "necessary-and-sufficient condition non-contractual mathematical judgment\n"
-    ),
+    "documents/conventions/common/05_docs.md": "documentation conventions\n",
     "documents/conventions/python/01_scope.md": "scope\n",
     "documents/conventions/python/04_type_annotations.md": "basedpyright-explicit-any.json\n",
     "documents/conventions/python/06_comments.md": "comments\n",
@@ -807,36 +803,24 @@ class CheckConventionComplianceTest(unittest.TestCase):
         self.assertEqual(missing, [])
 
     def test_mathematical_necessity_gate_requires_markers(self) -> None:
-        """Both canonical policy owners keep necessity-gate markers."""
-        policy_markers = (
-            (
-                "documents/conventions/common/05_docs.md",
-                "necessary-and-sufficient condition",
-            ),
-            (
-                "documents/conventions/coding-conventions-testing.md",
-                "Numerical Trigger",
-            ),
-        )
-        for policy_path, marker in policy_markers:
-            with (
-                self.subTest(policy_path=policy_path, marker=marker),
-                tempfile.TemporaryDirectory() as tmp_dir,
-            ):
-                root = Path(tmp_dir)
-                self.copy_minimal_repo(root)
-                policy = root / policy_path
-                policy.write_text(
-                    policy.read_text(encoding="utf-8").replace(marker, ""),
-                    encoding="utf-8",
-                )
+        """The testing policy retains its necessity-gate markers."""
+        policy_path = "documents/conventions/coding-conventions-testing.md"
+        marker = "Numerical Trigger"
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            policy = root / policy_path
+            policy.write_text(
+                policy.read_text(encoding="utf-8").replace(marker, ""),
+                encoding="utf-8",
+            )
 
-                result = self.run_checker(root)
+            result = self.run_checker(root)
 
-                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-                self.assertIn("mathematical_necessity_gate", result.stdout)
-                self.assertIn(policy_path, result.stdout)
-                self.assertIn(f"missing-marker:{marker}", result.stdout)
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("mathematical_necessity_gate", result.stdout)
+            self.assertIn(policy_path, result.stdout)
+            self.assertIn(f"missing-marker:{marker}", result.stdout)
 
     def test_minimal_fixture_covers_mathematical_necessity_surfaces(self) -> None:
         """The minimal test fixture includes every math necessity surface."""

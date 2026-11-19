@@ -7,7 +7,7 @@ responsibility Owns detailed source-side Issue evidence, task continuation, repo
 upstream design ../../AGENTS.md conditional source reader map
 upstream design ../../ROOT_AGENTS.md portable common boundaries
 upstream design ../../documents/design/entrypoint-owner-map.md source and consumer split contract
-upstream design ../internal-routines/verification-result-structuring.md reader reconstruction and pre-write result structuring
+upstream design ../internal-routines/verification-result-structuring.md verification findings and completion reporting
 @dependency-end
 -->
 
@@ -76,19 +76,16 @@ second completion state machine.
 
 ## Reader-facing writing
 
-Before any reader-facing draft or revision, use
-[reader reconstruction](../internal-routines/verification-result-structuring.md#reader-reconstruction).
-This includes documentation, instructions, designs, plans, reviews, chat, and
-handoffs without verification results, not just Issues or final reports. Apply
-the common root's self-contained writing boundary through this existing owner;
-keep the reader's necessary context even when choosing a compact presentation.
+State the established facts, their sources, and the resulting conclusion.
+Explanatory documents link to the existing sources for procedures and execution
+conditions. Use [terms and translation](../internal-routines/verification-result-structuring.md#terms-and-translation)
+for terminology and [Japanese revision](../internal-routines/verification-result-structuring.md#japanese-revision)
+for Japanese prose.
 
 ## Result reporting
 
-For verification results, including chat progress and interrupted handoffs, also
+For verification results, including chat progress and interrupted handoffs,
 use [verification result structuring](../internal-routines/verification-result-structuring.md#structure-before-writeout).
-Use its retained findings and coverage check for the following report; this
-specialization does not limit the writing boundary above.
 
 For task completion, apply [Completion reports](../internal-routines/verification-result-structuring.md#completion-reports)
 to those retained findings before drafting the final chat response.

@@ -175,7 +175,7 @@ path / clause / evidence trace に束縛してから language adapter の syntax
 
 この skeleton の reusable document-template projection target は
 [templates/documents/design-document.template.md](../../templates/documents/design-document.template.md) です。そこへ semantic clause をコピー
-して第二正本を作らず、contract owner への参照と projection/trace 欄を追加します。
+する代わりに、contract owner と設計・実装の対応を参照します。
 
 ## Projection consumers and acceptance trace
 
@@ -186,12 +186,8 @@ acceptance trace だけを持ちます。
 ### Document-template projection
 
 - consumer: [templates/documents/design-document.template.md](../../templates/documents/design-document.template.md)
-- responsibility region: authority / decision status、target state、OOP/type boundary、
-  dependency/effect、adversarial review、reconstruction、acceptance、必要な根拠
-- acceptance trace: template section anchor と design clause の source anchor を既存 DIC
-  の path / section / clause / evidence trace に保存します。semantic clause 本文をこの
-  templateへ複製せず、canonical guide への owner reference と projection/trace 欄だけを
-  追加します。
+- responsibility region: 責務、公開境界、設計判断と根拠。
+- acceptance trace: 設計・実装の対応は既存 DIC の参照で確認します。
 
 ### Python projection
 

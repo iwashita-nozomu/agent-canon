@@ -4,7 +4,7 @@
 contract skill
 responsibility Writes evidence-backed reader-facing reports with semantic claim/evidence, inference, limitation, and action boundaries.
 upstream design ../../documents/design/responsibility-rationale.md report semantics and finding-closure rationale
-upstream design ../internal-routines/verification-result-structuring.md reader reconstruction, pre-write structuring, and finding coverage
+upstream design ../internal-routines/verification-result-structuring.md verification findings and completion reporting
 upstream design structure-planning.md pre-write outline and structural-decision owner
 upstream design academic-writing.md conditional mathematical preliminary preparation
 upstream design result-artifact-writeout.md raw result artifact placement skill
@@ -23,9 +23,9 @@ raw artifact は `result-artifact-writeout` が所有し、report は第二の p
 
 ## Procedure
 
-Use [reader reconstruction](../internal-routines/verification-result-structuring.md#reader-reconstruction)
-to identify the source evidence, audience and decision, requested next action,
-findings, counterevidence, corrections, and limitations. Reuse settled checks and
+Identify the source evidence, audience, findings, and material limitations.
+Write the observed results and conclusions and link to existing run records for
+execution details. Reuse settled checks and
 source notes; repeat a check or investigate the environment only to resolve a
 specific gap that could change the answer. For branch-based experiment reports,
 establish each branch's origin or baseline, purpose, and delta before synthesizing
