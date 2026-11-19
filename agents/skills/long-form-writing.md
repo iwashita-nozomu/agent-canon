@@ -34,13 +34,12 @@ Before returning the text, replace any such details in the body, examples,
 notes, or tables with that link. A requested how-to places the requested steps
 in its own procedure.
 
-In a design document, use the purpose for the problem and goal. State each
-responsibility and guarantee once in the public boundary, including behavior on
-failure. In the rationale, name the choice briefly and explain the observations
-that support it. Before returning the text, compare the sections and remove
-restated claims, including guarantees paraphrased in the rationale or purpose.
-Cover open questions only when the request asks for them. State material limits
-of the evidence beside the relevant observations.
+設計文書の「目的」は、解く問題と達成したい状態を一文で示します。
+方式の説明、構成要素の責務、API の振舞いと失敗時の保証は「責務と公開境界」にまとめ、
+各項目を一度だけ書きます。「設計判断と根拠」は採用方式を名称で指し、比較で観測した
+事実と、それが採用を支える理由に絞ります。観測の適用範囲は該当する事実のそばに置きます。
+未決事項は依頼で尋ねられたものを扱います。提出前に各節を読み合わせ、同じ契約や方式を
+目的や根拠で言い換えている箇所を削ります。
 
 If a diagram would clarify workflow,
 dependency, ownership, state, or handoff, explain the specific question it
