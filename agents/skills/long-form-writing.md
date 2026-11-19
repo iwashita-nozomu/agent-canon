@@ -34,13 +34,13 @@ Before returning the text, replace any such details in the body, examples,
 notes, or tables with that link. A requested how-to places the requested steps
 in its own procedure.
 
-In a design document, state the purpose as the problem and intended outcome.
-Give each responsibility, public guarantee, design decision, and supporting
-observation one place in the text. Use the design rationale to connect the
-chosen approach to its evidence. Include open questions only when the request
-asks for them. State material limits of the evidence beside the claims they
-qualify. Before returning the document, remove repeated claims and speculative
-open questions.
+In a design document, use the purpose for the problem and goal. State each
+responsibility and guarantee once in the public boundary, including behavior on
+failure. In the rationale, name the choice briefly and explain the observations
+that support it. Before returning the text, compare the sections and remove
+restated claims, including guarantees paraphrased in the rationale or purpose.
+Cover open questions only when the request asks for them. State material limits
+of the evidence beside the relevant observations.
 
 If a diagram would clarify workflow,
 dependency, ownership, state, or handoff, explain the specific question it
