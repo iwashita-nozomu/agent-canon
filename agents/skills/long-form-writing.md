@@ -34,6 +34,14 @@ Before returning the text, replace any such details in the body, examples,
 notes, or tables with that link. A requested how-to places the requested steps
 in its own procedure.
 
+In a design document, state the purpose as the problem and intended outcome.
+Give each responsibility, public guarantee, design decision, and supporting
+observation one place in the text. Use the design rationale to connect the
+chosen approach to its evidence. Include open questions only when the request
+asks for them. State material limits of the evidence beside the claims they
+qualify. Before returning the document, remove repeated claims and speculative
+open questions.
+
 If a diagram would clarify workflow,
 dependency, ownership, state, or handoff, explain the specific question it
 answers and use `code-visualization` for its selected rendering. Route a
