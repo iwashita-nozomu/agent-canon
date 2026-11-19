@@ -9,7 +9,7 @@ upstream design ../skills/README.md defines the public skill surface contract
 downstream design ../canonical/CODEX_WORKFLOW.md routes internal review routines through workflow stages
 downstream design chatgpt-codex-routing.md owns request modality before Codex workflow admission
 downstream design incremental-code-change.md connects dependency-ordered migration and final validation
-downstream design verification-result-structuring.md makes all reader-facing writing reproducible and structures verification findings
+downstream design verification-result-structuring.md structures verification findings and completion reports
 @dependency-end
 -->
 
@@ -36,7 +36,7 @@ skill, entrypoint, or routine that calls it.
 
 | Group | Files | Public Route |
 | ----- | ----- | ------------ |
-| Reader-reproducible writing and verification results | [verification-result-structuring.md](verification-result-structuring.md) | General writing and delivery, `$report-writing`, `$pr-processing`, and connected work before any reader-facing output |
+| Verification and completion reports | [verification-result-structuring.md](verification-result-structuring.md) | Report observed results and their evidence |
 | Request modality routing | [chatgpt-codex-routing.md](chatgpt-codex-routing.md) | root entrypoints before `$agent-orchestration` |
 | GitHub-connected work | [github-connected-work.md](github-connected-work.md) | `$pr-processing` when current-session GitHub transport is available |
 | Incremental code change | [incremental-code-change.md](incremental-code-change.md) | `$code-cleanup` for dependency-ordered changes, retirement review, and final validation |

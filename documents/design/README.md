@@ -98,8 +98,8 @@ role と model の参照先は
 ## 追加の module 設計を置くとき
 
 - 実コードに対応する詳細設計が必要になった時点で、`documents/design/<topic>/` を追加します。
-- 詳細設計は、実装者がそのまま従える粒度の責務分割、公開境界、検証計画を含めます。
-- 詳細設計は通常の prose と Markdown links で current code、dependency context、parent documents を参照し、重要な判断を支える根拠と前提をその場で説明します。固定した ledger 見出しや claim-token 形式は要求しません。
+- 詳細設計は、合意した責務分割、公開境界と設計判断の根拠を記載します。
+  実装と検証の詳細は対応する既存資料を参照します。
 - 新しい設計入口は、対応する実装 path、dependency header edge、または親文書上の governing source と一緒に追加します。
 
 ## 更新ルール

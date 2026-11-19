@@ -71,7 +71,6 @@ upstream design ../experiments/gpu-admission-r5-source-packet.md exact managed G
   `experiments/<topic>/result/<run-id>/` に evidence を書きます。
 - 各 run は `result/<run-id>/logs/` を持ちます。top-level `run.log` は managed runner の統合ログとして残し、`logs/startup.jsonl`、`logs/stdout.log`、`logs/stderr.log`、topic 固有の追加ログは `logs/` 配下へ分けます。
 - 巨大な生成物や raw ログを `main` の入口文書へ混ぜません。
-- main server host で実行する run は、topic README に exact command と wrapper の使い方を明記します。
 - 実験実行コマンドは project `Makefile` に用意します。長い `python3 ...` command を README や chat だけに残して正式手順にしません。
 - formal / server-side run は `tools/bin/agent-canon run-managed-experiment` から起動します。Rust の managed owner は `run_manifest.json`、`eval_manifest.json`、`artifact_manifest.json`、`command.json`、`environment.json`、`source_snapshot.json`、`config.json`、`config_source.yaml`、`run.log`、`logs/startup.jsonl`、`logs/stdout.log`、`logs/stderr.log`、exit status を保存します。
 - managed runner は canonical `experiments/<topic>/run.py` と argv を fd-bound

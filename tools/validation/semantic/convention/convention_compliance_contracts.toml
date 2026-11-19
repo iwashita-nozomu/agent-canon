@@ -137,9 +137,6 @@ markers = ["Validation test/check", "failing_contract", "cause_classification", 
 [[contracts]]
 id = "mathematical_necessity_gate"
 [[contracts.surfaces]]
-path = "documents/conventions/common/05_docs.md"
-markers = ["mathematical necessity gate", "Judgment / Mathematical Role / Necessity Evidence / Owner / Validation Route", "necessary-and-sufficient condition", "non-contractual mathematical judgment"]
-[[contracts.surfaces]]
 path = "documents/conventions/coding-conventions-testing.md"
 markers = ["mathematical necessity gate", "Numerical Trigger", "Non-Numerical Alternative", "checker-owned property"]
 

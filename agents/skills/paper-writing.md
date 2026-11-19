@@ -27,7 +27,7 @@ paragraph map や細かな section contract は、実際の重複、欠落、順
 - `abstract`: problem、method、main result、implication
 - `introduction`: gap、contribution、paper map
 - `related work`: known results と unresolved position
-- `method`: setting、assumptions、notation、procedure
+- `method`: 手法の定義、記号、主張に必要な仮定
 - `results`: observations と measured outcomes
 - `discussion`/`limitations`: interpretation、scope、claim boundary
 - `conclusion`: contribution と next step

@@ -19,9 +19,8 @@ upstream design README.md durable document index
 
 ## Purpose
 
-- 検証の条件・手順・結果を、次の読者が再現できる状態にする。
 - 確認した失敗と原因をトピック単位で蓄積し、同じ失敗の繰り返しを減らす。
-- 観測が成立する範囲を保ち、条件変更後の再検証につなげる。
+- 観測結果と根拠を対応づけ、既存の検証記録へ案内する。
 
 ## Default Flow
 
@@ -45,18 +44,15 @@ private な再利用知識は [private log owner](../runtime/private-feedback-kn
 | 項目 | 内容 |
 | --- | --- |
 | 目的・候補 | 満たす要求と、試した実装・利用案・設定・合成 |
-| 再現条件 | source revision、入力、関連する版・環境・設定・前提 |
-| 検証手順 | 正規経路の command、対象、または仕様・コードの locator と確認手順 |
 | 期待と実際 | 判定基準、観測値、exit status / error / 反例、および根拠の参照 |
 | 結論 | 検証が確定した事実、原因が立証された範囲、候補の採用・修正・却下理由 |
-| 再利用条件 | 同じ判断を適用する条件と、再検証が必要になる変更点 |
 
 依頼されたメモは、必要な調査と検証を終えてからまとめます。仮説と確定結果は見分けられる形にし、検証した条件の範囲で結論を述べます。
 成功した修正や反証が得られた場合は、元の失敗から新しい結果へ参照を接続します。
 Issue / PR、設計、handoff には同じ topic の locator を載せます。
 
 失敗実験のコード・設定・生成物の破棄は実験 owner の既存規約で進めます。
-その際も、要求、再現手順、観測、結論を含む短い topic 記録を残します。保存対象の
+その際も、観測、結論、既存の検証記録への参照を含む短い topic 記録を残します。保存対象の
 知見と、削除対象の実装・生成物は責務を分けます。秘密情報や private 本文は各保存先の
 公開範囲を守り、読み戻しは今回の記録を対象にします。
 
@@ -78,7 +74,7 @@ Issue / PR、設計、handoff には同じ topic の locator を載せます。
 - `documents/notes/knowledge/`: 繰り返し使う短い横断知識。
 - `documents/notes/themes/`: 複数 run の topic-level synthesis。
 - private `agent-canon-log/knowledge/` と `feedback/`: source tree 外の private 知識。
-- `documents/notes/failures/`: 再現条件と検証結果を持つ failure knowledge。
+- `documents/notes/failures/`: 検証結果と根拠を持つ failure knowledge。
 - `documents/`: repository の恒久規約を所有する正本。
 
 ### 3. Optional Knowledge Outputs
@@ -92,12 +88,12 @@ action log や並行した台帳は作りません。
 | --- | --- |
 | `documents/notes/knowledge/` | command、path、環境規約、tool behavior の実務知識 |
 | `documents/notes/themes/` | 複数 run、実験、文献を結ぶ topic-level synthesis |
-| `documents/notes/failures/` | 失敗した検証の再現条件、結果、結論、再利用・再検証条件 |
+| `documents/notes/failures/` | 失敗した検証の結果、結論、根拠への参照 |
 | canonical `documents/` owner | repository 全体に適用する rule、workflow、contract |
 
 ## Closeout Readback
 
-依頼された知見メモが完成した内容と再現条件を伝えていることを確認します。
+依頼された知見メモの結論と根拠を確認します。
 採用・却下の理由は実際の検証結果に基づいて説明します。既存記録の更新、反証、昇格がある場合は
 参照も同期します。private log の保存・同期は各操作の実際の結果を示します。
 

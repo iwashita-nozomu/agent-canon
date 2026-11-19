@@ -7,7 +7,7 @@ responsibility Processes authorized Issue and PR operations, using queue plannin
 upstream design ../canonical/skills.md public Skill registry
 upstream design ../internal-routines/github-connected-work.md current-session GitHub transport and PR readback
 upstream design ../internal-routines/github-status-lifecycle.md conditional Issue status changes
-upstream design ../internal-routines/verification-result-structuring.md reader-reproducible publication
+upstream design ../internal-routines/verification-result-structuring.md verification findings and completion reporting
 upstream design ./issue-finding-report.md Issue ownership and reorganization
 upstream design ./agent-canon-update.md source PR and parent-pin route
 upstream design ../../documents/conventions/coding-conventions-testing.md bug reproduction evidence
@@ -83,8 +83,8 @@ dispatch and readback. Do not probe write access, create a substitute Issue afte
 a failed update, or blindly repeat an ambiguous create. Use the existing
 publication route. Before an explicitly authorized new Issue, use
 [issue-finding-report](issue-finding-report.md) to resolve ownership and
-duplicates. For Issue or PR bodies and comments, use the existing
-[reader-result structuring owner](../internal-routines/verification-result-structuring.md).
+duplicates. For published verification findings, use
+[result reporting](../internal-routines/verification-result-structuring.md#structure-before-writeout).
 
 ## Repository-qualified Issue identity
 

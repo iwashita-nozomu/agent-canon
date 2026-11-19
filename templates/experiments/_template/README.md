@@ -26,7 +26,7 @@ topic record に整理します。評価指標、比較方法、研究上の成�
 の順で確認します。実験毎の計画と machine-readable な値は `provenance.toml` に記録します。
 
 - `.gitignore`: topic-local raw input、raw output、中間物を通常 Git blob から除外する境界。
-- `README.md`: 人間向けの計画、判断、再現手順。
+- `README.md`: 研究の目的、判断、実行記録への参照。
 - `provenance.toml`: 実験計画・resource・run・result の機械可読な provenance。
 - `run.py`: managed runner の入口、case 集約、schema、atomic publication、manifest readback。
 - `cases.py`: `CaseSpec`、`CaseResult`、case registry、worker、failure classification。
@@ -114,16 +114,8 @@ HTML または画像を `summary/` など契約された出力先へ書きます
 
 ## 再現性と保持
 
-実行 command、branch、commit、config、environment、seed、resource allocation、result identity、
-cleanup policy は `provenance.toml` と summary snapshot の両方で読み戻せるようにします。raw は
-要約から再計算できるよう保持し、summary は比較・レビューに必要な最小証跡として保持します。
-
-`.gitignore` は未追跡 payload にだけ効きます。既に通常 Git で追跡された payload は、既存の
-`agent-canon save-experiment-result-annex`
-owner で圧縮 archive を作り、manifest の source digest、annex key、archive digest を読み戻してから
-移行します。設定済みの special remote へ payload を保持する場合だけ、owner が指定した exact path に
-対して `git annex copy --to <remote>`、取得側では `git annex get` を行い、content availability と
-checksum を別に読み戻します。その readback が完了するまで `git rm --cached` を実行しません。
+`provenance.toml` と summary snapshot が実験の出典を保持します。結果の詳細は
+run の記録、保管と取得はプロジェクトの既存資料を参照します。
 これは index entry だけを外す操作であり、作業 tree の入力やログを移動・削除する操作ではありません。
 
 Git branch の通常の `push` は pointer/metadata の共有であって、annex payload の transfer ではありません。

@@ -48,6 +48,9 @@ context/evidence. The contracts below apply without an installed Skill/runtime.
   Briefly explain necessary unfamiliar terms at first use for the intended
   reader; replace needless internal jargon with concrete actions. In Japanese,
   use conventional terminology or the original term rather than inventing a translation.
+- **Documentation:** write established facts and their sources in explanatory
+  documents. Refer to the owning procedure or run record for commands, steps,
+  and execution conditions.
 - **Reuse:** extend the existing capability owner first. A separate implementation
   needs a concrete requirement, responsibility, or contract gap extension cannot fill.
 - **Investigation:** start local repair at target code, diff, and contract, without
