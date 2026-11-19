@@ -24,8 +24,12 @@ raw artifact は `result-artifact-writeout` が所有し、report は第二の p
 ## Procedure
 
 Identify the source evidence, audience, findings, and material limitations.
-Write the observed results and conclusions and link to existing run records for
-execution details. Reuse settled checks and
+Report the observed results, the scope they support, and the conclusion. A link
+to the run record is the entire treatment of commands, setup, parameters,
+and stop rules. Before returning the report, replace those details in the body,
+notes, or tables with the link. Use actual observations for claims about what ran.
+
+Reuse settled checks and
 source notes; repeat a check or investigate the environment only to resolve a
 specific gap that could change the answer. For branch-based experiment reports,
 establish each branch's origin or baseline, purpose, and delta before synthesizing
@@ -85,7 +89,7 @@ only reviews tied to changed claims or sections.
 
 両者は段落・小節・表を分け、同じrun/caseと数値の到達条件を対応づけて比較します。
 数値結果が未取得・失敗なら、その状態を数値結果の位置で示してから実行時の結果を書きます。
-環境や設定の説明は比較条件として扱い、観測結果と区別します。
+本文には観測結果と比較の範囲が分かる事実を記載します。実行環境の設定と操作は実行記録を参照します。
 
 ## Output
 

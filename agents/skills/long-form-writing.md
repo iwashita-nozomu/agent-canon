@@ -27,8 +27,14 @@ and source support before drafting. A bounded wording edit can retain the
 existing structure; use `md-style-check` for a wording-independent typo, link,
 or formatting fix.
 
-Draft from the selected structure. State the subject, established facts, and
-sources. Link to existing procedure and execution records. If a diagram would clarify workflow,
+Write explanatory prose from the selected structure using established facts and
+their sources. Give the reader a link to the relevant runbook or execution record
+as the entire treatment of commands, steps, setup, and execution conditions.
+Before returning the text, replace any such details in the body, examples,
+notes, or tables with that link. A requested how-to places the requested steps
+in its own procedure.
+
+If a diagram would clarify workflow,
 dependency, ownership, state, or handoff, explain the specific question it
 answers and use `code-visualization` for its selected rendering. Route a
 mathematical or implementation-derived claim through `formal-proof-workflow`
