@@ -34,6 +34,16 @@ Before returning the text, replace any such details in the body, examples,
 notes, or tables with that link. A requested how-to places the requested steps
 in its own procedure.
 
+設計文書では、節ごとに異なる内容を書きます。
+
+- **目的**は利用者やシステムが必要とする結果の一文で完結させます。例は「長い集計の間も画面を使えるようにする」です。
+- **責務と公開境界**に方式、構成要素の役割、受付や失敗時の保証を各一回書きます。
+- **設計判断と根拠**は比較で観測した事実と採用理由に絞ります。方式を指すときは名称を使います。
+
+提出前に目的を読み返し、方式・構成・API が何をするかの説明は公開境界にだけ残します。
+同じ保証を言い換えた文も一か所にまとめます。未決事項は依頼で尋ねられたものだけを扱い、
+観測結果の意味を左右する根拠の限界は該当する事実のそばに置きます。
+
 If a diagram would clarify workflow,
 dependency, ownership, state, or handoff, explain the specific question it
 answers and use `code-visualization` for its selected rendering. Route a
