@@ -33,36 +33,11 @@ repo 全体を横断して、構成、文書、skills、ツール、静的健全
 - docs、skills、workflow、tooling のどこが正本でどこが drift しているか分かる
 - 局所修正で済むか、repo-wide 改造へ進むか判断できる
 
-## Mandatory Phases
+## Review scope
 
-1. `Inventory`
-   - 主要ディレクトリ、入口文書、skills、workflow family、automation 入口を洗います。
-1. `Static Health`
-   - `make agent-checks` と `make ci-quick` を変更リスクに応じて選びます。必要な個別 validator は catalog のコマンドから実行します。
-1. `Workflow Health`
-   - [AGENTS.md](../../AGENTS.md)、`agents/`、`documents/` の導線が一致しているかを見ます。
-1. `Tooling Health`
-   - Docker、CI、dependency、補助 script の stale 化を見ます。
-1. `Worktree Health`
-   - worktree、branch、carry-over、cleanup 忘れを確認します。
-1. `Follow-Up Decision`
-   - findings を即修正、後続、削除候補に分けます。
-
-## Default Sequence
-
-1. review の対象範囲を固定し、repo-wide で見るべき面を列挙します。
-1. まず inventory を取り、どの文書と script が current entrypoint かを確認します。
-1. static health を通して、破綻があるなら先に stop-the-line issue として扱います。
-1. workflow health と tooling health を cross-check し、正本の重複や stale route を見つけます。
-1. worktree / branch / note の残骸や carry-over 漏れを確認します。
-1. findings を分類し、必要なら `comprehensive-review`、`environment-maintenance`、`docs-consistency-review` へ分岐します。
-
-## Default Commands
-
-- `make agent-checks`
-- `make ci-quick`
-- `git worktree list --porcelain`
-- `git grep -n \"<pattern>\" -- agents documents README.md QUICK_START.md AGENTS.md`
+依頼された範囲で、入口と正本の関係、文書やツールの古い参照、運用上のずれを確認します。
+状態の確認に必要なコマンドや個別の検証は、見つかった兆候と変更箇所から選びます。
+作業ツリーの状態が論点なら Git の実状態を確認します。修正する箇所と根拠を findings に残します。
 
 ## Boundary
 

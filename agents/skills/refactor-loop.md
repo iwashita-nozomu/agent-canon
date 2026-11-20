@@ -67,9 +67,8 @@ abstraction の変更があるときは、`Allowed Structural Delta` と
 
 validation command の正本は
 [agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary](agent-orchestration.md#write-capable-handoff-validation-trust-boundary) です。
-refactor-loop は親 packet または変更後 responsibility graph が明示した exact command
-だけを消費します。global/full rescan が未指定なら実行せず、`unexpected-action` または
-`unresolved-risk` として親へ返します。
+変更した保証に対応する検証を選びます。委譲された作業では合意した検証範囲を使い、
+必要な性質が未検証なら、範囲内の方法を見直すか阻害要因を親へ返します。
 
 ## 共有構造 refactor の依存順
 
@@ -126,33 +125,11 @@ accepting a path or dependency-direction change.
 
 ## Procedure
 
-1. Start from the current target, diff, governing contract, required guarantee,
-   most recently incorporated implementation, and existing reuse evidence. A
-   prior refactor sequence is not a reason to repeat its stages.
-2. Decide the change before editing: select the owner, complete replaceable unit,
-   mechanism, affected callers, obsolete code to remove, and validation
-   route. Group dependent changes so each unit can finish its implementation and
-   retirement together. Follow the ordered execution in
-   [CODEX_IMPLEMENTATION](../canonical/CODEX_IMPLEMENTATION.md#5-implementation).
-3. For a structural refactor, fix the canonical root and update the surfaces in
-   the requested change. Remove obsolete entrypoints, wrappers, aliases, and
-   exclusive support under RC-09. Keep API/structure mapping only where the
-   change actually moves or deletes a public surface. A caller migration is in
-   scope only when it is requested; source retirement alone does not add
-   unrelated consumer migration.
-4. Preserve the agreed behavior and failure semantics. Add `structure-planning`,
-   `tool-finding-report`, or a domain reviewer only when the changed contract or
-   unresolved risk requires that owner. Prompt/doc/static-contract changes use the
-   selected static or targeted validation route.
-5. After implementing the planned migration, review its whole diff for obsolete
-   code, remaining references, exclusive support, and omitted deletions. Finish
-   that closure review, then run the selected validation together on the final state.
-   Use source-backed findings to settle the next complete repair decision before
-   editing. Reuse existing receipts and return unavailable or unrelated work to
-   its owner.
-6. A selected coordination route may hand off a bounded writer/reviewer. Use the
-   existing subagent and parallel-write owners for placement, lifecycle, and
-   handback; this skill does not reproduce their field lists or approval gates.
+現在の対象と契約から再利用先、変更する責務、残す挙動を決めます。
+実装・利用側の移行・旧経路の削除・最終検証は
+[実装の共通手順](../canonical/CODEX_IMPLEMENTATION.md#5-implementation) に従います。
+移動や削除の対応表は、公開面や利用側の判断に役立つ場合に使います。
+計画を変更したときは、影響した根拠を見直します。
 
 ## Subagent Routing
 

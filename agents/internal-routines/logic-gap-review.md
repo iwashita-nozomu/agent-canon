@@ -25,23 +25,11 @@ upstream design ../skills/prose-reasoning-graph.md prose graph logic diagnostic 
 - [agents/internal-routines/critical-review.md](critical-review.md)
 - [documents/conventions/REVIEW_PROCESS.md](../../documents/conventions/REVIEW_PROCESS.md)
 
-## Mandatory Checklist
+## Review criteria
 
-- 各 main claim に support が追跡できる
-- result と interpretation が混ざっていない
-- 段落間の依存関係が reader に追える
-- 暗黙の仮定、前提、boundary condition が露出している
-- 文献 citation が claim の重さに見合っている
-- limitation や alternative explanation を隠していない
-- prose graph diagnostics がある場合は unsupported claim、topic jump、weak bridge を初期 finding 候補として扱う
-
-## Default Sequence
-
-1. central contribution と subclaim を列挙します。
-1. 各 subclaim がどの evidence に依存するかを追います。
-1. unsupported leap、hidden assumption、premature conclusion を findings 化します。
-1. result / interpretation / speculation / future work の混線を findings 化します。
-1. logic の修正を wording の修正より先に要求します。
+主張を定義、仮定、引用、観測、導出に照らし、結論までの推論が成立するか確かめます。
+根拠の及ぶ範囲、暗黙の仮定、反証や別の解釈が結論を変える場合は、該当する主張を示します。
+prose graph の診断は、実際の本文と照合して判断します。
 
 ## Boundary
 

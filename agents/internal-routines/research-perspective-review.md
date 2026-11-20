@@ -19,30 +19,10 @@ upstream design ../canonical/skills.md skill canon registry
 - 研究 workflow、研究文書、比較設計の大きな整理
 - method 採否や報告方針を `main` に持ち帰る前の独立レビュー
 
-## Must Read Before Reviewing
+## Review perspectives
 
-- [agents/skills/research-workflow.md](../skills/research-workflow.md)
-- [agents/skills/experiment-lifecycle.md](../skills/experiment-lifecycle.md)
-- [documents/experiments/experiment-critical-review.md](../../documents/experiments/experiment-critical-review.md)
-- [documents/conventions/REVIEW_PROCESS.md](../../documents/conventions/REVIEW_PROCESS.md)
-
-## Default Perspective Pack
-
-repo-wide な research cleanup や methodology / artifact / reporting policy の変更では、まず 6 視点すべてを使います。
-scope が狭い場合だけ、使わない視点を明示して subset に落とします。
-
-1. `reproducibility`
-  - provenance、seed、command、environment、rerunability
-1. `scientific-computing`
-   - incremental change、testing、automation、prototype discipline
-1. `benchmark`
-   - fairness、confounders、case mix、anti-pattern
-1. `artifact`
-   - code、script、raw result、environment、rerun package の十分性
-1. `fair-data`
-   - metadata、命名、再利用性、result path と note path の可搬性
-1. `ml-science-reporting`
-   - assumptions、limitations、uncertainty、reader-facing reporting
+依頼と観測結果から、独立に確認する価値がある観点を選びます。対象の研究・実験・報告の
+正本を参照します。同じ根拠を確認する観点はまとめて扱います。
 
 ## Perspective To Subagent Mapping
 
