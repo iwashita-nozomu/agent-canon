@@ -63,6 +63,10 @@ an unresolved definition or inconsistent meaning that needs separate review.
 
 ## Structure before writeout
 
+主要な結論と判断理由を同じ段落に置きます。決め手となった事実と、その事実が判断基準を
+満たす理由を本文で述べ、根拠資料へリンクします。
+たとえば「新版を採用できます。全12件で集計値が一致し、採用基準の全件一致を満たしたためです。」
+
 1. At normal work boundaries, retain established findings and evidence in the
    existing task/Issue record, rather than reconstructing them from memory at
    closeout. Before each output, reconcile that record with the results obtained

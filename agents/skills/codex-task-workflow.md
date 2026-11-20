@@ -65,11 +65,13 @@ no coordination document or bundle.
 ## Validation and delivery
 
 Validate the changed guarantee; distinguish pass, failure, skip, and unrun work.
-Correct the owning failure and resume the requested operation. Reuse unchanged
-results. [Completion readiness](../canonical/CODEX_COMPLETION.md#completion-readiness)
-resolves an unfinished outcome; integration/publication follows the authorized
-owner and remote readback. Update the affected Skill when an operational
-procedure changes. Ordinary prose edits need no repository-wide Skill scan.
+Before returning a final answer, read the user's request again and match every
+requested outcome to the final diff, artifact, or execution result. Carry out
+each missing authorized action and read back its result. After a recoverable
+failure, fix the cause or use the available authorized route and resume the
+same task. Follow [Completion readiness](../canonical/CODEX_COMPLETION.md#completion-readiness)
+for pending validation, delivery, and concrete blockers.
+Update an affected Skill when its procedure changes.
 
 When the requested work is complete, report the result and wait for the user's
 next instruction. Plan or begin a subsequent task only after the user requests it.
