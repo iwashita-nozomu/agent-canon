@@ -68,32 +68,11 @@ C++ のビルドとテストは、変更対象を所有するプロジェクト�
 - 一時メモや cross-run の補助知見は `documents/notes/` に置きます。
 - review context は current Codex conversation と Git / PR state で扱い、experiment、Eval、hook log、user-facing report の output は各 existing owner に置きます。
 
-## 禁止事項
-
-- dated な completion summary や古い review 文書を `documents/` や repo root に残すことを禁止します。
-- current tree head 以外の design truth や implementation truth を tracked tree に残すことを禁止します。parallel design doc、implementation copy、snapshot tree、backup file は削除対象です。
-
 ## Findings の扱い
 
-findings は少なくとも次に分けます。
-
-- `fix now`
-  - この変更で直さないと回帰や矛盾が残るもの
-  - 修正後は、selected owning gate の focused rerun を実行する
-  - review reject / requested-change への応答が、同じ user request と design
-    intent を保つ修正や再設計ではなく、blanket revert、discard、または
-    completion scope の縮小になっているもの
-  - 旧実装、移行用の別経路、temporary alternate route、copied implementation、古い説明のままの README / guide / workflow を残すもの
-  - runtime success はあるが数式、仕様、protocol、reader path と実装 / 文書が一致していないもの
-  - 設計上の問題を `design_issue_blocker` として戻さず、local fallback、wrapper、helper、分岐、互換 route、test 緩和、docs 上書きで吸収したもの
-  - validation failure を通すために intended behavior/test を削る、oracle を弱める、
-    required validation を downscope する、または approved intent 変更前の
-    escalation を省くもの
-- `follow-up`
-  - 今回の受け入れを阻害しないが、後続で管理すべきもの
-- `delete-ok`
-  - stale asset や重複導線のように安全に削除できるもの
-  - non-canonical design doc、implementation copy、dated snapshot のように tree head 以外の truth surface を増やすもの
+- `fix now` は、合意した成果を損なう回帰、矛盾、検証不足です。影響した根拠を確認します。
+- `follow-up` は、今回の受け入れ範囲とは独立して扱う課題です。
+- `delete-ok` は、用途を確認した結果、削除できる旧経路や重複資産です。
 
 ## Review Finding Issue Routing
 

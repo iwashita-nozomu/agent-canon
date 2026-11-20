@@ -26,5 +26,7 @@ upstream design ../canonical/skills.md skill canon registry
 - `rerun_required` は、実装や比較条件を直し、新しいrunで確認します。
 - `approved` は、合意した結果を根拠が支えている状態です。
 
-既存の報告や記録に比較の根拠と判断を残します。依頼で雛形が必要な場合は
-[実験変更の雛形](../../templates/agents/experiment_change_loop.md) を使います。
+既存の報告や記録に比較の根拠と判断を残します。雛形を使う場合は、依頼に合う
+[実験変更](../../templates/agents/experiment_change_loop.md)、
+[実行記録](../../templates/agents/experiment_log.md)、
+[判断記録](../../templates/agents/decision_log.md) を選びます。
