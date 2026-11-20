@@ -24,31 +24,19 @@ Use at intake or when new evidence changes that choice.
 
 ## Decision Order
 
-1. Reuse the active Goal, latest agreement, source identity, and settled decisions.
-   Identify the requested operation: advice/read-only work, editing, testing,
-   integration, publication, or runtime administration. Planning an operation
-   does not select its execution procedure.
-2. Start at the target, current diff, and governing contract. Trace affected
-   callers, tests/checkers, and distribution inputs with targeted searches;
-   include their necessary changes in the same responsibility unit. Read the
-   assumptions and applicable input domain in the governing sources before
-   rejecting an approach or asking the user about it. For an unresolved contract conflict, identify
-   its owner/section, requested result, blocked action, and evidence. Apply a
-   resolution settled by current authority and requirements; otherwise ask the
-   user about the remaining choice.
-3. Ask before changing agreed scope, expected result, required properties, or
-   major approach. Give checked facts, the choice and its effect, recommendation,
-   and dependent action. Wait only on dependent work. Complete repairs derived
-   from the agreed contract without re-asking routine decisions.
-4. Use the known Skill directly. Consult the [task catalog](../task_catalog.yaml),
-   [Skill catalog](catalog.yaml), or [dependency map](skill-dependencies.yaml)
-   only for an unresolved route, identity, or prerequisite. Built-ins use their
-   registered entry; [task skill sets](README.md#task-skill-sets) resolve an
-   unknown composition. Related Skills are candidates, not mandatory reads.
-5. Use `bounded_fast_path` for one resolved root, owner, and writer unless actual
-   dependencies, collisions, or selected coordination require another route.
-   Activate design/research/review only for the decision or guarantee it owns.
-   Mathematical intent routes to [computational-optimization](computational-optimization.md).
+Use the agreed outcome, target, and governing sources to choose the owner and
+route. Read the relevant assumptions before assessing an approach. When a result
+disagrees with expectations, revisit the premise or execution route that could
+explain it. Resolve the facts available in the sources.
+
+Ask before changing agreed scope, result, required properties, or major approach.
+Give the checked facts and the decision's effect. Continue independent authorized work.
+
+Use the known Skill. Consult the [task catalog](../task_catalog.yaml),
+[Skill catalog](catalog.yaml), or [dependency map](skill-dependencies.yaml) for an
+unresolved route. Use the bounded route for one owner and writer. Activate
+specialists for a decision or guarantee they own. Mathematical intent routes to
+[computational-optimization](computational-optimization.md).
 
 ## Delegation selection
 
@@ -60,28 +48,16 @@ child; available slots and role inventories do not require filling them.
 
 ## Owner-First Read Trace
 
-Use loaded instructions and the selected target first. Read only a section that
-answers a concrete missing decision; links and dependency headers identify owners,
-not a reading checklist. Stop when the decision is resolved. For example, a
-read-only code plan needs target contracts and relevant source/tests; branch,
-PR, runtime installation, and coordination manuals apply when those operations
-are actually selected. Use headings and bounded reads rather than entire manuals.
-This leaves context for the source and consumers that determine the repair.
+Start with the target and its governing source. Follow references that establish
+an assumption or could change the decision, including after a contradictory result.
 
 ## Skill and tool cooperation
 
-The Skill owns acceptance; the provider owns its interface, execution state, and
-effects. Compose known APIs/CLIs with their actual target, execution plane,
-arguments, and output. Use [reuse feasibility](../../documents/conventions/software-engineering-principles.md#reuse-feasibility-support)
-only for a concrete reuse decision. Read schema/help only for an unresolved call.
-Preserve ordering and shared effects when parallelizing.
-
-Keep a returned handle and follow the provider's completion mechanism. Use actual
-outputs in the next call; obtain only the needed missing slice of truncated
-results. Apply acceptance to completed evidence. For a failure, compare expected
-and consumed inputs/outputs, distinguish setup, API, runtime, and Skill defects,
-repair the owner, then resume the original operation. Use
-[tool-finding-report](tool-finding-report.md) when a findings handoff is needed.
+Use existing tools at their actual target and judge results against the request.
+Follow pending operations to their result. On failure, check the input and the
+owning boundary, then resume the requested operation by a supported route.
+Use [reuse feasibility](../../documents/conventions/software-engineering-principles.md#reuse-feasibility-support)
+when the choice of an existing capability matters.
 
 ## Local Capability Priority
 
@@ -104,13 +80,10 @@ No separate work ledger is needed for coordination or resumption.
 
 ## Execution-Time-Aware Work-Conservation Contract
 
-For selected coordination, reuse actual tool/child results and context; follow
-only applicable [in-flight reads](task-routing.md#in-flight-skill-reads). Launch
-is not completion. Repair accepted findings and recheck affected evidence;
-repeat review only for new decision-relevant evidence. Time limits and keywords
-do not narrow the requested outcome. Apply the existing
-[completion owner](../canonical/CODEX_COMPLETION.md#completion-readiness) to
-unfinished requirements; PR queue planning applies only to dependent candidates.
+For coordinated work, reuse actual results and context. Resolve accepted findings
+and validate the affected evidence. Use
+[completion readiness](../canonical/CODEX_COMPLETION.md#completion-readiness) to
+finish the agreed work.
 
 ## Review Activation And Adjudication
 

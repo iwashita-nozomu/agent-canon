@@ -25,53 +25,27 @@ Use after routing selects a repository change. Read-only advice keeps its scope.
 
 ## Execution route
 
-Reuse the known route, target, agreement, and owner. Consult a catalog only for
-an unresolved choice. Read a linked section only when it answers a missing
-question; ordinary execution needs neither the whole phase map nor every manual.
-[Decision Order](agent-orchestration.md#decision-order) owns unresolved scope or
-contract choices. Resolve retrievable facts and continue independent work.
-
-## Stages
-
-Start from the target code, diff, and current contract. Before editing, trace
-the existing caller path and shared components, then locate the owning change
-and requested execution through the
-[existing implementation route](../canonical/CODEX_IMPLEMENTATION.md#library-and-reuse-sweep).
-Decide the complete repair unit, connecting existing APIs/CLIs and extending
-the existing owner for a demonstrated gap. Use
-[design admission](../canonical/CODEX_IMPLEMENTATION.md#design-integrity-gate)
-for an unsettled mechanism, and [tool cooperation](agent-orchestration.md#skill-and-tool-cooperation)
-for an unresolved tool/result boundary.
+Work from the target, agreed outcome, and governing contract. Reuse the existing
+owner and tools. Use [Decision Order](agent-orchestration.md#decision-order) for
+a missing decision and [cause localization](dependency-analysis.md#method) when
+the failure owner is unclear.
 
 ## Implementation and deletion
 
-Implement complete units in dependency order: move callers to the retained API,
-delete superseded code and exclusive support, inspect the final diff and old
-references, then format and run the selected validation together. Preserve tests
-of retained guarantees and shared support. Removal belongs to this work unit.
-Complete the [post-implementation necessity review](change-review.md#procedure)
-and delete unsupported stabilization and unnecessary added variables before validation.
-Use the [implementation sequence](../canonical/CODEX_IMPLEMENTATION.md#5-implementation)
-or [RC-09](../../documents/design/responsibility-cleanup.md#duplicate-implementation-retirement)
-only for an unresolved deletion boundary; passing replacement tests alone does
-not establish deletion.
+Keep caller changes and retirement in the same change. Review the final diff
+and references for obsolete code, unsupported stabilization, and unnecessary
+variables using [change-review](change-review.md#procedure).
 
 ## Coordination handoff
 
-When delegation is selected, use [subagent-bootstrap](subagent-bootstrap.md) for
-that handoff, scope, and continuation. A task that the current agent owns needs
-no coordination document or bundle.
+When selected, use [subagent-bootstrap](subagent-bootstrap.md) for the handoff.
 
 ## Validation and delivery
 
-Validate the changed guarantee; distinguish pass, failure, skip, and unrun work.
-Before returning a final answer, read the user's request again and match every
-requested outcome to the final diff, artifact, or execution result. Carry out
-each missing authorized action and read back its result. After a recoverable
-failure, fix the cause or use the available authorized route and resume the
-same task. Follow [Completion readiness](../canonical/CODEX_COMPLETION.md#completion-readiness)
-for pending validation, delivery, and concrete blockers.
-Update an affected Skill when its procedure changes.
+Use the final artifacts and results to assess
+[completion readiness](../canonical/CODEX_COMPLETION.md#completion-readiness).
+When a result falls short, reconsider the assumption or approach that could
+change it and complete the remaining authorized work.
 
 When the requested work is complete, report the result and wait for the user's
 next instruction. Plan or begin a subsequent task only after the user requests it.

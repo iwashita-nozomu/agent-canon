@@ -65,16 +65,10 @@ context/evidence. The contracts below apply without an installed Skill/runtime.
   while keeping governing requirements, authorized migrations, safety, and permissions.
   Record consequential changes at their owner: why needed, why the old approach did
   not fit, and retained/retired behavior; consult this rationale when reconsidering.
-- **Repair:** compare expected/actual inputs, outputs, and what the target consumed.
-  Inspect only the relevant target boundary.
-  For another responsibility's failure, also compare completed behavior and recorded
-  purpose; preserve shared purpose/invariants, distinguish changed inputs, and extend the
-  existing contract/type/interface/abstraction when required valid cases need it. Fix the
-  established cause and rerun the selected route. Preserve an interrupted task's
-  target, operation, and acceptance in the current context; resume it after repair.
-  Cause-local success is not task completion. No speculative guards, fallbacks,
-  retries, gates, or hypothetical-input layers; never alter tests or switch routes
-  just to pass. Distinguish observations, established causes, and unverified results.
+- **Repair:** compare expected and actual behavior at the owning boundary.
+  Preserve the required input domain, shared guarantees, and test oracle.
+  Match guards and fallbacks to demonstrated needs. Fix the cause and resume
+  the interrupted task with its original acceptance criteria.
 - **Transport:** use configured Git/GitHub transports. Do not discover, create,
   copy, link, or configure credentials/auth agents; return auth failures to the owner.
 - **Experiment context:** before work, record the origin base ref and exact commit,
@@ -122,11 +116,10 @@ context/evidence. The contracts below apply without an installed Skill/runtime.
   work, progress, reuse, scope, or per-commit validation ledgers. Implement the
   planned migration, review obsolete code and references, then validate its final
   state together; intermediate edits and commits are not separate test gates.
-- Before closing a task, match every requested outcome to the actual artifact,
-  execution result, or other evidence that establishes it. Complete missing
-  or failing authorized work in the same task. Complete planned repairs and retirement review
-  before final validation. If blocked, finish independent work and state the
-  failed operation, the remaining outcome, and what can unblock it.
+- Match each requested outcome to the actual artifact or execution result.
+  When evidence falls short, recheck the relevant assumptions and choose a
+  supported authorized approach that could change the result. Finish the
+  requested work, or report the concrete blocker and remaining outcome.
 - Report commit/push separately and distinguish implemented, verified, published,
   and applied. State the reason beside each material conclusion. Explain how the
   source, derivation, or observed result supports that judgment. State material
