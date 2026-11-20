@@ -153,33 +153,12 @@ compatible earlier requirements remain active. Before editing or restoring
 behavior, define the intended outcome across changed and retained requirements;
 use history for rationale, not correctness.
 
-For the planned repair or migration, follow this order:
-
-1. Decide what changes and how before editing: the required behavior, retained
-   implementation, affected callers, and obsolete paths/symbols to delete.
-   Group the work into complete units by responsibility and dependency.
-2. Implement each unit in dependency order: connect callers to the retained
-   API, then delete superseded code and its exclusive helpers, configuration,
-   build targets, dependencies, and fixtures under
-   [RC-09](../../documents/design/responsibility-cleanup.md#duplicate-implementation-retirement).
-   Move tests for retained guarantees to that API and preserve shared support.
-3. Inspect the actual diff and search old paths, symbols, imports, dispatch,
-   and build references within the affected responsibility. Use existing
-   reference tools when text search cannot establish reachability. Remove
-   missed code and migrate remaining callers before validation; explain retained
-   old code by a current requirement in the existing task/PR context.
-   Complete the [post-implementation necessity review](../skills/change-review.md#procedure)
-   and delete unsupported stabilization and unnecessary added variables in this unit.
-4. Format the final state and run its selected tests and checks together.
-
-The final-state review catches code left behind when a new path works; tests of
-the new path alone do not establish deletion. If the change makes no code
-obsolete, retain the required implementation without forcing unrelated deletion.
-
-Use existing failure evidence to settle the repair decision before the next
-implementation pass. Intermediate helpers, edits, and commits do not require
-separate test runs. Planning and handoff use the current context, without work
-ledgers, scope tables, or replacement-tracking files.
+Decide the required change and its mechanism before editing. Implement by
+responsibility, keeping affected callers and their necessary retirements together.
+Use [RC-09](../../documents/design/responsibility-cleanup.md#duplicate-implementation-retirement)
+for superseded code. Review the actual diff and references for missed removals,
+unsupported stabilization, and unnecessary variables. Format and validate the
+final state with evidence appropriate to the changed guarantees.
 
 For a failed test or unavailable execution, use the
 [test responsibility contract](../../documents/conventions/coding-conventions-testing.md#3-unit-test-contract)

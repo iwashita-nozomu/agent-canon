@@ -26,27 +26,11 @@ manifest metadataで確認します。別 variant の同名 run や旧 topic-onl
 - [documents/experiments/experiment-critical-review.md](../../documents/experiments/experiment-critical-review.md)
 - [templates/agents/experiment_report.md](../../templates/agents/experiment_report.md)
 
-## Expected Outcome
+## Review criteria
 
-- report が問い、結果、解釈、限界、artifact 導線を reader-facing に持っている
-- major claim が figure、table、JSON、command へ辿れる
-- outcome が `report_rewrite_required`、`extra_validation_required`、`rerun_required`、`approved` のどれかに落ちる
-
-## Mandatory Checklist
-
-- `Question`、`Protocol`、`Results`、`Discussion`、`Limitations`、`Critical Review` が埋まっている
-- major claim ごとに supporting artifact へ辿れる
-- branch、commit、command、result path、report path が再現可能な粒度で書かれている
-- result の羅列ではなく、問いに対する判断文書になっている
-- missing evidence や overclaim risk が report 内に残っている
-
-## Default Sequence
-
-1. 問い、比較対象、metrics が report 冒頭で分かるか確認します。
-1. protocol と reproducibility record から rerun 可能性を確認します。
-1. major claim が具体的な figure / table / JSON へ辿れるかを見ます。
-1. limitations と critical review が結論を十分に抑制しているか見ます。
-1. `rewrite / extra validation / rerun / approved` のいずれかで outcome を返します。
+問いに対する結論と判断理由を、対応する実験結果に照らします。比較に必要な対象、指標、
+仮定、検証の範囲を確認し、手順や実行条件は既存の記録を参照します。
+同名のrunやvariantを取り違えると判断が変わる場合は、実行記録から照合します。
 
 ## Decision States
 

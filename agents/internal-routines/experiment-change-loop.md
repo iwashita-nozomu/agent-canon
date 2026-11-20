@@ -8,112 +8,25 @@ upstream design ../canonical/skills.md skill canon registry
 -->
 
 
-## Reader Map
-
-This routine owns the inner loop for changing one implementation item at a time
-based on experiment evidence. Read `Purpose`, `Use When`, and `Core References`
-to confirm the loop applies, then use `Inputs`, `Outputs`, `Canonical Loop`,
-and `Decision States` while running iterations. `Operating Rules`,
-`Required Records`, `Suggested Templates`, and `Boundary` keep this routine
-separate from literature survey, single-run experiment handling, broader
-research workflow, and adaptive backlog tuning.
-
 ## Purpose
 
-実験結果を根拠に 1 change ずつ改造し、実行後の review decision に応じて loop を回すための運用を定めます。
-ここでの `approved` は post-run の iteration outcome であり、実験計画の記入や run 開始の前提ではありません。
-
-## Use When
-
-- benchmark や性能改善を根拠に code を段階的に改造する
-- 同じ protocol で baseline と change を繰り返し比較する
-- agent に `implement -> run -> review -> decide` を継続させたい
-- 実験結果付きの改造を、思いつきではなく明示的な decision state で閉じたい
-
-## Core References
-
-- [agents/skills/research-workflow.md](../skills/research-workflow.md)
-- [agents/internal-routines/critical-review.md](critical-review.md)
-- [agents/internal-routines/report-review.md](report-review.md)
-- [agents/skills/experiment-lifecycle.md](../skills/experiment-lifecycle.md)
-- [templates/agents/experiment_change_loop.md](../../templates/agents/experiment_change_loop.md)
-
-## Inputs
-
-- `Question:`
-- `Comparison Target:`
-- `Exit Criteria:`
-- baseline または current state
-- 固定した protocol と fairness rule
-- write scope
-
-## Outputs
-
-- loop log
-- iteration ごとの decision state
-- 次に入れる 1 change
-- close 可能かどうかの判断
+実験結果から、採用、追加検証、手法の見直しを判断します。
 
 ## Canonical Loop
 
-1. `Question:`、`Comparison Target:`、`Exit Criteria:` を固定する
-1. baseline または current state を同じ protocol で記録する
-1. 今回入れる change を 1 つだけ選ぶ
-1. 実装と静的チェックを行う
-1. 同じ protocol で fresh run を行う
-1. `Quantitative Summary:` と report draft を更新する
-1. `critical-review` と `report-review` を通す
-1. decision に応じて loop を戻す
+問いと比較対象を確認し、結論に必要な変更と証拠を選びます。比較条件を揃え、
+作用を切り分けたい場合は変更を分けます。結果の違いまたは欠落があれば、
+仮定を読み直し、既存結果の解析、追加検証、再実行から適切なものを選びます。
+実行と保存は [experiment-lifecycle](../skills/experiment-lifecycle.md) に従います。
 
 ## Decision States
 
-- `report_rewrite_required`
-  - 同じ result を使い、report だけを書き直します。
-- `extra_validation_required`
-  - 同じ仮説のまま追加 case、追加 figure、追加集計を行います。
-- `rerun_required`
-  - code か protocol を修正し、新しい `run_name` で fresh rerun します。
-- `approved`
-  - exit criteria を満たしていれば loop を閉じます。満たしていなければ次の 1 change を設計します。
+- `report_rewrite_required` は、既存の証拠で説明を修正します。
+- `extra_validation_required` は、結論に必要な証拠を補います。
+- `rerun_required` は、実装や比較条件を直し、新しいrunで確認します。
+- `approved` は、合意した結果を根拠が支えている状態です。
 
-## Operating Rules
-
-- 1 iteration で code change は 1 つだけにします。
-- baseline と change の比較条件を途中でずらしません。
-- `report_rewrite_required`、`extra_validation_required`、`rerun_required` が残る限り loop を閉じません。
-- 2 つ目の change を入れる前に、前の iteration の decision state を確定させます。
-- `approved` の前に、最新 run、critical review、report review の対応を記録します。
-
-## Required Records
-
-- `Question:`
-- `Comparison Target:`
-- `Exit Criteria:`
-- `Iteration Goal:`
-- `Change:`
-- `Expected Effect:`
-- `Validation Plan:`
-- `Run Name / Path:`
-- `Critical Review:`
-- `Report Review:`
-- `Decision:`
-- `Next Action:`
-
-## Suggested Templates
-
-- [templates/agents/experiment_change_loop.md](../../templates/agents/experiment_change_loop.md)
-- [templates/agents/experiment_log.md](../../templates/agents/experiment_log.md)
-- [templates/agents/decision_log.md](../../templates/agents/decision_log.md)
-
-## Boundary
-
-計画は question、comparison、protocol、operational stop condition を宣言するだけで開始できます。
-結果の support / reject / inconclusive や `approved` は run 後の owner decision として記録し、
-experiment runner の completion gate へ戻しません。
-
-- 外部調査そのものは `literature-survey` を使います。
-- 単一 run の設計と出力整理は [`experiment-lifecycle`](../skills/experiment-lifecycle.md) を使います。
-- 研究系変更の outer loop は `research-workflow` を使います。
-- tuning、調査、比較改善を backlog 付きで継続反復する outer loop では `adaptive-improvement-loop` を使います。
-- methodology、artifact、reporting policy を大きく変える場合は `research-perspective-review` を追加します。
-- run のために Docker、dependency、CI を触る場合は `environment-maintenance` を併用します。
+既存の報告や記録に比較の根拠と判断を残します。雛形を使う場合は、依頼に合う
+[実験変更](../../templates/agents/experiment_change_loop.md)、
+[実行記録](../../templates/agents/experiment_log.md)、
+[判断記録](../../templates/agents/decision_log.md) を選びます。

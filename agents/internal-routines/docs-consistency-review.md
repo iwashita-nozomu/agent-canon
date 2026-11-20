@@ -30,27 +30,10 @@ upstream design ../canonical/skills.md skill canon registry
 - stale path、古い command、duplicated truth が分かる
 - どの文書を正本に寄せるべきか判断できる
 
-## Comparison Surface
+## Review criteria
 
-- [AGENTS.md](../../AGENTS.md)、`README.md`、`QUICK_START.md` の入口文書
-- `agents/` と `documents/` の正本
-- `.codex/personal/skills/` の runtime shim
-- script usage と文書中の command 例
-
-## Mandatory Checklist
-
-- 入口文書と詳細文書で command、path、branch policy が一致している
-- 同じルールが複数箇所に書かれている場合、正本が明確である
-- 既に無い file / path / tool への参照が残っていない
-- one-off の実験や古い運用が正本として残っていない
-- runtime shim と human canon の差が意図的か確認している
-
-## Default Sequence
-
-1. 入口文書を先に見て、そこから辿れる正本を列挙します。
-1. command、path、branch policy、validation command を横並びで比較します。
-1. stale reference、duplicated truth、曖昧な正本を findings 化します。
-1. 直すべき場所が runtime entrypoint か canonical doc かを明示します。
+変更や報告されたずれから、関係する入口、正本、生成ビュー、実際のコマンドを選びます。
+矛盾や古い参照があれば、相違点と修正する正本を示します。
 
 ## Boundary
 

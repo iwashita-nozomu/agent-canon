@@ -24,166 +24,43 @@ downstream design ../design/algorithm-implementation-boundary.md algorithm math-
 - レビューが必要な変更では、コード、テスト、文書、必要なら環境設定をまとめて確認します。
 - repo-wide な workflow 改造、agent system の変更、研究系の完了判定にも適用します。
 
-## 変更前に固定すること
+## 変更前に確認すること
 
-- 変更スコープ
-- 受け入れ条件
-- current user request と existing owner constraints
-- 必要な review family
-- 必要な validation
-
-repo-wide の恒久ルールは `documents/` と `agents/` に残し、レビュー結果は current conversation と Git state に置きます。
+合意した範囲と受け入れ条件を把握します。レビューと検証は、変更した性質と
+残る不確実性に合わせて選びます。
 
 ## Review Family の選び方
 
-- 局所実装の review
-  - `change-review`
-- Python 差分の review
-  - `python-review`
-- C / C++ 差分の review
-  - `cpp-review`
-- C++ project layout / CMake command の差分
-  - [cpp-build-layout.md](../design/cpp-build-layout.md) で選択された `root-aggregate` または
-    `consumer-local` profile と、その project-owned CMake entrypoint の readback
-  - production path owner、selected consumer manifest、target dependency direction の readback
-  - 実際の project configure/build/test command を使い、他 profile や sibling consumer を要求しないことを確認
-- 大規模 refactor の review
-  - `change-review`
-  - `project_review`
-  - language reviewer
-  - docs consistency review
-- Markdown / 文書差分の review
-  - `md-style-check`
-  - substantive な文書変更では、未決の構造判断があれば `structure-planning` の evidence を確認し、明示依頼または具体的な診断目的がある場合だけ `prose-reasoning-graph` の evidence を確認する
-  - typo / link / format-only route では `md-style-check` を使い、独立した構造判断を追加しない
-  - 長文なら docs completeness review
-  - 必要なら docs consistency review
-  - 文書が completion gate の一部なら `document_flow_reviewer`
-  - readability や reader flow の accept / reject は tool check ではなく reviewer judgement で決める
-  - 実装を説明する文書では、reader が現行実装だけで作業できること、旧挙動や旧手順が残っていないことを確認する
-  - packet-first intake や workflow routing を変える場合は cross-doc coverage review
-  - 学術文章なら notation review
-  - 学術文章なら logic-gap review
-- 研究・実験 scope の review
-  - critical review
-  - report review
-  - 数式、擬似コード、仕様記述、method contract を伴う場合は、runtime success とは独立に equation/spec alignment を確認する
-  - アルゴリズム境界がある場合は [algorithm-implementation-boundary.md](../design/algorithm-implementation-boundary.md) の Boundary Map に照らして確認する
-- methodology、benchmark protocol、artifact policy、reporting policy を大きく変える review
-  - research perspective review pack
-- repo-wide な棚卸しや canon 整理
-  - `change-review` を基底にし、必要なら docs consistency review と research perspective review pack を追加
+変更の根拠と回帰は [change-review](../../agents/skills/change-review.md) で扱います。
+言語、設計、文書、研究の独立した判断が必要な場合は対応するレビューを選びます。
+C++ のビルドとテストは、変更対象を所有するプロジェクトの
+[ビルド契約](../design/cpp-build-layout.md) に従います。
 
 ## Decision ownership and selected reruns
 
-The selected reviewer reports its decision and the disposition of findings.
-Review decisions distinguish the normalized status from finding disposition.
-Only the selected owning gate reruns after an accepted behavior, owner-boundary,
-correctness, validation, or publication change. Explain any decision that changes
-scope in the current conversation or Git / PR context.
+レビュー結果は、判断と根拠を該当箇所と共に示します。修正で根拠が変わった範囲を
+確認し直します。合意した結果や範囲を変える判断はユーザーに確認します。
 
 ## 実行チェック
 
-- 軽い検証では `make ci-quick` を使います。
-- agent runtime / skill / canon 変更では `make agent-checks` を先に見ます。
-- Python 差分を含む場合は、必要に応じて次を追加します。
-  - `basedpyright --project tools/validation/code/config/basedpyright-explicit-any.json <changed-python-paths>`
-  - `python3 -m pytest tests/ -q --tb=short`
-  - `ruff check python tests --select D,E,F,I,UP --ignore E501`
-- C / C++ 差分を含む場合は、project-native configure / build / test evidence を追加します。
-  - `documents/design/cpp-build-layout.md` の selected profile と consumer-owned CMake entrypoint を使います。
-  - `configure`, `build`, `test`, `install` の command と binary directory はその project owner が決めます。
-  - test target / install contract が選択 profile に存在する場合だけ対応する project-native validation を実行します。
-- C++ design-only / convention-only 差分では native execution を `not_run` とし、
-  docs、dependency、target/path contract の evidence と実行 phase の未実行項目を分離します。
-- Markdown 差分を含む場合は、少なくとも `tools/bin/agent-canon docs check` を実行します。
-- dependency owner または affected closure を局所化できない場合だけ全 repo dependency review を選びます。局所化できる変更は affected dependency evidence を再利用し、repair 後は invalidated evidence だけを再実行します。
-- selected owning review gate が必要な場合、exact candidate epoch に一度だけ read-only initial diff review を行います。repair 後は stable blocker IDs と invalidated evidence の focused recheck に限定し、latest diff 全体の broad review を再開しません。
-- `tools/bin/agent-canon docs check`、lint、link check、smoke run は readability や reader flow の accept evidence ではありません。可読性は `document_flow_reviewer`、docs completeness review、または task に応じた reviewer judgement で確認します。
-- README、workflow、guide、migration 文書のような長文では、`document_flow_reviewer` と別 reviewer による docs completeness review を省略しません。
-- 学術文章では、`document_flow_reviewer`、`notation_definition_reviewer`、`logic_gap_reviewer`、別 reviewer による docs completeness review を省略しません。
-- 論文や thesis chapter では、さらに `citation_evidence_reviewer` を省略しません。
-- 実験結果や user-facing report を含む場合は、critical review と report review を省略しません。
+変更した性質を確かめる方法は
+[検証の指針](../../agents/canonical/CODEX_COMPLETION.md#6-validation) と対象の契約から選びます。
+文書の体裁は [md-style-check](../../agents/skills/md-style-check.md)、
+読みやすさと根拠のつながりは対象本文で確かめます。
 
 ## Review Flow
 
-1. requirements review で current request の scope、non-goals、acceptance criteria を確認します。過去の作業記録は現在の要件と混同しません。
-1. unresolved facts は明示し、silent assumption に変換しません。
-1. requirements review で、過去ログ由来の user trait が現在の task requirement へ silent に混入していないことを確認します。
-1. requirements review または management review で、導入済みライブラリと既存実装の再利用可能性を確認し、選んだ実装経路が既存 owner で足りない場合はその不足を説明できることを確認します。
-1. 必要なら research review で外部根拠と既存 code 調査の妥当性を確認します。
-1. plan review で execution order、responsibility owner、rollback / recovery path を確認し、normalized decision が承認でなければ planner に戻します。
-1. detailed design review で reuse plan、existing-style adherence、design doc completeness を確認し、normalized decision が承認でなければ designer に戻します。
-1. detailed design review で、導入済みライブラリと既存実装を再利用できるか確認します。新規追加や置換が必要な場合は、既存 owner で足りない理由を design context で確認します。
-1. 新規または rename する identifier、path、CLI flag、config key、public API は approved design または明白な local precedent で決めます。曖昧な naming は設計 owner へ戻します。選んだ名前は [documents/rule/naming.md](../rule/naming.md) と言語別規約に合います。
-1. detailed design review で、tree 上の親文書だけを読んで sibling / cross-cutting 文書を見落としていないか、`Cross-Doc Coverage Review` を確認します。
-1. detailed design review で、選択された `Design Side-Effect Map` が主要設計判断の影響先、owner、review gate、validation / test-plan を対応付け、scope と既存 precedent に合うことを確認します。
-1. 数式、擬似コード、仕様記述、method contract を伴う task では detailed design review か checkpoint review で、[algorithm-implementation-boundary.md](../design/algorithm-implementation-boundary.md) の Boundary Map に照らし、implementation がどの式・仕様項目・state boundary に対応するか、runtime success だけを acceptance 根拠にしていないか確認します。
-1. 大規模 refactor では project review で stale path、delete 漏れ、cross-module drift、semantic delta 混入を確認します。
-1. 大規模改修、統合、rename、構成変更では review 中に、旧実装 path、旧 helper 名、旧 guide / workflow / README / 規約文書 path への参照 sweep を行い、reader が削除済み・置換済み surface へ誘導されないことを確認します。残っていれば `fix now` です。
-1. 長文文書では、別 reviewer による docs completeness review で reader が不足なく作業できるか確認します。
-1. document flow review で、上から順に読んだときの section order、用語導入、reader path を確認し、normalized decision が承認でなければ designer に戻します。
-1. 学術文章では notation review で、記号、略語、technical term、unit、index、assumption の definition-before-use と一貫性を確認します。
-1. 学術文章では logic-gap review で、claim-to-evidence のつながり、hidden assumption、result と interpretation の飛躍を確認します。
-1. 実装中に checkpoint review を入れ、normalized decision が承認でない限り implementer に戻します。
-1. Review decision が修正要求または reject の場合、その判定は user request や design intent
-   を rollback する権限ではありません。選択した owner と runtime profile taxonomy に従い、
-   同じ意図を保つ修正または escalation を行います。
-1. review 後の修正で実装 slice を削除、revert、または discard する場合は、
-   affected behavior が user / owner によって撤回または置換された、canonical owner 外だった、
-   または危険な実装を同じ意図の代替修正や escalation に置き換えたことを確認します。
-   blanket revert で user-requested behavior を消してはいけません。
-1. checkpoint review と final acceptance review では、旧実装、移行用の別経路、temporary alternate route、implementation copy、dated snapshot、backup file が tracked tree に残っていないことを確認します。残っていれば `fix now` です。
-1. checkpoint review と final acceptance review では、README、guide、workflow、規約文書が最新実装と一致し、削除済み・置換済みの挙動や手順を reader に案内していないことを確認します。文書が現行実装を説明できていなければ `fix now` です。
-1. checkpoint review と final acceptance review では、README、guide、workflow、規約文書、script help、validation 出力が旧 implementation / 旧 document surface を参照していないことを確認します。参照が残っていれば `fix now` です。
-1. checkpoint review と final acceptance review では、実装済み side effect が approved `Design Side-Effect Map` と一致し、後続 stage へ送る item に owner、review gate、validation route があることを確認します。
-1. checkpoint review と final acceptance review では、task が数式、擬似コード、仕様、protocol を持つ場合、implementation boundary が Boundary Map と一致しているか、どこに近似や逸脱があるかを確認します。run が成功しても alignment が崩れていれば `fix now` です。
-1. checkpoint review と final acceptance review では、文書や prompt の readability / reader flow を tool 結果だけで accept せず、`document_flow_reviewer` や別 reviewer の judgement を確認します。
-1. checkpoint review と final acceptance review では、implementation が設計上の問題を勝手に吸収していないことを確認します。API shape、責務境界、path layout、命名、アルゴリズム、証明対象、test oracle、依存方向、runtime contract、config surface の欠落や矛盾が local fallback、wrapper、helper、分岐、互換 route、test 緩和、docs 上書きで処理されていれば `fix now` とし、design owner へ戻します。
-1. selected final candidate contract が要求する場合だけ `bash tools/analysis/dependencies/run_repo_dependency_review.sh` を全 repo に対して実行します。それ以外は affected dependency evidence と targeted checks を記録します。
-1. selected owning review gate が diff-check を要求する場合だけ read-only diff-check agent が latest diff を確認します。指摘に応じて修正した場合は selected gate を focused に rerun します。
-1. review decision が修正要求を返し、code / docs / test / workflow に修正が入った場合は、selected owning gate を修正後の diff に対して再実行します。
-1. final acceptance review では current user-agreed scope が満たされ、未解決の条件が silent assumption にされていないことを確認します。
-1. final acceptance review では、cross-cutting packet に含まれる文書のうち今回の task に効くものが review から漏れていないか確認します。
-1. final acceptance review では、required review の `fix now` findings が実装へ反映済み、再レビュー済み、または明示的に escalated であることを確認します。
-1. final acceptance review では、review reject / requested-change への応答が
-   user request を縮める rollback になっていないことを確認します。rollback、
-   revert、discard がある場合は、撤回 / 置換 / owner 外 / unsafe replacement /
-   escalation の authority と、保持された design intent の証跡が必要です。
-1. validation test/check failure への応答では、通すための simplification、revert、
-   intended behavior/test の削除、oracle 弱体化、required validation の downscope を
-   認めません。failure の contract、observation、cause と intent を確認し、
-   runtime profile taxonomy の owner route に従います。
-   `cause_classification` と `intent_preservation` の token-safe slug list は
-   `documents/runtime/runtime-profiles-and-check-matrix.json` が正本で、
-   [documents/runtime/runtime-profiles-and-check-matrix.md](../runtime/runtime-profiles-and-check-matrix.md) が生成済み reader projection
-   です。この review checklist は slug list を独自定義せず、runtime profile
-   taxonomy の owner route に従って approved intent を保った修正または intent
-   変更前の escalation を確認します。
-1. Review が修正要求または `fix now` finding を返し、その後に code / docs / workflow / config の修正が入った場合は、selected owning gate を focused に rerun します。
-1. validation 実行後に final acceptance review を行い、必要なら追加修正や追加検証を行います。
-1. audit review で required reviews と evidence の欠落を確認します。
-1. repo-wide の恒久ルール変更がある場合は、対応する `documents/` または `agents/` の正本を同じ変更で更新します。
+要求と最終差分を照合し、保証を変えた箇所、参照の削除漏れ、根拠の不足を確認します。
+数式や仕様に基づく変更は [実装境界](../design/algorithm-implementation-boundary.md) と照合します。
+結果が期待と違う場合や未検証の場合は
+[テストの責務](coding-conventions-testing.md#3-unit-test-contract) に従い、
+前提、入力、実装、判定のどこが原因かを調べます。
 
 ## マージ条件
 
-- selected review family が完了していること
-- selected requirements、計画、詳細設計、文書通読、checkpoint、final acceptance、audit review が完了していること
-- selected review の normalized decision が承認であること
-- current user-agreed scope と acceptance criteria が満たされ、unknown が silent assumption に変換されていないこと
-- identifier、path、CLI flag、config key、public API が approved design または local precedent に従うこと
-- 導入済みライブラリと既存実装の再利用可能性を考慮し、新規追加や置換は既存 owner で足りない場合に限ること
-- 長文文書では、別 reviewer による docs completeness review も揃っていること
-- 学術文章では、notation review と logic-gap review も揃っていること
-- 対象に応じた validation 結果が確認されていること
-- runtime success だけでなく、task に式、仕様、protocol、method contract がある場合は implementation alignment を review で確認していること
-- selected final candidate contract が要求した dependency review が pass していること
-- selected diff-check route がある場合だけ、その review が最新 diff に対して pass していること
-- review-driven fix が入った場合、selected gate の focused rerun evidence が残っていること
-- 変更理由と影響範囲が追えること
-- コンフリクトがないこと
-- tracked tree に current tree head 以外の implementation truth や古い説明文書が残っていないこと
-- README、guide、workflow、規約文書が最新実装を説明していること
+合意した成果、必要な検証と選択したレビューの結果を統合する差分に照らします。
+統合と公開は [PRの手順](../../agents/skills/pr-processing.md#base-integration-and-merge-readiness)
+と [ブランチ運用](../operations/BRANCH_SCOPE.md) に従います。
 
 ## エビデンス保存
 
@@ -191,32 +68,11 @@ scope in the current conversation or Git / PR context.
 - 一時メモや cross-run の補助知見は `documents/notes/` に置きます。
 - review context は current Codex conversation と Git / PR state で扱い、experiment、Eval、hook log、user-facing report の output は各 existing owner に置きます。
 
-## 禁止事項
-
-- dated な completion summary や古い review 文書を `documents/` や repo root に残すことを禁止します。
-- current tree head 以外の design truth や implementation truth を tracked tree に残すことを禁止します。parallel design doc、implementation copy、snapshot tree、backup file は削除対象です。
-
 ## Findings の扱い
 
-findings は少なくとも次に分けます。
-
-- `fix now`
-  - この変更で直さないと回帰や矛盾が残るもの
-  - 修正後は、selected owning gate の focused rerun を実行する
-  - review reject / requested-change への応答が、同じ user request と design
-    intent を保つ修正や再設計ではなく、blanket revert、discard、または
-    completion scope の縮小になっているもの
-  - 旧実装、移行用の別経路、temporary alternate route、copied implementation、古い説明のままの README / guide / workflow を残すもの
-  - runtime success はあるが数式、仕様、protocol、reader path と実装 / 文書が一致していないもの
-  - 設計上の問題を `design_issue_blocker` として戻さず、local fallback、wrapper、helper、分岐、互換 route、test 緩和、docs 上書きで吸収したもの
-  - validation failure を通すために intended behavior/test を削る、oracle を弱める、
-    required validation を downscope する、または approved intent 変更前の
-    escalation を省くもの
-- `follow-up`
-  - 今回の受け入れを阻害しないが、後続で管理すべきもの
-- `delete-ok`
-  - stale asset や重複導線のように安全に削除できるもの
-  - non-canonical design doc、implementation copy、dated snapshot のように tree head 以外の truth surface を増やすもの
+- `fix now` は、合意した成果を損なう回帰、矛盾、検証不足です。影響した根拠を確認します。
+- `follow-up` は、今回の受け入れ範囲とは独立して扱う課題です。
+- `delete-ok` は、用途を確認した結果、削除できる旧経路や重複資産です。
 
 ## Review Finding Issue Routing
 
