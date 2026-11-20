@@ -53,6 +53,8 @@ context/evidence. The contracts below apply without an installed Skill/runtime.
   and execution conditions.
 - **Reuse:** extend the existing capability owner first. A separate implementation
   needs a concrete requirement, responsibility, or contract gap extension cannot fill.
+  Use standard Git for repository operations and `gh` or the configured GitHub
+  connection for PRs.
 - **Investigation:** start local repair at the target code, diff, and contract.
   Before rejecting a claim or asking about a premise, read the relevant assumptions
   and valid input domain in the governing sources and apply them to the case.

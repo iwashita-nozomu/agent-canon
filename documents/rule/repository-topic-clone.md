@@ -60,6 +60,7 @@ git merge origin/main
 
 競合時は `git status`、`git diff`、`git ls-files --unmerged` で双方の内容を確認し、
 解消したpathを `git add` または `git rm` で反映して `git merge --continue` を使います。
+移動・削除した構成を確認する場合は、対象pathの `git diff` と `git ls-tree` を使います。
 意図した削除と旧branchの編集が競合した場合は削除を採用し、必要な編集を移行先へ
 反映します。既存の利用者差分と、自分が始めたGit操作の状態を保持して進めます。
 

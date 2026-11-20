@@ -84,7 +84,7 @@ server workflow や Docker builder は layout で選択した場合だけ host r
 ## Git Rule
 
 - GitHub canonical remote と authentication state を記録します
-- GitHub publish / PR 作業は [GitHub publication contract](../tools/github_publish.md) の canonical entrypoint を使います
+- branch の公開は `git push`、PR の操作は [GitHub 接続手順](../../agents/internal-routines/github-connected-work.md) の経路を使います。
 
 ## Validation
 

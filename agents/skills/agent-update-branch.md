@@ -6,7 +6,6 @@ responsibility Documents Agent Update Branch Skill for this repository.
 upstream design ../canonical/CODEX_WORKFLOW.md provides branch and closeout policy
 upstream design ../../documents/operations/BRANCH_SCOPE.md commit/push authority and local-only state
 upstream design ./agent-canon-update.md owns standalone AgentCanon source PRs
-upstream implementation ../../tools/repository/git/agent_update_branch.sh validates update branch lanes
 @dependency-end
 -->
 
@@ -51,16 +50,8 @@ checkers, and static fixtures remain under `eval/`; generated reports and
 packets go to the explicit external runtime spool and are published through
 the `agent-canon-log` archive.
 
-Commit with a message identifying this as a private knowledge/eval-only update
-only when the current task authorizes that commit. Push through the lane adapter
-only when task authority selects publication to the designated remote:
-
-```bash
-bash tools/repository/git/agent_update_branch.sh push knowledge-eval <branch>
-```
-
-Lane selection and validation grant neither commit nor push authority. When
-either action is not selected, preserve that local state and report it.
+Identify a private knowledge/eval-only update in the commit message. Use standard
+`git push` when the task authorizes publication to the designated remote.
 
 ## AgentCanon Source Updates
 
@@ -78,15 +69,5 @@ skill does not repeat integration commands or merge gates.
 
 ## Validation
 
-Before a local commit or handoff, validate the selected lane's changed paths:
-
-```bash
-bash tools/repository/git/agent_update_branch.sh validate <lane>
-```
-
-When an authorized `push` is selected, the adapter performs the same lane
-validation; run the standalone command only when a pre-commit result could change
-the commit decision. Run convention compliance when the selected change touches
-a convention contract it checks. Integration dependency review and repository
-static analysis are selected by `$integration`; they do not apply to other
-lanes.
+Review the selected lane's changed paths with `git diff --name-status <base>...HEAD`.
+Include staged and unstaged changes when reviewing work before a commit.

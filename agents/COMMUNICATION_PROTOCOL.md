@@ -272,9 +272,8 @@ contract, assigned scope, or authority.
 
 Every agent and work unit that can inspect or change repository state carries
 one observational `checkout_identity` block at bounded lifecycle transitions.
-The block is produced by
-`tools/bin/agent-canon checkout-identity --format lines` and contains
-exactly these fields:
+Read it from the current directory and standard Git (`git rev-parse`,
+`git branch --show-current`, and `git remote get-url origin`). The handoff contains:
 
 - `cwd`: absolute directory in which the operation is acting
 - `git_root`: absolute Git toplevel, or `unknown`
