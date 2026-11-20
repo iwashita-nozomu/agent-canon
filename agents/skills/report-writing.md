@@ -17,92 +17,35 @@ downstream implementation ../../tools/runtime/dispatch/agent-canon/src/dependenc
 
 ## Purpose
 
-既存 evidence からタスク完了報告、status、audit、evaluation、experiment、review、decision、recommendation、presentation の
-reader-facing prose を作ります。material claim は source に辿れ、observation と inference、limitation、next action を分けます。
-raw artifact は `result-artifact-writeout` が所有し、report は第二の policy/source-of-truth になりません。
+既存の検証結果や観測から、読者が判断に使える報告を作ります。
 
 ## Procedure
 
-Identify the source evidence, audience, findings, and material limitations.
-Read the governing assumptions and decision criterion before judging the results.
-結論のすぐそばに判断理由を書きます。決め手となった事実を示し、その事実が判断基準を
-どう満たすかを説明します。前提で定まる対象範囲は、結論が当てはまる範囲として
-一度記載します。操作の詳細は既存の資料を参照します。
-A link to the run record is the entire treatment of commands, setup, parameters,
-and stop rules. Before returning the report, replace those details in the body,
-notes, or tables with the link. Use actual observations for claims about what ran.
+資料の仮定と判定基準を読み、結論のそばに決め手の事実と採用理由を書きます。
+結論が当てはまる範囲を示し、コマンド、設定、手順は既存の実行記録を参照します。
+検証結果と完了報告は [報告の指針](../internal-routines/verification-result-structuring.md#structure-before-writeout) に従います。
 
-Reuse settled checks and
-source notes; repeat a check or investigate the environment only to resolve a
-specific gap that could change the answer. For branch-based experiment reports,
-establish each branch's origin or baseline, purpose, and delta before synthesizing
-the final paper-level report. Preserve material external references with their
-URL/DOI, access date, source identity, and adoption status.
+1. 章立てを決めます。使える構成は再利用し、不足する構成は
+   [structure-planning](structure-planning.md#before-prose) で決めます。
+2. 図が必要かを判断し、伝える結果と配置を決めます。
+3. 必要な図を再利用するか、[result-visualize](result-visualize.md) や
+   [code-visualization](code-visualization.md) で作ります。
+4. [long-form-writing](long-form-writing.md)、[paper-writing](paper-writing.md)、
+   [academic-writing](academic-writing.md) から文書に合う執筆スキルで本文を書きます。
 
-If selecting mathematical premises needed for the report is still unsettled,
-first use [academic-writing](academic-writing.md#mathematical-preliminary-preparation)
-to settle the purpose, minimum abstract premises and model facts, relevant model
-owner references, and verification goal with its support status. Carry those
-settled premises, references, and conclusion boundary into the outline. Reuse
-known facts; do not re-expand the model or create a separate math packet. Skip
-this handoff when the premises are already settled or the report does not need
-mathematical premise selection.
-
-Follow this writing sequence:
-
-1. **Outline.** Settle the reader-facing order of results and supporting evidence
-   with [structure-planning](structure-planning.md#before-prose). Reuse a
-   sufficient existing structure, especially for a short completion report; do
-   not create a separate outline artifact when the task and existing material
-   already establish the order. Include denominator, metric direction, and valid
-   or invalid comparison where relevant to evaluation or experiment results.
-2. **Decide figures.** Before producing an asset, decide whether a figure is
-   needed and specify its message, supporting evidence, and placement in the
-   outline. A short report may need no figure.
-3. **Create or reuse figures as needed.** Reuse existing result assets where they
-   answer the planned message. For a necessary plot or diagram, use the existing
-   [result-visualize](result-visualize.md) and
-   [code-visualization](code-visualization.md) owners and their selected
-   providers. Preserve the source data and provenance; do not invent data to fill
-   a visual. Update the outline if asset review exposes a material gap.
-4. **Draft the body with the selected writing owner.** Explicitly read and use
-   [paper-writing](paper-writing.md) for a scholarly manuscript or
-   [academic-writing](academic-writing.md) for a scholarly note where applicable,
-   or [long-form-writing](long-form-writing.md) for other reader-facing reports.
-   Select and use the appropriate prose owner without loading every owner skill.
-   Pass the settled outline, figure plan, and created or reused assets so the
-   writing stage can proceed without restarting those decisions. Keep
-   `Results/Observations`, `Interpretation`, and `Limitations` distinct, and tie
-   each material claim to evidence or identify it as an inference. In numerical
-   reports, follow [Numerical and runtime results](#numerical-and-runtime-results).
-
-Before finalizing, close material factual errors, unsupported claims, broken
-evidence mappings, missing context, and omitted counterevidence. Advisory/style,
-out-of-scope, and accepted-risk findings may remain with a brief reason. For task
-completion reports, apply [Completion reports](../internal-routines/verification-result-structuring.md#completion-reports)
-and include important attempts and grounds for acceptance or rejection. Re-run
-only reviews tied to changed claims or sections.
+実験branchを報告する場合は起点・目的・差分を示します。数理の仮定の選択が残る場合は
+[数理予備検討](academic-writing.md#mathematical-preliminary-preparation) を参照します。
 
 ## Numerical and runtime results
 
-数値計算のreportは、要約・結果本文とも数値結果を対象全体について先にまとめ、その後に実行時・アーキテクチャの結果をまとめます。分類は次のとおりです。
-
-1. **数値結果**: 解・目的値・残差や誤差、制約充足、収束・成功/失敗、反復回数など、要求された数値的性質と到達条件を示す。
-2. **実行時・アーキテクチャの結果**: 実行時間、compile/warmupや反復あたりの時間、メモリ、device/backend/並列化に関する観測を示す。
-
-両者は段落・小節・表を分け、同じrun/caseと数値の到達条件を対応づけて比較します。
-数値結果が未取得・失敗なら、その状態を数値結果の位置で示してから実行時の結果を書きます。
-本文には観測結果と比較の範囲が分かる事実を記載します。実行環境の設定と操作は実行記録を参照します。
+数値結果を対象全体について先にまとめ、その後に実行時・アーキテクチャの結果を示します。
+同じrunやcaseを対応づけます。数値結果が未取得または失敗の場合も、数値結果の節で状態を示します。
 
 ## Output
 
-Markdown が既定です。小さな内部 status は数段落や小表で足り、固定 heading 数や `finding_count == 0` は完了条件ではありません。
-独立 reviewer は claim impact、外部公開、曖昧さ、evidence complexity が必要な場合だけ選びます。
-For requested native Google Docs delivery, use the
-[Google Docs handoff](README.md#installed-external-skill-handoffs); this Skill
-retains report claims, evidence, and interpretation.
+Markdownを既定とします。Google Docsでの納品は
+[既存の連携手順](README.md#installed-external-skill-handoffs) を使います。
 
 ## Boundary
 
-読者向け本文の claim/evidence/limitation をこの skill が持ち、raw file・checksum・readback は `result-artifact-writeout`、
-構造上の未決定は `structure-planning`、図の rendering/coverage は `code-visualization` に委譲します。
+報告は結果と解釈を扱い、raw artifactの保存は [result-artifact-writeout](result-artifact-writeout.md) が担います。

@@ -122,44 +122,13 @@ Use [Completion Readiness](#completion-readiness) for the selected route. Read
 
 ## Completion Readiness
 
-For either execution route, compare the current result and evidence against the
-whole agreed deliverable before a terminal response. Use the current context,
-actual diff, and available results; no completion ledger is required.
+Match the requested outcomes to the actual artifacts, diff, and validation.
+Use the [common completion rule](../../ROOT_AGENTS.md#task-entry) for remaining
+work or a concrete blocker. The parent verifies integrated child work against
+the same request. Respect the user's requested pause or handoff boundary.
 
-When a required result is missing, perform its next authorized owning action in
-the same task, then reassess the affected evidence. A defect returns to repair;
-unmigrated consumers or remaining retired code return to implementation; an unrun
-check goes to the selected validation route; missing publication/readback goes to
-the delivery owner. Follow pending checks through their existing wait/readback
-route. A partial test pass, checkpoint, commit, draft PR, status label, or written
-remaining-work list is progress, not a reason to return control to the user.
-Recording a gap does not discharge it or require another request to continue.
-
-For a selected child route, a child return establishes only its assigned unit and
-evidence. The parent verifies that unit, integrates it, and continues remaining
-required work; it does not turn child completion or a blocked child into overall
-completion. Delegate or repair through the already authorized route, retaining
-user-guided parent ownership. A bounded route has no child return to interpret.
-The user's explicit step boundary defines that step's deliverable; do not expand
-it to the entire project or wait for unrelated work.
-
-Return a completion result only when the selected evidence establishes all
-required outcomes on the final source.
-If the user explicitly requests pause/handoff, preserve that boundary. Otherwise,
-an incomplete blocker handoff requires evidence that the next required operations
-cannot proceed under current authority, safety, or available execution routes,
-and that independent actionable required work has been completed. Identify each
-blocked property, actual failed operation or authoritative restriction, evidence,
-and the specific owner/action that can unblock it. A generic environment concern,
-untried available route, task length, or self-chosen checkpoint is not such evidence.
-Keep blocked status distinct from completion; preserve safety and rerun limits
-without bypasses, speculative environment repair, or repeated unchanged attempts.
-
-Before either result, apply
-[reader-facing writing](ROOT_DELIVERY.md#reader-facing-writing) and
-[result reporting](ROOT_DELIVERY.md#result-reporting). Issue-backed work receives
-comparable rationale, results, limitations, and exact PR/head references on the
-Issue. Review-only/no-change work retains its result and source-backed rationale.
+Use [result reporting](ROOT_DELIVERY.md#result-reporting) to communicate the
+completed scope and any remaining blocker.
 
 ## Coordinated delivery
 

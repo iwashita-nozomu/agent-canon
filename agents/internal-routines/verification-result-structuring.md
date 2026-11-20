@@ -63,101 +63,20 @@ an unresolved definition or inconsistent meaning that needs separate review.
 
 ## Structure before writeout
 
-主要な結論と判断理由を同じ段落に置きます。決め手となった事実と、その事実が判断基準を
-満たす理由を本文で述べ、根拠資料へリンクします。
-たとえば「新版を採用できます。全12件で集計値が一致し、採用基準の全件一致を満たしたためです。」
+主要な結論と判断理由を同じ段落に置きます。決め手の事実と、その事実が判断基準を
+満たす理由を本文で述べます。仮定、重要な反証、検証の範囲は対応する判断に添え、
+操作の詳細は既存の根拠資料を参照します。
 
-1. At normal work boundaries, retain established findings and evidence in the
-   existing task/Issue record, rather than reconstructing them from memory at
-   closeout. Before each output, reconcile that record with the results obtained
-   so far. Organize each distinct finding using the relationships below. These
-   are semantic relationships, not prescribed output columns or headings;
-   no empty fields or serialization are required.
-
-   | Relationship | Content |
-   | --- | --- |
-   | Established fact | What was observed or demonstrated; distinguish inference and hypothesis |
-   | Evidence | Observed result and its source, with a link to the existing record |
-   | Meaning and scope | What the result establishes for the reader |
-   | Limits and contrary evidence | Failed or unrun checks, blockers, counterevidence, rejected hypotheses and reasons |
-   | Disposition | Decision and its factual basis |
-
-2. Merge repeated observations, not distinct findings. Preserve each established
-   in-scope result and material counterevidence even when no code change follows,
-   it does not support the final conclusion, later verification fails, or the
-   overall task is unfinished. Preserve unresolved hypotheses as hypotheses.
-   When new evidence corrects a result, retain the correction and its reason;
-   do not keep presenting the superseded claim as current.
-3. Check both directions before writeout: each output claim has evidence or is
-   labelled as inference, and each established finding has a place in the output
-   or an explicitly identified retained record. Do not silently omit facts to
-   shorten the response. Unrun is not passed, partial validation is not complete
-   validation, and a document edit is not evidence of runtime behavior.
-   For parent/worker execution failures, preserve process-local scope and
-   counterevidence through the existing [execution diagnosis owner](../canonical/ROOT_EXECUTION.md#configured-execution-and-bounded-diagnosis);
-   do not generalize a child's access failure into a host/environment defect.
-4. Before drafting, [choose the presentation](#choose-the-presentation) from this
-   structure. Write to the applicable, authorized destinations in the current task.
-   Adapt presentation, not facts or their limits. For Issue-backed work, leave
-   comparable conclusions, grounds, and limitations on the Issue and
-   the applicable PR body/comment as well as chat; a link alone is insufficient.
-   Progress updates may carry the new or corrected findings and identify the
-   earlier retained results; final reports consolidate the current result.
-   Refer to the existing evidence for procedures and execution details.
-5. On interruption or publication failure, write out the established portion and
-   separate the unverified or unpublished portion with its reason and next
-   owner/action. Retain the result for the existing publication route; never
-   claim a destination was updated without that route's readback. A blocked
-   destination does not erase results or justify withholding them from another
-   authorized output.
+観測したこと、そこからの推論、未確認の点を区別します。IssueとPRがある場合は、
+チャットと同程度の結論・根拠・限界を記載します。進捗報告は新しく判明した結果を伝えます。
 
 ## Completion reports
 
-Build a task completion report from the retained findings and decisions. Lead
-with the requested outcome, its concrete effect, and the completed scope. Explain
-the material approach choices before giving supporting validation and limits.
-
-For an approach actually tried that affected implementation, validation, or the
-conclusion, state its purpose, observed result, grounds for retaining, rejecting,
-or replacing it, and effect on the final choice. Preserve a material failed
-attempt after a successful retry. Identify relevant source-based assessments and untried
-proposals as such; distinguish observed outcomes from hypotheses about causes
-or expected benefits.
-
-Put these decisive findings and choice grounds in the final chat itself. Use
-Issue, PR, and artifact references for supporting detail; a link or a statement
-that the details were recorded cannot replace that explanation. Carry the
-relevant validation coverage, remaining uncertainty, and delivery state through
-the existing result structure.
-
-Choose detail by the significance of the findings and decisions. Include
-material discarded approaches and the observations that decided them.
+依頼された結果、判断理由、実際に確かめた範囲を示します。採否を変えた試行があれば、
+観測と判断理由を残します。公開・適用は確認できた状態を述べます。
+未完了の結果は、残っている成果とその理由を明記します。
 
 ## Choose the presentation
 
-After structuring the content and before drafting or revising the output, choose
-its form by the relationship the reader needs to see. Honor explicit user and
-destination format requirements. Structuring does not imply a table, list,
-fixed headings, or the same layout for every destination.
-
-| Information relationship | Suitable form |
-| --- | --- |
-| Compare multiple targets or map them across shared attributes | Table with meaningful row and column labels |
-| Enumerate independent findings or actions with no meaningful order | Bulleted list |
-| Show execution order, dependencies, or a meaningful sequence | Numbered list |
-| Explain a conclusion, rationale, cause, context, or qualification | Prose |
-
-Choose per section when relationships differ: a short conclusion, a comparison
-table, and an explanation can coexist. Use prose for a single brief point; do
-not fragment connected reasoning into bullets or invent a comparison axis to
-justify a table. Keep cells concise and columns relevant. When long explanations,
-sparse cells, or excessive width make a table harder to read, move explanations
-to prose or use a list instead. Never omit material evidence or qualifications
-to fit a layout, and keep them visibly associated with the finding they support.
-
-Before writeout, check that the form exposes the intended comparison or order,
-reads clearly at the destination's width, and preserves the facts and limits
-already structured. Change the form rather than distort the content. This is
-part of the existing writing step, not a separate approval or validation gate.
-
-Keep credentials and private logs within their authorized storage.
+説明は文章、比較は表、独立した結果は箇条書きにすると読みやすくなります。
+読者と依頼に合う形を選び、各結論とその根拠を近くに置きます。

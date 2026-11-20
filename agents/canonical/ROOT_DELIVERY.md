@@ -84,29 +84,9 @@ for Japanese prose.
 
 ## Result reporting
 
-For verification results, including chat progress and interrupted handoffs,
-use [verification result structuring](../internal-routines/verification-result-structuring.md#structure-before-writeout).
-
-For task completion, apply [Completion reports](../internal-routines/verification-result-structuring.md#completion-reports)
-to those retained findings before drafting the final chat response.
-
-A result report leads with the answer to the user's request, not an inventory
-of work. Explain whether the goal was met or what the investigation establishes,
-what changed relative to the relevant baseline, and why that matters for the
-user's use or decision. Connect decisive evidence to the conclusion and state
-its scope precisely; file lists, command success, test counts, status labels,
-and PR links are supporting details, not the answer.
-Scale detail to useful findings and decision complexity, not elapsed time or
-tool counts; preserve the internal routine's finding coverage and scope boundary.
-Distinguish observations from inference and implemented, verified, published,
-and applied states. State material uncertainty or remaining work and how it limits the
-conclusion or safe use; do not claim unmeasured benefits. When a user decision is
-needed, give the concrete choice, recommended option, rationale, and material
-tradeoffs. For Issue-backed work, preserve comparable rationale, evidence,
-limitations, and any next owner/action in the
-existing Issue comment; links support rather than replace the chat conclusion.
-Keep pre-write structuring mandatory without adding fixed headings, minimum
-length, empty fields, or a separate approval gate.
+[検証結果の記述](../internal-routines/verification-result-structuring.md#structure-before-writeout)
+と [完了報告](../internal-routines/verification-result-structuring.md#completion-reports) に従います。
+ユーザーの判断が必要な場合は、確認した事実、選択肢と結果、推奨案の理由を示します。
 
 ## Commit and push decisions
 
