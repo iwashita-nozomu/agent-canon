@@ -25,7 +25,3 @@ bare repo / `post-receive` の共通モデル、push と remote freshness の確
 - 前提 credential
 - 手動同期コマンド
 - 失敗時の確認コマンド
-
-## Related
-
-- `agent-canon github-publish`

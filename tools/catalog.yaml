@@ -410,27 +410,6 @@ entries:
     tests:
       - tests/agent_tools/test_tool_drift.py
 
-  - id: checkout-identity
-    summary: Reads the current cwd, Git root, branch state, HEAD, and normalized remote owner/repository for bounded workflow transitions.
-    path: tools/runtime/dispatch/agent-canon/src/checkout_identity.rs
-    family: agent_tools
-    role: helper
-    status: canonical
-    audience: agent
-    placement: workflow_helper
-    command: tools/bin/agent-canon checkout-identity --format lines
-    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "checkout-identity"]}
-    writes: false
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - agents/COMMUNICATION_PROTOCOL.md
-      - agents/skills/agent-orchestration.md
-      - agents/skills/subagent-bootstrap.md
-    tests:
-      - tests/agent_tools/test_checkout_identity.py
-
   - id: responsibility-scope
     summary: Validates responsibility scopes, owner classes, protecting tool coverage, and planned path owners.
     path: tools/runtime/dispatch/agent-canon/src/responsibility_scope.rs
@@ -947,28 +926,6 @@ entries:
       - documents/structure/repo-structure-contract.toml
     tests:
       - tests/agent_tools/test_repo_structure_contract.py
-
-  - id: github-publish
-    public: true
-    summary: Publishes verified GitHub branches, pull requests, and PR checks through gh with explicit user-task evidence and verified remote policy.
-    path: tools/runtime/dispatch/agent-canon/src/github_publish.rs
-    family: agent_tools
-    role: sync
-    status: canonical
-    command: tools/bin/agent-canon github-publish --help
-    dispatch: {runtime: rust, argv: ["{rust-cli}", "github-publish"]}
-    writes: true
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-      - documents/tools/github_publish.md
-      - agents/skills/pr-processing.md
-      - documents/agent-canon/agent-canon-github-remote.md
-    tests:
-      - tools/runtime/dispatch/agent-canon/tests/github_publish_native.rs
 
   - id: wiki-publish
     public: true
@@ -1740,26 +1697,6 @@ entries:
     tests:
       - tests/tools/test_run_gpu_container.py
 
-  - id: orphan-lifecycle
-    summary: Inventories semantic branch, PR-head, and worktree lifecycle state and authorizes exact cleanup candidates without performing mutation.
-    path: tools/runtime/dispatch/agent-canon/src/orphan_lifecycle.rs
-    family: agent_tools
-    role: inventory
-    status: canonical
-    audience: agent
-    placement: workflow_helper
-    command: tools/bin/agent-canon orphan-lifecycle
-    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "orphan-lifecycle"]}
-    writes: true
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - documents/operations/orphan-lifecycle.md
-      - documents/operations/worktree-lifecycle.md
-    tests:
-      - tests/agent_tools/test_orphan_lifecycle.py
-
   - id: agent-canon-cli
     public: true
     summary: Stable wrapper for the AgentCanon Rust CLI, migration audit, migration plan, docs, search, and analysis tools.
@@ -1812,7 +1749,6 @@ entries:
       - agents/skills/agent-canon-update.md
     tests:
       - tools/runtime/dispatch/agent-canon/tests/generated_completeness_native.rs
-      - tools/runtime/dispatch/agent-canon/tests/github_publish_native.rs
 
   - id: check-agent-canon-pr
     summary: Runs the standalone AgentCanon PR readiness checklist.

@@ -11,7 +11,6 @@ upstream design ../internal-routines/verification-result-structuring.md verifica
 upstream design ./issue-finding-report.md Issue ownership and reorganization
 upstream design ./agent-canon-update.md source PR and parent-pin route
 upstream design ../../documents/conventions/coding-conventions-testing.md bug reproduction evidence
-upstream implementation ../../tools/runtime/dispatch/agent-canon/src/github_publish.rs authorized GitHub publication
 downstream design ../../.codex/personal/skills/pr-processing/SKILL.md runtime discovery adapter
 @dependency-end
 -->

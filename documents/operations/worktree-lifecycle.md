@@ -27,6 +27,9 @@ statusに出る変更に加え、必要なignored成果物、submodule内の変�
 対象に応じて確認します。実験branchでは論文・結果・起点と目的を辿れる参照を保持します。
 利用中または内容の所有が不明なpathは保存し、判明している独立作業を続けます。
 
+squash や rebase を使った branch は、対応 PR と `git diff`、`git cherry` の結果を
+照合し、保存先に必要な差分が揃っていることを確認します。
+
 ## 削除
 
 linked worktreeは `git worktree remove <path>` を使います。独立cloneは必要な内容の

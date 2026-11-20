@@ -127,14 +127,6 @@ language = "rust"
 summary = "Rust-native algorithm InitializeConfig/SolveConfig ownership and runtime-default checker."
 
 [[tool]]
-id = "github-publish"
-classification = "public"
-tool = "tools/runtime/dispatch/agent-canon/src/github_publish.rs"
-doc = "documents/tools/github_publish.md"
-language = "python"
-summary = "gh-backed GitHub branch and PR publish tool documentation."
-
-[[tool]]
 id = "wiki-publish"
 classification = "public"
 tool = "tools/runtime/dispatch/agent-canon/src/wiki_publish.rs"

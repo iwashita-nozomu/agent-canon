@@ -12,7 +12,6 @@
 // downstream implementation check_algorithm_config_partition.rs checks algorithm config ownership and default policy
 // downstream implementation config.rs applies managed Codex context defaults while preserving TOML values
 // downstream implementation dependency_headers.rs checks selected dependency manifests and typed edge syntax
-// downstream implementation check_merge_structure.rs validates local structural integration readback
 // downstream implementation run_evaluation.rs scores and reports one agent run bundle
 // downstream implementation generated_completeness.rs routes the G2 receipt producer
 // downstream implementation graph.rs routes one-build dependency and runtime-evidence graph commands
@@ -56,12 +55,10 @@
 // downstream implementation catalog/skill_routes.rs routes explicit skill capabilities
 // upstream implementation lib.rs exposes native SCIP index and Git dependency summary APIs
 // downstream implementation extract_docx.rs routes the native DOCX extraction command
-// downstream implementation lib.rs exports checkout-identity and native workspace lifecycle APIs
 // @dependency-end
 
 mod agent_search;
 mod check_algorithm_config_partition;
-mod check_merge_structure;
 mod check_solid_evidence;
 pub mod classify_path_risk;
 mod config;
@@ -119,7 +116,6 @@ use std::env;
 const HELP: &str = "AgentCanon's native command line interface.
 
 Usage: agent-canon <command> [arguments]
-  github-publish [--root ROOT] <push|pr|publish-pr|checks> --user-task TASK [options]
   run-gpu-command [options] -- COMMAND ...
   render-dependency-manifest-graph [--root ROOT] [--scope full|changed] [--bundle-dir DIR | --ir-out PATH] [--markdown-out PATH] [--dot-out PATH] [--html-out PATH]
   run-managed-experiment [options] -- COMMAND ...
@@ -151,7 +147,6 @@ Commands:
   check-algorithm-config-partition [--root <repo-root>] [--exclude <pattern>]... [--format text|json] [--fail-on-finding] [--fail-on-default] [paths...]
   responsibility-scope [--root <repo-root>] [--manifest <path>] [--format text|json] [--path <path>]...
   tool-rejection-preflight [paths...] [--root <repo-root>] [--changed] [--format text|json]
-  check-merge-structure --source <ref> [--target <ref>] [--compare-commit <ref>] [--repo-root <path>]
   jit-ir-to-lean --jit-ir <path> --namespace <Lean.Namespace> --out <path>
   operational-ir-to-lean --ir <path> --namespace <Lean.Namespace> [options]
   jit-canonical-ir --python-symbol PATH::QUALNAME --input-factory PATH::QUALNAME --out PATH [options]
@@ -182,7 +177,6 @@ Commands:
   generate-agent-improvement-guide [--root ROOT] [--runtime-root ROOT] [--out PATH] [--output-mode 600|644]
   generate-agent-runtime-dashboard [--root ROOT] [--runtime-root ROOT] [--out PATH] [--compact-out PATH] [--api-out PATH] [--recent-days DAYS]
   issue-sync [--repo OWNER/REPO] [--issue-url URL] [options]
-  checkout-identity [--cwd PATH] [--format json|lines]
   eval-accumulation-check [--root ROOT] [--runtime-root ROOT] [--family-registry PATH] [--format text|json] [--compact-out PATH]
   oop-python-rule-inventory|oop-cpp-rule-inventory [--root <repo-root>] [--format text|json|markdown]
   oop-python-readability|oop-cpp-readability [paths...] [--root ROOT] [options]
@@ -200,7 +194,6 @@ Commands:
   repo-structure-contract [--root ROOT] [--contract PATH] [options]
   check-agent-canon-log-policy [--input PATH|--remote URL] [--commit SHA]
   wiki-publish --wiki-root PATH --source-root PATH --source-commit SHA [options]
-  orphan-lifecycle <inventory|authorize-cleanup> [options]
   render-code-template [--root SOURCE_ROOT] TEMPLATE
   skill-shim-materializer <check|materialize|readback> [options]
   skill-shim-evaluation [options]
@@ -327,9 +320,6 @@ fn main() {
         std::process::exit(theorem_graph_circularity_check::run(&args[2..]));
     }
 
-    if args.len() >= 2 && args[1] == "github-publish" {
-        std::process::exit(agent_canon::github_publish::run(&args[2..]));
-    }
     if args.len() >= 2 && args[1] == "bootstrap-runtime" {
         std::process::exit(agent_canon::bootstrap_runtime::run(&args[2..]));
     }
@@ -357,9 +347,6 @@ fn main() {
     }
     if args.len() >= 2 && args[1] == "issue-sync" {
         std::process::exit(agent_canon::issue_sync::run(&args[2..]));
-    }
-    if args.len() >= 2 && args[1] == "checkout-identity" {
-        std::process::exit(agent_canon::checkout_identity::run(&args[2..]));
     }
     if args.len() >= 2 && args[1] == "tool-catalog" {
         std::process::exit(catalog::tool_catalog::run(&args[2..]));
@@ -547,9 +534,6 @@ fn main() {
     if args.len() >= 2 && args[1] == "wiki-publish" {
         std::process::exit(agent_canon::wiki_publish::run(&args[2..]));
     }
-    if args.len() >= 2 && args[1] == "orphan-lifecycle" {
-        std::process::exit(agent_canon::orphan_lifecycle::run(&args[2..]));
-    }
     if args.len() >= 2 && args[1] == agent_canon::codex_agent_role_eval::SELECTOR {
         std::process::exit(agent_canon::codex_agent_role_eval::run(&args[2..]));
     }
@@ -686,10 +670,6 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "notebook-quality" {
         std::process::exit(notebook_quality::run(&args[2..]));
-    }
-
-    if args.len() >= 2 && args[1] == "check-merge-structure" {
-        std::process::exit(check_merge_structure::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "python-structure-hash" {

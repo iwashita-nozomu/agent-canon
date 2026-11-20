@@ -50,7 +50,6 @@
 // downstream implementation path_expansion.rs owns shared user-home path expansion
 // downstream implementation scip_index.rs owns the native generated-index reader and SCIP command
 // downstream implementation git_dependency_diff_summary.rs owns native Git dependency summaries
-// downstream implementation checkout_identity.rs reads bounded checkout identity
 // downstream implementation main.rs consumes the shared runtime and CLI library APIs
 // downstream implementation ../tests/owner_guarantee_native.rs validates Python packet and projection oracles
 // downstream implementation ../tests/artifacts_native.rs validates the shared artifact API
@@ -68,7 +67,6 @@ pub mod authority;
 pub mod catalog;
 pub mod chatgpt_codex_routing;
 pub mod check_proof_trace_alignment;
-pub mod checkout_identity;
 pub mod code_template_rendering;
 pub mod codex_agent_role_eval;
 pub mod codex_runtime_summary;
@@ -93,7 +91,6 @@ pub mod file_surface_inventory;
 pub mod formal_proof;
 pub mod generated_completeness;
 pub mod git_read;
-pub mod github_publish;
 pub mod github_status_lifecycle;
 pub mod gpu_command_admission;
 pub mod historical_skill_usage;
@@ -133,7 +130,6 @@ mod oop_python;
 #[path = "oop/readability.rs"]
 pub mod oop_readability;
 pub mod operational_ir_to_lean;
-pub mod orphan_lifecycle;
 pub mod owner_guarantee;
 pub mod parent_repository_audit;
 pub mod path_expansion;
