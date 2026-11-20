@@ -25,9 +25,8 @@ Use at intake or when new evidence changes that choice.
 ## Decision Order
 
 Use the agreed outcome, target, and governing sources to choose the owner and
-route. Read the relevant assumptions before assessing an approach. When a result
-disagrees with expectations, revisit the premise or execution route that could
-explain it. Resolve the facts available in the sources.
+route. Read the relevant assumptions before assessing an approach. Reconsider the
+route when evidence is missing or contradicts the expected result.
 
 Ask before changing agreed scope, result, required properties, or major approach.
 Give the checked facts and the decision's effect. Continue independent authorized work.
@@ -77,13 +76,6 @@ unavailable required verification stays unverified.
 Resolve only questions that could change outcome, mechanism, or validation using
 current owner evidence. Carry decisions in the conversation or native handoff.
 No separate work ledger is needed for coordination or resumption.
-
-## Execution-Time-Aware Work-Conservation Contract
-
-For coordinated work, reuse actual results and context. Resolve accepted findings
-and validate the affected evidence. Use
-[completion readiness](../canonical/CODEX_COMPLETION.md#completion-readiness) to
-finish the agreed work.
 
 ## Review Activation And Adjudication
 

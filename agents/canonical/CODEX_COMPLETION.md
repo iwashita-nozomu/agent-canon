@@ -92,11 +92,9 @@ downstream review. Select a whole-repository dependency review only when the
 changed contract or explicit request requires it. Shared canon, Large Delivery,
 and high-risk labels alone do not request every repository check.
 
-After failed verification, use the actual output to distinguish observation,
-cause, input assumptions, and required API behavior before deciding a repair.
-Keep the diagnosis and next action in the conversation. No failure-topic file,
-classification ledger, or per-attempt status record is required. Unrun checks
-remain unverified.
+For a failed or unverified property, use the
+[common completion rule](../../ROOT_AGENTS.md#task-entry) to reconsider the
+assumptions and select evidence for the requested behavior.
 
 Tool or reviewer findings entering implementation use the existing
 [tool-finding-report](../skills/tool-finding-report.md) route when its condition

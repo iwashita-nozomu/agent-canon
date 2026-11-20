@@ -20,7 +20,6 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 - Question: <!-- 一文で記録します。 -->
 - Comparison Target: <!-- baseline、main、external reference。 -->
 - Operational Stop Conditions: <!-- run を止める条件。研究上の結論ではない。 -->
-- Stop Budget: <!-- iteration count、runtime budget、stop condition。 -->
 - Scope: <!-- 対象となる file、experiment topic、report。 -->
 
 ## Extension Backlog（拡張 backlog）

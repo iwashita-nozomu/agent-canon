@@ -117,9 +117,10 @@ context/evidence. The contracts below apply without an installed Skill/runtime.
   planned migration, review obsolete code and references, then validate its final
   state together; intermediate edits and commits are not separate test gates.
 - Match each requested outcome to the actual artifact or execution result.
-  When evidence falls short, recheck the relevant assumptions and choose a
-  supported authorized approach that could change the result. Finish the
-  requested work, or report the concrete blocker and remaining outcome.
+  When a required property remains unverified or a result contradicts it,
+  recheck the relevant assumptions and choose an authorized way to verify or
+  repair it. Finish the requested work, or report the concrete blocker and
+  remaining outcome.
 - Report commit/push separately and distinguish implemented, verified, published,
   and applied. State the reason beside each material conclusion. Explain how the
   source, derivation, or observed result supports that judgment. State material
@@ -127,7 +128,8 @@ context/evidence. The contracts below apply without an installed Skill/runtime.
 
 ## Validation Routing
 
-Validate changed guarantees, adding consumer checks for explicit consumer migration.
+Judge acceptance and completion by evidence of the required behavior. Treat
+processing time as an observation. Add consumer checks for explicit consumer migration.
 Reuse unchanged results; broaden suites only when those guarantees require it.
 Format final edited files with the configured formatter before delivery and include
 its diff; unavailable formatting stays unverified. Tests, observations, and proofs

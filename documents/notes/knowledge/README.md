@@ -30,7 +30,6 @@ upstream design ../README.md notes lifecycle index
 - [experiment_directory_planning.md](./experiment_directory_planning.md)
 - [experiment_operations.md](./experiment_operations.md)
 - [benchmark_vs_experiment.md](./benchmark_vs_experiment.md)
-- [benchmark_levels_analysis.md](./benchmark_levels_analysis.md)
 - [path_resolution.md](./path_resolution.md)
 - [pyright_operations.md](./pyright_operations.md)
 - [coding_decision_methods.md](./coding_decision_methods.md)
