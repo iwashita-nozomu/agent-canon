@@ -26,7 +26,8 @@ raw artifact は `result-artifact-writeout` が所有し、report は第二の p
 Identify the source evidence, audience, findings, and material limitations.
 Read the governing assumptions and decision criterion before judging the results.
 結論のすぐそばに判断理由を書きます。決め手となった事実を示し、その事実が判断基準を
-どう満たすかを説明します。資料から判断できる範囲もその結論に添えます。
+どう満たすかを説明します。前提で定まる対象範囲は、結論が当てはまる範囲として
+一度記載します。操作の詳細は既存の資料を参照します。
 A link to the run record is the entire treatment of commands, setup, parameters,
 and stop rules. Before returning the report, replace those details in the body,
 notes, or tables with the link. Use actual observations for claims about what ran.
