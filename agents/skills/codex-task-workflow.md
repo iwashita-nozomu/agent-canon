@@ -44,8 +44,8 @@ When selected, use [subagent-bootstrap](subagent-bootstrap.md) for the handoff.
 
 Use the final artifacts and results to assess
 [completion readiness](../canonical/CODEX_COMPLETION.md#completion-readiness).
-When a result falls short, reconsider the assumption or approach that could
-change it and complete the remaining authorized work.
+When a required property fails or remains unverified, reconsider the assumptions
+and method. Complete the remaining authorized work.
 
 When the requested work is complete, report the result and wait for the user's
 next instruction. Plan or begin a subsequent task only after the user requests it.

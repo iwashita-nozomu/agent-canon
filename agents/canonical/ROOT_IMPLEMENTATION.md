@@ -33,7 +33,7 @@ obsolete behavior that the authorized change is meant to correct.
 Describe the agreed design and its rationale. Leave private names, layout, and
 edit order to the implementation owner.
 
-Keep the required input domain, output, safety, performance, and failure guarantees.
+Preserve the required input domain, outputs, safety, resource bounds, and failure behavior.
 Do not turn a method's limitations into stronger user preconditions, silently skip
 valid cases, or weaken guarantees to make implementation or proof easier. A changed
 internal precondition needs a derivation showing how every required input reaches

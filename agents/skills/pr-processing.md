@@ -39,9 +39,7 @@ inventory unrelated PRs or require queue closure.
 
 Build a candidate graph only when source-to-pin order, shared files, conflicts,
 base chains, or publication order constrain the next action. Refresh candidates
-whose base or head becomes stale after earlier work. Apply the
-[work-conservation contract](agent-orchestration.md#execution-time-aware-work-conservation-contract)
-only to this selected coordination.
+whose base or head becomes stale after earlier work.
 
 ## Validation and repair
 

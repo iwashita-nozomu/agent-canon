@@ -39,7 +39,8 @@ downstream implementation ../../tools/runtime/dispatch/agent-canon/src/dependenc
 ## Numerical and runtime results
 
 数値結果を対象全体について先にまとめ、その後に実行時・アーキテクチャの結果を示します。
-同じrunやcaseを対応づけます。数値結果が未取得または失敗の場合も、数値結果の節で状態を示します。
+同じrunやcaseを対応づけ、処理時間は観測値として示します。
+数値結果が未取得または失敗の場合も、数値結果の節で状態を示します。
 
 ## Output
 

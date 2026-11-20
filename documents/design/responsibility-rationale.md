@@ -184,7 +184,8 @@ OOP/SOLID review exists when inheritance/substitutability, dependency inversion,
 
 Queue snapshots and dependency DAGs exist when multiple PRs/issues interact through source→pin order, conflict order, or publication dependencies. A single independent PR needs only its own base/head/diff/check/authority state.
 
-Multi-agent execution starts with one owner and expands only when independent search surfaces, competing hypotheses, material verification value, or parallel gain justify it. Fixed scout/verifier/arbiter counts are not a default topology; expansion and stopping depend on marginal information gain, latency/budget, and write contention.
+Multi-agent execution starts with one owner. Independent work, competing hypotheses,
+verification value, and write contention determine whether to delegate.
 
 ## Write controls
 
