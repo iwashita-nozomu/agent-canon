@@ -14,11 +14,10 @@ from __future__ import annotations
 import os
 import subprocess
 import tempfile
-import tomllib
 from pathlib import Path
 
+import tomllib
 import yaml
-
 
 ROOT = Path(__file__).resolve().parents[2]
 AGENT_CANON_CLI = os.environ.get("AGENT_CANON_CLI")
@@ -38,6 +37,49 @@ def _native_cli() -> str:
     ):
         raise RuntimeError("AGENT_CANON_CLI must select an absolute executable file")
     return str(executable)
+
+
+def test_consumer_uses_project_runner_labels_and_rejects_invalid_workflow(
+    tmp_path: Path,
+) -> None:
+    workflows = tmp_path / ".github/workflows"
+    workflows.mkdir(parents=True)
+    workflow = workflows / "ci.yml"
+    workflow.write_text(
+        """
+name: Consumer CI
+on: push
+jobs:
+  project:
+    runs-on: [self-hosted, project-eval-worker]
+    steps:
+      - run: echo ok
+""",
+        encoding="utf-8",
+    )
+    args = [
+        _native_cli(),
+        "check-github-workflows",
+        "--consumer",
+        "--root",
+        str(tmp_path),
+    ]
+    unconfigured = subprocess.run(args, text=True, capture_output=True, check=False)
+    assert unconfigured.returncode != 0
+    assert "project-eval-worker" in unconfigured.stdout + unconfigured.stderr
+
+    (tmp_path / ".github/actionlint.yaml").write_text(
+        "self-hosted-runner:\n  labels: [project-eval-worker]\n",
+        encoding="utf-8",
+    )
+    valid = subprocess.run(args, text=True, capture_output=True, check=False)
+    assert valid.returncode == 0, valid.stdout + valid.stderr
+    assert "GITHUB_WORKFLOWS=pass" in valid.stdout
+
+    workflow.write_text("name: Broken\non: push\njobs: [\n", encoding="utf-8")
+    invalid = subprocess.run(args, text=True, capture_output=True, check=False)
+    assert invalid.returncode != 0
+    assert "GITHUB_WORKFLOWS=fail" in invalid.stdout
 
 
 def test_native_build_toolchain_matches_canonical_image_pin() -> None:

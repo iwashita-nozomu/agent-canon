@@ -10,6 +10,68 @@ use std::process::{Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
 
+pub(crate) struct IndexEntry {
+    pub mode: String,
+    pub object: String,
+    pub path: String,
+}
+
+pub(crate) fn require_repository_root(root: &Path) -> Result<(), String> {
+    if repository_bytes(root, &["rev-parse", "--show-prefix"])?
+        .iter()
+        .all(u8::is_ascii_whitespace)
+    {
+        Ok(())
+    } else {
+        Err("--root must select the repository root".into())
+    }
+}
+
+pub(crate) fn index_entries(root: &Path) -> Result<Vec<IndexEntry>, String> {
+    let output = repository_bytes(root, &["ls-files", "-z", "-s"])?;
+    output
+        .split(|byte| *byte == 0)
+        .filter(|entry| !entry.is_empty())
+        .map(|entry| {
+            let tab = entry
+                .iter()
+                .position(|byte| *byte == b'\t')
+                .ok_or("git ls-files returned an invalid index entry")?;
+            let metadata = std::str::from_utf8(&entry[..tab])
+                .map_err(|error| format!("git index metadata: {error}"))?;
+            let mut fields = metadata.split_whitespace();
+            let (Some(mode), Some(object), Some(_stage), None) =
+                (fields.next(), fields.next(), fields.next(), fields.next())
+            else {
+                return Err("git ls-files returned invalid index metadata".into());
+            };
+            Ok(IndexEntry {
+                mode: mode.to_owned(),
+                object: object.to_owned(),
+                path: String::from_utf8_lossy(&entry[tab + 1..]).into_owned(),
+            })
+        })
+        .collect()
+}
+
+pub(crate) fn repository_bytes(root: &Path, args: &[&str]) -> Result<Vec<u8>, String> {
+    let command = args.first().copied().unwrap_or("command");
+    let result = Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(args)
+        .output()
+        .map_err(|error| format!("could not start git {command}: {error}"))?;
+    if !result.status.success() {
+        return Err(format!(
+            "git {command} failed in {}: {}",
+            root.display(),
+            String::from_utf8_lossy(&result.stderr).trim()
+        ));
+    }
+    Ok(result.stdout)
+}
+
 pub fn output(root: &Path, args: &[&str], timeout: Duration) -> Result<Option<String>, String> {
     let mut child = Command::new("git")
         .arg("-C")

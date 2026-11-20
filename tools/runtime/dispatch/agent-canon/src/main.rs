@@ -67,7 +67,6 @@ pub mod classify_path_risk;
 mod config;
 mod dependency_headers;
 mod dependency_manifest;
-mod file_surface_inventory;
 mod github_workflow_check;
 mod graph;
 pub mod graph_client;
@@ -124,7 +123,7 @@ Usage: agent-canon <command> [arguments]
   run-gpu-command [options] -- COMMAND ...
   render-dependency-manifest-graph [--root ROOT] [--scope full|changed] [--bundle-dir DIR | --ir-out PATH] [--markdown-out PATH] [--dot-out PATH] [--html-out PATH]
   run-managed-experiment [options] -- COMMAND ...
-  experiment-registry [--repo-root ROOT] [--registry PATH]
+  experiment-registry [--repo-root ROOT] [--registry PATH] [--profile python|cmake] [--cmake-entry PATH]
 
 Commands:
   evaluate-codex-agent-roles [--root ROOT] [--runtime-root PATH] [--accumulate] [--format text|json]
@@ -588,7 +587,7 @@ fn main() {
     }
 
     if args.len() >= 2 && args[1] == "file-surface-inventory" {
-        std::process::exit(file_surface_inventory::run(&args[2..]));
+        std::process::exit(agent_canon::file_surface_inventory::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "extract-docx" {

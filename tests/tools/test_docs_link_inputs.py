@@ -129,6 +129,30 @@ def test_native_docs_check_detects_broken_readme_link_without_project_configs(
     assert not (root / "tools/validation/documentation/config/lychee.toml").exists()
 
 
+def test_consumer_links_checks_tracked_markdown_and_rejects_external_file_targets(
+    tmp_path: Path,
+) -> None:
+    root = _prepare_docs_root(tmp_path)
+    (tmp_path / "outside.txt").write_text("outside the project\n", encoding="utf-8")
+    (root / "local.txt").write_text("inside the project\n", encoding="utf-8")
+    readme = root / "README.md"
+    readme.write_text("# Project\n\n[Local](local.txt)\n", encoding="utf-8")
+    subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+    subprocess.run(["git", "add", "README.md", "local.txt"], cwd=root, check=True)
+    args = [_native_cli(), "docs", "links", "--root", str(root), "--consumer"]
+    valid = subprocess.run(args, text=True, capture_output=True, check=False)
+    assert valid.returncode == 0, valid.stdout + valid.stderr
+
+    for target in ("../outside.txt", "FILE://local/outside.txt"):
+        readme.write_text(f"# Project\n\n[Outside]({target})\n", encoding="utf-8")
+        outside = subprocess.run(args, text=True, capture_output=True, check=False)
+        assert outside.returncode != 0
+        assert (
+            f"local Markdown link must resolve within the repository: {target}"
+            in outside.stdout + outside.stderr
+        )
+
+
 @pytest.mark.parametrize(
     ("relative", "contents"),
     [

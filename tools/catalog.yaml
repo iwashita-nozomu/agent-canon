@@ -1700,7 +1700,7 @@ entries:
       - tests/agent_tools/test_tool_dispatch.py
 
   - id: check-github-workflows
-    summary: Validates GitHub Actions and PR template surfaces.
+    summary: Validates GitHub Actions and selected repository workflow policy.
     path: tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs
     family: ci
     role: checker
@@ -2034,7 +2034,7 @@ entries:
       - tests/agent_tools/test_evaluate_codex_agent_roles.py
 
   - id: check-experiment-registry
-    summary: Validates the shared experiment registry contract.
+    summary: Validates Python and consumer CMake experiment registrations.
     path: tools/runtime/dispatch/agent-canon/src/experiment_registry.rs
     family: ci
     role: checker
