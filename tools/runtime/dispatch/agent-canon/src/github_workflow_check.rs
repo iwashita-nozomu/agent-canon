@@ -295,11 +295,8 @@ fn run_one(name: &str, executable: &str, args: &[String], root: &Path) -> i32 {
     }
 }
 
-fn run_providers(root: &Path, files: &[PathBuf]) -> Vec<i32> {
-    if files.is_empty() {
-        return Vec::new();
-    }
-    let args: Vec<String> = files
+fn workflow_arguments(root: &Path, files: &[PathBuf]) -> Vec<String> {
+    files
         .iter()
         .map(|path| {
             path.strip_prefix(root)
@@ -307,7 +304,14 @@ fn run_providers(root: &Path, files: &[PathBuf]) -> Vec<i32> {
                 .to_string_lossy()
                 .replace('\\', "/")
         })
-        .collect();
+        .collect()
+}
+
+fn run_providers(root: &Path, files: &[PathBuf]) -> Vec<i32> {
+    if files.is_empty() {
+        return Vec::new();
+    }
+    let args = workflow_arguments(root, files);
     println!("GITHUB_WORKFLOW_NATIVE_INPUTS={}", args.join(","));
     flush_stdout();
     let mut statuses = Vec::with_capacity(2);
@@ -343,6 +347,55 @@ fn run_providers(root: &Path, files: &[PathBuf]) -> Vec<i32> {
     argv.extend(args);
     statuses.push(run_one("zizmor", ZIZMOR, &argv, root));
     statuses
+}
+
+fn consumer_workflows(root: &Path, files: &[PathBuf]) -> (Vec<Finding>, Vec<i32>) {
+    let in_repository = |path: &Path| {
+        path.canonicalize()
+            .is_ok_and(|resolved| resolved.starts_with(root) && resolved.is_file())
+    };
+    let mut findings = Vec::new();
+    if files.is_empty() {
+        findings.push(Finding {
+            severity: "error",
+            path: root.join(".github/workflows"),
+            message: "no_workflows".into(),
+        });
+    }
+    let config = [".github/actionlint.yaml", ".github/actionlint.yml"]
+        .into_iter()
+        .map(|relative| root.join(relative))
+        .find(|path| fs::symlink_metadata(path).is_ok());
+    for path in files.iter().chain(config.iter()) {
+        if !in_repository(path) {
+            findings.push(Finding {
+                severity: "error",
+                path: path.clone(),
+                message: "expected_file_within_repository".into(),
+            });
+        }
+    }
+    if !findings.is_empty() {
+        return (findings, Vec::new());
+    }
+    let executable = if Path::new(ACTIONLINT).is_file() {
+        ACTIONLINT
+    } else {
+        "actionlint"
+    };
+    let mut args = vec![
+        "-no-color".into(),
+        "-shellcheck=".into(),
+        "-pyflakes=".into(),
+    ];
+    if let Some(path) = config {
+        args.extend(["-config-file".into(), path.to_string_lossy().into_owned()]);
+    }
+    args.extend(workflow_arguments(root, files));
+    (
+        findings,
+        vec![run_one("actionlint", executable, &args, root)],
+    )
 }
 
 fn report(root: &Path, findings: &[Finding], files: &[PathBuf], statuses: &[i32]) -> String {
@@ -384,25 +437,33 @@ fn run_with_statuses(root: &Path, statuses: &[i32]) -> (String, i32) {
     )
 }
 
-const HELP: &str = "usage: agent-canon check-github-workflows [-h] [--root ROOT]\n\nRun native GitHub workflow analyzers and check AgentCanon workflow and PR-template contracts.\n\noptions:\n  -h, --help   show this help message and exit\n  --root ROOT  repository root to check";
+const HELP: &str = "usage: agent-canon check-github-workflows [-h] [--root ROOT] [--consumer]\n\nRun native GitHub workflow analyzers and check AgentCanon workflow and PR-template contracts.\n\noptions:\n  -h, --help   show this help message and exit\n  --root ROOT  repository root to check\n  --consumer  validate workflows with the target repository's actionlint configuration";
 
 #[derive(Clone, Copy)]
 enum CheckerOption {
     Help,
     Root,
+    Consumer,
 }
 
 const CHECKER_OPTIONS: &[(&str, CheckerOption)] = &[
     ("--help", CheckerOption::Help),
     ("--root", CheckerOption::Root),
+    ("--consumer", CheckerOption::Consumer),
 ];
 
 enum ParseError {
     InvalidArguments,
 }
 
-fn parse_args(args: &[String]) -> Result<Option<PathBuf>, ParseError> {
+struct CheckerArgs {
+    root: PathBuf,
+    consumer: bool,
+}
+
+fn parse_args(args: &[String]) -> Result<Option<CheckerArgs>, ParseError> {
     let mut root = PathBuf::from(".");
+    let mut consumer = false;
     let mut index = 0;
     while index < args.len() {
         let argument = args[index].as_str();
@@ -418,6 +479,8 @@ fn parse_args(args: &[String]) -> Result<Option<PathBuf>, ParseError> {
         match resolved {
             CheckerOption::Help if inline_value.is_none() => return Ok(None),
             CheckerOption::Help => return Err(ParseError::InvalidArguments),
+            CheckerOption::Consumer if inline_value.is_none() => consumer = true,
+            CheckerOption::Consumer => return Err(ParseError::InvalidArguments),
             CheckerOption::Root => {
                 let value: &str = if let Some(value) = inline_value {
                     value
@@ -439,25 +502,28 @@ fn parse_args(args: &[String]) -> Result<Option<PathBuf>, ParseError> {
         }
         index += 1;
     }
-    Ok(Some(root))
+    Ok(Some(CheckerArgs { root, consumer }))
 }
 
 pub fn run(args: &[String]) -> i32 {
-    let root = match parse_args(args) {
+    let CheckerArgs { root, consumer } = match parse_args(args) {
         Ok(None) => {
             println!("{HELP}");
             return 0;
         }
-        Ok(Some(root)) => root,
+        Ok(Some(args)) => args,
         Err(ParseError::InvalidArguments) => {
-            eprintln!("usage: agent-canon check-github-workflows [-h] [--root ROOT]");
+            eprintln!("usage: agent-canon check-github-workflows [-h] [--root ROOT] [--consumer]");
             return 2;
         }
     };
     let root = root.canonicalize().unwrap_or(root);
     let files = workflows(&root);
-    let findings = check_owned(&root);
-    let statuses = run_providers(&root, &files);
+    let (findings, statuses) = if consumer {
+        consumer_workflows(&root, &files)
+    } else {
+        (check_owned(&root), run_providers(&root, &files))
+    };
     print!("{}", report(&root, &findings, &files, &statuses));
     exit_code(&findings, &statuses)
 }

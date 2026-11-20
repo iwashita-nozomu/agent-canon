@@ -44,6 +44,16 @@ manifest、report、result pointer に一度だけ記録します。managed run 
 `experiments/<topic>/result/<run-id>.tar.gz` です。旧 topic-only layout は
 新しい runner、annex retention、LATEST updater から読み替えません。
 
+## CMake profile
+
+`agent-canon experiment-registry --profile cmake` はC++プロジェクトの登録表を検査します。
+`schema_version = 1`、`defaults.integration_branch`、`[[topic]]` の `topic` と
+`topic_dir` を読み、トピック名の重複と登録先ディレクトリを確認します。
+
+`--cmake-entry` はプロジェクト内のCMake入口を指定し、既定値は `CMakeLists.txt` です。
+入口と実験ディレクトリはリポジトリ内に置きます。個別トピックのCMakeファイル、
+Pythonの実行入口、出力ディレクトリの生成はプロジェクトが管理します。
+
 ## 正本ファイル
 
 - `experiments/registry.toml`

@@ -16,6 +16,7 @@
 // downstream implementation ../../../../bin/agent-canon invokes this command through the CLI wrapper
 // downstream implementation template_bundle.rs shares static-seed TOML traversal and prefix policy
 // downstream implementation ../../../../../tests/tools/test_check_bootstrap_docs.py validates bootstrap and static-seed checks
+// upstream implementation docs/source_independence.rs checks consumer Git source boundaries
 // downstream implementation ../../../../../tests/agent_tools/test_export_static_seed.py invokes source-free validation on native-exported seeds
 // downstream implementation ../../../../../tests/tools/test_fix_mermaid.py tests native Mermaid syntax validation
 // downstream test ../tests/source_mutation_native.rs validates source mutation capability behavior
@@ -193,6 +194,7 @@ struct Args {
     paths: Vec<String>,
     apply: bool,
     check_after_apply: bool,
+    consumer: bool,
     mutation_capability_json: Option<String>,
 }
 
@@ -268,6 +270,7 @@ fn run_parsed(args: Args) -> i32 {
         }
         DocsCommand::Check => render_check(&root, &args.paths),
         DocsCommand::Format => render_format(&root, &args.paths),
+        DocsCommand::Links if args.consumer => consumer_link_audit(&root),
         DocsCommand::Links => run_link_audit(
             &root,
             &args.paths,
@@ -1610,6 +1613,7 @@ impl Args {
         let mut paths = Vec::new();
         let mut apply = false;
         let mut check_after_apply = false;
+        let mut consumer = false;
         let mut mutation_capability_json = None;
         let mut index = 1;
         while index < args.len() {
@@ -1629,6 +1633,10 @@ impl Args {
                     check_after_apply = true;
                     index += 1;
                 }
+                "--consumer" if command == DocsCommand::Links => {
+                    consumer = true;
+                    index += 1;
+                }
                 "--mutation-capability-json" if command == DocsCommand::Links => {
                     let value = args
                         .get(index + 1)
@@ -1643,6 +1651,7 @@ impl Args {
                         paths,
                         apply,
                         check_after_apply,
+                        consumer,
                         mutation_capability_json,
                     });
                 }
@@ -1656,20 +1665,38 @@ impl Args {
             }
         }
 
+        if consumer
+            && (apply
+                || check_after_apply
+                || mutation_capability_json.is_some()
+                || !paths.is_empty())
+        {
+            return Err(
+                "docs links --consumer checks tracked Markdown; use only --root with this mode"
+                    .into(),
+            );
+        }
         Ok(Self {
             command,
             root,
             paths,
             apply,
             check_after_apply,
+            consumer,
             mutation_capability_json,
         })
     }
 }
 
+mod source_independence;
+
+const BOOTSTRAP_USAGE: &str =
+    "usage: agent-canon docs check-bootstrap [--root <path>] [--static-seed-consumer | --source-policy PATH]";
+
 struct BootstrapArgs {
     root: PathBuf,
     static_seed_consumer: bool,
+    source_policy: Option<PathBuf>,
 }
 
 enum BootstrapParseResult {
@@ -1685,9 +1712,7 @@ fn run_bootstrap_command(raw: &[String]) -> i32 {
         }
         Ok(BootstrapParseResult::Options(args)) => args,
         Err(error) => {
-            eprintln!(
-                "usage: agent-canon docs check-bootstrap [--root <path>] [--static-seed-consumer]"
-            );
+            eprintln!("{BOOTSTRAP_USAGE}");
             eprintln!("agent-canon docs check-bootstrap: error: {error}");
             return 2;
         }
@@ -1701,7 +1726,15 @@ fn run_bootstrap_command(raw: &[String]) -> i32 {
                 .join(&args.root)
         }
     });
-    let (title, findings) = if args.static_seed_consumer {
+    let (title, findings) = if let Some(policy) = args.source_policy {
+        match source_independence::check(&root, &policy) {
+            Ok(findings) => ("Consumer source independence check", findings),
+            Err(error) => {
+                eprintln!("agent-canon docs check-bootstrap: {error}");
+                return 2;
+            }
+        }
+    } else if args.static_seed_consumer {
         (
             "Static seed consumer check",
             iter_static_seed_consumer_findings(&root),
@@ -1722,6 +1755,7 @@ fn parse_bootstrap_args(raw: &[String]) -> Result<BootstrapParseResult, String> 
     let mut args = BootstrapArgs {
         root: PathBuf::from("."),
         static_seed_consumer: false,
+        source_policy: None,
     };
     let mut index = 0;
     while index < raw.len() {
@@ -1734,8 +1768,15 @@ fn parse_bootstrap_args(raw: &[String]) -> Result<BootstrapParseResult, String> 
             index += 2;
             continue;
         }
+        if token == "--source-policy" {
+            args.source_policy = Some(PathBuf::from(required_bootstrap_value(raw, index, token)?));
+            index += 2;
+            continue;
+        }
         if let Some(value) = token.strip_prefix("--root=") {
             args.root = PathBuf::from(value);
+        } else if let Some(value) = token.strip_prefix("--source-policy=") {
+            args.source_policy = Some(PathBuf::from(value));
         } else if token == "--static-seed-consumer" {
             args.static_seed_consumer = true;
         } else if token == "--" {
@@ -1749,6 +1790,9 @@ fn parse_bootstrap_args(raw: &[String]) -> Result<BootstrapParseResult, String> 
             return Err(format!("unrecognized arguments: {token}"));
         }
         index += 1;
+    }
+    if args.static_seed_consumer && args.source_policy.is_some() {
+        return Err("--static-seed-consumer and --source-policy are mutually exclusive".into());
     }
     Ok(BootstrapParseResult::Options(args))
 }
@@ -1779,11 +1823,12 @@ fn is_argparse_negative_float(value: &str) -> bool {
 fn print_bootstrap_help() {
     println!(
         "Validate bootstrap docs or a source-free static-seed consumer.\n\n\
-         usage: agent-canon docs check-bootstrap [--root <path>] [--static-seed-consumer]\n\n\
+         {BOOTSTRAP_USAGE}\n\n\
          options:\n\
            -h, --help             show this help message and exit\n\
            --root <path>          Repository or exported seed root. Defaults to cwd.\n\
-           --static-seed-consumer validate only the source-free static-seed consumer surface."
+           --static-seed-consumer validate only the source-free static-seed consumer surface.\n\
+           --source-policy PATH   check an ordinary consumer's Git index against its TOML policy."
     );
 }
 
@@ -1988,6 +2033,7 @@ options:\n\
   --root <repo-root>      repository root to evaluate; defaults to the current directory\n\
   --apply                 rewrite uniquely resolved links (links only)\n\
   --check                 run docs check after applying link rewrites (links only)\n\
+  --consumer              check tracked Markdown and its local links within the repository (links only)\n\
   --mutation-capability-json <json>  authorize exact source paths for links --apply\n\
 \n\
 examples:\n\
@@ -2416,6 +2462,82 @@ fn render_format(root: &Path, raw_paths: &[String]) -> i32 {
         summary.changed_files, summary.changes
     );
     0
+}
+
+fn consumer_link_audit(root: &Path) -> i32 {
+    let entries = crate::git_read::require_repository_root(root)
+        .and_then(|()| crate::git_read::index_entries(root));
+    let entries = match entries {
+        Ok(entries) => entries,
+        Err(error) => {
+            eprintln!("docs links: {error}");
+            return 2;
+        }
+    };
+    let mut files = BTreeSet::new();
+    let mut findings = Vec::new();
+    for entry in entries {
+        if !entry.path.ends_with(".md") || entry.path.starts_with("reports/") {
+            continue;
+        }
+        let source = root.join(entry.path);
+        if !source
+            .canonicalize()
+            .is_ok_and(|path| path.starts_with(root) && path.is_file())
+        {
+            findings.push(Finding {
+                path: Some(source),
+                line: None,
+                message: "expected Markdown file within the repository".into(),
+            });
+            continue;
+        }
+        files.insert(source);
+    }
+    for source in &files {
+        let document = match read_document_ast(root, source) {
+            Ok(document) => document,
+            Err(error) => {
+                findings.push(Finding {
+                    path: Some(source.clone()),
+                    line: None,
+                    message: error,
+                });
+                continue;
+            }
+        };
+        let parent = source.parent().unwrap_or(root);
+        for target in document.links {
+            let file_url = target
+                .get(..5)
+                .is_some_and(|scheme| scheme.eq_ignore_ascii_case("file:"));
+            if target.is_empty() || (is_external_link_target(&target) && !file_url) {
+                continue;
+            }
+            let (path, _) = split_link_anchor(&target);
+            let path = path.split('?').next().unwrap_or(path);
+            let destination = parent.join(crate::lsp_code_analysis::uri_path_buf(path));
+            if file_url
+                || !destination
+                    .canonicalize()
+                    .is_ok_and(|path| path.starts_with(root))
+            {
+                findings.push(Finding {
+                    path: Some(source.clone()),
+                    line: None,
+                    message: format!(
+                        "local Markdown link must resolve within the repository: {target}"
+                    ),
+                });
+            }
+        }
+    }
+    if render_findings(&findings, root) && run_lychee(root, &files.into_iter().collect::<Vec<_>>())
+    {
+        0
+    } else {
+        1
+    }
 }
 
 fn run_link_audit(

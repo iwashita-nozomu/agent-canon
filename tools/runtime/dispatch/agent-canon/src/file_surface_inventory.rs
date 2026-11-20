@@ -279,43 +279,11 @@ fn inventory_scope(name: &str, root: &Path) -> Result<ScopeInventory, String> {
 }
 
 fn git_files(root: &Path) -> Result<Vec<(String, String)>, String> {
-    let tracked = Command::new("git")
-        .arg("-C")
-        .arg(root)
-        .args(["ls-files", "-z", "-s"])
-        .output()
-        .map_err(|error| {
-            format!(
-                "git ls-files failed for inventory scope: {} ({error})",
-                root.display()
-            )
-        })?;
-    if !tracked.status.success() {
-        return Err(format!(
-            "git ls-files failed for inventory scope: {}",
-            root.display()
-        ));
-    }
-    let mut rows = Vec::new();
-    for record in tracked
-        .stdout
-        .split(|byte| *byte == 0)
-        .filter(|record| !record.is_empty())
-    {
-        let Some(tab) = record.iter().position(|byte| *byte == b'\t') else {
-            continue;
-        };
-        let metadata = String::from_utf8_lossy(&record[..tab]);
-        let mode = metadata
-            .split_whitespace()
-            .next()
-            .unwrap_or_default()
-            .to_string();
-        rows.push((
-            mode,
-            String::from_utf8_lossy(&record[tab + 1..]).into_owned(),
-        ));
-    }
+    let mut rows: Vec<_> = crate::git_read::index_entries(root)
+        .map_err(|error| format!("git ls-files failed for inventory scope: {error}"))?
+        .into_iter()
+        .map(|entry| (entry.mode, entry.path))
+        .collect();
     let untracked = Command::new("git")
         .arg("-C")
         .arg(root)

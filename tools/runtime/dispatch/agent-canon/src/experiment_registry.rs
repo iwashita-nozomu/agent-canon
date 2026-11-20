@@ -4,6 +4,7 @@
 // upstream design ../../../../../documents/experiments/experiment-registry.md defines the registry contract
 // upstream implementation experiment_identity.rs owns safe topic and variant segments
 // upstream implementation path_resolution.rs owns non-strict path resolution
+// upstream implementation experiment_registry/cmake.rs validates the consumer CMake registry profile
 // upstream implementation python_cli_options.rs owns argparse-compatible option prefixes
 // downstream implementation main.rs exposes the native experiment-registry command
 // downstream test ../tests/experiment_registry_native.rs preserves registry and CLI oracles
@@ -21,6 +22,7 @@ use std::process::{Command, Output};
 use toml_edit::{DocumentMut, Item, TableLike, Value as TomlValue};
 
 pub const SELECTOR: &str = "experiment-registry";
+mod cmake;
 pub mod context;
 pub mod create_experiment_topic;
 pub(crate) mod store;
@@ -60,6 +62,8 @@ pub(crate) enum RegistryValue {
 enum OptionKind {
     RepoRoot,
     Registry,
+    Profile,
+    CmakeEntry,
 }
 
 enum ParsedArgs {
@@ -67,6 +71,7 @@ enum ParsedArgs {
     Values {
         repo_root: Option<PathBuf>,
         registry: Option<PathBuf>,
+        cmake_entry: Option<PathBuf>,
     },
 }
 
@@ -185,6 +190,7 @@ pub fn run(args: &[String]) -> i32 {
     let ParsedArgs::Values {
         repo_root: requested_root,
         registry: requested_registry,
+        cmake_entry,
     } = parsed
     else {
         print_help();
@@ -213,7 +219,11 @@ pub fn run(args: &[String]) -> i32 {
             return 2;
         }
     };
-    let findings = match collect_findings(&repo_root, &registry_path) {
+    let validation = match cmake_entry {
+        Some(entry) => cmake::collect_findings(&repo_root, &registry_path, &entry),
+        None => collect_findings(&repo_root, &registry_path),
+    };
+    let findings = match validation {
         Ok(findings) => findings,
         Err(error) => {
             eprintln!("{error}");
@@ -240,9 +250,13 @@ pub fn run(args: &[String]) -> i32 {
 fn parse_args(args: &[String]) -> Result<ParsedArgs, String> {
     let mut repo_root = None;
     let mut registry = None;
+    let mut profile = "python".to_owned();
+    let mut cmake_entry = None;
     let options = [
         ("--repo-root", OptionKind::RepoRoot),
         ("--registry", OptionKind::Registry),
+        ("--profile", OptionKind::Profile),
+        ("--cmake-entry", OptionKind::CmakeEntry),
     ];
     let mut index = 0;
     while index < args.len() {
@@ -271,12 +285,21 @@ fn parse_args(args: &[String]) -> Result<ParsedArgs, String> {
         match option {
             OptionKind::RepoRoot => repo_root = Some(PathBuf::from(value)),
             OptionKind::Registry => registry = Some(PathBuf::from(value)),
+            OptionKind::Profile => profile = value,
+            OptionKind::CmakeEntry => cmake_entry = Some(PathBuf::from(value)),
         }
         index += 1;
     }
+    let cmake_entry = match profile.as_str() {
+        "python" if cmake_entry.is_none() => None,
+        "python" => return Err("--cmake-entry requires --profile cmake".to_owned()),
+        "cmake" => Some(cmake_entry.unwrap_or_else(|| "CMakeLists.txt".into())),
+        _ => return Err(format!("unknown registry profile: {profile}")),
+    };
     Ok(ParsedArgs::Values {
         repo_root,
         registry,
+        cmake_entry,
     })
 }
 
@@ -291,7 +314,9 @@ fn print_help() {
          options:\n\
          -h, --help       Print help and exit\n\
          --repo-root PATH\n\
-         --registry PATH  Optional registry path; defaults to <repo-root>/experiments/registry.toml"
+         --registry PATH  Optional registry path; defaults to <repo-root>/experiments/registry.toml\n\
+         --profile PROFILE  python (default) or cmake\n\
+         --cmake-entry PATH  Repository-relative CMake entry; defaults to CMakeLists.txt"
     );
 }
 

@@ -47,7 +47,7 @@ tools/bin/agent-canon docs check <paths...>
 tools/bin/agent-canon docs format <paths...>
 tools/bin/agent-canon docs find-redundant-designs [--design-root <path>] [--delete] [--mutation-capability-json <json>] [--runtime-root <path>] [--output <path>]
 tools/bin/agent-canon docs check-entrypoints [--root <repo-root>] [--format text|json]
-tools/bin/agent-canon docs check-bootstrap [--root <path>] [--static-seed-consumer]
+tools/bin/agent-canon docs check-bootstrap [--root <path>] [--static-seed-consumer | --source-policy PATH]
 tools/bin/agent-canon template-bundle export --source-root <root> --source-ref <commit-ish> --profile static-seed --output <directory>
 tools/bin/agent-canon template-bundle committed-tree --source-root <root> --source-ref <commit-ish>
 tools/bin/agent-canon test-design check <test-paths...>
@@ -94,6 +94,43 @@ an exported static seed or source-hidden consumer root with
 `--static-seed-consumer`. It reads the selected root and emits the existing
 bootstrap-check findings and pass/fail markers without resolving an AgentCanon
 source checkout.
+
+## 下流リポジトリの検査
+
+製品のビルド環境から独立して、インストール済みのネイティブCLIを対象リポジトリに向けます。
+`docs links --consumer` はGit管理下のMarkdownを確認します。ローカルリンクが
+リポジトリ内に解決することを既存のMarkdown解析で確かめ、`lychee` で確認します。
+`experiment-registry --profile cmake` は[実験登録](../experiments/experiment-registry.md#cmake-profile)
+と、プロジェクトが指定したCMakeの入口を確認します。
+
+```bash
+agent-canon docs links --root "$project" --consumer
+agent-canon experiment-registry --repo-root "$project" --profile cmake --cmake-entry CMakeLists.txt
+agent-canon check-github-workflows --root "$project" --consumer
+agent-canon docs check-bootstrap --root "$project" --source-policy source-policy.toml
+```
+
+`--consumer` は対象のGitHub Actionsワークフローを `actionlint` で検査し、
+`.github/actionlint.yaml` または `.github/actionlint.yml` の設定を使います。
+AgentCanon自身のPR雛形に対する検査は通常のモードが担います。
+
+`--source-policy` は対象リポジトリ内のTOMLを読み、Gitインデックス内の持ち込みを検査します。
+`source_name_pattern` はsubmodule記述、gitlinkの名前、symlinkの名前と指す先を照合する正規表現です。
+`forbidden_paths` はファイルまたはディレクトリ、`forbidden_path_fragments` はパス名の部分文字列です。
+`references` では対象パス、その中で許可する個別ファイル、禁止する文字列を指定します。
+
+```toml
+source_name_pattern = '(?i)agent[\W_]*canon'
+forbidden_paths = ["vendor/agent-canon", ".agent-canon"]
+forbidden_path_fragments = ["agent-canon-static-seed"]
+
+[[references]]
+paths = [".github/workflows"]
+forbidden = ["vendor/agent-canon", "checkout_agent_canon_submodule"]
+```
+
+リンク検査とワークフロー検査は既存の共有ツール環境でも実行できます。
+登録検査と持ち込み検査はRust製CLIが担当し、製品のビルドや実験はプロジェクトが実行します。
 
 `template-bundle export --profile static-seed` exports the exact allowlisted
 source snapshot. `template-bundle committed-tree` returns the resolved commit

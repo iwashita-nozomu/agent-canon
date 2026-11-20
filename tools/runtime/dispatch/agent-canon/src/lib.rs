@@ -89,6 +89,7 @@ pub mod execution_source_freeze;
 pub mod experiment_identity;
 pub mod experiment_registry;
 pub mod extract_docx;
+pub mod file_surface_inventory;
 pub mod formal_proof;
 pub mod generated_completeness;
 pub mod git_read;
