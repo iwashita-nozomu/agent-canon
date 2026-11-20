@@ -53,10 +53,11 @@ context/evidence. The contracts below apply without an installed Skill/runtime.
   and execution conditions.
 - **Reuse:** extend the existing capability owner first. A separate implementation
   needs a concrete requirement, responsibility, or contract gap extension cannot fill.
-- **Investigation:** start local repair at target code, diff, and contract, without
-  requiring use-site/out-of-scope investigation. For an unresolved decision, state
-  the missing fact and smallest needed reference. Cross-module/API migrations use
-  their declared dependency scope only.
+- **Investigation:** start local repair at the target code, diff, and contract.
+  Before rejecting a claim or asking about a premise, read the relevant assumptions
+  and valid input domain in the governing sources and apply them to the case.
+  For a decision that remains unresolved, name the missing fact and its source.
+  Cross-module/API migrations use their declared dependency scope.
 - **Correctness:** follow current requirements and input/output contracts while
   preserving external boundaries. History explains causes, not correctness;
   restore old behavior only when required. Source and applicable tests can establish
@@ -121,15 +122,15 @@ context/evidence. The contracts below apply without an installed Skill/runtime.
   work, progress, reuse, scope, or per-commit validation ledgers. Implement the
   planned migration, review obsolete code and references, then validate its final
   state together; intermediate edits and commits are not separate test gates.
-- Complete the authorized in-scope outcome, including existing failures; diagnosis,
-  checkpoints, and no-op checks are insufficient. Complete the planned repair
-  units and retirement review before final validation; independent work may proceed
-  in parallel.
-  If blocked, name the failed operation, unverified property, and next owner/action;
-  finish independent work.
+- Before closing a task, match every requested outcome to the actual artifact,
+  execution result, or other evidence that establishes it. Complete missing
+  or failing authorized work in the same task. Complete planned repairs and retirement review
+  before final validation. If blocked, finish independent work and state the
+  failed operation, the remaining outcome, and what can unblock it.
 - Report commit/push separately and distinguish implemented, verified, published,
-  and applied. Support claims with source, checked derivation, or the owner's
-  operation; disclose material uncertainty/limits without exposing secrets.
+  and applied. State the reason beside each material conclusion. Explain how the
+  source, derivation, or observed result supports that judgment. State material
+  limits and uncertainty. Keep secrets private.
 
 ## Validation Routing
 

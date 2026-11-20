@@ -30,8 +30,9 @@ Use at intake or when new evidence changes that choice.
    does not select its execution procedure.
 2. Start at the target, current diff, and governing contract. Trace affected
    callers, tests/checkers, and distribution inputs with targeted searches;
-   include their necessary changes in the same responsibility unit. Resolve retrievable
-   facts before asking the user. For an unresolved contract conflict, identify
+   include their necessary changes in the same responsibility unit. Read the
+   assumptions and applicable input domain in the governing sources before
+   rejecting an approach or asking the user about it. For an unresolved contract conflict, identify
    its owner/section, requested result, blocked action, and evidence. Apply a
    resolution settled by current authority and requirements; otherwise ask the
    user about the remaining choice.
