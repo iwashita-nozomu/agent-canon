@@ -291,6 +291,11 @@ _agent_canon_host_native_cli() {
   fi
 }
 
+_agent_canon_main_eval_api_available() {
+  command -v gh >/dev/null 2>&1 &&
+    gh api --hostname github.com user --jq '.login' >/dev/null 2>&1
+}
+
 _agent_canon_update_native_cli() (
   set -euo pipefail
   local home_root
@@ -452,6 +457,13 @@ _agent_canon_sync_operation() (
   fi
 
   local archive_cli
+  local -a main_eval_args=()
+  if _agent_canon_main_eval_api_available; then
+    main_eval_args=(--include-main-evals)
+  else
+    printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"warning","operation":"sync","code":"github_main_eval_api_deferred","detail":"gh API is unavailable on the execution host; main Eval delivery remains pending"}\n' >&2
+    printf 'AGENT_CANON_GITHUB_AUTH_HOST=%s\n' "$(hostname)" >&2
+  fi
   archive_cli=$(_agent_canon_host_native_cli)
   if [[ -x "$archive_cli" ]] && "$archive_cli" --version >/dev/null 2>&1; then
     "$archive_cli" runtime-log-archive-git \
@@ -460,7 +472,7 @@ _agent_canon_sync_operation() (
       --archive-root "$AGENT_CANON_PRIVATE_LOG_ROOT" \
       --runtime-root "$AGENT_CANON_RUNTIME_ROOT" \
       --remote "${AGENT_CANON_LOG_REMOTE:-git@github.com:iwashita-nozomu/agent-canon-log.git}" \
-      sync --no-agent-reports --include-main-evals || hook_rc=$?
+      sync --no-agent-reports "${main_eval_args[@]}" || hook_rc=$?
   else
     _agent_canon_json_error runtime_archive_unavailable \
       "runtime archive owner is unavailable for scheduled hook delivery"

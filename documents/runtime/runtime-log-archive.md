@@ -148,6 +148,14 @@ requirement to recreate a failure before recording or routing it. Explicitly
 selected manual recovery remains supported, but is neither the automatic retry
 mechanism nor a prerequisite for reading existing evidence.
 
+The scheduler probes `gh api user` on its own execution host before requesting
+GitHub Actions main-Eval artifacts. If that API context is unavailable, `sync`
+emits `github_main_eval_api_deferred` with the execution hostname and continues
+the independent local hook, eval, and feedback archive routes. The next timer
+run retries main-Eval delivery after that host's GitHub authentication works;
+authentication in another shell or on another machine does not authorize this
+host's API requests.
+
 ## Collection contract
 
 ### Main-change Eval collection
