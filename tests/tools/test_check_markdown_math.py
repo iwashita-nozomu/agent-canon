@@ -27,7 +27,9 @@ class CheckMarkdownMathTest(unittest.TestCase):
         """Run the docs command with its existing project configuration."""
         config = root / LYCHEE_CONFIG
         config.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(PROJECT_ROOT / ".markdownlint-cli2.jsonc", root / ".markdownlint-cli2.jsonc")
+        shutil.copyfile(
+            PROJECT_ROOT / ".markdownlint-cli2.jsonc", root / ".markdownlint-cli2.jsonc"
+        )
         shutil.copyfile(PROJECT_ROOT / LYCHEE_CONFIG, config)
         return subprocess.run(
             [str(AGENT_CANON), "docs", "check", "--root", str(root), *args],
@@ -81,6 +83,16 @@ class CheckMarkdownMathTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertNotIn("mathematical notation", result.stderr)
 
+    def test_reports_unclosed_display_math_at_opening_line(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_file(root / "doc.md", "# Doc\n\n$$\nx + y\n")
+
+            result = self.run_cli(root, "doc.md")
+
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("doc.md:3: unclosed `$$` display math block", result.stderr)
+
     def test_uses_markdownlint_native_findings(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
@@ -123,7 +135,9 @@ class CheckMarkdownMathTest(unittest.TestCase):
             result = self.run_cli(root, "doc.md")
 
             self.assertEqual(result.returncode, 1)
-            self.assertIn("workspace-absolute Markdown target should be relative", result.stderr)
+            self.assertIn(
+                "workspace-absolute Markdown target should be relative", result.stderr
+            )
 
 
 if __name__ == "__main__":

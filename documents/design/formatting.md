@@ -28,7 +28,7 @@ checklist into every Skill.
 | Python | [`ruff.toml`](../../ruff.toml) | `ruff format <edited Python paths...>` |
 | C, C++, CUDA | [`.clang-format`](../../.clang-format) | `clang-format -i --style=file <edited paths...>` |
 | Rust | [`rustfmt.toml`](../../rustfmt.toml) | Owning crate's existing formatting command, or `rustfmt` on edited files using its declared edition |
-| Markdown | [AgentCanon docs tool](../tools/agent-canon.md) | `agent-canon docs format --root . <edited Markdown paths...>` |
+| Markdown | [`.markdownlint-cli2.jsonc`](../../.markdownlint-cli2.jsonc) | `agent-canon docs format --root . <edited Markdown paths...>` |
 | VS Code integration | [Settings](../../.vscode/settings.json), [recommendations](../../.vscode/extensions.json) | Format on save for Python, C/C++/CUDA and Rust using the selected native formatter |
 
 Run commands from the repository's existing working context and name the edited
@@ -40,14 +40,13 @@ do not expand a bounded edit to a whole-workspace reformat.
 ### Markdown execution
 
 Run the installed native CLI's `agent-canon docs format --root . <edited paths...>`
-in the writable work checkout. Formatting uses the native executable alone.
-It does not start Docker or run document checks.
+in the writable work checkout. It delegates fixes to `markdownlint-cli2 --fix`
+with the repository configuration and preserves two-space Markdown hard breaks.
+The executable must be available on `PATH`.
 
-Select `agent-canon docs check` when validation of lint, links, math or diagrams
-is required and its standard providers are available in the selected environment.
-The [command owner](../tools/agent-canon.md#commands) lists those providers.
-A missing image or provider does not block formatting or the remaining task;
-report the selected checks that could not run.
+Use `agent-canon docs check` for GitHub-bound changes. The
+[command owner](../tools/agent-canon.md#commands) lists its providers and
+rendering checks. Report any formatting or checks left unverified.
 
 If the already selected environment is a shared resident with read-only source
 mounts, format a writable task snapshot and copy back only the selected files.

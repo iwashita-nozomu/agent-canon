@@ -23,7 +23,9 @@ def run_docs(root: Path, command: str, *args: str) -> subprocess.CompletedProces
     """Run the docs CLI with the existing project configuration."""
     config = root / LYCHEE_CONFIG
     config.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(PROJECT_ROOT / ".markdownlint-cli2.jsonc", root / ".markdownlint-cli2.jsonc")
+    shutil.copyfile(
+        PROJECT_ROOT / ".markdownlint-cli2.jsonc", root / ".markdownlint-cli2.jsonc"
+    )
     shutil.copyfile(PROJECT_ROOT / LYCHEE_CONFIG, config)
     return subprocess.run(
         [str(AGENT_CANON), "docs", command, "--root", str(root), *args],
@@ -43,7 +45,10 @@ def write_markdown(path: Path, text: str) -> None:
 def test_docs_check_accepts_valid_mermaid_source() -> None:
     with tempfile.TemporaryDirectory() as tmp_dir:
         root = Path(tmp_dir)
-        write_markdown(root / "diagram.md", "# Diagram\n\n```mermaid\nflowchart LR\n  a[Start] --> b[End]\n```\n")
+        write_markdown(
+            root / "diagram.md",
+            "# Diagram\n\n```mermaid\nflowchart LR\n  a[Start] --> b[End]\n```\n",
+        )
 
         result = run_docs(root, "check", "diagram.md")
 
@@ -53,11 +58,51 @@ def test_docs_check_accepts_valid_mermaid_source() -> None:
 def test_docs_check_rejects_invalid_mermaid_source() -> None:
     with tempfile.TemporaryDirectory() as tmp_dir:
         root = Path(tmp_dir)
-        write_markdown(root / "diagram.md", "# Diagram\n\n```mermaid\nnot a valid diagram\n```\n")
+        write_markdown(
+            root / "diagram.md", "# Diagram\n\n```mermaid\nnot a valid diagram\n```\n"
+        )
 
         result = run_docs(root, "check", "diagram.md")
 
         assert result.returncode != 0
+
+
+def test_docs_check_rejects_invalid_mermaid_in_tilde_fence(tmp_path: Path) -> None:
+    write_markdown(
+        tmp_path / "diagram.md", "# Diagram\n\n~~~mermaid\nnot a valid diagram\n~~~\n"
+    )
+
+    result = run_docs(tmp_path, "check", "diagram.md")
+
+    assert result.returncode == 1
+    assert "diagram.md: Mermaid block 1 failed to render" in result.stderr
+
+
+def test_docs_check_rejects_pandoc_mermaid_attributes(tmp_path: Path) -> None:
+    write_markdown(
+        tmp_path / "diagram.md",
+        "# Diagram\n\n```{.mermaid}\nflowchart LR\n  a --> b\n```\n",
+    )
+
+    result = run_docs(tmp_path, "check", "diagram.md")
+
+    assert result.returncode == 1
+    assert (
+        "GitHub Mermaid fences use the `mermaid` language identifier" in result.stderr
+    )
+
+
+def test_docs_format_applies_native_fixes_to_selected_file(tmp_path: Path) -> None:
+    selected = tmp_path / "selected.md"
+    untouched = tmp_path / "untouched.md"
+    write_markdown(selected, "# Title\n\nFirst line  \nNext line \n\n-   Item\n")
+    write_markdown(untouched, "# Other\n\n-   Item\n")
+
+    result = run_docs(tmp_path, "format", selected.name)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert selected.read_bytes() == b"# Title\n\nFirst line  \nNext line\n\n- Item\n"
+    assert untouched.read_bytes() == b"# Other\n\n-   Item\n"
 
 
 def test_docs_format_does_not_rewrite_diagram_content() -> None:

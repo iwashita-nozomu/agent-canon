@@ -26,37 +26,16 @@ downstream implementation ../../tests/tools/test_fix_mermaid.py tests native Mer
 
 ## Procedure
 
-1. Identify the changed Markdown paths and content owner. This binds the
-   operation and returned findings to the requested scope.
-2. Follow the
-   [formatter execution procedure](../../documents/design/formatting.md#markdown-execution).
-   Run the installed native `agent-canon docs format --root . <changed paths...>`
-   in the writable checkout and inspect its diff. This operation needs no Docker
-   image or external provider. Use a writable task snapshot only when the
-   selected environment exposes source read-only.
-   Select `docs check` separately for the changed guarantee using available
-   standard providers. Missing validation is reported with its reason while
-   the remaining authorized work continues. Read help only for an unresolved option.
-3. Inspect the formatter's changes and diagnostics, then repair relevant
-   formatting, link, heading, math, or Mermaid findings. The formatter
-   normalizes line endings, trailing whitespace, and repeated blank lines; it
-   does not decide the correctness of claims or mathematical/diagram meaning.
-   The content owner handles semantic and cross-document findings for that
-   reason.
-4. After repairs or later edits, rerun the formatter on the changed scope and
-   inspect the final diff for readability and meaning. Retain the actual
-   command, diagnostics, exit status, and remaining verification limits.
-   Earlier results do not cover subsequent edits, so this keeps the
-   [edited, validated, and submitted content](../../documents/design/formatting.md#engineering-rationale)
-   aligned.
+Run `agent-canon docs format --root . <edited paths...>` with `markdownlint-cli2`
+available and inspect the final diff. The
+[formatter settings](../../documents/design/formatting.md#markdown-execution)
+describe how to use the shared environment when it exposes source read-only.
 
-The selected AgentCanon `docs check` route invokes `markdownlint-cli2` and offline
-`lychee` providers directly, then uses Quarto's embedded Pandoc AST for
-workspace-absolute local-target policy and Mermaid-block selection. `mmdc`
-validates Mermaid syntax in a temporary output directory without rewriting the
-source. The repository-specific residuals are per-depth unordered-marker
-consistency, exact math delimiter spelling, bootstrap documentation, and the
-runtime-profile inventory. Standard-tool output and exit status remain native.
+For Markdown intended for GitHub, run `agent-canon docs check --root . <edited paths...>`.
+It checks lint and local links, parses the document as GitHub Flavored Markdown,
+and sends Mermaid blocks to the installed renderer. For changes that depend on
+GitHub's hosted rendering, inspect the GitHub preview when available. Record
+unavailable providers or preview checks with the result.
 
 ## Boundary
 

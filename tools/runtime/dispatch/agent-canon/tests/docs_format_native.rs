@@ -1,19 +1,18 @@
 // @dependency-start
 // contract test
-// responsibility Checks standalone formatting without Docker or document providers.
-// upstream implementation ../src/docs.rs owns Markdown normalization and explicit checks
+// responsibility Checks missing Markdown providers without changing source files.
+// upstream implementation ../src/docs.rs dispatches Markdown formatting and checks
 // @dependency-end
 
 use std::fs;
 use std::process::Command;
 
 #[test]
-fn format_normalizes_selected_file_with_no_external_commands() {
+fn format_reports_missing_formatter_without_rewriting_source() {
     let root = tempfile::tempdir().unwrap();
     let selected = root.path().join("selected.md");
-    let untouched = root.path().join("untouched.md");
-    fs::write(&selected, "# Title  \r\n\r\n\r\n\r\n### Detail\r\n").unwrap();
-    fs::write(&untouched, "# Unchanged  \r\n").unwrap();
+    let source = b"# Title\r\n\r\nFirst line  \r\nNext line \r\n";
+    fs::write(&selected, source).unwrap();
     let output = Command::new(env!("CARGO_BIN_EXE_agent-canon"))
         .args(["docs", "format", "--root"])
         .arg(root.path())
@@ -21,13 +20,9 @@ fn format_normalizes_selected_file_with_no_external_commands() {
         .env("PATH", "")
         .output()
         .unwrap();
-    assert!(output.status.success(), "{output:?}");
-    assert_eq!(
-        fs::read_to_string(selected).unwrap(),
-        "# Title\n\n\n### Detail\n"
-    );
-    assert_eq!(fs::read(untouched).unwrap(), b"# Unchanged  \r\n");
-    assert!(output.stderr.is_empty(), "{output:?}");
+    assert_eq!(output.status.code(), Some(1), "{output:?}");
+    assert!(String::from_utf8_lossy(&output.stderr).contains("markdownlint-cli2"));
+    assert_eq!(fs::read(selected).unwrap(), source);
 }
 
 #[test]
