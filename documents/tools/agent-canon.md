@@ -146,12 +146,15 @@ property/metamorphic candidates. Its detailed contract lives in
 current stage, and `DEFERRED_SKILLS` for dynamic wave triggers. Use it before
 broad skill-selection prose or subagent fan-out.
 
-`format` normalizes line endings, trailing whitespace, and repeated blank lines
-using only the native executable. Run it directly in a writable checkout;
-Docker and external document providers are unnecessary for this operation.
-Select `check` separately when its validation is required. Missing providers
-leave those checks unverified while formatting and other authorized work proceed.
-Math and Mermaid content is preserved by formatting and checked by `check`.
+`format` passes selected files to the installed `markdownlint-cli2 --fix` with
+the repository configuration. Its diagnostics include rules that require a
+manual correction.
+
+`check` uses `markdownlint-cli2` and offline `lychee` for lint and links.
+Quarto's Pandoc reads GitHub Flavored Markdown, and `mmdc` renders the Mermaid
+blocks found in the document. The check reports Pandoc-style Mermaid fences
+and unclosed `$$` display math blocks. GitHub's hosted preview uses its own
+renderer. [GitHub Mermaid syntax](https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/creating-diagrams)
 
 `check-entrypoints` validates the finite root entrypoint owner-map grammar,
 required owner rows and destinations, and marker ownership. It uses the same

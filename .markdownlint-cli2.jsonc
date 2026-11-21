@@ -3,7 +3,7 @@
     "default": false,
     "MD001": true,
     "MD004": false,
-    "MD009": { "br_spaces": 0 },
+    "MD009": { "br_spaces": 2 },
     "MD010": { "ignore_code_blocks": false },
     "MD030": {
       "ul_single": 1,

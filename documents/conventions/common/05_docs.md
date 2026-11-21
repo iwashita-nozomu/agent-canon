@@ -56,8 +56,10 @@ downstream implementation ../../../tools/runtime/dispatch/agent-canon/src/conven
 - workflow、依存関係、責務境界、状態遷移、routing、review gate、multi-step 手順を説明する reader-facing Markdown では、Mermaid 図を既定の visual 候補にします。
 - Mermaid 図は Markdown 内の fenced `mermaid` code block として保持し、本文の責務説明と併記して正本化します。
 - Mermaid 図には、図が示す関係を本文で短く説明します。
-- Markdown の整形は、変更したファイルを対象に AgentCanon の `agent-canon docs format` を実行します。
-  [Markdown style check の実行手順](../../../agents/skills/md-style-check.md#procedure) に従い、共有 runtime と登録 target を使います。
+- Markdown の整形は、変更したファイルを対象に `agent-canon docs format` から既存の
+  `markdownlint-cli2` を呼び出します。
+  [Markdown style check の実行手順](../../../agents/skills/md-style-check.md#procedure) に沿って
+  GitHub向けの文書を検査します。
 - 体裁チェックの設定はリポジトリ root の [`.markdownlint-cli2.jsonc`](../../../.markdownlint-cli2.jsonc) を使います。
   例外が必要な場合は設定ファイルと規約文書を同時に更新します。
 - 空行は 1 行に保ち、見出しには本文または箇条書きを続けます。

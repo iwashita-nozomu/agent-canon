@@ -214,12 +214,6 @@ struct Finding {
     message: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct WriteSummary {
-    changed_files: usize,
-    changes: usize,
-}
-
 pub fn run(args: &[String]) -> i32 {
     if args
         .first()
@@ -2019,7 +2013,7 @@ fn usage_text() -> &'static str {
 \n\
 commands:\n\
   check                   check Markdown lint, links, math, Mermaid, headings, and runtime-profile docs\n\
-  format                  normalize Markdown whitespace using the native executable\n\
+  format                  fix selected Markdown with markdownlint-cli2\n\
   find-redundant-designs  report exact duplicate design documents; --delete requires an exact source mutation capability\n\
   find-similar-designs    compare Markdown design documents and write an external runtime report\n\
   organize-designs        plan design-document placement; --apply requires an exact source mutation capability\n\
@@ -2408,7 +2402,7 @@ fn python_list_repr(values: &[&str]) -> String {
 
 fn render_check(root: &Path, raw_paths: &[String]) -> i32 {
     let markdown_files = collect_markdown_files(root, raw_paths);
-    let mut succeeded = run_markdownlint_cli(root, &markdown_files);
+    let mut succeeded = run_markdownlint_cli(root, &markdown_files, false);
     succeeded &= run_lychee(root, &markdown_files);
     let mut findings = Vec::new();
     for path in &markdown_files {
@@ -2429,8 +2423,24 @@ fn render_check(root: &Path, raw_paths: &[String]) -> i32 {
             Ok(document) => {
                 findings.extend(check_workspace_absolute_links(root, path, &document.links));
                 findings.extend(check_markdown_math(path, &text, &document.math_fences));
-                if document.has_mermaid {
-                    succeeded &= run_mermaid_cli(root, path);
+                for tag in document.mermaid_attributes {
+                    findings.push(Finding {
+                        path: Some(path.clone()),
+                        line: None,
+                        message: format!(
+                            "GitHub Mermaid fences use the `mermaid` language identifier; found `{tag}`"
+                        ),
+                    });
+                }
+                for (index, diagram) in document.mermaid_blocks.iter().enumerate() {
+                    if !run_mermaid_cli(root, diagram) {
+                        eprintln!(
+                            "{}: Mermaid block {} failed to render",
+                            display_path(root, path),
+                            index + 1
+                        );
+                        succeeded = false;
+                    }
                 }
             }
             Err(message) => {
@@ -2450,18 +2460,8 @@ fn render_check(root: &Path, raw_paths: &[String]) -> i32 {
 }
 
 fn render_format(root: &Path, raw_paths: &[String]) -> i32 {
-    let summary = match format_markdown_files(root, raw_paths) {
-        Ok(summary) => summary,
-        Err(error) => {
-            eprintln!("docs format: {error}");
-            return 1;
-        }
-    };
-    println!(
-        "docs format: {} file(s), {} change(s)",
-        summary.changed_files, summary.changes
-    );
-    0
+    let files = collect_markdown_files(root, raw_paths);
+    i32::from(!run_markdownlint_cli(root, &files, true))
 }
 
 fn consumer_link_audit(root: &Path) -> i32 {
@@ -2916,7 +2916,7 @@ fn docs_provider_config(
     }
 }
 
-fn run_markdownlint_cli(root: &Path, files: &[PathBuf]) -> bool {
+fn run_markdownlint_cli(root: &Path, files: &[PathBuf], fix: bool) -> bool {
     if files.is_empty() {
         return true;
     }
@@ -2939,6 +2939,9 @@ fn run_markdownlint_cli(root: &Path, files: &[PathBuf]) -> bool {
         .arg("--config")
         .arg(config.path())
         .arg("--no-globs");
+    if fix {
+        command.arg("--fix");
+    }
     for path in files {
         command.arg(format!(":{}", path.display()));
     }
@@ -3045,7 +3048,8 @@ fn run_native_command(name: &str, command: &mut Command) -> bool {
 struct DocumentAst {
     links: Vec<String>,
     math_fences: Vec<String>,
-    has_mermaid: bool,
+    mermaid_attributes: Vec<String>,
+    mermaid_blocks: Vec<String>,
 }
 
 fn read_document_ast(root: &Path, path: &Path) -> Result<DocumentAst, String> {
@@ -3056,6 +3060,7 @@ fn read_document_ast(root: &Path, path: &Path) -> Result<DocumentAst, String> {
         .env("XDG_CACHE_HOME", &cache.0)
         .arg("pandoc")
         .arg(path)
+        .arg("--from=gfm+tex_math_dollars")
         .arg("--to=json")
         .output()
         .map_err(|error| format!("quarto pandoc: {error}"))?;
@@ -3087,22 +3092,32 @@ fn collect_document_ast(value: &Value, document: &mut DocumentAst) {
                 }
             }
             "CodeBlock" => {
-                if let Some(classes) = value
-                    .get("c")
-                    .and_then(Value::as_array)
+                let content = value.get("c").and_then(Value::as_array);
+                if let Some(tag) = content
                     .and_then(|content| content.first())
                     .and_then(Value::as_array)
                     .and_then(|attributes| attributes.get(1))
                     .and_then(Value::as_array)
+                    .and_then(|classes| classes.first())
+                    .and_then(Value::as_str)
                 {
-                    for class in classes.iter().filter_map(Value::as_str) {
-                        match class.to_ascii_lowercase().as_str() {
-                            "mermaid" => document.has_mermaid = true,
-                            "math" | "latex" | "tex" => {
-                                document.math_fences.push(class.to_ascii_lowercase());
+                    let language = tag.to_ascii_lowercase();
+                    match language.as_str() {
+                        "mermaid" => {
+                            if let Some(body) = content
+                                .and_then(|content| content.get(1))
+                                .and_then(Value::as_str)
+                            {
+                                document.mermaid_blocks.push(body.to_string());
                             }
-                            _ => {}
                         }
+                        "{mermaid}" | "{.mermaid}" | "{.mermaid" => {
+                            document.mermaid_attributes.push(tag.to_string());
+                        }
+                        "math" | "latex" | "tex" | "{math}" | "{.math}" | "{.latex}" | "{.tex}" => {
+                            document.math_fences.push(language);
+                        }
+                        _ => {}
                     }
                 }
             }
@@ -3124,7 +3139,7 @@ fn collect_document_ast(value: &Value, document: &mut DocumentAst) {
     }
 }
 
-fn run_mermaid_cli(root: &Path, path: &Path) -> bool {
+fn run_mermaid_cli(root: &Path, diagram: &str) -> bool {
     let directory = match DocsTemporaryDirectory::create("mermaid") {
         Ok(directory) => directory,
         Err(error) => {
@@ -3137,16 +3152,20 @@ fn run_mermaid_cli(root: &Path, path: &Path) -> bool {
         eprintln!("mmdc: cannot write Puppeteer configuration: {error}");
         return false;
     }
-    let rendered_markdown = directory.0.join("rendered.md");
+    let diagram_path = directory.0.join("diagram.mmd");
+    if let Err(error) = fs::write(&diagram_path, diagram) {
+        eprintln!("mmdc: cannot write diagram input: {error}");
+        return false;
+    }
     let mut command = Command::new("mmdc");
     command
         .current_dir(root)
         .arg("--puppeteerConfigFile")
         .arg(config)
         .arg("-i")
-        .arg(path)
+        .arg(diagram_path)
         .arg("-o")
-        .arg(rendered_markdown);
+        .arg(directory.0.join("diagram.svg"));
     run_native_command("mmdc", &mut command)
 }
 
@@ -3177,52 +3196,6 @@ impl Drop for DocsTemporaryDirectory {
     fn drop(&mut self) {
         let _ = fs::remove_dir_all(&self.0);
     }
-}
-
-fn format_markdown_files(root: &Path, raw_paths: &[String]) -> io::Result<WriteSummary> {
-    rewrite_markdown_files(root, raw_paths, |text| {
-        let text = text.replace("\r\n", "\n").replace('\r', "\n");
-        let lines = text.split('\n').map(str::trim_end);
-        let mut output = Vec::new();
-        let mut blank_count = 0usize;
-        for line in lines {
-            if line.is_empty() {
-                blank_count += 1;
-            } else {
-                blank_count = 0;
-            }
-            if blank_count <= 2 {
-                output.push(line.to_string());
-            }
-        }
-        let formatted = output.join("\n").trim_end_matches('\n').to_string() + "\n";
-        let extra_changes = if formatted != text { 1 } else { 0 };
-        (formatted, extra_changes)
-    })
-}
-
-fn rewrite_markdown_files(
-    root: &Path,
-    raw_paths: &[String],
-    rewrite: fn(&str) -> (String, usize),
-) -> io::Result<WriteSummary> {
-    let mut changed_files = 0usize;
-    let mut changes = 0usize;
-    for path in collect_markdown_files(root, raw_paths) {
-        let original = fs::read_to_string(&path)?;
-        let (updated, file_changes) = rewrite(&original);
-        if updated == original {
-            continue;
-        }
-        fs::write(&path, updated)?;
-        changed_files += 1;
-        changes += file_changes.max(1);
-        println!("formatted {}", display_path(root, &path));
-    }
-    Ok(WriteSummary {
-        changed_files,
-        changes,
-    })
 }
 
 fn collect_markdown_files(root: &Path, raw_paths: &[String]) -> Vec<PathBuf> {
@@ -3341,7 +3314,7 @@ fn check_markdown_math(path: &Path, text: &str, math_fences: &[String]) -> Vec<F
     }
 
     let mut fence: Option<(char, usize)> = None;
-    let mut in_display_block = false;
+    let mut display_open_line = None;
     for (line_index, line) in text.lines().enumerate() {
         let trimmed = line.trim_start();
         if let Some((fence_char, fence_len)) = fence {
@@ -3374,7 +3347,11 @@ fn check_markdown_math(path: &Path, text: &str, math_fences: &[String]) -> Vec<F
 
         let compact = markdown_text.trim();
         if compact == "$$" {
-            in_display_block = !in_display_block;
+            display_open_line = if display_open_line.is_some() {
+                None
+            } else {
+                line_no
+            };
             continue;
         }
         if compact == "$" {
@@ -3385,7 +3362,7 @@ fn check_markdown_math(path: &Path, text: &str, math_fences: &[String]) -> Vec<F
             ));
             continue;
         }
-        if in_display_block {
+        if display_open_line.is_some() {
             continue;
         }
         if compact.starts_with('$')
@@ -3410,6 +3387,13 @@ fn check_markdown_math(path: &Path, text: &str, math_fences: &[String]) -> Vec<F
                 "inline math must use `$...$`, not `$$...$$`",
             ));
         }
+    }
+    if let Some(line) = display_open_line {
+        findings.push(math_finding(
+            path,
+            Some(line),
+            "unclosed `$$` display math block",
+        ));
     }
     findings
 }
@@ -3871,7 +3855,7 @@ mod tests {
         collect_document_ast(&ast, &mut document);
 
         assert_eq!(document.links, vec!["/repo/docs/guide.md"]);
-        assert!(document.has_mermaid);
+        assert_eq!(document.mermaid_blocks, vec!["flowchart LR\n  a --> b"]);
         assert_eq!(document.math_fences, vec!["tex"]);
     }
 
