@@ -1043,7 +1043,7 @@ skill_families:
     shim: .codex/personal/skills/experiment-lifecycle/SKILL.md
     discovery:
       name: experiment-lifecycle
-      description: "Use this skill when preparing, running, or validating experiments."
+      description: "Use for requested experiment planning, execution, validation, result interpretation, reruns, or topic setup."
     routing:
       stage_policy: active
       reason: experiment run, lifecycle, artifacts, results, or rerun workflow is in scope
@@ -1124,7 +1124,7 @@ skill_families:
     shim: .codex/personal/skills/computational-optimization/SKILL.md
     discovery:
       name: computational-optimization
-      description: "Use when designing, implementing, reviewing, or diagnosing numerical optimization, solvers, preconditioners, convergence, gradients, Jacobians, Hessians, KKT conditions, tolerances, or optimization benchmarks; fixes the mathematical and validation contract before code or experiment changes."
+      description: "Use for loss functions and changes to their terms, numerical optimization, solvers, preconditioners, convergence, gradients, Jacobians, Hessians, KKT conditions, tolerances, and optimization benchmarks."
     routing:
       stage_policy: active
       reason: numerical optimization, solver, convergence, derivative, or KKT validation contract is in scope

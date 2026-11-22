@@ -2,7 +2,7 @@
 name: structure-refactor
 description: "Use when repository structure review, repo-refactor requests, expected AgentCanon layout, directory responsibilities, canonical README ownership, path layout, root views, project .codex/.agents views, personal ~/.codex runtime boundaries, or responsibility-scope maps must be reviewed, repaired, or refactored using structure contracts, recursive directory README analysis, source/view ownership checks, stale-surface sweeps, dependency manifests, and behavior-preserving move/rename gates."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"40ab2afee99442fd839a30fe2213f69412b33054a8d4c69ad0097bdc02395a3d"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"e7ab86b0eb7f965ec34a77507e47c256bf1bd07230cf1f4ee98063878d3d9b7c"} -->
 
 <!--
 @dependency-start

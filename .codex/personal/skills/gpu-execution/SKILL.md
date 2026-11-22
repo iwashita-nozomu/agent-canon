@@ -2,7 +2,7 @@
 name: gpu-execution
 description: "Use when planning, running, validating, or diagnosing GPU/CUDA/JAX/XLA/IREE execution, selecting an available GPU index or UUID for native Docker, optional free-GPU admission or reservation, nvidia-smi evidence, arbitrary pytest/benchmark/diagnostic argv, managed ExperimentRunner runs, GPU validation blockers, or preallocation-disabled JAX/XLA execution."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"2d8ae76bdac37fc6ac47c42dda289bd3f3bce3b69fd100b2dfe5fbd474cfaa2a"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"5ff0e8399a1f765c994cac72e2e74843c3250f16f75441fc854b11282b0996ad"} -->
 
 <!--
 @dependency-start

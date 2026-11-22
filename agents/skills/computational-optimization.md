@@ -28,6 +28,17 @@ every numerical question.
   in scope.
 - Implementing a numerical formula or removing unsupported stabilization is in scope.
 
+## Loss changes
+
+Read the current loss from its defining equation or implementation. Open with
+the specific change and its reason. State what the current term penalizes or
+rewards and what the proposed term changes. Then show the resulting formula.
+Distinguish what follows from the formula from behavior that needs evidence.
+
+For a loss-only specification, write the scalar computation from the agreed
+inputs. Define the necessary indices, summation ranges, weights, normalization,
+and assumptions so the reader can implement the formula.
+
 ## Mathematical fidelity
 
 Implement the agreed equations, relevant assumptions, valid inputs, derivatives
