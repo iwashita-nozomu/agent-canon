@@ -31,8 +31,10 @@ requires a request for that outcome.
 
 ## Method
 
-1. State the question or claim, the inputs and comparison that can answer it,
-   and the stopping condition needed for this request.
+1. Identify the requested models, variants, update counts, and any other
+   conditions that define the comparison. Use the existing records to establish
+   coverage before choosing where to start. State the question, the inputs and
+   comparison that can answer it, and the stopping condition for the request.
 2. Run through the project's existing runner and environment. Preserve their
    configured defaults and execution semantics; use a specialized profile or
    variant only when the requested evidence needs it.

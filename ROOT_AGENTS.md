@@ -30,8 +30,11 @@ context/evidence. The contracts below apply without an installed Skill/runtime.
   Preserve explicit read limits across continuation, handoff, and Skill use,
   including instructions, Issues, and logs; continue authorized work from known
   facts when further reading is forbidden. Honor agreed stop boundaries.
-- **State and scope:** confirm checkout/revision; preserve unknown Git state and
-  user data. Task authority excludes unrelated changes/publication. Code cleanup
+- **State and scope:** confirm checkout/revision and preserve unknown Git state
+  and user data. Establish all requested targets from the request and relevant
+  sources before choosing what to examine first. Keep those targets in scope
+  throughout the task and agree with the user before dropping any. Task
+  authority excludes unrelated changes/publication. Code cleanup
   must reduce the owning implementation while preserving guarantees; unrelated
   document/artifact deletion does not offset source growth. Functional expansion
   needs separate current-user agreement.
