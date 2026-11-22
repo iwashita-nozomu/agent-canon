@@ -24,6 +24,11 @@ Use when the request includes planning, running, interpreting, or rerunning an
 experiment. Topic creation, GPU diagnosis, report generation, and code/archive
 closeout are separate conditional tasks.
 
+A loss-only handoff on an experiment branch uses
+[Loss changes](computational-optimization.md#loss-changes). The branch is the
+destination for the formula and its definitions. An experiment plan or run
+requires a request for that outcome.
+
 ## Method
 
 1. State the question or claim, the inputs and comparison that can answer it,

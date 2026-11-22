@@ -34,8 +34,9 @@ Give the checked facts and the decision's effect. Continue independent authorize
 Use the known Skill. Consult the [task catalog](../task_catalog.yaml),
 [Skill catalog](catalog.yaml), or [dependency map](skill-dependencies.yaml) for an
 unresolved route. Use the bounded route for one owner and writer. Activate
-specialists for a decision or guarantee they own. Mathematical intent routes to
-[computational-optimization](computational-optimization.md).
+specialists for a decision or guarantee they own. Route mathematical work to
+[computational-optimization](computational-optimization.md), including
+[loss definitions and term changes](computational-optimization.md#loss-changes).
 
 ## Delegation selection
 

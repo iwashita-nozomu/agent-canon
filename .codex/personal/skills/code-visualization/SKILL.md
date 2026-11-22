@@ -2,7 +2,7 @@
 name: code-visualization
 description: "Use when visualizing code, repository structure, runtime behavior, state, data movement, dependencies, types, proof status, or document diagrams; selects the source owner, useful view, and existing renderer."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"5b1909933bdd26620bcd750bd7a91f056a209f8110df9daf6c7ed171854a1c4f"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"53b653220ab55b295c45a6782f5627845d06df22d9485eec59dad9f72854dda2"} -->
 
 <!--
 @dependency-start
