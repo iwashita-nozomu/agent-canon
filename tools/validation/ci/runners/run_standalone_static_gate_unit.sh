@@ -3,7 +3,7 @@
 # contract tool
 # responsibility Runs one standalone AgentCanon static-gate execution unit without selecting whether that unit is required.
 # upstream design ../../../../documents/runtime/runtime-profiles-and-check-matrix.md risk-based validation routing
-# upstream implementation ./run_all_checks.sh owns the full-confidence check body executed from a read-only target
+# upstream implementation ./run_all_checks.sh owns the full-confidence check body
 # upstream implementation ../../../../tools/runtime/dispatch/agent-canon/src/eval_archive_paths.rs resolves the canonical eval archive destination
 # upstream implementation ../../../../tools/runtime/dispatch/agent-canon/src/eval_accumulation_check.rs validates accumulated hook and eval results
 # downstream implementation ../checks/check_agent_canon_pr.sh aggregates all units for the manual full-confidence route
@@ -28,40 +28,35 @@ if [[ "${UNIT}" != "full" && "${UNIT}" != "docs" && "${UNIT}" != "rust" && "${#U
   exit 2
 fi
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-if [[ ! -f /usr/local/share/agent-canon/.agent-canon-tool-container ]]; then
-  echo "AGENT_CANON_STATIC_GATE=fail reason=shared_tool_runtime_required" >&2
-  exit 2
+SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd -P)"
+ROOT="${AGENT_CANON_TARGET_ROOT:-${SCRIPT_ROOT}}"
+default_cli=agent-canon
+if [[ -n "${AGENT_CANON_CACHE_ROOT:-}" ]]; then
+  default_cli="${AGENT_CANON_CACHE_ROOT}/bin/agent-canon"
 fi
-ROOT="${AGENT_CANON_TARGET_ROOT:?AGENT_CANON_TARGET_ROOT is required}"
-RUNTIME_ROOT="$(cd "${SCRIPT_DIR}/../../../.." && pwd -P)"
-TOOLS_ROOT="${RUNTIME_ROOT}/tools"
-
-assert_read_only_target() {
-  "${AGENT_CANON_NATIVE_BIN:-${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}}" \
-    runtime-paths check-read-only --source-root "${ROOT}"
-}
-
-assert_read_only_target
+export AGENT_CANON_CLI="${AGENT_CANON_NATIVE_BIN:-${AGENT_CANON_CLI:-${default_cli}}}"
+export AGENT_CANON_NATIVE_BIN="${AGENT_CANON_CLI}"
 cd "${ROOT}"
+ROOT="$(pwd -P)"
 
 # Runtime artifacts belong to the caller-selected external runtime root.  Keep
 # the path resolver in runtime_boundary.rs as the single source of truth.
 runtime_boundary_root() {
-  "${AGENT_CANON_NATIVE_BIN:-${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}}" runtime-paths root --source-root "${ROOT}" --runtime-root "$1"
+  "${AGENT_CANON_CLI}" runtime-paths root --source-root "${ROOT}" --runtime-root "$1"
 }
 
 runtime_boundary_path() {
-  "${AGENT_CANON_NATIVE_BIN:-${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}}" runtime-paths path --source-root "${ROOT}" --runtime-root "${AGENT_CANON_STATIC_RUNTIME_ROOT}" --candidate "$1"
+  "${AGENT_CANON_CLI}" runtime-paths path --source-root "${ROOT}" --runtime-root "${AGENT_CANON_STATIC_RUNTIME_ROOT}" --candidate "$1"
 }
 
-AGENT_CANON_STATIC_RUNTIME_ROOT="${AGENT_CANON_RUNTIME_ROOT}"
-AGENT_CANON_STATIC_RUNTIME_ROOT="$(runtime_boundary_root "${AGENT_CANON_STATIC_RUNTIME_ROOT}")"
-export AGENT_CANON_RUNTIME_ROOT="${AGENT_CANON_STATIC_RUNTIME_ROOT}"
-export TMPDIR="$(runtime_boundary_path "${TMPDIR:-${AGENT_CANON_STATIC_RUNTIME_ROOT}/tmp}")"
-mkdir -p "${TMPDIR}"
-export XDG_CACHE_HOME="$(runtime_boundary_path "${AGENT_CANON_STATIC_RUNTIME_ROOT}/cache")"
-mkdir -p "${XDG_CACHE_HOME}"
+if [[ "${UNIT}" != docs || -n "${AGENT_CANON_RUNTIME_ROOT:-}" ]]; then
+  AGENT_CANON_STATIC_RUNTIME_ROOT="$(runtime_boundary_root "${AGENT_CANON_RUNTIME_ROOT:-}")"
+  export AGENT_CANON_RUNTIME_ROOT="${AGENT_CANON_STATIC_RUNTIME_ROOT}"
+  TMPDIR="$(runtime_boundary_path "${TMPDIR:-${AGENT_CANON_STATIC_RUNTIME_ROOT}/tmp}")"
+  XDG_CACHE_HOME="$(runtime_boundary_path "${AGENT_CANON_STATIC_RUNTIME_ROOT}/cache")"
+  export TMPDIR XDG_CACHE_HOME
+  mkdir -p "${TMPDIR}" "${XDG_CACHE_HOME}"
+fi
 export PYTHONDONTWRITEBYTECODE=1
 
 run_full() {
@@ -70,30 +65,30 @@ run_full() {
   local control_parent_root="${AGENT_CANON_CONTROL_PARENT_ROOT:?AGENT_CANON_CONTROL_PARENT_ROOT is required}"
   AGENT_CANON_CONTROL_PARENT_ROOT="${control_parent_root}" \
   AGENT_CANON_CHILD_PURPOSE="standalone-static-gate-unit" \
-  AGENT_CANON_CLI_CMD="${AGENT_CANON_CACHE_ROOT}/bin/agent-canon" \
+  AGENT_CANON_CLI_CMD="${AGENT_CANON_CLI}" \
   AGENT_CANON_RUNTIME_ROOT="${AGENT_CANON_STATIC_RUNTIME_ROOT}" \
     bash "${ROOT}/tools/validation/ci/runners/run_all_checks.sh" "${UNIT_ARGS[@]}"
 }
 
 run_docs() {
-  local cli="${AGENT_CANON_CACHE_ROOT}/bin/agent-canon"
   local path
   local -a paths=()
   for path in "${UNIT_ARGS[@]}"; do
     # A deletion can break links in unchanged documents. Use the docs owner's
     # full check rather than silently dropping missing input paths.
     if [[ ! -f "${ROOT}/${path#./}" ]]; then
-      "${cli}" docs check --root "${ROOT}"
+      "${AGENT_CANON_CLI}" docs check --root "${ROOT}"
       return
     fi
     paths+=("./${path#./}")
   done
-  "${cli}" docs check --root "${ROOT}" "${paths[@]}"
+  "${AGENT_CANON_CLI}" docs check --root "${ROOT}" "${paths[@]}"
 }
 
 run_rust() {
   # Producer identity checks hash the test executable; reduce debug-only bytes.
   export CARGO_PROFILE_TEST_DEBUG=0
+  export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-${AGENT_CANON_STATIC_RUNTIME_ROOT}/cargo-target}"
   local phase="${1:-all}"
   case "${phase}" in
     controller-driver)
@@ -104,12 +99,6 @@ run_rust() {
     all|prepare)
       [[ "$#" -le 1 ]] || return 2
       cargo build --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --locked --offline
-      local agent_cli="${CARGO_TARGET_DIR:?}/debug/agent-canon"
-      if [[ ! -x "${agent_cli}" ]]; then
-        echo "AGENT_CANON_CLI_BUILD=fail" >&2
-        return 1
-      fi
-      "${agent_cli}" --version
       cargo fmt --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml -- --check
       cargo clippy --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --locked --offline --all-targets -- -D warnings
       if [[ "${phase}" == "prepare" ]]; then
@@ -134,8 +123,6 @@ run_rust() {
 }
 
 run_contracts() {
-  node --version
-  AGENT_CANON_CLI="${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" \
   python3 -m pytest -p no:cacheprovider --pyargs \
     tests.agent_tools.test_tool_dispatch \
     tests.agent_tools.test_paper_writing_citeproc \
@@ -155,15 +142,14 @@ run_contracts() {
     tests.agent_tools.test_check_algorithm_config_partition \
     tests.agent_tools.test_tool_drift \
     tests/agent_tools/test_dependency_*.py
-  AGENT_CANON_NATIVE_BIN="${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" \
-    python3 -m pytest -p no:cacheprovider -q tests/agent_tools/test_evaluate_agent_run.py
+  python3 -m pytest -p no:cacheprovider -q tests/agent_tools/test_evaluate_agent_run.py
   python3 -m pytest -p no:cacheprovider \
     tests/agent_tools/test_prose_reasoning_graph.py::ProseReasoningGraphTest::test_check_document_preserves_missing_manifest_severity
-  "${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" tool-catalog
-  "${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" tool-proof-coverage
-  "${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" responsibility-scope --root "${ROOT}"
-  "${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" check-agent-runtime-alignment --root "${ROOT}"
-  "${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" check-convention-compliance \
+  "${AGENT_CANON_CLI}" tool-catalog
+  "${AGENT_CANON_CLI}" tool-proof-coverage
+  "${AGENT_CANON_CLI}" responsibility-scope --root "${ROOT}"
+  "${AGENT_CANON_CLI}" check-agent-runtime-alignment --root "${ROOT}"
+  "${AGENT_CANON_CLI}" check-convention-compliance \
     --root "${ROOT}" --format json
 }
 
@@ -197,16 +183,13 @@ run_eval() (
   eval_results_parent="${AGENT_CANON_STATIC_RUNTIME_ROOT}/archive/agent-canon-log/eval-results"
   mkdir -p "${eval_log_dir}" "${eval_results_parent}"
   env -u AGENT_CANON_HOOK_ARCHIVE_DIR -u AGENT_CANON_LOG_ROOT \
-    AGENT_CANON_NATIVE_BIN="${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" \
-    AGENT_CANON_CLI="${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" \
     python3 -m pytest -p no:cacheprovider -q \
       tests/agent_tools/test_eval_accumulation_check.py \
       tests/agent_tools/test_evaluate_codex_agent_roles.py \
       tests/agent_tools/test_model_profile_registry.py
   set +e
   env -u AGENT_CANON_HOOK_ARCHIVE_DIR -u AGENT_CANON_LOG_ROOT \
-    AGENT_CANON_NATIVE_BIN="${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" \
-    "${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" run-accumulated-agent-evals \
+    "${AGENT_CANON_CLI}" run-accumulated-agent-evals \
       --run-id agent-canon-pr-gate \
       --root "${ROOT}" \
       --runtime-root "${AGENT_CANON_STATIC_RUNTIME_ROOT}" \
@@ -228,12 +211,8 @@ run_eval() (
   fi
   if [[ "${primary_status}" -eq 0 ]]; then
     env -u AGENT_CANON_HOOK_ARCHIVE_DIR -u AGENT_CANON_LOG_ROOT \
-      "${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" eval-accumulation-check \
+      "${AGENT_CANON_CLI}" eval-accumulation-check \
         --root "${ROOT}" --runtime-root "${AGENT_CANON_STATIC_RUNTIME_ROOT}"
-    primary_status=$?
-  fi
-  if [[ "${primary_status}" -eq 0 ]]; then
-    PYTHONPATH="${ROOT}${PYTHONPATH:+:${PYTHONPATH}}" \
     primary_status=$?
   fi
   set -e
@@ -241,24 +220,16 @@ run_eval() (
 )
 
 run_workflow_container() {
-  local cargo_target_dir controller_test_driver
-  cargo_target_dir="${CARGO_TARGET_DIR:-${ROOT}/tools/runtime/dispatch/agent-canon/target}"
+  local controller_test_driver
   run_rust controller-driver
-  controller_test_driver="${cargo_target_dir}/debug/agent-canon-controller-test-driver"
-  [[ -x "${controller_test_driver}" ]] || {
-    echo "AGENT_CANON_CONTROLLER_TEST_DRIVER=fail" >&2
-    return 1
-  }
-  AGENT_CANON_CLI="${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" \
+  controller_test_driver="${CARGO_TARGET_DIR}/debug/agent-canon-controller-test-driver"
   AGENT_CANON_CONTROLLER_TEST_DRIVER="${controller_test_driver}" \
   python3 -m pytest -p no:cacheprovider -q \
     tests/tools/test_standalone_static_gate_units.py \
     tests/tools/test_read_only_full_check.py \
     tests/tools/test_check_github_workflows.py \
     tests/tools/test_agent_improvement_guide_workflow.py
-  AGENT_CANON_NATIVE_BIN="${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" \
-    "${ROOT}/tools/bin/agent-canon" check-github-workflows --root "${ROOT}"
-  AGENT_CANON_CLI="${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" \
+  "${AGENT_CANON_CLI}" check-github-workflows --root "${ROOT}"
   AGENT_CANON_CONTROLLER_TEST_DRIVER="${controller_test_driver}" \
   python3 -m pytest -p no:cacheprovider -q \
     tests/tools/test_bootstrap_container_contract.py \

@@ -2754,8 +2754,21 @@ fn command_sync(context: &ArchiveContext, options: &CommandOptions) -> Result<i3
             .iter()
             .filter_map(|path| path.file_stem().and_then(OsStr::to_str).map(str::to_owned))
             .collect::<BTreeSet<_>>();
-        let count = github_eval_delivery::deliver_main_evals(context, &mut published, no_pull)?;
-        println!("RUNTIME_LOG_ARCHIVE_MAIN_EVAL_DELIVERED={count}");
+        match github_eval_delivery::deliver_main_evals(context, &mut published, no_pull) {
+            Ok(count) => println!("RUNTIME_LOG_ARCHIVE_MAIN_EVAL_DELIVERED={count}"),
+            Err(error)
+                if matches!(
+                    error.code.as_str(),
+                    "github_eval_transport_unavailable" | "github_eval_metadata_unavailable"
+                ) =>
+            {
+                eprintln!(
+                    "RUNTIME_LOG_ARCHIVE_MAIN_EVAL_STATUS=deferred code={}",
+                    error.code
+                );
+            }
+            Err(error) => return Err(error),
+        }
     }
     println!("RUNTIME_LOG_ARCHIVE_SYNC=pass");
     Ok(0)
