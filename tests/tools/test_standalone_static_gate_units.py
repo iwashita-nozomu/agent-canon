@@ -698,9 +698,12 @@ def test_contracts_unit_rejects_retired_baseline_argument() -> None:
     assert "does not accept arguments: contracts" in result.stderr
 
 
-@pytest.mark.parametrize("paths", [[], ["has space.md"], ["deleted.md"]])
+@pytest.mark.parametrize(
+    ("paths", "provider_status"),
+    [([], 0), (["has space.md"], 9), (["deleted.md"], 9)],
+)
 def test_docs_unit_executes_native_checker_and_propagates_failure(
-    tmp_path: Path, paths
+    tmp_path: Path, paths: list[str], provider_status: int
 ) -> None:
     fixture_root = executable_fixture_root(tmp_path)
     root, cache = fixture_root / "target", fixture_root / "cache"
@@ -708,23 +711,28 @@ def test_docs_unit_executes_native_checker_and_propagates_failure(
     (cache / "bin").mkdir(parents=True)
     (root / "has space.md").write_text("# Document\n")
     cli = cache / "bin/agent-canon"
-    cli.write_text('#!/usr/bin/env bash\nprintf "%s\\n" "$@" > "$CALLS"\nexit 9\n')
+    cli.write_text(
+        '#!/usr/bin/env bash\nprintf "%s\\n" "$@" > "$CALLS"\nexit "$PROVIDER_STATUS"\n'
+    )
     cli.chmod(0o755)
     calls = tmp_path / "args"
-    text = RUNNER.read_text()
-    body = (
-        "run_docs() {"
-        + text.split("run_docs() {", 1)[1].split("\n}\n\nrun_rust()", 1)[0]
-        + "\n}\n"
+    environment = {
+        **os.environ,
+        "AGENT_CANON_TARGET_ROOT": str(root),
+        "AGENT_CANON_NATIVE_BIN": str(cli),
+        "CALLS": str(calls),
+        "PROVIDER_STATUS": str(provider_status),
+    }
+    environment.pop("AGENT_CANON_RUNTIME_ROOT", None)
+    result = subprocess.run(
+        ["bash", str(RUNNER), "docs", *paths],
+        cwd=root,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
     )
-    result = run_shell(
-        body + "UNIT_ARGS=(" + shlex.join(paths) + "); run_docs",
-        root=root,
-        ROOT=str(root),
-        AGENT_CANON_CACHE_ROOT=str(cache),
-        CALLS=str(calls),
-    )
-    assert result.returncode == 9
+    assert result.returncode == provider_status, result.stderr
     expected = ["docs", "check", "--root", str(root)]
     if paths == ["has space.md"]:
         expected.append("./has space.md")
@@ -733,17 +741,13 @@ def test_docs_unit_executes_native_checker_and_propagates_failure(
 
 @pytest.mark.parametrize("explicit_cli", [False, True])
 @pytest.mark.parametrize("checker_exit", [0, 9])
-def test_workflow_unit_passes_selected_native_cli_to_source_wrapper(
+def test_workflow_unit_invokes_selected_native_cli(
     tmp_path: Path, explicit_cli: bool, checker_exit: int
 ) -> None:
     fixture_root = executable_fixture_root(tmp_path)
     root = fixture_root / "target with spaces"
     root.mkdir()
     cache = fixture_root / "cache with spaces"
-    wrapper = root / "tools/bin/agent-canon"
-    wrapper.parent.mkdir(parents=True)
-    wrapper.write_bytes((ROOT / "tools/bin/agent-canon").read_bytes())
-    wrapper.chmod(0o755)
     (cache / "bin").mkdir(parents=True)
     for label, path in (
         ("default", cache / "bin/agent-canon"),
@@ -778,6 +782,10 @@ def test_workflow_unit_passes_selected_native_cli_to_source_wrapper(
         )
     else:
         setup += "unset AGENT_CANON_CLI\n"
+    setup += (
+        "default_cli=agent-canon"
+        + text.split("default_cli=agent-canon", 1)[1].split('cd "${ROOT}"', 1)[0]
+    )
     calls, trace = fixture_root / "calls", fixture_root / "trace"
     result = run_shell(
         body + setup + "run_workflow_container",
@@ -835,7 +843,7 @@ def test_contract_unit_passes_selected_native_cli_to_alignment(
         + text.split("run_contracts() {", 1)[1].split("\n}\n\nrun_eval()", 1)[0]
         + "\n}\n"
     )
-    setup = "unset AGENT_CANON_NATIVE_BIN\nnode() { :; }\npython3() { :; }\n"
+    setup = "unset AGENT_CANON_NATIVE_BIN\npython3() { :; }\n"
     if explicit_cli:
         setup += (
             "export AGENT_CANON_CLI="
@@ -844,6 +852,10 @@ def test_contract_unit_passes_selected_native_cli_to_alignment(
         )
     else:
         setup += "unset AGENT_CANON_CLI\n"
+    setup += (
+        "default_cli=agent-canon"
+        + text.split("default_cli=agent-canon", 1)[1].split('cd "${ROOT}"', 1)[0]
+    )
     calls, selected = fixture_root / "calls", fixture_root / "selected"
     result = run_shell(
         body + setup + "run_contracts",
@@ -867,16 +879,16 @@ def test_contract_unit_passes_selected_native_cli_to_alignment(
 def test_runner_places_xdg_cache_under_the_task_runtime() -> None:
     text = RUNNER.read_text()
     runtime_root_setup = text.index(
-        'AGENT_CANON_STATIC_RUNTIME_ROOT="${AGENT_CANON_RUNTIME_ROOT}"'
+        'AGENT_CANON_STATIC_RUNTIME_ROOT="$(runtime_boundary_root'
     )
     docs_dispatch = text.index("run_docs() {")
     xdg_cache_setup = (
-        'export XDG_CACHE_HOME="$(runtime_boundary_path '
+        'XDG_CACHE_HOME="$(runtime_boundary_path '
         '"${AGENT_CANON_STATIC_RUNTIME_ROOT}/cache")"'
     )
     runtime_setup = text[runtime_root_setup:docs_dispatch]
     assert xdg_cache_setup in runtime_setup
-    assert 'mkdir -p "${XDG_CACHE_HOME}"' in runtime_setup
+    assert 'mkdir -p "${TMPDIR}" "${XDG_CACHE_HOME}"' in runtime_setup
 
 
 def test_contract_collection_and_source_toolchain_owners() -> None:
@@ -891,26 +903,12 @@ def test_contract_collection_and_source_toolchain_owners() -> None:
     assert "export RUSTUP_HOME=" not in text
     assert "export CARGO_HOME=" not in text
     assert (
-        'AGENT_CANON_CLI="${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}"'
+        'export AGENT_CANON_CLI="${AGENT_CANON_NATIVE_BIN:-${AGENT_CANON_CLI:-${default_cli}}}"'
         in text
     )
     assert (
         "/opt/agent-canon/source/tools/validation/ci/runners/" in WORKFLOW.read_text()
     )
-
-
-def test_runner_rejects_host_before_executing_units() -> None:
-    if Path("/usr/local/share/agent-canon/.agent-canon-tool-container").is_file():
-        pytest.skip("Host rejection does not apply inside the shared runtime")
-    result = subprocess.run(
-        ["bash", str(RUNNER), "eval"],
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    assert result.returncode == 2
-    assert "shared_tool_runtime_required" in result.stderr
 
 
 def test_shell_syntax_and_single_runtime_install() -> None:
@@ -961,7 +959,7 @@ def test_units_do_not_duplicate_rust_or_full_wrapper_commands() -> None:
     wrapper = (
         FULL_WRAPPER.read_text()
         .split("run_standalone_static_gate_ci() {", 1)[1]
-        .split("\n}\n\ngithub_repo_security_status()", 1)[0]
+        .split("\n}\n\necho ", 1)[0]
     )
     assert "owned_by_bootstrap_container_workflow" in wrapper
     for command in (

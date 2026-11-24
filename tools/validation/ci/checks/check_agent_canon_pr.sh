@@ -94,7 +94,6 @@ AGENT_CANON_G1_BUNDLE_ACTIVE=0
 PR_AGENT_CANON_SOURCE_ROOT="${WORKSPACE_ROOT}"
 
 REMOTE_NAME="${AGENT_CANON_REMOTE_NAME:-agent-canon}"
-AGENT_CANON_GITHUB_REPO="${AGENT_CANON_GITHUB_REPO:-iwashita-nozomu/agent-canon}"
 REMOTE_URL="<unset>"
 if git remote get-url "${REMOTE_NAME}" >/dev/null 2>&1; then
   REMOTE_URL="$(git remote get-url "${REMOTE_NAME}")"
@@ -168,45 +167,6 @@ run_standalone_static_gate_ci() {
   echo "AGENT_CANON_STATIC_GATE_UNITS=owned_by_bootstrap_container_workflow"
 }
 
-github_repo_security_status() {
-  local repo="$1"
-  local label="$2"
-  local repo_json=""
-  local remote_sha=""
-  echo "${label}_repo=${repo}"
-  if ! command -v gh >/dev/null 2>&1; then
-    echo "${label}_gh=unavailable"
-    return
-  fi
-  if repo_json="$(gh repo view "${repo}" --json nameWithOwner,visibility,isPrivate,defaultBranchRef 2>/dev/null)"; then
-    echo "${label}_gh=visible"
-    echo "${label}_metadata=${repo_json}"
-  else
-    echo "${label}_gh=not_visible_or_not_created"
-    return
-  fi
-  if remote_sha="$(git ls-remote "https://github.com/${repo}.git" main 2>/dev/null | awk '{print $1}')"; then
-    echo "${label}_github_main_sha=${remote_sha:-<missing>}"
-  else
-    echo "${label}_github_main_sha=<unavailable>"
-  fi
-  if gh api "repos/${repo}/branches/main/protection" >/dev/null 2>&1; then
-    echo "${label}_branch_protection=enabled"
-  else
-    echo "${label}_branch_protection=missing_or_unavailable"
-  fi
-  if gh api "repos/${repo}/vulnerability-alerts" >/dev/null 2>&1; then
-    echo "${label}_vulnerability_alerts=enabled"
-  else
-    echo "${label}_vulnerability_alerts=disabled_or_unavailable"
-  fi
-  if gh api "repos/${repo}/dependabot/alerts" --jq length >/dev/null 2>&1; then
-    echo "${label}_dependabot_alerts=readable"
-  else
-    echo "${label}_dependabot_alerts=disabled_or_scope_missing"
-  fi
-}
-
 echo "=========================================="
 echo "AGENT-CANON PR CHECK"
 echo "=========================================="
@@ -222,10 +182,6 @@ echo ""
 
 echo "2️⃣  changed AgentCanon paths"
 git status --short -- .github agents documents tools rust tests || true
-echo ""
-
-echo "3️⃣  GitHub security evidence"
-github_repo_security_status "${AGENT_CANON_GITHUB_REPO}" "agent_canon_github"
 echo ""
 
 echo "4️⃣  agent runtime checks"

@@ -453,7 +453,7 @@ _agent_canon_sync_operation() (
 
   local archive_cli
   archive_cli=$(_agent_canon_host_native_cli)
-  if [[ -x "$archive_cli" ]] && "$archive_cli" --version >/dev/null 2>&1; then
+  if [[ -x "$archive_cli" ]]; then
     "$archive_cli" runtime-log-archive-git \
       --source-root "$install_root" \
       --canon-root "$install_root" \

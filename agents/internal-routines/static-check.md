@@ -5,7 +5,7 @@ contract agent-runtime
 responsibility Documents static-check selection and read-only full-confidence execution for this repository.
 upstream design ../canonical/skills.md skill canon registry
 upstream design ../../documents/runtime/bootstrap-runtime.md shared runtime and target registration boundary
-upstream implementation ../../tools/validation/ci/runners/run_standalone_static_gate_unit.sh read-only target admission and full-check dispatch
+upstream implementation ../../tools/validation/ci/runners/run_standalone_static_gate_unit.sh static check dispatch
 @dependency-end
 -->
 
@@ -46,6 +46,9 @@ route の結果（pass / fail / 未実行）と追加調査の要否だけを記
 
 full-confidence が必要な場合だけ、下記の shared runtime/read-only target
 route に進みます。
+
+単体の文書検査はホストの AgentCanon CLI と既存の文書ツールでも実行できます。
+生成物を伴う検証では外部ランタイムのパスを指定します。
 
 ## Read-only Full Confidence
 

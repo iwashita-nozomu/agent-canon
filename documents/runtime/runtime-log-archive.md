@@ -85,6 +85,12 @@ resident writer and invokes `bootstrap.sh ... tool run/exec issue-sync --
 GitHub mutation and its sync request is consumed by the existing
 host-shell private-feedback archive adapter.
 
+Scheduled sync publishes local archive data before looking up main-branch Eval
+artifacts. When the GitHub CLI or its metadata request is unavailable on the
+execution host, sync reports `RUNTIME_LOG_ARCHIVE_MAIN_EVAL_STATUS=deferred`.
+The next sync retries the lookup. Invalid metadata and artifacts retain their
+failure status.
+
 The receipt ToolCall keeps the AgentCanon source root (the owner of
 `bootstrap.sh` and the resident image) separate from the registered product
 target root taken from `checkout_identity.git_root`; the generated command uses

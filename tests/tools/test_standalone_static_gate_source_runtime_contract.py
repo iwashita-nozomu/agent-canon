@@ -81,8 +81,8 @@ def test_all_source_gate_entrypoints_require_distinct_control_and_runtime_roots(
         assert "control_parent_root_is_source" in text
         assert 'AGENT_CANON_PARENT_ROOT="${AGENT_CANON_CONTROL_PARENT_ROOT}"' in text
         assert "${RUNNER_TEMP:-${TMPDIR:-/tmp}}" not in text
-    assert "AGENT_CANON_TARGET_ROOT:?AGENT_CANON_TARGET_ROOT is required" in source
-    assert 'AGENT_CANON_STATIC_RUNTIME_ROOT="${AGENT_CANON_RUNTIME_ROOT}"' in source
+    assert 'ROOT="${AGENT_CANON_TARGET_ROOT:-${SCRIPT_ROOT}}"' in source
+    assert 'runtime_boundary_root "${AGENT_CANON_RUNTIME_ROOT:-}"' in source
     assert "control_parent_root_required" not in source
 
 
@@ -208,7 +208,7 @@ def test_eval_preserves_failed_producer_logs_until_ci_capture(
             "AGENT_CANON_STATIC_RUNTIME_ROOT": str(runtime),
             "AGENT_CANON_RUNTIME_ROOT": str(runtime),
             "AGENT_CANON_CLI": str(native_cli),
-            "AGENT_CANON_NATIVE_BIN": "",
+            "AGENT_CANON_NATIVE_BIN": str(native_cli),
             "AGENT_CANON_HOOK_ARCHIVE_DIR": "/var/lib/agent-canon/private-log",
             "AGENT_CANON_LOG_ROOT": "/var/lib/agent-canon/private-log",
             "CALLS": str(calls),
@@ -224,10 +224,7 @@ def test_eval_preserves_failed_producer_logs_until_ci_capture(
     records = [json.loads(line) for line in calls.read_text().splitlines()]
     assert [record[0] for record in records] == expected_names
     assert all(record[1:4] == [None, None, str(runtime)] for record in records)
-    assert [record[4] for record in records] == [
-        str(native_cli) if record[0] in ("regression", "producer") else ""
-        for record in records
-    ]
+    assert all(record[4] == str(native_cli) for record in records)
     report_path = (
         runtime
         / LOG_ARCHIVE_PARENT

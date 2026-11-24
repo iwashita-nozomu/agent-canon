@@ -360,7 +360,12 @@ fn sync_publishes_to_the_selected_local_archive_branch_and_reads_back_clean_stat
 set -eu
 printf '%s\n' "$4" >> "$GH_CALLS"
 case "$4" in
-  repos/example/source) printf '{"id":42}\n';;
+  repos/example/source)
+    case "${GH_RESPONSE:-available}" in
+      unauthorized) printf 'gh: Bad credentials (HTTP 401)\n' >&2; exit 1;;
+      malformed) printf 'not json\n';;
+      available) printf '{"id":42}\n';;
+    esac;;
   repos/example/source/actions/workflows/agent-canon-static-gates.yml)
     printf '{"id":19,"path":".github/workflows/agent-canon-static-gates.yml"}\n';;
   repos/example/source/actions/artifacts\?*) printf '{"artifacts":[]}\n';;
@@ -376,8 +381,8 @@ esac
             include_bytes!("../../../../../bootstrap/host/manifest.toml"),
         )
         .unwrap();
-        let result = Command::new(NATIVE)
-            .args(["runtime-log-archive-git", "--source-root"])
+        let mut sync = Command::new(NATIVE);
+        sync.args(["runtime-log-archive-git", "--source-root"])
             .arg(&source)
             .arg("--canon-root")
             .arg(&canon)
@@ -397,19 +402,34 @@ esac
                 ),
             )
             .env("GH_CALLS", &calls)
-            .output()
-            .unwrap();
+            .env("GH_RESPONSE", "available");
+        let result = sync.output().unwrap();
         assert!(
             result.status.success(),
             "{}\n{}",
             String::from_utf8_lossy(&result.stdout),
             String::from_utf8_lossy(&result.stderr)
         );
-        assert!(fs::read_to_string(calls)
+        assert!(fs::read_to_string(&calls)
             .unwrap()
             .lines()
             .any(|line| line
                 == "repos/example/source/actions/workflows/agent-canon-static-gates.yml"));
+        fs::write(&calls, "").unwrap();
+        let deferred = sync.env("GH_RESPONSE", "unauthorized").output().unwrap();
+        assert!(deferred.status.success(), "{deferred:?}");
+        assert!(String::from_utf8_lossy(&deferred.stdout).contains("RUNTIME_LOG_ARCHIVE_SYNC=pass"));
+        assert!(String::from_utf8_lossy(&deferred.stderr).contains(
+            "RUNTIME_LOG_ARCHIVE_MAIN_EVAL_STATUS=deferred code=github_eval_metadata_unavailable"
+        ));
+        assert_eq!(
+            fs::read_to_string(&calls).unwrap(),
+            "repos/example/source\n"
+        );
+
+        let malformed = sync.env("GH_RESPONSE", "malformed").output().unwrap();
+        assert!(!malformed.status.success(), "{malformed:?}");
+        assert!(String::from_utf8_lossy(&malformed.stdout).contains("github_eval_metadata_invalid"));
     }
 
     let status = archive_command(

@@ -24,7 +24,7 @@ fn run_inner(args: &[String]) -> Result<i32, String> {
         .iter()
         .any(|value| matches!(value.as_str(), "--help" | "-h"))
     {
-        println!("usage: agent-canon runtime-paths <root|path|ensure-dir|check-control|check-read-only|gate-g1|temp-dir|remove-tree|copy-read-only|capture-subprocess|detect-secrets-report|write-file|receipt-identity> [options]");
+        println!("usage: agent-canon runtime-paths <root|path|ensure-dir|check-control|gate-g1|temp-dir|remove-tree|copy-read-only|capture-subprocess|detect-secrets-report|write-file|receipt-identity> [options]");
         return Ok(0);
     }
     let action = args.first().ok_or("runtime-paths action is required")?;
@@ -33,7 +33,6 @@ fn run_inner(args: &[String]) -> Result<i32, String> {
         "path",
         "ensure-dir",
         "check-control",
-        "check-read-only",
         "gate-g1",
         "temp-dir",
         "remove-tree",
@@ -83,43 +82,6 @@ fn run_inner(args: &[String]) -> Result<i32, String> {
             if source == control {
                 return Err("control parent root must differ from source root".into());
             }
-            Ok(0)
-        }
-        "check-read-only" => {
-            let root = Path::new(required(&values, "source-root")?)
-                .canonicalize()
-                .map_err(|error| error.to_string())?;
-            let output=Command::new("findmnt").args(["--kernel","--first-only","--direction","backward","--list","--target"]).arg(root).args(["--json","--output","TARGET,VFS-OPTIONS"]).output().map_err(|error|format!("AGENT_CANON_STATIC_GATE=fail reason=target_mount_query_failed error={error}"))?;
-            if !output.status.success() {
-                return Err("AGENT_CANON_STATIC_GATE=fail reason=target_mount_query_failed".into());
-            }
-            let payload: Value = serde_json::from_slice(&output.stdout).map_err(|error| {
-                format!(
-                    "AGENT_CANON_STATIC_GATE=fail reason=target_mount_query_failed error={error}"
-                )
-            })?;
-            let rows = payload
-                .get("filesystems")
-                .and_then(Value::as_array)
-                .filter(|rows| rows.len() == 1)
-                .ok_or("AGENT_CANON_STATIC_GATE=fail reason=target_mount_missing")?;
-            let mount = rows[0]
-                .get("target")
-                .and_then(Value::as_str)
-                .filter(|value| !value.is_empty())
-                .ok_or("AGENT_CANON_STATIC_GATE=fail reason=target_mount_columns_missing")?;
-            let flags = rows[0]
-                .get("vfs-options")
-                .and_then(Value::as_str)
-                .ok_or("AGENT_CANON_STATIC_GATE=fail reason=target_mount_columns_missing")?;
-            if !flags.split(',').any(|flag| flag == "ro")
-                || flags.split(',').any(|flag| flag == "rw")
-            {
-                return Err(format!(
-                    "AGENT_CANON_STATIC_GATE=fail reason=target_mount_not_read_only mount={mount}"
-                ));
-            }
-            println!("AGENT_CANON_STATIC_GATE_TARGET_MOUNT=read-only mount={mount}");
             Ok(0)
         }
         "gate-g1" => {
