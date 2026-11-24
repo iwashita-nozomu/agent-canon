@@ -32,10 +32,12 @@ available and inspect the final diff. The
 describe how to use the shared environment when it exposes source read-only.
 
 For Markdown intended for GitHub, run `agent-canon docs check --root . <edited paths...>`.
-It checks lint and local links, parses the document as GitHub Flavored Markdown,
-and sends Mermaid blocks to the installed renderer. For changes that depend on
-GitHub's hosted rendering, inspect the GitHub preview when available. Record
-unavailable providers or preview checks with the result.
+If Quarto, Mermaid CLI, or another required tool is missing on the host, run
+the check using the existing [shared tool runtime](agent-canon-bootstrap.md).
+Use the edited checkout or a snapshot with the same content. The check runs
+lint and link checks, parses GitHub Flavored Markdown, and renders Mermaid
+blocks. Inspect GitHub's preview for changes that depend on hosted rendering
+when the preview is available. Record any checks that remain unverified.
 
 ## Boundary
 
