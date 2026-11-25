@@ -122,10 +122,11 @@ context/evidence. The contracts below apply without an installed Skill/runtime.
   planned migration, review obsolete code and references, then validate its final
   state together; intermediate edits and commits are not separate test gates.
 - Match each requested outcome to the actual artifact or execution result.
-  When a required property remains unverified or a result contradicts it,
-  recheck the relevant assumptions and choose an authorized way to verify or
-  repair it. Finish the requested work, or report the concrete blocker and
-  remaining outcome.
+  When an approach fails or leaves a required outcome unverified, identify what
+  blocked it and try an applicable authorized alternative against the original
+  requirement. Continue independent work while resolving the blocker. If the
+  available approaches still leave work open, state what you tried, the concrete
+  blocker, and what remains to finish.
 - Report commit/push separately and distinguish implemented, verified, published,
   and applied. State the reason beside each material conclusion. Explain how the
   source, derivation, or observed result supports that judgment. State material
