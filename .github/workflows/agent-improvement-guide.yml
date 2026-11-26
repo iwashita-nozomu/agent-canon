@@ -3,7 +3,7 @@
 # responsibility Generates bounded AgentCanon improvement guidance for its generator surface and manual dispatch.
 # upstream design ../../agents/skills/agent-canon-update.md PR evidence rules
 # upstream implementation ../../tools/runtime/dispatch/agent-canon/src/agent_runtime_dashboard.rs builds the guide
-# upstream implementation ../../tools/runtime/artifacts/runtime_artifacts.py owns external report/archive paths
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/runtime_boundary.rs owns external artifact paths
 # @dependency-end
 
 # Standalone AgentCanon improvement guidance workflow. Derived repositories run
