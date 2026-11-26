@@ -268,7 +268,7 @@ def test_entrypoint_is_executable_and_has_strict_health_dispatch() -> None:
     assert 'exec "$@"' not in text
     assert "sleep infinity" in text
     assert "resident)" in text
-    assert "activate)" in text
+    assert "activate|compile)" in text
     assert "verify-tools)" in text
     subprocess.run(["bash", "-n", str(ENTRYPOINT)], check=True)
 
