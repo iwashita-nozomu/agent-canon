@@ -997,9 +997,6 @@ fn resolve_container_argv(
     }
     let mut command = spec.argv.clone();
     command.extend_from_slice(args);
-    let cache_root = nonempty_env("AGENT_CANON_CACHE_ROOT")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("/var/lib/agent-canon/cache"));
     for (index, value) in command.iter_mut().take(spec.argv.len()).enumerate() {
         if index == 0 && matches!(value.as_str(), "python" | "python3") {
             *value = find_executable("python3")
@@ -1008,9 +1005,10 @@ fn resolve_container_argv(
             continue;
         }
         if value == "tools/bin/agent-canon" {
-            *value = cache_root
-                .join("bin")
-                .join("agent-canon")
+            *value = env::current_exe()
+                .map_err(|error| {
+                    DispatchError::new("container-exec-failed", format!("{}:{error}", spec.tool_id))
+                })?
                 .display()
                 .to_string();
         } else if (value.starts_with("tools/") || value.starts_with("eval/"))

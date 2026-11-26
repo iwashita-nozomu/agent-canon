@@ -223,6 +223,34 @@ class NativeToolDispatchTests(unittest.TestCase):
         self.assertEqual(payload["entries"][0]["side_effect"], "read-only")
         self.assertEqual(payload["entries"][0]["output_root"], "none")
 
+    def test_container_dispatch_uses_native_cli_with_an_empty_cache(self) -> None:
+        cache = self.base / "empty-cache"
+        cache.mkdir()
+        self._write_catalog(
+            [
+                _entry(
+                    "native",
+                    path="tools/bin/agent-canon",
+                    argv=["tools/bin/agent-canon", "--version"],
+                    dispatch={"runtime": "rust"},
+                )
+            ]
+        )
+        result = self._run(
+            "run",
+            "--container-exec",
+            "--root",
+            str(self.root),
+            "native",
+            "--",
+            extra_env={
+                **self._container_environment(),
+                "AGENT_CANON_CACHE_ROOT": str(cache),
+            },
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(result.stdout.startswith(b"agent-canon "), result.stdout)
+
     def test_repository_inventory_keeps_native_and_python_dispatch_entries(
         self,
     ) -> None:

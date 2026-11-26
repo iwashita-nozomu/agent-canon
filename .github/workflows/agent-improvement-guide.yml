@@ -70,10 +70,23 @@ jobs:
           guide_dir="$(realpath -m -- "${AGENT_CANON_CONTROL_PARENT_ROOT}/agent-improvement-guide")"
           guide_path="${guide_dir}/agent-improvement-guide-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.md"
           container_guide="/var/lib/agent-canon/runtime/reports/agent-improvement-guide/agent-improvement-guide-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.md"
+          guide_stderr="${RUNNER_TEMP}/agent-improvement-guide.stderr"
+          result=0
           "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" \
             tool run --root "${GITHUB_WORKSPACE}" generate-agent-improvement-guide -- \
             --root . --runtime-root /var/lib/agent-canon/runtime --out "${container_guide}" \
-            --output-mode 644
+            --output-mode 644 2>"${guide_stderr}" || result=$?
+          cat -- "${guide_stderr}" >&2
+          if (( result != 0 )); then
+            status_path="${RUNNER_TEMP}/agent-improvement-guide-runtime.json"
+            if receipt="$(jq -Rer 'fromjson? | select(.schema == "agent-canon.bootstrap-receipt.v2" and .code == "tool_failed") | .evidence.receipt_path | strings | select(test("^/var/lib/agent-canon/runtime/receipts/[0-9]{8}T[0-9]{6}Z-exec-[a-f0-9]{32}[.]json$"))' "${guide_stderr}")" &&
+               "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" status >"${status_path}" &&
+               container="$(jq -er 'select(.schema == "agent-canon.bootstrap-receipt.v2" and .status == "ok" and .operation == "status") | .container | select(.drift == false) | .name | strings | select(length > 0)' "${status_path}")"; then
+              docker cp -- "${container}:${receipt}" - | tar -xOf - |
+                jq -c '{stderr: .details.stderr_preview, truncated: .details.stderr_truncated}' >&2 || true
+            fi
+            exit "${result}"
+          fi
           "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" \
             tool export guide --destination "${guide_dir}"
           cat "${guide_path}" >> "${GITHUB_STEP_SUMMARY}"
