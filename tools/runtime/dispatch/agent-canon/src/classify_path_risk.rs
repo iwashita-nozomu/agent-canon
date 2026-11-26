@@ -43,9 +43,9 @@ const CONTAINER_PATHS: &[&str] = &[
     "bootstrap.sh",
     "tools/runtime/dispatch/agent-canon/src/bootstrap_runtime.rs",
     "tools/runtime/dispatch/agent-canon/tests/bootstrap_runtime_native.rs",
-    "tools/runtime/container/compile.sh",
+    "tools/runtime/container/seed-cargo-cache.sh",
     "tests/tools/test_bootstrap_container_contract.py",
-    "tests/tools/test_compile_cache.py",
+    "tests/tools/test_seed_cargo_cache.py",
 ];
 const GITHUB_PREFIXES: &[&str] = &[".github/"];
 const EVAL_PREFIXES: &[&str] = &[

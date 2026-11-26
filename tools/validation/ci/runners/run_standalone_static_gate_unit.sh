@@ -30,11 +30,7 @@ fi
 
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd -P)"
 ROOT="${AGENT_CANON_TARGET_ROOT:-${SCRIPT_ROOT}}"
-default_cli=agent-canon
-if [[ -n "${AGENT_CANON_CACHE_ROOT:-}" ]]; then
-  default_cli="${AGENT_CANON_CACHE_ROOT}/bin/agent-canon"
-fi
-export AGENT_CANON_CLI="${AGENT_CANON_NATIVE_BIN:-${AGENT_CANON_CLI:-${default_cli}}}"
+export AGENT_CANON_CLI="${AGENT_CANON_NATIVE_BIN:-${AGENT_CANON_CLI:-agent-canon}}"
 export AGENT_CANON_NATIVE_BIN="${AGENT_CANON_CLI}"
 cd "${ROOT}"
 ROOT="$(pwd -P)"
@@ -98,7 +94,6 @@ run_rust() {
       ;;
     all|prepare)
       [[ "$#" -le 1 ]] || return 2
-      cargo build --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --locked --offline
       cargo fmt --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml -- --check
       cargo clippy --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --locked --offline --all-targets -- -D warnings
       if [[ "${phase}" == "prepare" ]]; then
@@ -233,7 +228,7 @@ run_workflow_container() {
   AGENT_CANON_CONTROLLER_TEST_DRIVER="${controller_test_driver}" \
   python3 -m pytest -p no:cacheprovider -q \
     tests/tools/test_bootstrap_container_contract.py \
-    tests/tools/test_compile_cache.py
+    tests/tools/test_seed_cargo_cache.py
 }
 
 case "${UNIT}" in

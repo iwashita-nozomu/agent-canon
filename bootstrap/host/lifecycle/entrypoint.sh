@@ -2901,7 +2901,7 @@ _agent_canon_run_controller() {
   output_file=$(mktemp "$temporary_root/.bootstrap.stdout.XXXXXX")
   error_file=$(mktemp "$temporary_root/.bootstrap.stderr.XXXXXX")
   _agent_canon_container_exec "$container" \
-    /var/lib/agent-canon/cache/bin/agent-canon bootstrap-runtime \
+    agent-canon bootstrap-runtime \
     --repository-root /opt/agent-canon/source \
     --control-parent-root /var/lib/agent-canon \
     --runtime-root /var/lib/agent-canon/runtime \
@@ -2923,7 +2923,7 @@ _agent_canon_restore_candidate_failure() {
   restore_error=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.bootstrap.restore.stderr.XXXXXX")
   if "$AGENT_CANON_DOCKER_CMD" container inspect "$container" >/dev/null 2>&1; then
     if _agent_canon_container_exec "$container" \
-      /var/lib/agent-canon/cache/bin/agent-canon bootstrap-runtime \
+      agent-canon bootstrap-runtime \
       --repository-root /opt/agent-canon/source \
       --control-parent-root /var/lib/agent-canon \
       --runtime-root /var/lib/agent-canon/runtime \
@@ -3326,7 +3326,7 @@ _agent_canon_replace_resident_locked() {
   fi
   rc=0
   if _agent_canon_container_exec "$candidate" \
-    /usr/local/bin/agent-canon-container-entrypoint compile; then
+    /usr/local/bin/agent-canon-container-entrypoint activate; then
     :
   else
     rc=$?
@@ -4465,7 +4465,7 @@ _agent_canon_apply_context_defaults() {
   config_mode=$(stat -c '%a' -- "$config_source")
   config_tmp=$(mktemp "${config_source%/*}/.config.toml.context.XXXXXX") || return $?
   if ! _agent_canon_container_exec "$container" --stdin \
-    /var/lib/agent-canon/cache/bin/agent-canon codex-config \
+    agent-canon codex-config \
     --source-config "$AGENT_CANON_SOURCE_DESTINATION/.codex/config.toml" \
     < "$config_source" > "$config_tmp"; then
     rm -f -- "$config_tmp"
@@ -4646,7 +4646,7 @@ _agent_canon_codex_hook() {
     _agent_canon_use_active_image "$container" || return $?
     container=$(_agent_canon_ensure_container) || return $?
     if ! _agent_canon_container_exec "$container" \
-      "$AGENT_CANON_CACHE_DESTINATION/bin/agent-canon" template-bundle \
+      agent-canon template-bundle \
       verify --root "$AGENT_CANON_SOURCE_DESTINATION" >/dev/null; then
       _agent_canon_json_error codex_bundle_invalid \
         "Codex user bundle integrity readback failed"
@@ -4680,7 +4680,7 @@ _agent_canon_codex_hook() {
       printf '\0'
       printf '%s' "$payload"
     } | _agent_canon_container_exec "$container" --stdin \
-      /var/lib/agent-canon/cache/bin/agent-canon bootstrap-runtime \
+      agent-canon bootstrap-runtime \
       --repository-root "$AGENT_CANON_SOURCE_DESTINATION" \
       --control-parent-root /var/lib/agent-canon \
       --runtime-root /var/lib/agent-canon/runtime \
@@ -4727,7 +4727,7 @@ _agent_canon_codex_hook() {
   fi
 
   printf '%s' "$payload" | _agent_canon_container_exec "$container" --stdin \
-    "$AGENT_CANON_CACHE_DESTINATION/bin/agent-canon" codex-hook "$event"
+    agent-canon codex-hook "$event"
 }
 
 _agent_canon_codex_bundle_install_locked() {
@@ -4757,7 +4757,7 @@ _agent_canon_codex_bundle_install_locked() {
   container=$(_agent_canon_ensure_container) || return $?
   records=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.codex-bundle-install.XXXXXX") || return $?
   if ! _agent_canon_container_exec "$container" \
-    "$AGENT_CANON_CACHE_DESTINATION/bin/agent-canon" template-bundle \
+    agent-canon template-bundle \
     verify --root "$AGENT_CANON_SOURCE_DESTINATION" --format install-tsv > "$records"; then
     rm -f -- "$records"
     _agent_canon_json_error codex_bundle_invalid \
@@ -5280,7 +5280,7 @@ _agent_canon_exec_tool_route_locked() {
   error_file=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.bootstrap.stderr.XXXXXX")
   rc=0
   _agent_canon_container_exec "$container" \
-    /var/lib/agent-canon/cache/bin/agent-canon bootstrap-runtime \
+    agent-canon bootstrap-runtime \
     --repository-root /opt/agent-canon/source \
     --control-parent-root /var/lib/agent-canon \
     --runtime-root /var/lib/agent-canon/runtime \
@@ -5681,7 +5681,7 @@ bootstrap_host_entrypoint() {
       error_file=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.bootstrap.stderr.XXXXXX")
       rc=0
       _agent_canon_container_exec "$container" \
-        /var/lib/agent-canon/cache/bin/agent-canon bootstrap-runtime \
+        agent-canon bootstrap-runtime \
         --repository-root /opt/agent-canon/source \
         --control-parent-root /var/lib/agent-canon \
         --runtime-root /var/lib/agent-canon/runtime \

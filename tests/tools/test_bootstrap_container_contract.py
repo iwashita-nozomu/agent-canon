@@ -29,6 +29,7 @@ DOCKERFILE = CONTAINER / "image" / "Dockerfile"
 ENTRYPOINT = CONTAINER / "lifecycle" / "entrypoint.sh"
 DEPENDENCIES = CONTAINER / "image" / "dependencies.toml"
 ROOT_DOCKERIGNORE = ROOT / ".dockerignore"
+IMAGE_DIGEST = CONTAINER / "image" / "digest.sh"
 WRAPPER = CONTAINER / "dispatch" / "tool-wrapper.sh"
 CONTAINER_MARKER = b"agent-canon-tool-container/v1\n"
 RUNTIME_MARKER = b"agent-canon-runtime/v1\n"
@@ -104,6 +105,45 @@ def test_dockerfile_copies_only_runtime_tool_artifacts() -> None:
     assert "build-essential" in text
     assert "rustfmt" not in text
     assert "clippy" not in text
+
+
+def test_image_digest_tracks_tool_sources_and_ignores_unmounted_docs(
+    tmp_path: Path,
+) -> None:
+    dockerfile = tmp_path / DOCKERFILE.relative_to(ROOT)
+    dockerfile.parent.mkdir(parents=True)
+    dockerfile.write_bytes(DOCKERFILE.read_bytes())
+    tool = tmp_path / "tools" / "example.rs"
+    tool.parent.mkdir()
+    tool.write_text("fn main() {}\n", encoding="utf-8")
+
+    def commit_and_digest() -> str:
+        subprocess.run(["git", "add", "."], cwd=tmp_path, check=True)
+        subprocess.run(
+            [
+                "git",
+                "-c",
+                "user.name=Test",
+                "-c",
+                "user.email=test@example.org",
+                "commit",
+                "-qm",
+                "fixture",
+            ],
+            cwd=tmp_path,
+            check=True,
+        )
+        return subprocess.check_output(
+            ["bash", str(IMAGE_DIGEST), str(tmp_path)], text=True
+        ).strip()
+
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    original = commit_and_digest()
+    tool.write_text('fn main() { println!("updated"); }\n', encoding="utf-8")
+    updated = commit_and_digest()
+    assert updated != original
+    (tmp_path / "notes.md").write_text("# Notes\n", encoding="utf-8")
+    assert commit_and_digest() == updated
 
 
 def test_runtime_manifest_owns_apt_tools_and_build_tools_are_absent() -> None:
@@ -218,13 +258,13 @@ def test_entrypoint_is_executable_and_has_strict_health_dispatch() -> None:
     assert '[[ "${uid}" == "0" ]]' not in text
     assert 'exec /usr/local/bin/agent-canon-tool "$@"' in text
     assert (
-        "usage: $0 health | resident | compile | verify-tools | tool run <catalog-id> -- [args...]"
+        "usage: $0 health | resident | activate | verify-tools | tool run <catalog-id> -- [args...]"
         in text
     )
     assert 'exec "$@"' not in text
     assert "sleep infinity" in text
     assert "resident)" in text
-    assert "compile)" in text
+    assert "activate)" in text
     assert "verify-tools)" in text
     subprocess.run(["bash", "-n", str(ENTRYPOINT)], check=True)
 
@@ -256,7 +296,7 @@ def test_typed_tool_wrapper_rejects_arbitrary_dispatch() -> None:
     text = WRAPPER.read_text(encoding="utf-8")
     assert "tool" in text and "run" in text
     assert "tool_dispatch.py" not in text
-    assert '"$cache_root/bin/agent-canon"' in text
+    assert "/usr/local/bin/agent-canon" in text
     assert "--container-exec" in text
     assert "AGENT_CANON_EXECUTION_PLANE=tool-container" in text
     assert "--root /opt/agent-canon/source" in text

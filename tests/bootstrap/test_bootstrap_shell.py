@@ -231,9 +231,7 @@ def test_codex_hook_routes_register_only_trusted_project_targets(
     assert any(
         "\tcodex\thook-admission\t--event\tUserPromptSubmit" in call for call in calls
     )
-    assert any(
-        "/cache/bin/agent-canon\tcodex-hook\tUserPromptSubmit" in call for call in calls
-    )
+    assert any("agent-canon\tcodex-hook\tUserPromptSubmit" in call for call in calls)
     assert not any("\tcodex\thook\t--event\t" in call for call in calls)
     assert codex_config.read_bytes() == config_before
     mounts = control / ".runtime" / "container-state" / "mounts.tsv"
@@ -650,7 +648,7 @@ _agent_canon_container_exec() {{
   shift
   [[ "$1" == --stdin ]] || return 91
   shift
-  [[ "$1" == /var/lib/agent-canon/cache/bin/agent-canon &&
+  [[ "$1" == agent-canon &&
      "$2" == codex-config && "$3" == --source-config &&
      "$4" == "$AGENT_CANON_SOURCE_DESTINATION/.codex/config.toml" ]] || return 92
   local personal

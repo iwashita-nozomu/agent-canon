@@ -114,8 +114,8 @@ evidence.
   An exact local image and resident with current source/cache mounts are
   reused; otherwise the image is pulled or built once and the resident is
   replaced. No remote-ref comparison, candidate checkout, Git rollback, or
-  secondary source-sync lock is allowed. Source-mounted Rust tools are then
-  compiled by the container's generic `tools/**/Cargo.toml` scan into cache/bin.
+  secondary source-sync lock is allowed. The image provides the native tools
+  on `PATH`; activation verifies them and seeds the offline Cargo cache.
   For caller compatibility, `sync` accepts and ignores `--remote` and `--branch`;
   the source remote and branch remain fixed to `origin main`.
 - The same sync updates a managed host native CLI from the latest stable release.

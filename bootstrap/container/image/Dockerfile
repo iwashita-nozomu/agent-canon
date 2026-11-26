@@ -4,7 +4,7 @@
 # upstream design ../../../documents/design/agent-canon-bootstrap-tool-runtime.md shared tool runtime boundary
 # upstream design ../../../documents/design/cpp-debugging.md native diagnostic provisioning and execution boundary
 # upstream design ../../../documents/design/runtime-debugging.md system and Python diagnostic selection
-# upstream implementation ../../../tools/runtime/container/compile.sh source-mounted Rust compilation
+# upstream implementation ../../../tools/runtime/container/seed-cargo-cache.sh offline Cargo cache setup
 # downstream implementation ../lifecycle/entrypoint.sh resident liveness and dispatch
 # @dependency-end
 
@@ -20,6 +20,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     AGENT_CANON_CARGO_TARGET_DIR=/var/lib/agent-canon/cache/cargo-target \
     AGENT_CANON_SOURCE_ROOT=/opt/agent-canon/source \
     AGENT_CANON_CACHE_ROOT=/var/lib/agent-canon/cache \
+    AGENT_CANON_NATIVE_BIN=/usr/local/bin/agent-canon \
     PIPX_HOME=/usr/local/share/agent-canon/pipx \
     PIPX_BIN_DIR=/usr/local/bin \
     PIPX_MAN_DIR=/usr/local/share/man \
@@ -29,7 +30,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     XDG_CACHE_HOME=/tmp/agent-canon-cache \
     OFFICECLI_NO_AUTO_INSTALL=1 \
     OFFICECLI_SKIP_UPDATE=1 \
-    PATH=/var/lib/agent-canon/cache/bin:/usr/local/share/agent-canon/toolchains/cargo/bin:/usr/local/bin:/usr/bin:/bin
+    PATH=/usr/local/bin:/usr/local/share/agent-canon/toolchains/cargo/bin:/usr/bin:/bin
 
 LABEL org.opencontainers.image.title="AgentCanon shared tool runtime" \
       org.opencontainers.image.version="24.04" \
@@ -44,11 +45,12 @@ LABEL org.opencontainers.image.title="AgentCanon shared tool runtime" \
       io.agent-canon.run.pids-limit="512" \
       io.agent-canon.run.tmpfs="/tmp"
 
-# Bootstrap the native planner with the manifest's pinned Rust version, then
-# install the full manifest-owned environment in the same image layer.
-RUN --mount=type=bind,source=bootstrap/container/image/dependencies.toml,target=/src/bootstrap/container/image/dependencies.toml,readonly \
-    --mount=type=bind,source=.,target=/src/repository,readonly \
-    --mount=type=bind,source=tools,target=/src/all-tools,readonly \
+# Build the executable tools and install their shared providers.
+RUN --mount=type=bind,source=bootstrap/container/image/dependencies.toml,target=/src/repository/bootstrap/container/image/dependencies.toml,readonly \
+    --mount=type=bind,source=tools,target=/src/repository/tools,readonly \
+    --mount=type=bind,source=.markdownlint-cli2.jsonc,target=/src/repository/.markdownlint-cli2.jsonc,readonly \
+    --mount=type=bind,source=documents/experiments/gpu-admission-r5-ordered-integration-interface.json,target=/src/repository/documents/experiments/gpu-admission-r5-ordered-integration-interface.json,readonly \
+    --mount=type=cache,target=/var/lib/agent-canon/cache/cargo-target,sharing=locked \
     set -eux; \
     export CARGO_HOME=/usr/local/share/agent-canon/toolchains/cargo; \
     export PATH="$CARGO_HOME/bin:$PATH"; \
@@ -68,25 +70,27 @@ RUN --mount=type=bind,source=bootstrap/container/image/dependencies.toml,target=
     rustup-init -y --no-modify-path --default-toolchain "$AGENT_CANON_BOOTSTRAP_RUST_VERSION" --profile minimal; \
     cargo build --locked --release \
       --manifest-path /src/repository/tools/runtime/dispatch/agent-canon/Cargo.toml; \
-    install -m 0555 "$CARGO_TARGET_DIR/release/agent-canon" /usr/local/bin/agent-canon-dependency-bootstrap; \
-    /usr/local/bin/agent-canon-dependency-bootstrap environment-dependencies \
+    cargo build --locked --release \
+      --manifest-path /src/repository/tools/runtime/python-provider/Cargo.toml; \
+    install -m 0555 "$CARGO_TARGET_DIR/release/agent-canon" /usr/local/bin/agent-canon; \
+    install -m 0555 "$CARGO_TARGET_DIR/release/agent-canon-python-provider" /usr/local/bin/agent-canon-python-provider; \
+    agent-canon environment-dependencies \
       image-install --workspace /src/repository \
-      --manifest /src/bootstrap/container/image/dependencies.toml \
+      --manifest /src/repository/bootstrap/container/image/dependencies.toml \
       --final-binary-dir /usr/local/bin --format text; \
-    bash -ceu 'shopt -s globstar nullglob; for manifest in /src/all-tools/**/Cargo.toml; do cargo fetch --locked --manifest-path "$manifest"; done'; \
+    bash -ceu 'shopt -s globstar nullglob; for manifest in /src/repository/tools/**/Cargo.toml; do cargo fetch --locked --manifest-path "$manifest"; done'; \
     install -d -m 0755 /usr/local/share/agent-canon/runtime; \
-    install -m 0444 /src/bootstrap/container/image/dependencies.toml /usr/local/share/agent-canon/runtime/dependencies.toml; \
+    install -m 0444 /src/repository/bootstrap/container/image/dependencies.toml /usr/local/share/agent-canon/runtime/dependencies.toml; \
+    install -m 0555 /src/repository/tools/runtime/container/seed-cargo-cache.sh /usr/local/bin/agent-canon-seed-cargo-cache; \
     printf 'agent-canon-tool-container/v1\n' > /usr/local/share/agent-canon/.agent-canon-tool-container; \
     chmod 0444 /usr/local/share/agent-canon/.agent-canon-tool-container; \
     printf 'agent-canon-runtime/v1\n' > /usr/local/share/agent-canon/runtime/.agent-canon-runtime; \
     chmod 0444 /usr/local/share/agent-canon/runtime/.agent-canon-runtime; \
-    rm -rf /var/lib/agent-canon/cache/cargo-target /root/.npm /root/.cache /tmp/* /usr/local/bin/rustup-init /usr/local/share/agent-canon/pipx/shared; \
+    rm -rf "$CARGO_HOME/registry/src" /root/.npm /root/.cache /tmp/* /usr/local/bin/rustup-init /usr/local/share/agent-canon/pipx/shared; \
     DEBIAN_FRONTEND=noninteractive apt-get purge -y --auto-remove pipx; \
     rm -rf /var/lib/apt/lists/*
 
-# Only the fixed container adapter is copied into the image.  The current
-# AgentCanon source, controller, skills, and dispatch catalog are mounted by
-# the host at runtime, so source-only updates reuse this environment image.
+# The host supplies the source checkout and registered project inputs at runtime.
 RUN --mount=type=bind,source=bootstrap/container/lifecycle/entrypoint.sh,target=/src/entrypoint.sh,readonly \
     --mount=type=bind,source=bootstrap/container/dispatch/tool-wrapper.sh,target=/src/tool-wrapper.sh,readonly \
     set -eux; \

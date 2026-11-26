@@ -34,9 +34,14 @@ stable tag is `ghcr.io/iwashita-nozomu/agent-canon:env-<key>`, where the shared
 shell key owner hashes the Dockerfile and its `source=` bind inputs by
 repository-relative Git tree identity. The key is independent of checkout
 path and source commit ID. CI builds both architectures only when that tag is
-absent; pull requests build for verification without publishing. A source-only
-update reuses the environment image and recompiles only source-mounted Rust
-tools into the writable cache.
+absent; pull requests build for verification without publishing. The key
+covers the mounted tool sources and build inputs. Updates outside those inputs
+reuse the current image. CI imports available layers from the published main
+image and embeds cache metadata in the new image.
+
+The image builds `agent-canon` and `agent-canon-python-provider` and installs both
+on `PATH`. The offline Cargo seed contains crate archives and the registry index.
+Build products and unpacked registry sources stay outside the final image.
 
 ## Host/container activation boundary
 
@@ -45,7 +50,7 @@ has Docker and Git but no Python package environment. They never import or
 execute AgentCanon Python directly. Lifecycle and tool operations first select
 the env-key image, create/start exactly one resident container with
 `--network none`, mount the source checkout read-only at
-`/opt/agent-canon/source`, and invoke source-mounted tools through `docker exec`.
+`/opt/agent-canon/source`, and invoke the image's tools through `docker exec`.
 
 The controller never issues Docker operations. The host shell owns the fixed
 Docker lifecycle transaction and invokes the controller only after the
@@ -317,14 +322,13 @@ generation, container, target, limits, and receipt fields before retrying.
 
 The container entrypoint's `verify-tools` command checks the installed image
 against its dependency manifest and runs a small Markdown and KaTeX example
-in the read-only runtime. CI runs it before publishing each architecture.
-Candidate installation runs it before compiling the source-mounted tools
-and uses the existing rollback path if verification fails. Use the image
-dependency record and command output to resolve installation failures.
+in the read-only runtime. CI runs the same activation as installation for each
+architecture before publishing, with an empty writable cache and no network.
+If activation fails during an update, the host restores the previous runtime.
 
 The host reports pending or unavailable Docker health metadata and differences
 from the default network, security, CPU, memory, and PID profile as warnings.
-It proceeds directly to compilation and controller execution after Docker starts
+It proceeds directly to image verification and controller execution after Docker starts
 the resident. Codex link collisions preserve the existing entry and defer that
 optional setting. A failed optional Codex projection or post-install rollback
 cleanup also produces a warning while the installed resident remains available.
@@ -333,7 +337,7 @@ filesystem owner. The controller validates its task limits from the manifest;
 the host owns Docker profile settings and observed ownership. Unused health
 timings and duplicate host-profile checks are removed from the controller's
 manifest requirements. Source/mount ownership and safe file operations retain their
-existing boundaries, and Docker, compilation, and controller errors identify
+existing boundaries, and Docker, image verification, and controller errors identify
 the failed operation.
 
 `stop` removes the owned container but retains runtime state and spool data.

@@ -97,12 +97,15 @@ jobs:
             --builder "$BUILDER" \
             --file bootstrap/container/image/Dockerfile \
             --platform "$PLATFORM" \
+            --cache-from "type=registry,ref=${IMAGE_NAME}:main" \
+            --cache-to type=inline \
             --tag "${IMAGE}-${ARCH}" \
             --load \
             .
           docker run --rm --user 1000:1000 --read-only --network none \
             --cap-drop ALL --security-opt no-new-privileges --tmpfs /tmp \
-            "${IMAGE}-${ARCH}" verify-tools
+            --tmpfs /var/lib/agent-canon/cache:uid=1000,gid=1000,mode=0700 \
+            "${IMAGE}-${ARCH}" activate
 
       - name: Publish architecture image
         if: github.event_name != 'pull_request'

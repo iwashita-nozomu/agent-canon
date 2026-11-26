@@ -236,19 +236,18 @@ Compose、workspace lifecycle は移植せず、旧developer-container surface�
 Image は digest-pinned Ubuntu 24.04 の一つの output image です。bootstrap package
 transaction は一度だけ apt update を行い、manifest-owned dependency を同じ
 dependency layer へ導入してから asset / materializer layer を作ります。
-build-essential、curl、pipx、npm、`rustup-init` と
-Cargo build の後、npm/pipx/build provider と cache を同じ layer で purge します。
-runtime は Node runtime、Python 3.12、jq/tree、clangd、AgentCanon binary、pipx
-venv launchers、dependency plan/receipts を保持しますが、npm executable や build
-provider は保持しません。Docker cache mount は使用しません。
+イメージ構築時に AgentCanon CLI と Python provider をビルドし、
+`/usr/local/bin` に配置します。Cargo のビルド成果物は BuildKit のキャッシュに
+置きます。イメージには検証用の Rust toolchain と、オフライン実行に必要な Cargo の
+圧縮アーカイブとインデックスを収録します。
 
 dependency plan / receipts は manifest の declared records と観測した Rust source
 digest、exact Cargo.lock digest、binary digest/version を build provenance として
 保存します。Rust source digest は手動の manifest expectation ではありません。
-CI が image を build/load/run し、entrypoint health を検証します。canonical
-install/sync/update は env key image を再利用し、source-only 更新では
-source-mounted tool compile だけを writable cache に行います。Dockerfile または
-その bind input が変わったときだけ新しい環境 image を作ります。
+CI は各対応アーキテクチャのイメージで共有ツールを実行してから配布します。
+Dockerfile、ビルドコンテキストの除外設定、Dockerfile が参照する入力からイメージの
+キーを求めます。install/sync/update は対応するイメージを選び、導入時に共有ツールの
+実行を確認します。
 
 `bootstrap/container/image/Dockerfile` は次を必須にします。
 
@@ -268,9 +267,8 @@ container、venv、Cargo toolchain、volume を作りません。
 
 Resident は AgentCanon source checkout を `/opt/agent-canon/source` に read-only
 で、runtime state volume の cache を `/var/lib/agent-canon/cache` に writable
-で mount します。source-mounted `tools/**/Cargo.toml` を走査する compile route
-が必要な Rust tool だけを cache/bin に更新し、source-only 更新では environment
-image を再構築しません。
+で mount します。共有ツールはイメージの `/usr/local/bin` から実行します。導入時は
+イメージに収録した Cargo の圧縮アーカイブとインデックスを共有キャッシュに反映します。
 
 ## Mount Registry And Generation Transaction
 

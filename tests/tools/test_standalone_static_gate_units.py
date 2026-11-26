@@ -101,9 +101,9 @@ def selected_units(*paths: str) -> tuple[str, ...]:
         (("eval/definitions/example.toml",), ("eval",)),
         ((".github/PULL_REQUEST_TEMPLATE.md",), ("docs", "workflow-container")),
         (("bootstrap/container/image/Dockerfile",), ("workflow-container",)),
-        (("tools/runtime/container/compile.sh",), ("workflow-container",)),
+        (("tools/runtime/container/seed-cargo-cache.sh",), ("workflow-container",)),
         (
-            ("tests/tools/test_compile_cache.py",),
+            ("tests/tools/test_seed_cargo_cache.py",),
             ("contracts", "workflow-container"),
         ),
         (("bootstrap.sh",), ("eval", "workflow-container")),
@@ -783,8 +783,8 @@ def test_workflow_unit_invokes_selected_native_cli(
     else:
         setup += "unset AGENT_CANON_CLI\n"
     setup += (
-        "default_cli=agent-canon"
-        + text.split("default_cli=agent-canon", 1)[1].split('cd "${ROOT}"', 1)[0]
+        "export AGENT_CANON_CLI="
+        + text.split("export AGENT_CANON_CLI=", 1)[1].split('cd "${ROOT}"', 1)[0]
     )
     calls, trace = fixture_root / "calls", fixture_root / "trace"
     result = run_shell(
@@ -792,6 +792,7 @@ def test_workflow_unit_invokes_selected_native_cli(
         root=root,
         ROOT=str(root),
         AGENT_CANON_SOURCE_ROOT=str(root),
+        PATH=str(cache / "bin") + os.pathsep + os.environ["PATH"],
         AGENT_CANON_CACHE_ROOT=str(cache),
         CARGO_TARGET_DIR=str(cache / "target"),
         CHECKER_EXIT=str(checker_exit),
@@ -853,8 +854,8 @@ def test_contract_unit_passes_selected_native_cli_to_alignment(
     else:
         setup += "unset AGENT_CANON_CLI\n"
     setup += (
-        "default_cli=agent-canon"
-        + text.split("default_cli=agent-canon", 1)[1].split('cd "${ROOT}"', 1)[0]
+        "export AGENT_CANON_CLI="
+        + text.split("export AGENT_CANON_CLI=", 1)[1].split('cd "${ROOT}"', 1)[0]
     )
     calls, selected = fixture_root / "calls", fixture_root / "selected"
     result = run_shell(
@@ -862,6 +863,7 @@ def test_contract_unit_passes_selected_native_cli_to_alignment(
         root=root,
         ROOT=str(root),
         TOOLS_ROOT=str(root / "tools"),
+        PATH=str(cache / "bin") + os.pathsep + os.environ["PATH"],
         AGENT_CANON_CACHE_ROOT=str(cache),
         CHECKER_EXIT=str(checker_exit),
         CALLS=str(calls),
@@ -903,7 +905,7 @@ def test_contract_collection_and_source_toolchain_owners() -> None:
     assert "export RUSTUP_HOME=" not in text
     assert "export CARGO_HOME=" not in text
     assert (
-        'export AGENT_CANON_CLI="${AGENT_CANON_NATIVE_BIN:-${AGENT_CANON_CLI:-${default_cli}}}"'
+        'export AGENT_CANON_CLI="${AGENT_CANON_NATIVE_BIN:-${AGENT_CANON_CLI:-agent-canon}}"'
         in text
     )
     assert (
