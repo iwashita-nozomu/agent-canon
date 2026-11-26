@@ -122,6 +122,8 @@ context/evidence. The contracts below apply without an installed Skill/runtime.
   planned migration, review obsolete code and references, then validate its final
   state together; intermediate edits and commits are not separate test gates.
 - Match each requested outcome to the actual artifact or execution result.
+  Start image-provided tools in the configured execution container. Resolve
+  missing image tools and setup failures at the image's installation boundary.
   When an approach fails or leaves a required outcome unverified, identify what
   blocked it and try an applicable authorized alternative against the original
   requirement. Continue independent work while resolving the blocker. If the

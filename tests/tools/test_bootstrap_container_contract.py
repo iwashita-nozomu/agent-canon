@@ -218,13 +218,14 @@ def test_entrypoint_is_executable_and_has_strict_health_dispatch() -> None:
     assert '[[ "${uid}" == "0" ]]' not in text
     assert 'exec /usr/local/bin/agent-canon-tool "$@"' in text
     assert (
-        "usage: $0 health | resident | compile | tool run <catalog-id> -- [args...]"
+        "usage: $0 health | resident | compile | verify-tools | tool run <catalog-id> -- [args...]"
         in text
     )
     assert 'exec "$@"' not in text
     assert "sleep infinity" in text
     assert "resident)" in text
     assert "compile)" in text
+    assert "verify-tools)" in text
     subprocess.run(["bash", "-n", str(ENTRYPOINT)], check=True)
 
 
@@ -283,6 +284,7 @@ def test_dependency_manifest_contains_only_shared_tools() -> None:
         "scip-python",
         "bash-language-server",
         "markdownlint-cli2",
+        "katex",
         "officecli",
         "gnupg",
         "node",

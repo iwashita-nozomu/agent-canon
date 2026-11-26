@@ -315,6 +315,13 @@ generation, container, target, limits, and receipt fields before retrying.
 
 ### Installation diagnostics
 
+The container entrypoint's `verify-tools` command checks the installed image
+against its dependency manifest and runs a small Markdown and KaTeX example
+in the read-only runtime. CI runs it before publishing each architecture.
+Candidate installation runs it before compiling the source-mounted tools
+and uses the existing rollback path if verification fails. Use the image
+dependency record and command output to resolve installation failures.
+
 The host reports pending or unavailable Docker health metadata and differences
 from the default network, security, CPU, memory, and PID profile as warnings.
 It proceeds directly to compilation and controller execution after Docker starts

@@ -114,6 +114,17 @@ provides = ["markdownlint-cli2"]
 failure_policy = "fail"
 
 [[records]]
+id = "katex"
+package = "katex"
+method = "npm-global"
+version = "0.16.47"
+source = "https://registry.npmjs.org/katex"
+verification = { kind = "npm-package", executable = "katex", args = ["--version"], output_contains = "0.16.47" }
+deps = ["node"]
+provides = ["katex"]
+failure_policy = "fail"
+
+[[records]]
 # The npm provider downloads its version-matched native binary; verification
 # must execute it because postinstall alone can succeed after a download failure.
 id = "officecli"
