@@ -5814,7 +5814,10 @@ def test_gpu006_stale_source_sync_mount_is_recreated_by_public_route(
     # The image is prepared before an existing resident is stopped (#1853).
     assert pull_index < stop_index
     assert resident["id"] in calls[stop_index]
-    assert any(old_image_id in call for call in calls if call.startswith("tag\t"))
+    rollback_tagged = any(
+        old_image_id in call for call in calls if call.startswith("tag\t")
+    )
+    assert rollback_tagged == (operation != "install")
     if operation == "install":
         assert (
             subprocess.run(
