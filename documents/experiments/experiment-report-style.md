@@ -27,6 +27,7 @@ repo 固有の結論を先に言うと、実験レポートは IMRaD をその�
 1. `Discussion`
 1. `Limitations`
 1. `Reproducibility Record`
+1. `AI Assistance`（AIを使った場合）
 1. `Artifacts and Carry-Over`
 1. `Critical Review`
 
@@ -202,6 +203,8 @@ repo では、次のラベルで observation と interpretation を分けると�
 
 - 計算実験では、再現情報を report の一部として明示します。
 - 既に `summary/summary.json` に入っている情報でも、本文から辿れるように要約を書きます。
+- AIを使った場合は、再現情報の後に利用実績を記載します。
+  [AI Assistance](../../agents/skills/academic-writing.md#ai-assistance) を参照します。
 
 最低限含めるもの:
 
@@ -350,6 +353,8 @@ review owner になります。この文書は確認観点を示しますが、�
     ## Limitations
 
     ## Reproducibility Record
+
+    ## AI Assistance
 
     ## Artifacts and Carry-Over
 

@@ -16,7 +16,8 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 ## Reader Map（読者 map）
 
 この template は 1 つの experiment report の構造を所有します。question、protocol、results、
-interpretation、limitations、reproducibility record、artifacts、critical review の順に埋め、
+interpretation、limitations、reproducibility record、AI Assistance（該当時）、artifacts、
+critical review の順に埋め、
 abstract は最後に書きます。run-scoped empirical evidence に使い、durable policy、workflow
 change、根拠のない conclusion を昇格させる場所にはしません。
 
@@ -115,6 +116,16 @@ change、根拠のない conclusion を昇格させる場所にはしません�
 ## Reproducibility Record（再現性 record）
 
 <!-- commit、exact command、environment、final JSON、raw JSONL、renderer/plot command。 -->
+
+## AI Assistance
+
+<!-- AIを使った場合に、実際の利用、確認結果、人が決めたことを記入します。 -->
+
+- **Tools**
+- **Purpose**
+- **Contribution**
+- **Verification**
+- **Human decisions**
 
 ## Artifacts and Carry-Over（artifact と carry-over）
 

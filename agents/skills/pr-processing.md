@@ -74,6 +74,9 @@ work route own the review and operation sequence.
 
 ## Publication boundary
 
+AIを使ったIssueやPRは、本文に利用実績を記載します。
+[AI Assistance](academic-writing.md#ai-assistance) を参照します。
+
 Before any Issue or PR write, keep the requested operation,
 repository-qualified target, authority, and real payload aligned through
 dispatch and readback. Do not probe write access, create a substitute Issue after

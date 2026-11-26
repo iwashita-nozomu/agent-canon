@@ -35,6 +35,16 @@ downstream implementation ../../../../tools/runtime/dispatch/agent-canon/src/git
 - validation result and evidence:
 - validation gap or not_applicable reason:
 
+## AI Assistance
+
+<!-- AIを使った場合に、実際の内容を記載します。 -->
+
+- **Tools**
+- **Purpose**
+- **Contribution**
+- **Verification**
+- **Human decisions**
+
 ## Mutation Authority
 
 - mutation authority:
