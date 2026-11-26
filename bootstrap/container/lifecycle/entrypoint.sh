@@ -70,7 +70,8 @@ case "${1:-}" in
         }
         exec /usr/local/bin/agent-canon-tool "$@"
         ;;
-    activate)
+    # A sync started with an older host script still sends compile after fetching the image.
+    activate|compile)
         [[ "$#" -eq 1 ]] || {
             echo "usage: $0 activate" >&2
             exit 64
