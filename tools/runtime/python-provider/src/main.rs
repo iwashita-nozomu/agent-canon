@@ -6,10 +6,9 @@
 // @dependency-end
 
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyDict};
+use pyo3::types::PyBytes;
 use serde_json::{json, Value};
 use std::io::{self, Read};
-use std::path::Path;
 
 mod jit_runtime;
 mod proof_trace_alignment;
@@ -111,30 +110,11 @@ fn pdf(py: Python<'_>, bytes: &[u8]) -> PyResult<Value> {
     Ok(json!({"status":"pass","method":"pypdf","text":pages.join("\n"),"runtime":runtime(py)?}))
 }
 
-fn trace(py: Python<'_>, path: &Path, symbol: &str) -> PyResult<Value> {
-    let path = path.to_str().ok_or_else(|| {
-        pyo3::exceptions::PyValueError::new_err("trace module path must be UTF-8")
-    })?;
-    let module = py.import("runpy")?.getattr("run_path")?.call1((path,))?;
-    let globals = module.cast::<PyDict>()?;
-    let value = globals.get_item(symbol)?.ok_or_else(|| {
-        pyo3::exceptions::PyValueError::new_err(format!("missing trace symbol: {symbol}"))
-    })?;
-    let text = py
-        .import("json")?
-        .getattr("dumps")?
-        .call1((value,))?
-        .extract::<String>()?;
-    let value: Value = serde_json::from_str(&text)
-        .map_err(|error| pyo3::exceptions::PyValueError::new_err(error.to_string()))?;
-    Ok(json!({"status":"pass","value":value,"runtime":runtime(py)?}))
-}
-
 fn main() {
     let args: Vec<_> = std::env::args().skip(1).collect();
     let Some(command) = args.first().map(String::as_str) else {
         eprintln!(
-            "usage: agent-canon-python-provider <pdf-extract|trace-json|proof-source|jit-lower|module-location|runtime> [arguments]"
+            "usage: agent-canon-python-provider <pdf-extract|proof-source|jit-lower|module-location|runtime> [arguments]"
         );
         std::process::exit(2);
     };
@@ -207,9 +187,6 @@ fn main() {
             }
             Python::attach(|py| pdf(py, &bytes))
         }
-        "trace-json" if args.len() == 3 => {
-            Python::attach(|py| trace(py, Path::new(&args[1]), &args[2]))
-        }
         _ => {
             eprintln!("unsupported provider command or arguments");
             std::process::exit(2);
@@ -239,23 +216,6 @@ mod tests {
         let result = Python::attach(runtime).unwrap();
         assert_eq!(result["implementation"], "CPython");
         assert!(!result["version"].as_str().unwrap().is_empty());
-    }
-
-    #[test]
-    fn trace_preserves_consumer_mapping_and_reports_missing_symbols() {
-        let temporary = tempfile::tempdir().unwrap();
-        let module = temporary.path().join("trace.py");
-        std::fs::write(
-            &module,
-            "FORMAL_PROOF_TRACE = {'claim': '保持', 'steps': [1, 2], 'checked': True}\n",
-        )
-        .unwrap();
-        let result = Python::attach(|py| trace(py, &module, "FORMAL_PROOF_TRACE")).unwrap();
-        assert_eq!(
-            result["value"],
-            json!({"claim":"保持","steps":[1,2],"checked":true})
-        );
-        assert!(Python::attach(|py| trace(py, &module, "MISSING")).is_err());
     }
 
     #[test]

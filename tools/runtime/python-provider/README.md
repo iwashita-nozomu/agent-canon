@@ -19,8 +19,8 @@ place `agent-canon-python-provider` on `PATH`, or set
 `AGENT_CANON_PYTHON_PROVIDER` to its executable path. Python's normal runtime
 environment supplies optional packages such as `pypdf`.
 
-The executable accepts `runtime`, `pdf-extract` with PDF bytes on stdin, and
-`trace-json <module-path> <symbol>`. Each operation writes one JSON result.
+The `runtime` and `pdf-extract` commands write one JSON result.
+`pdf-extract` reads PDF bytes from stdin.
 The native `check-proof-trace-alignment` command selects the provider's
 `proof-trace-alignment` operation. That operation loads the existing trace
 mapping and uses CPython's standard AST APIs while Rust checks the contracts,

@@ -1,7 +1,6 @@
 // @dependency-start
 // contract implementation
 // responsibility Builds machine-readable file-surface inventories for repo review.
-// upstream implementation ../../../../analysis/code/file_surface_inventory.py frozen migration oracle
 // downstream implementation ../../../../repository/github/review_backlog_scan.sh includes inventory reports
 // downstream implementation ../../../../../tests/agent_tools/test_file_surface_inventory.py exercises the inventory CLI
 // @dependency-end
