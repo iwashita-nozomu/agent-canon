@@ -49,6 +49,9 @@ docs-completeness review は要求された複数 section や関連文書の網�
 大きな構造修正を済ませてから line edit を行い、`tools/bin/agent-canon docs
 check` は選択された文書 check として使います。
 
+論文でAIを使った場合は、利用箇所、検証、人が決めたことを記載します。
+[AI Assistance](academic-writing.md#ai-assistance) を参照します。
+
 ## Start the writing task
 
 Follow the section and figure outline above, then use the selected writing Skill

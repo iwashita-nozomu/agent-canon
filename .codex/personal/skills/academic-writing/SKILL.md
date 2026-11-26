@@ -2,7 +2,7 @@
 name: academic-writing
 description: "Use when drafting a paper, thesis chapter, scholarly note, or other academic document that needs mandatory multi-agent review for notation, logic, and reader flow."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"7c180e3879f036367f69306882d7182d2c3ec66dd57af3f03fd8140df4ea433d"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"095e9770997e8b444017d15e669caa480dddb1f23aa6edcdb9f41f7a660f90a1"} -->
 
 <!--
 @dependency-start

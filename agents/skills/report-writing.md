@@ -36,6 +36,9 @@ downstream implementation ../../tools/runtime/dispatch/agent-canon/src/dependenc
 実験branchを報告する場合は起点・目的・差分を示します。数理の仮定の選択が残る場合は
 [数理予備検討](academic-writing.md#mathematical-preliminary-preparation) を参照します。
 
+数理・実験レポートでAIを使った場合は、利用箇所、検証、人が決めたことを記載します。
+[AI Assistance](academic-writing.md#ai-assistance) を参照します。
+
 ## Numerical and runtime results
 
 数値結果を対象全体について先にまとめ、その後に実行時・アーキテクチャの結果を示します。

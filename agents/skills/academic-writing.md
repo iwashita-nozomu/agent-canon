@@ -60,6 +60,19 @@ owner's applicable check.
 Use `tools/bin/agent-canon docs check` when that check is selected for the
 document.
 
+## AI Assistance
+
+数理・実験レポートや論文でAIを使った場合は、`AI Assistance` セクションに
+利用実績を記載します。投稿先に指定の形式がある場合は、その形式に合わせます。
+
+- **Tools** 実際に使ったツール名（例 ChatGPT、Codex）。
+- **Purpose** 使った目的（例 数式の導出、アルゴリズムの実装）。
+- **Contribution** AIが支援した箇所と内容（例 導出、実装、数値テスト）。
+- **Verification** 実際に行った確認と結果。数式の整合性確認、コードレビュー、
+  解析解との数値比較など、該当するものと根拠を示します。未実施の確認は未検証と記載します。
+- **Human decisions** 人が決めた問題設定、数理的な仮定、採否基準など。
+  判断者や判断の内容が未確認なら、その状態を示します。
+
 ## Start the writing task
 
 Follow the section and figure outline above, then use the selected writing Skill
