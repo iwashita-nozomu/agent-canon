@@ -1306,6 +1306,7 @@ def test_fake_docker_install_two_forced_updates_and_rollback_toggle(
         timeout=120,
     )
     assert smoke.returncode == 0, smoke.stderr
+    assert "usage: agent-canon generate-agent-improvement-guide" in smoke.stdout
     active_ref, image_a = active_image()
     # ``--local-build`` reuses an existing image reference by design. Advance
     # the fixture's actual image input between updates so the digest owner

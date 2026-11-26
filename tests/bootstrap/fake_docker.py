@@ -449,14 +449,19 @@ def _run_source_free_resident_native(
     if controller_command and driver:
         test_bin = Path(os.environ["FAKE_DOCKER_STATE"]).parent / ".fake-docker-bin"
         test_bin.mkdir(mode=0o700, parents=True, exist_ok=True)
-        tool_wrapper = test_bin / "agent-canon-tool"
-        if tool_wrapper.is_symlink():
-            if tool_wrapper.resolve() != binary.resolve():
+        for name, executable in (
+            ("agent-canon-tool", binary),
+            ("agent-canon", Path(native)),
+        ):
+            link = test_bin / name
+            executable = executable.resolve()
+            if link.is_symlink():
+                if link.resolve() != executable:
+                    return 1
+            elif link.exists():
                 return 1
-        elif tool_wrapper.exists():
-            return 1
-        else:
-            tool_wrapper.symlink_to(binary)
+            else:
+                link.symlink_to(executable)
         environment["PATH"] = f"{test_bin}{os.pathsep}{environment['PATH']}"
         process_arguments.extend(
             [

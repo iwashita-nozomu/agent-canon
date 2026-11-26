@@ -4,6 +4,7 @@ use agent_canon::bootstrap_runtime::{run_with_target_namespace, TargetNamespace}
 use std::collections::BTreeMap;
 use std::env;
 use std::path::PathBuf;
+use std::process::Command;
 
 fn namespace_from_process_environment() -> Result<TargetNamespace, String> {
     let source_root = env::var_os("AGENT_CANON_RUNTIME_TOOLS_ROOT")
@@ -86,6 +87,17 @@ fn run_tool_wrapper(arguments: &[String]) -> i32 {
 
 fn main() {
     let arguments = env::args().skip(1).collect::<Vec<_>>();
+    // A dispatched Rust command re-enters this process through current_exe.
+    // The fake container provides the real CLI on PATH for that child.
+    if env::var("AGENT_CANON_DISPATCH_RUNTIME").is_ok_and(|runtime| runtime == "rust") {
+        match Command::new("agent-canon").args(&arguments).status() {
+            Ok(status) => std::process::exit(status.code().unwrap_or(2)),
+            Err(error) => {
+                eprintln!("test driver: start native CLI: {error}");
+                std::process::exit(2);
+            }
+        }
+    }
     let mut mounts = Vec::new();
     let mut control_root = None;
     let mut runtime_root = None;

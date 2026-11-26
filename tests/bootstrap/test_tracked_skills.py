@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
@@ -152,25 +153,29 @@ def test_global_foreign_skill_link_is_preserved(tmp_path: Path, dangling: bool) 
     link.symlink_to(foreign, target_is_directory=True)
     before = link.lstat()
     result = install_links(home, checkout)
-    assert result.returncode == 2
-    assert "skill_link_collision" in result.stderr
+    assert result.returncode == 0, result.stderr
+    warning = json.loads(result.stderr)
+    assert warning["status"] == "warning"
+    assert warning["code"] == "skill_link_collision"
     assert link.readlink() == foreign
     assert link.lstat().st_ino == before.st_ino
 
 
-def test_missing_distribution_fails_without_creating_an_empty_view(
+def test_missing_distribution_warns_without_creating_an_empty_view(
     tmp_path: Path,
 ) -> None:
-    """Bootstrap cannot report success for an absent Git distribution."""
+    """Missing Git distribution defers skill linking with a warning."""
     home = tmp_path / "home"
     home.mkdir()
     checkout = tmp_path / "checkout"
     checkout.mkdir()
     result = install_links(home, checkout)
-    assert result.returncode == 2
-    assert "skill_source_missing" in result.stderr
-    assert not (checkout / SKILLS).exists()
-    assert not (home / ".agents/skills").is_symlink()
+    assert result.returncode == 0, result.stderr
+    warning = json.loads(result.stderr)
+    assert warning["status"] == "warning"
+    assert warning["code"] == "skill_source_missing"
+    assert not os.path.lexists(checkout / SKILLS)
+    assert not os.path.lexists(home / ".agents/skills")
 
 
 def test_runtime_has_no_skill_writer_or_transfer() -> None:
