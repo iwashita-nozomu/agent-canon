@@ -1,13 +1,14 @@
 // @dependency-start
 // contract implementation
-// responsibility Materializes consulted HTML and PDF references with retained external parser APIs.
+// responsibility Materializes consulted HTML and PDF references as Markdown.
 // upstream design ../../../../../references/README.md external reference capture contract
-// upstream implementation ../../../python-provider/src/main.rs safe parser and PDF runtime connection
+// upstream implementation ../../../python-provider/src/main.rs optional PDF runtime connection
 // downstream test ../../../../../tests/agent_tools/test_reference_materializer.py public CLI oracles
 // @dependency-end
 
 use crate::authority::{AttestationRequest, NonEmptyTrimmedString, Nonce128, ParentRootAttestor};
 use crate::python_text::{python_splitlines, python_strip};
+use html5gum::{State, Token, Tokenizer};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
@@ -34,6 +35,57 @@ fn normalize(value: &str) -> String {
         previous_blank = line.is_empty();
     }
     python_strip(&result.join("\n")).to_owned()
+}
+
+fn extract_html(bytes: &[u8]) -> (String, String) {
+    let document = String::from_utf8_lossy(bytes);
+    let mut tokenizer = Tokenizer::new(document.as_bytes());
+    let mut title = Vec::new();
+    let mut text = Vec::new();
+    let mut in_title = false;
+    let mut hidden_depth = 0usize;
+    while let Some(Ok(token)) = tokenizer.next() {
+        match token {
+            Token::StartTag(tag) => {
+                let name = tag.name.as_slice();
+                if !tag.self_closing {
+                    in_title |= name == b"title";
+                    match name {
+                        b"script" => tokenizer.set_state(State::ScriptData),
+                        b"style" => tokenizer.set_state(State::RawText),
+                        _ => {}
+                    }
+                    if matches!(name, b"script" | b"style" | b"noscript" | b"template") {
+                        hidden_depth += 1;
+                    }
+                }
+                if matches!(
+                    name,
+                    b"p" | b"br" | b"div" | b"section" | b"article" | b"li" | b"h1" | b"h2" | b"h3"
+                ) {
+                    text.push("\n".to_owned());
+                }
+            }
+            Token::EndTag(tag) => match tag.name.as_slice() {
+                b"title" => in_title = false,
+                b"script" | b"style" | b"noscript" | b"template" => {
+                    hidden_depth = hidden_depth.saturating_sub(1);
+                }
+                _ => {}
+            },
+            Token::String(data) => {
+                let value = String::from_utf8_lossy(&data.value);
+                if in_title {
+                    title.push(value.to_string());
+                }
+                if hidden_depth == 0 && !value.trim().is_empty() {
+                    text.push(value.into_owned());
+                }
+            }
+            _ => {}
+        }
+    }
+    (normalize(&title.join(" ")), normalize(&text.join(" ")))
 }
 
 pub(crate) fn provider(kind: &str, bytes: &[u8]) -> Result<Value, String> {
@@ -172,21 +224,15 @@ fn execute(values: &BTreeMap<String, String>, force: bool, fetch: bool) -> Resul
         _ => return Err("invalid --source-kind".into()),
     };
     let (title, text, method) = if source_kind == "html" {
-        let result = provider("html-extract", &bytes)?;
-        if result["status"] != "pass" {
-            return Err(result["error"]
-                .as_str()
-                .unwrap_or("HTML extraction failed")
-                .into());
-        }
+        let (title, text) = extract_html(&bytes);
         (
             if get("--title").is_empty() {
-                normalize(result["title"].as_str().unwrap_or(""))
+                title
             } else {
                 normalize(get("--title"))
             },
-            normalize(result["text"].as_str().unwrap_or("")),
-            "stdlib-html-parser",
+            text,
+            "html5gum",
         )
     } else {
         let result = provider("pdf-extract", &bytes).ok();

@@ -97,10 +97,11 @@ agent-canon reference-materializer --root /abs/path/to/parent-repository \
   --input /path/to/downloaded-source.pdf
 ```
 
-HTML and `pypdf` extraction use the
-[native parser provider](../tools/runtime/python-provider/README.md), installed
-by the shared tool runtime or through its Cargo installation command. PDF
-extraction also supports `pdftotext`.
+AgentCanon extracts HTML titles and text with the Rust
+[html5gum tokenizer](https://docs.rs/html5gum/0.9.2/html5gum/).
+PDF extraction uses `pypdf` through the
+[provider](../tools/runtime/python-provider/README.md) and supports
+`pdftotext`.
 
 `AGENT_CANON_PARENT_ROOT` must name the authenticated Git repository that owns
 the reference output. The materializer has no source-checkout or `$HOME`
