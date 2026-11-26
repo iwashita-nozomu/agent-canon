@@ -66,9 +66,11 @@ class ReferenceMaterializerTest(unittest.TestCase):
             html_path = root / "source.html"
             html_path.write_text(
                 (
-                    "<html><head><title>Example Reference</title>"
-                    "<script>hidden()</script></head>"
-                    "<body><h1>Visible Heading</h1><p>Visible body text.</p></body></html>"
+                    "<html><head><title>Example &amp; Reference</title>"
+                    "<script>const example = '<div>script-marker</div>';</script>"
+                    "<style>.style-marker { display: none; }</style></head>"
+                    "<body><h1>Visible Heading</h1><p>Visible body text. &#65;</p>"
+                    "<template><div>template-marker</div></template></body></html>"
                 ),
                 encoding="utf-8",
             )
@@ -79,7 +81,10 @@ class ReferenceMaterializerTest(unittest.TestCase):
                 "https://example.com/reference.html",
                 "--input",
                 str(html_path),
-                env={"AGENT_CANON_PARENT_ROOT": str(root)},
+                env={
+                    "AGENT_CANON_PARENT_ROOT": str(root),
+                    "AGENT_CANON_PYTHON_PROVIDER": str(root / "unavailable-provider"),
+                },
             )
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -94,9 +99,12 @@ class ReferenceMaterializerTest(unittest.TestCase):
             self.assertIn("@dependency-start", text)
             self.assertIn("source_url: https://example.com/reference.html", text)
             self.assertIn("source_kind: html", text)
+            self.assertIn("Example & Reference", text)
+            self.assertIn("extraction_method: html5gum", text)
             self.assertIn("Visible Heading", text)
-            self.assertIn("Visible body text.", text)
-            self.assertNotIn("hidden()", text)
+            self.assertIn("Visible body text. A", text)
+            for marker in ("script-marker", "style-marker", "template-marker"):
+                self.assertNotIn(marker, text)
 
     def test_pdf_literal_text_scanner_is_not_used(self) -> None:
         """PDF input should fail when configured extractors cannot read the source."""

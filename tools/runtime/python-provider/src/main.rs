@@ -6,87 +6,13 @@
 // @dependency-end
 
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyCFunction, PyDict};
+use pyo3::types::{PyBytes, PyDict};
 use serde_json::{json, Value};
 use std::io::{self, Read};
 use std::path::Path;
-use std::sync::{Arc, Mutex};
 
 mod jit_runtime;
 mod proof_trace_alignment;
-
-#[derive(Default)]
-struct HtmlText {
-    title: Vec<String>,
-    text: Vec<String>,
-    hidden_depth: usize,
-    in_title: bool,
-}
-
-fn html(py: Python<'_>, bytes: &[u8]) -> PyResult<Value> {
-    let state = Arc::new(Mutex::new(HtmlText::default()));
-    let parser = py.import("html.parser")?.getattr("HTMLParser")?.call0()?;
-    let start_state = Arc::clone(&state);
-    let start = PyCFunction::new_closure(py, None, None, move |args, _| -> PyResult<()> {
-        let tag = args.get_item(0)?.extract::<String>()?.to_lowercase();
-        let mut state = start_state.lock().map_err(|_| {
-            pyo3::exceptions::PyRuntimeError::new_err("HTML text state lock poisoned")
-        })?;
-        if matches!(tag.as_str(), "script" | "style" | "noscript" | "template") {
-            state.hidden_depth += 1;
-        }
-        if tag == "title" {
-            state.in_title = true;
-        }
-        if matches!(
-            tag.as_str(),
-            "p" | "br" | "div" | "section" | "article" | "li" | "h1" | "h2" | "h3"
-        ) {
-            state.text.push("\n".into());
-        }
-        Ok(())
-    })?;
-    let end_state = Arc::clone(&state);
-    let end = PyCFunction::new_closure(py, None, None, move |args, _| -> PyResult<()> {
-        let tag = args.get_item(0)?.extract::<String>()?.to_lowercase();
-        let mut state = end_state.lock().map_err(|_| {
-            pyo3::exceptions::PyRuntimeError::new_err("HTML text state lock poisoned")
-        })?;
-        if matches!(tag.as_str(), "script" | "style" | "noscript" | "template")
-            && state.hidden_depth > 0
-        {
-            state.hidden_depth -= 1;
-        }
-        if tag == "title" {
-            state.in_title = false;
-        }
-        Ok(())
-    })?;
-    let data_state = Arc::clone(&state);
-    let data = PyCFunction::new_closure(py, None, None, move |args, _| -> PyResult<()> {
-        let data = args.get_item(0)?.extract::<String>()?;
-        let mut state = data_state.lock().map_err(|_| {
-            pyo3::exceptions::PyRuntimeError::new_err("HTML text state lock poisoned")
-        })?;
-        if state.in_title {
-            state.title.push(data.clone());
-        }
-        if state.hidden_depth == 0 && !data.trim().is_empty() {
-            state.text.push(data);
-        }
-        Ok(())
-    })?;
-    parser.setattr("handle_starttag", start)?;
-    parser.setattr("handle_endtag", end)?;
-    parser.setattr("handle_data", data)?;
-    parser.call_method1("feed", (String::from_utf8_lossy(bytes).as_ref(),))?;
-    let state = state
-        .lock()
-        .map_err(|_| pyo3::exceptions::PyRuntimeError::new_err("HTML text state lock poisoned"))?;
-    Ok(
-        json!({"status":"pass","title":state.title.join(" "),"text":state.text.join(" "),"method":"stdlib-html-parser"}),
-    )
-}
 
 fn runtime(py: Python<'_>) -> PyResult<Value> {
     let sys = py.import("sys")?;
@@ -208,7 +134,7 @@ fn main() {
     let args: Vec<_> = std::env::args().skip(1).collect();
     let Some(command) = args.first().map(String::as_str) else {
         eprintln!(
-            "usage: agent-canon-python-provider <html-extract|pdf-extract|trace-json|proof-source|jit-lower|module-location|runtime> [arguments]"
+            "usage: agent-canon-python-provider <pdf-extract|trace-json|proof-source|jit-lower|module-location|runtime> [arguments]"
         );
         std::process::exit(2);
     };
@@ -273,19 +199,13 @@ fn main() {
             }
         }
         "module-location" if args.len() == 2 => Python::attach(|py| module_location(py, &args[1])),
-        "pdf-extract" | "html-extract" if args.len() == 1 => {
+        "pdf-extract" if args.len() == 1 => {
             let mut bytes = Vec::new();
             if let Err(error) = io::stdin().read_to_end(&mut bytes) {
                 eprintln!("{error}");
                 std::process::exit(2);
             }
-            Python::attach(|py| {
-                if command == "pdf-extract" {
-                    pdf(py, &bytes)
-                } else {
-                    html(py, &bytes)
-                }
-            })
+            Python::attach(|py| pdf(py, &bytes))
         }
         "trace-json" if args.len() == 3 => {
             Python::attach(|py| trace(py, Path::new(&args[1]), &args[2]))
@@ -407,19 +327,5 @@ mod tests {
             .as_str()
             .unwrap()
             .contains("Native provider PDF"));
-    }
-
-    #[test]
-    fn html_uses_standard_parser_entities_and_hides_scripts() {
-        let result = Python::attach(|py| {
-            html(
-                py,
-                b"<title>A &amp; B</title><script>hidden()</script><p>Visible &#65;</p>",
-            )
-        })
-        .unwrap();
-        assert_eq!(result["title"], "A & B");
-        assert!(result["text"].as_str().unwrap().contains("Visible A"));
-        assert!(!result["text"].as_str().unwrap().contains("hidden"));
     }
 }
