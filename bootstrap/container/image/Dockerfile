@@ -46,10 +46,10 @@ LABEL org.opencontainers.image.title="AgentCanon shared tool runtime" \
       io.agent-canon.run.tmpfs="/tmp"
 
 # Build the executable tools and install their shared providers.
-RUN --mount=type=bind,source=bootstrap/container/image/dependencies.toml,target=/src/repository/bootstrap/container/image/dependencies.toml,readonly \
-    --mount=type=bind,source=tools,target=/src/repository/tools,readonly \
-    --mount=type=bind,source=.markdownlint-cli2.jsonc,target=/src/repository/.markdownlint-cli2.jsonc,readonly \
-    --mount=type=bind,source=documents/experiments/gpu-admission-r5-ordered-integration-interface.json,target=/src/repository/documents/experiments/gpu-admission-r5-ordered-integration-interface.json,readonly \
+RUN --mount=type=bind,source=bootstrap/container/image/dependencies.toml,target=/opt/agent-canon/source/bootstrap/container/image/dependencies.toml,readonly \
+    --mount=type=bind,source=tools,target=/opt/agent-canon/source/tools,readonly \
+    --mount=type=bind,source=.markdownlint-cli2.jsonc,target=/opt/agent-canon/source/.markdownlint-cli2.jsonc,readonly \
+    --mount=type=bind,source=documents/experiments/gpu-admission-r5-ordered-integration-interface.json,target=/opt/agent-canon/source/documents/experiments/gpu-admission-r5-ordered-integration-interface.json,readonly \
     --mount=type=cache,target=/var/lib/agent-canon/cache/cargo-target,sharing=locked \
     set -eux; \
     export CARGO_HOME=/usr/local/share/agent-canon/toolchains/cargo; \
@@ -69,19 +69,19 @@ RUN --mount=type=bind,source=bootstrap/container/image/dependencies.toml,target=
     chmod 0555 /usr/local/bin/rustup-init; \
     rustup-init -y --no-modify-path --default-toolchain "$AGENT_CANON_BOOTSTRAP_RUST_VERSION" --profile minimal; \
     cargo build --locked --release \
-      --manifest-path /src/repository/tools/runtime/dispatch/agent-canon/Cargo.toml; \
+      --manifest-path /opt/agent-canon/source/tools/runtime/dispatch/agent-canon/Cargo.toml; \
     cargo build --locked --release \
-      --manifest-path /src/repository/tools/runtime/python-provider/Cargo.toml; \
+      --manifest-path /opt/agent-canon/source/tools/runtime/python-provider/Cargo.toml; \
     install -m 0555 "$CARGO_TARGET_DIR/release/agent-canon" /usr/local/bin/agent-canon; \
     install -m 0555 "$CARGO_TARGET_DIR/release/agent-canon-python-provider" /usr/local/bin/agent-canon-python-provider; \
     agent-canon environment-dependencies \
-      image-install --workspace /src/repository \
-      --manifest /src/repository/bootstrap/container/image/dependencies.toml \
+      image-install --workspace /opt/agent-canon/source \
+      --manifest /opt/agent-canon/source/bootstrap/container/image/dependencies.toml \
       --final-binary-dir /usr/local/bin --format text; \
-    bash -ceu 'shopt -s globstar nullglob; for manifest in /src/repository/tools/**/Cargo.toml; do cargo fetch --locked --manifest-path "$manifest"; done'; \
+    bash -ceu 'shopt -s globstar nullglob; for manifest in /opt/agent-canon/source/tools/**/Cargo.toml; do cargo fetch --locked --manifest-path "$manifest"; done'; \
     install -d -m 0755 /usr/local/share/agent-canon/runtime; \
-    install -m 0444 /src/repository/bootstrap/container/image/dependencies.toml /usr/local/share/agent-canon/runtime/dependencies.toml; \
-    install -m 0555 /src/repository/tools/runtime/container/seed-cargo-cache.sh /usr/local/bin/agent-canon-seed-cargo-cache; \
+    install -m 0444 /opt/agent-canon/source/bootstrap/container/image/dependencies.toml /usr/local/share/agent-canon/runtime/dependencies.toml; \
+    install -m 0555 /opt/agent-canon/source/tools/runtime/container/seed-cargo-cache.sh /usr/local/bin/agent-canon-seed-cargo-cache; \
     printf 'agent-canon-tool-container/v1\n' > /usr/local/share/agent-canon/.agent-canon-tool-container; \
     chmod 0444 /usr/local/share/agent-canon/.agent-canon-tool-container; \
     printf 'agent-canon-runtime/v1\n' > /usr/local/share/agent-canon/runtime/.agent-canon-runtime; \
