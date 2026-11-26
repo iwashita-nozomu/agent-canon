@@ -391,6 +391,7 @@ def _run_source_free_resident_native(
         "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
         "HOME": str(runtime_root.parent / "fake-home"),
         "AGENT_CANON_SOURCE_ROOT": str(source_root),
+        "AGENT_CANON_NATIVE_BIN": native,
         "AGENT_CANON_HOST_INSTALL_ROOT": str(source_root),
         "AGENT_CANON_RUNTIME_ROOT": str(runtime_root),
         "AGENT_CANON_CONTROL_PARENT_ROOT": str(volume_root),
@@ -1429,7 +1430,11 @@ def main(argv: list[str]) -> int:
                 return 1
             sys.stdout.write(content)
             return 0
-        if command and (command[0] == "/var/lib/agent-canon/cache/bin/agent-canon"):
+        if (
+            command
+            and command[0] == "agent-canon"
+            and command[1:2] not in (["--version"], ["run-accumulated-agent-evals"])
+        ):
             failed_operation = os.environ.get(
                 "FAKE_DOCKER_FAIL_CONTROLLER_OPERATION", ""
             )
@@ -1449,7 +1454,7 @@ def main(argv: list[str]) -> int:
             print("route output: " + " ".join(command[3:]))
             return 0
         if command[:2] == [
-            "/var/lib/agent-canon/cache/bin/agent-canon",
+            "agent-canon",
             "run-accumulated-agent-evals",
         ]:
             runtime_arg = command[command.index("--runtime-root") + 1]

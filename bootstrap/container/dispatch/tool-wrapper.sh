@@ -14,8 +14,7 @@ if [[ "${1:-}" != "tool" || "${2:-}" != "run" ]]; then
 fi
 shift 2
 
-cache_root=${AGENT_CANON_CACHE_ROOT:-/var/lib/agent-canon/cache}
 exec env AGENT_CANON_EXECUTION_PLANE=tool-container \
     AGENT_CANON_SOURCE_ROOT=/opt/agent-canon/source \
-    "$cache_root/bin/agent-canon" \
+    /usr/local/bin/agent-canon \
     tool run --container-exec --root /opt/agent-canon/source "$@"

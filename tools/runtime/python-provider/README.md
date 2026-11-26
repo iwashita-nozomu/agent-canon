@@ -12,9 +12,9 @@ Build in the existing tool or consumer execution environment with
 cargo build --locked --manifest-path tools/runtime/python-provider/Cargo.toml
 ```
 
-The shared tool runtime installs it through the existing
-[`compile.sh`](../container/compile.sh) route. Direct callers can install the
-crate with `cargo install --locked --path tools/runtime/python-provider` and
+The [shared image build](../../../bootstrap/container/image/Dockerfile) installs
+the executable. Direct callers can install the crate with
+`cargo install --locked --path tools/runtime/python-provider` and
 place `agent-canon-python-provider` on `PATH`, or set
 `AGENT_CANON_PYTHON_PROVIDER` to its executable path. Python's normal runtime
 environment supplies optional packages such as `pypdf`.

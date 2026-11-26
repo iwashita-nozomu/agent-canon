@@ -2,8 +2,8 @@
 
 # @dependency-start
 # contract test
-# responsibility Verifies the bootstrap compiler refreshes seeded mutable registry-index files only.
-# upstream implementation ../../tools/runtime/container/compile.sh owns the sourceable registry-index merge.
+# responsibility Verifies the activation command refreshes seeded mutable registry-index files only.
+# upstream implementation ../../tools/runtime/container/seed-cargo-cache.sh owns the sourceable registry-index merge.
 # @dependency-end
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-COMPILE_SCRIPT = PROJECT_ROOT / "tools" / "runtime" / "container" / "compile.sh"
+SEED_SCRIPT = PROJECT_ROOT / "tools" / "runtime" / "container" / "seed-cargo-cache.sh"
 
 
 def merge_seeded_registry_index(
@@ -27,8 +27,8 @@ def merge_seeded_registry_index(
             "bash",
             "-c",
             'source "$1"; _refresh_seeded_registry_index "$2" "$3"',
-            "compile-cache-test",
-            str(COMPILE_SCRIPT),
+            "seed-cache-test",
+            str(SEED_SCRIPT),
             str(seed_index),
             str(destination_index),
         ],

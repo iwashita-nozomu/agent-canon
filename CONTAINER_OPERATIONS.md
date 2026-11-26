@@ -105,9 +105,9 @@ projects; task separation is provided by exact target mounts and runtime-root
 task directories. This resident is not a project product container, even when
 a project reuses an image or layer in its own execution plane.
 The source checkout is mounted read-only at `/opt/agent-canon/source`; the
-runtime state volume provides the writable `/var/lib/agent-canon/cache`. After
-the resident is available, source-mounted Rust tools are compiled by the
-directory-scanning compile route into `cache/bin`.
+runtime state volume provides the writable `/var/lib/agent-canon/cache`.
+The image build places AgentCanon and its Python provider in `/usr/local/bin`.
+Activation runs the shared tools and populates the offline Cargo cache.
 
 The default limits are:
 

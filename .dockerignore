@@ -65,6 +65,8 @@ tools/validation/tests/run_pytest_with_logs.sh
 !tools/runtime/dispatch/agent-canon/**
 tools/runtime/dispatch/agent-canon/target
 tools/runtime/dispatch/agent-canon/target/**
+tools/runtime/python-provider/target
+tools/runtime/python-provider/target/**
 **/__pycache__
 **/__pycache__/**
 **/*.pyc

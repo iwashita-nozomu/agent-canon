@@ -8,17 +8,19 @@
 
 set -euo pipefail
 
-compile() {
+activate() {
     verify_tools
-    exec /opt/agent-canon/source/tools/runtime/container/compile.sh
+    exec /usr/local/bin/agent-canon-seed-cargo-cache
 }
 
 verify_tools() (
     local scratch
-    local verifier=/usr/local/bin/agent-canon-dependency-bootstrap
+    local verifier=/usr/local/bin/agent-canon
     scratch=$(mktemp -d)
     trap 'rm -r -- "$scratch"' EXIT
 
+    "$verifier" --version
+    agent-canon-python-provider runtime
     CARGO_HOME=/usr/local/share/agent-canon/toolchains/cargo \
         "$verifier" environment-dependencies image-verify \
         --workspace /workspace \
@@ -68,18 +70,18 @@ case "${1:-}" in
         }
         exec /usr/local/bin/agent-canon-tool "$@"
         ;;
-    compile)
+    activate)
         [[ "$#" -eq 1 ]] || {
-            echo "usage: $0 compile" >&2
+            echo "usage: $0 activate" >&2
             exit 64
         }
-        compile
+        activate
         ;;
     resident)
         exec sleep infinity
         ;;
     *)
-        echo "usage: $0 health | resident | compile | verify-tools | tool run <catalog-id> -- [args...]" >&2
+        echo "usage: $0 health | resident | activate | verify-tools | tool run <catalog-id> -- [args...]" >&2
         exit 64
         ;;
 esac

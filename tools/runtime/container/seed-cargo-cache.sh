@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # @dependency-start
 # contract tool
-# responsibility Compiles every source-mounted Rust tool into the external runtime cache.
-# upstream design ../../../documents/design/agent-canon-bootstrap-tool-runtime.md source-mounted tool build
-# downstream implementation ../../../bootstrap/container/dispatch/tool-wrapper.sh cached tool dispatch
-# downstream test ../../../tests/tools/test_compile_cache.py verifies the seeded registry-index merge
+# responsibility Seeds writable Cargo archives and index from the shared image.
+# upstream design ../../../documents/design/agent-canon-bootstrap-tool-runtime.md offline Rust dependency support
+# downstream implementation ../../../bootstrap/container/lifecycle/entrypoint.sh activation route
+# downstream test ../../../tests/tools/test_seed_cargo_cache.py verifies the seeded registry-index merge
 # @dependency-end
 
 _refresh_seeded_registry_index() (
@@ -42,32 +42,13 @@ _refresh_seeded_registry_index() (
 main() {
     set -euo pipefail
 
-    local source_root=${AGENT_CANON_SOURCE_ROOT:-/opt/agent-canon/source}
     local cache_root=${AGENT_CANON_CACHE_ROOT:-/var/lib/agent-canon/cache}
-    local cargo_target_dir=${CARGO_TARGET_DIR:-${AGENT_CANON_CARGO_TARGET_DIR:-$cache_root/cargo-target}}
     local cargo_home=${CARGO_HOME:-$cache_root/cargo}
-    local seed_cargo_home=/usr/local/share/agent-canon/toolchains/cargo
+    local seed_registry=/usr/local/share/agent-canon/toolchains/cargo/registry
 
-    mkdir -p -- "$cache_root" "$cargo_target_dir" "$cargo_home"
-    if [[ -d "$seed_cargo_home" ]]; then
-        cp -R --update=none -- "$seed_cargo_home/." "$cargo_home/"
-        _refresh_seeded_registry_index \
-            "$seed_cargo_home/registry/index" \
-            "$cargo_home/registry/index"
-    fi
-
-    shopt -s globstar nullglob
-    local -a manifests=("$source_root"/tools/**/Cargo.toml)
-    local manifest
-    for manifest in "${manifests[@]}"; do
-        cargo install \
-            --path "${manifest%/Cargo.toml}" \
-            --root "$cache_root" \
-            --target-dir "$cargo_target_dir" \
-            --locked \
-            --force \
-            --offline
-    done
+    mkdir -p -- "$cargo_home/registry/cache"
+    cp -R --update=none -- "$seed_registry/cache/." "$cargo_home/registry/cache/"
+    _refresh_seeded_registry_index "$seed_registry/index" "$cargo_home/registry/index"
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
