@@ -311,3 +311,14 @@ body:
         reconstructibility readback:
     validations:
       required: true
+  - type: textarea
+    id: ai_assistance
+    attributes:
+      label: AI Assistance
+      description: AIを使った場合に、実際の内容を記録します。
+      placeholder: |
+        Tools
+        Purpose
+        Contribution
+        Verification
+        Human decisions

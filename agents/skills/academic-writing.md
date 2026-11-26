@@ -62,7 +62,7 @@ document.
 
 ## AI Assistance
 
-数理・実験レポートや論文でAIを使った場合は、`AI Assistance` セクションに
+数理・実験レポート、論文、Issue、PRでAIを使った場合は、`AI Assistance` セクションに
 利用実績を記載します。投稿先に指定の形式がある場合は、その形式に合わせます。
 
 - **Tools** 実際に使ったツール名（例 ChatGPT、Codex）。

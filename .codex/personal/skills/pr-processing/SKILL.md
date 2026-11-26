@@ -2,7 +2,7 @@
 name: pr-processing
 description: "Use for an authorized GitHub Issue or PR operation; build a queue only when candidates depend on or conflict with each other."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"ae674e8e6581dffe74879b824044963f1f954ef4a83e5c62c6d20ab31f754128"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"25afb0458d026b055c24f3ec5c4de898dd2c7a7ea5b9fcd210c2b407ef350854"} -->
 
 <!--
 @dependency-start
