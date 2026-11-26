@@ -594,7 +594,7 @@ def test_install_cleanup_warns_and_preserves_a_symlink(tmp_path: Path) -> None:
             f"source {str(ADAPTER)!r}\n"
             f"AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}\n"
             f"AGENT_CANON_STATE_ROOT={str(state)!r}\n"
-            "_agent_canon_finish_clean_install\n",
+            "_agent_canon_reset_install_projection\n",
         ],
         capture_output=True,
         text=True,
@@ -5790,7 +5790,8 @@ def test_gpu006_stale_source_sync_mount_is_recreated_by_public_route(
         "/var/lib/agent-canon/source-sync",
         "/opt/agent-canon/source",
     }
-    expected_mounts.add(f"/targets/{valid_digest}")
+    if operation != "install":
+        expected_mounts.add(f"/targets/{valid_digest}")
     assert {mount["Destination"] for mount in replacement["Mounts"]} == expected_mounts
     assert f"/targets/{stale_digest}" not in {
         mount["Destination"] for mount in replacement["Mounts"]
@@ -6122,10 +6123,10 @@ def test_public_clean_install_uses_tracked_skills_and_first_target(
     )
 
 
-def test_clean_install_failure_restores_resident_and_lifecycle_state(
+def test_failed_install_removes_candidate_and_can_rebuild_with_preserved_data(
     tmp_path: Path,
 ) -> None:
-    """A failed replacement restores the pre-install resident and lifecycle."""
+    """Install preserves the volume and retries through a fresh activation."""
     home = tmp_path / "home"
     home.mkdir()
     origin = tmp_path / "origin.git"
@@ -6207,19 +6208,13 @@ def test_clean_install_failure_restores_resident_and_lifecycle_state(
     }
     before["images"][foreign_ref] = foreign_record
     fake_state.write_text(json.dumps(before), encoding="utf-8")
-    lifecycle_paths = [
-        state_root / "state.json",
-        state_root / "owner.json",
-        state_root / "mounts.toml",
-        state_root / "mounts.tsv",
-        active_image,
-    ]
-    lifecycle_before = {
-        path.relative_to(runtime).as_posix(): path.read_bytes()
-        if path.exists()
-        else None
-        for path in lifecycle_paths
-    }
+    volume_name = (
+        "agent-canon-runtime-"
+        + hashlib.sha256(str(home.resolve()).encode("utf-8")).hexdigest()
+    )
+    volume_root = Path(before["volumes"][volume_name]["Mountpoint"])
+    saved_archive = volume_root / "archive" / "previous-report.txt"
+    saved_archive.write_text("preserved\n", encoding="utf-8")
 
     failed = subprocess.run(
         [*common, "install"],
@@ -6232,22 +6227,13 @@ def test_clean_install_failure_restores_resident_and_lifecycle_state(
             "FAKE_DOCKER_FAIL_CONTROLLER_RC": "41",
         },
     )
-    assert failed.returncode != 0
+    assert failed.returncode == 41, failed.stderr
 
     after = json.loads(fake_state.read_text(encoding="utf-8"))
-    restored = after["containers"][container_name]
-    assert restored["Config"]["Image"] == old_image_ref
-    assert restored["Config"]["Labels"] == old_resident["Config"]["Labels"]
-    assert restored["Mounts"] == old_resident["Mounts"]
-    assert restored["HostConfig"] == old_resident["HostConfig"]
-    assert restored["State"]["Running"] is True
-    assert restored["State"]["Health"]["Status"] == "healthy"
-    for relative, content in lifecycle_before.items():
-        path = runtime / relative
-        if content is None:
-            assert not path.exists()
-        else:
-            assert path.read_bytes() == content
+    assert container_name not in after["containers"]
+    assert not active_image.exists()
+    assert after["volumes"][volume_name]["Mountpoint"] == str(volume_root)
+    assert saved_archive.read_text(encoding="utf-8") == "preserved\n"
     assert not (state_root / "rollback-plan.tsv").exists()
     assert not (state_root / ".pending-rollback-plan.tsv").exists()
 
@@ -6258,10 +6244,22 @@ def test_clean_install_failure_restores_resident_and_lifecycle_state(
         )
         if len(fields) == 3 and fields[0] == "tag" and "-rollback-" in fields[2]
     ]
-    assert rollback_refs
-    assert rollback_refs[-1] not in after["images"]
+    assert not rollback_refs
     assert after["images"][old_image_ref]["Id"] == old_image_id
     assert after["images"][foreign_ref] == foreign_record
+
+    retried = subprocess.run(
+        [*common, "install"],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
+    )
+    assert retried.returncode == 0, retried.stderr
+    rebuilt = json.loads(fake_state.read_text(encoding="utf-8"))
+    assert rebuilt["containers"][container_name]["State"]["Running"] is True
+    assert saved_archive.read_text(encoding="utf-8") == "preserved\n"
+    assert active_image.is_file()
 
 
 def test_real_docker_public_clean_install_e2e(tmp_path: Path) -> None:
@@ -7319,9 +7317,6 @@ _agent_canon_prepare_host_runtime() {{
   mkdir -p "$AGENT_CANON_RUNTIME_ROOT/host-state" "$AGENT_CANON_STATE_ROOT"
 }}
 _agent_canon_source_sync_write() {{ :; }}
-_agent_canon_finish_clean_install() {{
-  printf '%s\\n' finish >> {str(marker)!r}
-}}
 _agent_canon_install_locked() {{
   printf '%s\\n' install >> {str(marker)!r}
   _agent_canon_json_error install_probe_failed "install transaction failed"

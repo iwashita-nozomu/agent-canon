@@ -159,10 +159,11 @@ separate checkout-mode flag. An existing project `--skip-build` request remains
 an explicit build-reuse choice.
 
 `install` is a clean reconstruction transition. After SourceSync has selected
-the current source generation, it resets the reconstructible lifecycle state
-and target projection before creating the resident; the new install therefore
-starts with no prior target or rollback generation. Receipts, pending spool,
-archive, and cache evidence remain available. `update` and `target add` may
+the current source generation, it prepares the image, removes the owned
+resident, and creates a new resident with an empty target projection. The
+named volume retains receipts, pending spool, archive, and cache evidence.
+A failed installation returns the original error and removes the failed
+container. Run `install` again to recreate the resident. `update` and `target add` may
 remove only syntactically valid, derived target registry entries whose host
 source is missing, not a directory, or a symlink; all other live target
 entries remain unchanged. `target add` applies the same stale entry cleanup
