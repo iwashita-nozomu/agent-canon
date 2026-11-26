@@ -26,6 +26,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     AGENT_CANON_IMAGE_DEPENDENCIES_ROOT=/usr/local/share/agent-canon/image-dependencies \
     PUPPETEER_CACHE_DIR=/usr/local/share/agent-canon/puppeteer \
     PUPPETEER_CHROME_SKIP_DOWNLOAD=true \
+    XDG_CACHE_HOME=/tmp/agent-canon-cache \
     OFFICECLI_NO_AUTO_INSTALL=1 \
     OFFICECLI_SKIP_UPDATE=1 \
     PATH=/var/lib/agent-canon/cache/bin:/usr/local/share/agent-canon/toolchains/cargo/bin:/usr/local/bin:/usr/bin:/bin
@@ -79,7 +80,7 @@ RUN --mount=type=bind,source=bootstrap/container/image/dependencies.toml,target=
     chmod 0444 /usr/local/share/agent-canon/.agent-canon-tool-container; \
     printf 'agent-canon-runtime/v1\n' > /usr/local/share/agent-canon/runtime/.agent-canon-runtime; \
     chmod 0444 /usr/local/share/agent-canon/runtime/.agent-canon-runtime; \
-    rm -rf /var/lib/agent-canon/cache/cargo-target /root/.npm /root/.cache /tmp/* /usr/local/bin/rustup-init /usr/local/bin/agent-canon-dependency-bootstrap /usr/local/share/agent-canon/pipx/shared; \
+    rm -rf /var/lib/agent-canon/cache/cargo-target /root/.npm /root/.cache /tmp/* /usr/local/bin/rustup-init /usr/local/share/agent-canon/pipx/shared; \
     DEBIAN_FRONTEND=noninteractive apt-get purge -y --auto-remove pipx; \
     rm -rf /var/lib/apt/lists/*
 

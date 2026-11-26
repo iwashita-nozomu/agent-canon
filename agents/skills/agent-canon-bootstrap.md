@@ -53,6 +53,11 @@ evidence.
   owner to diagnose and, when authorized, register the exact root. Concurrent
   target changes remain serialized; a failed candidate keeps the last verified
   generation active.
+- Image dependencies belong to
+  [the image manifest](../../bootstrap/container/image/dependencies.toml).
+  Use the image acceptance result to repair missing or unusable tools at that
+  owner. CI and candidate installation execute the same image verification and
+  document smoke check.
 - `tool run` is the verified namespaced route. Internal Python/Rust/LSP tools
   are not exposed as host commands or compatibility choices. Never create flat
   host wrappers.

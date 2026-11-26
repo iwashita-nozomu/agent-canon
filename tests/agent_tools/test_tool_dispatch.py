@@ -17,8 +17,6 @@ import subprocess
 import tempfile
 import unittest
 from pathlib import Path
-from typing import Any
-
 import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -123,6 +121,8 @@ class NativeToolDispatchTests(unittest.TestCase):
             "  'args': sys.argv[1:],\n"
             "  'cwd': os.getcwd(),\n"
             "  'secret': os.environ.get('DISPATCH_TEST_SECRET'),\n"
+            "  'xdg_cache_home': os.environ.get('XDG_CACHE_HOME'),\n"
+            "  'puppeteer_cache_dir': os.environ.get('PUPPETEER_CACHE_DIR'),\n"
             "  'git_config_count': os.environ.get('GIT_CONFIG_COUNT'),\n"
             "  'git_config_key_0': os.environ.get('GIT_CONFIG_KEY_0'),\n"
             "  'git_config_value_0': os.environ.get('GIT_CONFIG_VALUE_0'),\n"
@@ -289,6 +289,7 @@ class NativeToolDispatchTests(unittest.TestCase):
                 "GIT_CONFIG_VALUE_0": "always",
                 "GIT_CONFIG_KEY_1": "safe.directory",
                 "GIT_CONFIG_VALUE_1": "*",
+                "XDG_CACHE_HOME": "/tmp/shared-cache",
             },
         )
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -521,12 +522,35 @@ class NativeToolDispatchTests(unittest.TestCase):
         self.assertEqual(payload["args"], ["two words", "tools/relative-child.txt"])
         self.assertEqual(payload["cwd"], str(self.target))
         self.assertIsNone(payload["secret"])
+        self.assertIsNone(payload["xdg_cache_home"])
         self.assertEqual(payload["git_config_count"], "1")
         self.assertEqual(payload["git_config_key_0"], "safe.directory")
         self.assertEqual(payload["git_config_value_0"], str(self.target))
         self.assertIsNone(payload["git_config_key_1"])
         self.assertEqual(payload["stdin"], "")
         self.assertEqual(result.stderr, b"dispatch-stderr\n")
+
+    def test_container_dispatch_preserves_image_tool_caches(self) -> None:
+        environment = self._container_environment()
+        environment["XDG_CACHE_HOME"] = "/tmp/agent-canon-cache"
+        environment["PUPPETEER_CACHE_DIR"] = "/usr/local/share/agent-canon/puppeteer"
+        self._write_catalog([_entry()])
+        result = self._run(
+            "run",
+            "--container-exec",
+            "--root",
+            str(self.root),
+            "echo",
+            "--",
+            extra_env=environment,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["xdg_cache_home"], environment["XDG_CACHE_HOME"])
+        self.assertEqual(
+            payload["puppeteer_cache_dir"], environment["PUPPETEER_CACHE_DIR"]
+        )
+        self.assertIsNone(payload["secret"])
 
     def test_container_execution_requires_the_authenticated_plane(self) -> None:
         environment = self._container_environment()

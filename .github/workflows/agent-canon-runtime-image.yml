@@ -100,7 +100,9 @@ jobs:
             --tag "${IMAGE}-${ARCH}" \
             --load \
             .
-          docker run --rm --network none "${IMAGE}-${ARCH}" health
+          docker run --rm --user 1000:1000 --read-only --network none \
+            --cap-drop ALL --security-opt no-new-privileges --tmpfs /tmp \
+            "${IMAGE}-${ARCH}" verify-tools
 
       - name: Publish architecture image
         if: github.event_name != 'pull_request'

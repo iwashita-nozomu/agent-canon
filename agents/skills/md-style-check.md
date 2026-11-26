@@ -32,15 +32,15 @@ available and inspect the final diff. The
 describe how to use the shared environment when it exposes source read-only.
 
 For Markdown intended for GitHub, run `agent-canon docs check --root . <edited paths...>`.
-Run it directly in the existing [shared tool runtime](agent-canon-bootstrap.md)
-when available. Use installed host tools when the shared runtime is unavailable.
+Run it directly in the existing [shared tool runtime](agent-canon-bootstrap.md).
+Resolve missing image providers through the shared image installation.
 Use the edited checkout or a snapshot with the same content. The check runs
 lint and link checks, parses GitHub Flavored Markdown, and renders Mermaid
 blocks.
 
 For a requested equation preview, render the expressions with an available
 renderer that supports the source syntax. If Pandoc's MathML writer cannot
-render an expression, try an existing compatible renderer such as KaTeX.
+render an expression, try the shared image's `katex` command.
 Name the renderer used. Inspect GitHub's preview for changes that depend on
 hosted rendering when the preview is available. Record any remaining verification
 gaps with the reason.

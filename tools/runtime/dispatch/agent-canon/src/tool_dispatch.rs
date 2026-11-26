@@ -1393,7 +1393,20 @@ fn run_container_spec(
         })?;
     }
     let command = resolve_container_argv(root, spec, args)?;
-    let child_environment = environment(root, spec, &runtime, output.as_deref())?;
+    let mut child_environment = environment(root, spec, &runtime, output.as_deref())?;
+    if spec.env_policy == "allowlisted" {
+        for key in [
+            "XDG_CACHE_HOME",
+            "PUPPETEER_CACHE_DIR",
+            "PUPPETEER_CHROME_SKIP_DOWNLOAD",
+            "OFFICECLI_NO_AUTO_INSTALL",
+            "OFFICECLI_SKIP_UPDATE",
+        ] {
+            if let Ok(value) = env::var(key) {
+                child_environment.insert(key.to_owned(), value);
+            }
+        }
+    }
     run_process(
         &command,
         &cwd,
