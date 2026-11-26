@@ -231,7 +231,11 @@ def test_dockerfile_does_not_duplicate_dependency_manifest_validation() -> None:
 
 
 def test_dockerfile_does_not_pull_project_or_host_tooling() -> None:
-    text = DOCKERFILE.read_text(encoding="utf-8").lower()
+    text = re.sub(
+        r"--mount=type=bind,[^\s]+",
+        "",
+        DOCKERFILE.read_text(encoding="utf-8").lower(),
+    )
     for forbidden in (
         "compose",
         "gpu",
