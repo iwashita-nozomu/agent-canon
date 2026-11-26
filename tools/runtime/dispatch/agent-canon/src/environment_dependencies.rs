@@ -8928,13 +8928,12 @@ output_contains = "1.2.3"
             .join("../../../../")
             .canonicalize()
             .expect("repository root exists");
-        // Frozen from the pre-migration Python build_plan oracle at source SHA
-        // d6e7592dddd2ea8fe9e1160742808f9f38c1d3c293608cda0921147e1a47f4c5.
+        // Keep the pre-migration manifest oracle current when image capabilities change.
         let manifest = root.join("bootstrap/container/image/dependencies.toml");
         let manifest_bytes = fs::read(&manifest).expect("canonical manifest bytes are readable");
         assert_eq!(
             sha256_hex(&manifest_bytes),
-            "25cf0192adb3e7361154281a2b5b9f2a49d73e6d9de8b812b1805b5a7a4c5570"
+            "21631c5e02b30af700fc82cfb3a89617ae2b8d2da296fd4f15295186288fae1a"
         );
         let plan = load_plan(&root, None).expect("canonical dependency plan parses");
         let mut expected = [
@@ -8947,6 +8946,7 @@ output_contains = "1.2.3"
             "scip-python",
             "bash-language-server",
             "markdownlint-cli2",
+            "katex",
             "officecli",
             "gnupg",
             "node",
@@ -9013,14 +9013,13 @@ output_contains = "1.2.3"
             .map(|record| record.id.clone())
             .collect::<BTreeSet<_>>();
         assert_eq!(actual, expected);
-        // Python platform.machine() was controlled for these oracle rows; the
-        // aarch64 fingerprint does not claim an actual arm64 execution.
+        // The arm64 plan omits the amd64-only scip-clang record.
         let expected_fingerprint = match env::consts::ARCH {
             "x86_64" | "amd64" => {
-                "a51cbacded9478282eb188e3be0e2f9d1cc91896c7015eac74452dc15bdfd135"
+                "5c1ec60bda9c2bee7b1dd9681b5fc771e7ee10f6c86ea92d6eb7c9cf3500ca5e"
             }
             "aarch64" | "arm64" => {
-                "edc6bcc252ed48b73f4eaf5eb0b8912ddafbe55ceb8261b971fa231a78101045"
+                "8143f651e9a4c80a55199c11699e87572ac1611dd661822cd720f4f85df71482"
             }
             other => panic!("unsupported plan-golden architecture: {other}"),
         };
