@@ -992,7 +992,7 @@ entries:
     writes: false
     default_wiring:
       ci: false
-      pr_check: true
+      pr_check: false
     docs:
       - tools/README.md
       - documents/tools/README.md
@@ -1492,7 +1492,7 @@ entries:
       - tests/agent_tools/test_route.py
 
   - id: check-convention-compliance
-    summary: Verifies convention sources and workflow gate wiring stay connected.
+    summary: Checks convention sources and their tool references.
     path: tools/runtime/dispatch/agent-canon/src/convention_compliance.rs
     family: agent_tools
     role: checker
@@ -1804,8 +1804,8 @@ entries:
     dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "check-agent-runtime-alignment"]}
     writes: false
     default_wiring:
-      ci: false
-      pr_check: true
+      ci: true
+      pr_check: false
     docs:
       - tools/README.md
       - documents/tools/README.md

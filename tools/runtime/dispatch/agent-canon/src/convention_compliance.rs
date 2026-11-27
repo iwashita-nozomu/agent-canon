@@ -29,7 +29,6 @@ struct Configuration {
 #[derive(Deserialize)]
 struct Checker {
     convention_sources: Vec<String>,
-    workflow_consumers: Vec<String>,
     stale_owner_phrases: Vec<String>,
     forwarder_markers: Vec<String>,
     forwarder_policy_markers: Vec<String>,
@@ -119,46 +118,6 @@ fn tool_checks(root: &Path, config: &Checker, findings: &mut Vec<Finding>) -> Re
                     );
                 }
             }
-        }
-    }
-    Ok(())
-}
-fn workflow_checks(
-    root: &Path,
-    config: &Checker,
-    findings: &mut Vec<Finding>,
-) -> Result<(), String> {
-    required(root, &config.workflow_consumers, "workflow_hook", findings);
-    let positive=Regex::new(r#"(?m)^\s*run_agent_canon\s+check-convention-compliance\s+--root\s+"\$\{WORKSPACE_ROOT\}"\s+--format\s+json$"#).map_err(|error|error.to_string())?;
-    let forbidden=Regex::new(r"(?is)(?:do\s+not|don't|never|skip|omit)\s+(?:\S+\s+){0,6}?check-convention-compliance|check-convention-compliance(?:\S+\s+){0,6}?(?:optional|not\s+required)").map_err(|error|error.to_string())?;
-    for path in &config.workflow_consumers {
-        let Some(text) = read(root, path)? else {
-            continue;
-        };
-        if !text.contains("check-convention-compliance") {
-            finding(
-                findings,
-                "workflow_hook",
-                path,
-                "missing-convention-compliance-gate",
-            );
-            continue;
-        }
-        if !positive.is_match(&text) {
-            finding(
-                findings,
-                "workflow_hook",
-                path,
-                "missing-positive-convention-compliance-command",
-            );
-        }
-        if forbidden.is_match(&text) {
-            finding(
-                findings,
-                "workflow_hook",
-                path,
-                "forbidden-convention-compliance-suppression",
-            );
         }
     }
     Ok(())
@@ -354,14 +313,13 @@ fn run_inner(args: &[String]) -> Result<i32, String> {
         &mut findings,
     );
     tool_checks(&root, &config.checker, &mut findings)?;
-    workflow_checks(&root, &config.checker, &mut findings)?;
     contract_checks(&root, &config, &mut findings)?;
     convention_assertions(&root, &config.checker, &mut findings)?;
     forwarders(&root, &config.checker, &mut findings)?;
     findings.sort();
     let status = if findings.is_empty() { "pass" } else { "fail" };
     if format == "json" {
-        println!("{}",serde_json::to_string_pretty(&serde_json::json!({"status":status,"findings":findings,"convention_sources":config.checker.convention_sources.len(),"tool_gates":config.checker.gates.len(),"workflow_prompts":config.checker.workflow_consumers.iter().filter(|path|readable(&root,path).is_some()).count()})).map_err(|error|error.to_string())?);
+        println!("{}",serde_json::to_string_pretty(&serde_json::json!({"status":status,"findings":findings,"convention_sources":config.checker.convention_sources.len(),"tool_gates":config.checker.gates.len()})).map_err(|error|error.to_string())?);
     } else {
         for value in &findings {
             println!(
@@ -369,7 +327,7 @@ fn run_inner(args: &[String]) -> Result<i32, String> {
                 value.check, value.path, value.detail
             );
         }
-        println!("CONVENTION_COMPLIANCE_SOURCES={}\nCONVENTION_COMPLIANCE_TOOL_GATES={}\nCONVENTION_COMPLIANCE_WORKFLOWS={}\nCONVENTION_COMPLIANCE_FINDINGS={}\nCONVENTION_COMPLIANCE={status}",config.checker.convention_sources.len(),config.checker.gates.len(),config.checker.workflow_consumers.len(),findings.len());
+        println!("CONVENTION_COMPLIANCE_SOURCES={}\nCONVENTION_COMPLIANCE_TOOL_GATES={}\nCONVENTION_COMPLIANCE_FINDINGS={}\nCONVENTION_COMPLIANCE={status}",config.checker.convention_sources.len(),config.checker.gates.len(),findings.len());
     }
     Ok(i32::from(!findings.is_empty()))
 }

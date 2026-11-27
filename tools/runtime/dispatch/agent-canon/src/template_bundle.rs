@@ -2669,7 +2669,7 @@ pub(crate) fn verify_native_packages(
     let source = GitSource::open(source_root)?;
     let commit = source.commit(source_ref)?;
     let tree = source.tree(&commit)?;
-    let (manifest, manifest_digest) = source.resolve_profile(&commit)?;
+    let (manifest, _) = source.resolve_profile(&commit)?;
     let version = native_release_version(&source.root, &commit)?;
     if targets.is_empty()
         || targets.iter().collect::<BTreeSet<_>>().len() != targets.len()
