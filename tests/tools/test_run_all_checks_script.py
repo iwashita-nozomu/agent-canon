@@ -104,7 +104,7 @@ class RunAllChecksScriptTest(unittest.TestCase):
         )
 
     def test_pr_gate_only_keeps_shared_surface_ownership(self) -> None:
-        """The PR gate emits ownership evidence without running run_all_checks."""
+        """The PR script runs the shared checks also selectable in run_all_checks."""
         ci_text = SCRIPT.read_text(encoding="utf-8")
         pr_text = PR_SCRIPT.read_text(encoding="utf-8")
 
@@ -115,10 +115,8 @@ class RunAllChecksScriptTest(unittest.TestCase):
             "GITHUB_WORKFLOW_CHECKS=skip reason=already_checked_by_parent_gate",
             ci_text,
         )
-        self.assertIn("AGENT_CANON_PR_PROJECT_QUALITY=delegated", pr_text)
-        self.assertIn(
-            "AGENT_CANON_PR_PROJECT_QUALITY_OWNER=agentcanon_project_ci", pr_text
-        )
+        self.assertIn('"${cli}" docs check', pr_text)
+        self.assertIn('"${cli}" check-github-workflows', pr_text)
         self.assertNotIn('bash "${CANON_TOOLS_ROOT}/ci/run_all_checks.sh"', pr_text)
         self.assertNotIn("PR_QUICK_CI_ARGS=", pr_text)
 

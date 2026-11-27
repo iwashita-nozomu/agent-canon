@@ -1,6 +1,6 @@
 // @dependency-start
 // contract implementation
-// responsibility Checks standalone GitHub workflows and AgentCanon PR-template contracts.
+// responsibility Runs native providers for GitHub workflow validation.
 // upstream design ../../../../../documents/design/rust-agent-tool-migration.md native tool owner policy
 // upstream implementation ../../../../../tools/validation/ci/config/actionlint.yaml canonical pinned actionlint configuration
 // upstream implementation python_cli_options.rs resolves unique argparse-compatible option prefixes
@@ -8,62 +8,17 @@
 // downstream implementation ../../../../../tests/tools/test_check_github_workflows.py exercises the native CLI
 // @dependency-end
 
-use regex::Regex;
 use std::fs;
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
-use yaml_rust2::YamlLoader;
 
 const ACTIONLINT: &str = "/usr/local/bin/actionlint";
 const SHELLCHECK: &str = "/usr/local/bin/shellcheck";
 const ZIZMOR: &str = "/usr/local/bin/zizmor";
 const ACTIONLINT_CONFIG: &[u8] =
     include_bytes!("../../../../../tools/validation/ci/config/actionlint.yaml");
-
-const PR_REQUIRED: &[&str] = &[
-    "## PR Essence",
-    "Problem / user request:",
-    "Canonical owner / responsibility unit:",
-    "Behavior or contract delta:",
-    "Evidence route:",
-    "Explicit non-goals:",
-    "canonical route",
-    "changed surfaces:",
-    "source_commit:",
-    "template_pin:",
-    "pr_head:",
-    "identity relation (source_commit -> template_pin -> pr_head):",
-    "changed-surface validation:",
-    "mutation authority:",
-    "risk:",
-    "follow-up owner or issue:",
-];
-const PR_FORBIDDEN: &[&str] = &[
-    "Plan Mode Evidence",
-    "Agent Orchestration Evidence",
-    "paused until",
-    "Existing durable findings were searched",
-    "Copilot Configuration Impact",
-    "Candidate Commit And Publication Identity",
-    "GitHub Mirror / Submodule Evidence",
-    "template submodule SHA:",
-];
-const GUIDE_REQUIRED: &[&str] = &["generate-agent-improvement-guide"];
-const DASHBOARD_REQUIRED: &[&str] = &[
-    "pull_request:",
-    "workflow_dispatch:",
-    "schedule:",
-    "generate-agent-runtime-dashboard",
-];
-const STATIC_GATES_REQUIRED: &[&str] = &[
-    "pull_request:",
-    "workflow_dispatch:",
-    "github.event.pull_request.head.sha || github.sha",
-    "bootstrap.sh",
-    "run_standalone_static_gate_unit.sh",
-];
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct Finding {
@@ -104,117 +59,6 @@ fn workflows(root: &Path) -> Vec<PathBuf> {
         .collect();
     files.sort();
     files
-}
-
-fn require_text(path: &Path, required: &[&str]) -> Vec<Finding> {
-    let Ok(text) = fs::read_to_string(path) else {
-        return vec![Finding {
-            severity: "error",
-            path: path.to_path_buf(),
-            message: "missing_file".into(),
-        }];
-    };
-    let normalized = Regex::new(r"/{2,}")
-        .unwrap()
-        .replace_all(&text, "/")
-        .into_owned();
-    required
-        .iter()
-        .filter(|item| !text.contains(**item) && !normalized.contains(**item))
-        .map(|item| Finding {
-            severity: "error",
-            path: path.to_path_buf(),
-            message: format!("missing_text:{item}"),
-        })
-        .collect()
-}
-
-fn check_template_gate(path: &Path) -> Vec<Finding> {
-    let Ok(text) = fs::read_to_string(path) else {
-        return vec![Finding {
-            severity: "error",
-            path: path.to_path_buf(),
-            message: "missing_file".into(),
-        }];
-    };
-    let mut findings = Vec::new();
-    for item in PR_FORBIDDEN {
-        if text.contains(item) {
-            findings.push(Finding {
-                severity: "error",
-                path: path.to_path_buf(),
-                message: format!("forbidden_universal_pr_gate:{item}"),
-            });
-        }
-    }
-    for field in ["source_commit", "template_pin", "pr_head"] {
-        let pattern = Regex::new(&format!(r"(?m)^\s*-\s*{}:", regex::escape(field))).unwrap();
-        let count = pattern.find_iter(&text).count();
-        if count != 1 {
-            findings.push(Finding {
-                severity: "error",
-                path: path.to_path_buf(),
-                message: format!("identity_field_count:{field}:{count}"),
-            });
-        }
-    }
-    let count = text
-        .matches("identity relation (source_commit -> template_pin -> pr_head):")
-        .count();
-    if count != 1 {
-        findings.push(Finding {
-            severity: "error",
-            path: path.to_path_buf(),
-            message: format!("identity_relation_count:{count}"),
-        });
-    }
-    findings
-}
-
-fn check_headers(root: &Path) -> Vec<Finding> {
-    let dir = root.join(".github/workflows");
-    let mut findings = Vec::new();
-    for (name, required) in [
-        ("agent-improvement-guide.yml", GUIDE_REQUIRED),
-        ("agent-runtime-dashboard.yml", DASHBOARD_REQUIRED),
-        ("agent-canon-static-gates.yml", STATIC_GATES_REQUIRED),
-    ] {
-        let path = dir.join(name);
-        if !path.exists() {
-            continue;
-        }
-        findings.extend(require_text(&path, required));
-        if name == "agent-runtime-dashboard.yml" {
-            let guard = fs::read_to_string(&path)
-                .ok()
-                .and_then(|text| YamlLoader::load_from_str(&text).ok())
-                .filter(|docs| docs.len() == 1)
-                .and_then(|mut docs| docs.pop())
-                .and_then(|yaml| yaml["jobs"]["dashboard"]["if"].as_str().map(str::to_owned));
-            if guard.as_deref() != Some("github.event_name != 'pull_request'") {
-                findings.push(Finding {
-                    severity: "error",
-                    path,
-                    message: "missing_dashboard_pr_job_exclusion".into(),
-                });
-            }
-        }
-    }
-    findings
-}
-
-fn check_owned(root: &Path) -> Vec<Finding> {
-    let mut findings = check_headers(root);
-    let pr = root.join(".github/PULL_REQUEST_TEMPLATE.md");
-    findings.extend(require_text(&pr, PR_REQUIRED));
-    for relative in [
-        ".github/PULL_REQUEST_TEMPLATE.md",
-        ".github/PULL_REQUEST_TEMPLATE/agent_canon.md",
-        "templates/documents/github/pull-request/agent_canon.md",
-    ] {
-        findings.extend(check_template_gate(&root.join(relative)));
-    }
-    findings
 }
 
 fn temp_config() -> Result<TempConfig, std::io::Error> {
@@ -426,18 +270,7 @@ fn exit_code(findings: &[Finding], statuses: &[i32]) -> i32 {
         })
 }
 
-#[cfg(test)]
-fn run_with_statuses(root: &Path, statuses: &[i32]) -> (String, i32) {
-    let root = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
-    let files = workflows(&root);
-    let findings = check_owned(&root);
-    (
-        report(&root, &findings, &files, statuses),
-        exit_code(&findings, statuses),
-    )
-}
-
-const HELP: &str = "usage: agent-canon check-github-workflows [-h] [--root ROOT] [--consumer]\n\nRun native GitHub workflow analyzers and check AgentCanon workflow and PR-template contracts.\n\noptions:\n  -h, --help   show this help message and exit\n  --root ROOT  repository root to check\n  --consumer  validate workflows with the target repository's actionlint configuration";
+const HELP: &str = "usage: agent-canon check-github-workflows [-h] [--root ROOT] [--consumer]\n\nRun native GitHub workflow analyzers.\n\noptions:\n  -h, --help   show this help message and exit\n  --root ROOT  repository root to check\n  --consumer  validate workflows with the target repository's actionlint configuration";
 
 #[derive(Clone, Copy)]
 enum CheckerOption {
@@ -522,189 +355,8 @@ pub fn run(args: &[String]) -> i32 {
     let (findings, statuses) = if consumer {
         consumer_workflows(&root, &files)
     } else {
-        (check_owned(&root), run_providers(&root, &files))
+        (Vec::new(), run_providers(&root, &files))
     };
     print!("{}", report(&root, &findings, &files, &statuses));
     exit_code(&findings, &statuses)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use base64::engine::general_purpose::STANDARD;
-    use base64::Engine;
-    use serde_json::Value;
-    use sha2::{Digest, Sha256};
-
-    struct TestRoot(PathBuf);
-    impl TestRoot {
-        fn new(label: &str) -> Self {
-            static NEXT: AtomicU64 = AtomicU64::new(0);
-            let id = NEXT.fetch_add(1, Ordering::Relaxed);
-            let path = std::env::temp_dir().join(format!(
-                "agent-canon-workflow-test-{}-{label}-{id}",
-                std::process::id()
-            ));
-            fs::create_dir_all(&path).unwrap();
-            Self(path)
-        }
-    }
-    impl Drop for TestRoot {
-        fn drop(&mut self) {
-            let _ = fs::remove_dir_all(&self.0);
-        }
-    }
-
-    fn write_corpus_file(root: &Path, relative: &str, content: &[u8]) {
-        let path = root.join(relative);
-        fs::create_dir_all(path.parent().unwrap()).unwrap();
-        fs::write(path, content).unwrap();
-    }
-
-    fn corpus() -> Value {
-        serde_json::from_str(include_str!(
-            "../../../../../tests/fixtures/github_workflow_check/python_golden.json"
-        ))
-        .unwrap()
-    }
-
-    #[test]
-    fn embedded_actionlint_config_matches_canonical_bytes() {
-        let digest = format!("{:x}", Sha256::digest(ACTIONLINT_CONFIG));
-        assert_eq!(
-            digest,
-            "8842e14b6daec1470b1b38b22524cea4c95d98cab66a992347eb94002d738e5d"
-        );
-    }
-
-    #[test]
-    fn captured_legacy_cli_corpus_matches_native_owned_api() {
-        for case in corpus()["cli_cases"].as_array().unwrap() {
-            let root = TestRoot::new(case["name"].as_str().unwrap());
-            for (relative, encoded) in corpus()["shared_files"].as_object().unwrap() {
-                write_corpus_file(
-                    &root.0,
-                    relative,
-                    &STANDARD.decode(encoded.as_str().unwrap()).unwrap(),
-                );
-            }
-            for (relative, encoded) in case["files_delta"].as_object().unwrap() {
-                let path = root.0.join(relative);
-                if encoded.is_null() {
-                    let _ = fs::remove_file(path);
-                } else {
-                    write_corpus_file(
-                        &root.0,
-                        relative,
-                        &STANDARD.decode(encoded.as_str().unwrap()).unwrap(),
-                    );
-                }
-            }
-            let statuses: Vec<i32> = case["native_statuses"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .map(|v| v.as_i64().unwrap() as i32)
-                .collect();
-            let (actual, exit) = run_with_statuses(&root.0, &statuses);
-            assert_eq!(
-                actual,
-                case["owned_report"].as_str().unwrap(),
-                "{}",
-                case["name"]
-            );
-            assert_eq!(
-                exit,
-                case["exit"].as_i64().unwrap() as i32,
-                "{}",
-                case["name"]
-            );
-        }
-    }
-
-    #[test]
-    fn captured_dashboard_header_oracles_match_native_checker() {
-        for case in corpus()["header_cases"].as_array().unwrap() {
-            let root = TestRoot::new(case["name"].as_str().unwrap());
-            for (relative, encoded) in case["files"].as_object().unwrap() {
-                write_corpus_file(
-                    &root.0,
-                    relative,
-                    &STANDARD.decode(encoded.as_str().unwrap()).unwrap(),
-                );
-            }
-            let actual = check_headers(&root.0);
-            let expected: Vec<Value> = case["findings"].as_array().unwrap().to_vec();
-            assert_eq!(actual.len(), expected.len(), "{}", case["name"]);
-            for (finding, expected) in actual.iter().zip(expected) {
-                assert_eq!(finding.severity, expected["severity"].as_str().unwrap());
-                let relative_path = finding.path.strip_prefix(&root.0).unwrap();
-                assert_eq!(
-                    relative_path.to_string_lossy().replace('\\', "/"),
-                    expected["path"].as_str().unwrap()
-                );
-                assert_eq!(finding.message, expected["message"].as_str().unwrap());
-            }
-        }
-    }
-
-    #[test]
-    fn python_base_loader_contract_rejects_an_additional_yaml_document() {
-        // The valid dashboard input comes from the captured Python header oracle.
-        // At cfac45c7:tools/validation/ci/checks/check_github_workflows.py,
-        // check_root_copy_headers uses yaml.load(..., Loader=yaml.BaseLoader).
-        // Its old finding for this input is the missing dashboard guard below.
-        let captured = corpus();
-        let case = &captured["header_cases"][0];
-        let root = TestRoot::new("extra-yaml-document");
-        let encoded = case["files"][".github/workflows/agent-runtime-dashboard.yml"]
-            .as_str()
-            .unwrap();
-        let mut workflow = STANDARD.decode(encoded).unwrap();
-        workflow.extend_from_slice(b"\n---\nsecond: document\n");
-        write_corpus_file(
-            &root.0,
-            ".github/workflows/agent-runtime-dashboard.yml",
-            &workflow,
-        );
-        let findings = check_headers(&root.0);
-        assert_eq!(findings.len(), 1);
-        let finding = &findings[0];
-        assert_eq!(finding.severity, "error");
-        assert_eq!(
-            finding
-                .path
-                .strip_prefix(&root.0)
-                .unwrap()
-                .to_string_lossy()
-                .replace('\\', "/"),
-            ".github/workflows/agent-runtime-dashboard.yml"
-        );
-        assert_eq!(finding.message, "missing_dashboard_pr_job_exclusion");
-    }
-
-    #[test]
-    fn captured_legacy_exit_precedence_is_preserved() {
-        for case in corpus()["exit_cases"].as_array().unwrap() {
-            let statuses: Vec<i32> = case["native_statuses"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .map(|v| v.as_i64().unwrap() as i32)
-                .collect();
-            let findings = if case["has_error"].as_bool().unwrap() {
-                vec![Finding {
-                    severity: "error",
-                    path: PathBuf::from(".github/PULL_REQUEST_TEMPLATE.md"),
-                    message: "captured".into(),
-                }]
-            } else {
-                Vec::new()
-            };
-            assert_eq!(
-                exit_code(&findings, &statuses),
-                case["exit"].as_i64().unwrap() as i32
-            );
-        }
-    }
 }

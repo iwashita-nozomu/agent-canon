@@ -30,10 +30,4 @@ owners contain the procedures; ROOT owns the shared reading constraints.
 | Design or implementation is active | [implementation reader map](CODEX_IMPLEMENTATION.md#reader-map) |
 | Validation or closeout is due | [completion reader map](CODEX_COMPLETION.md#reader-map) |
 | Additional context becomes necessary during the active phase | [context read conditions](CODEX_INTAKE.md#optional-context) and the active Skill's matching conditional link, then return to the interrupted phase |
-| Execution fails | [bounded diagnosis](ROOT_EXECUTION.md#configured-execution-and-bounded-diagnosis) |
-| Verification fails | [bounded diagnosis](ROOT_EXECUTION.md#configured-execution-and-bounded-diagnosis) using actual output and current context |
-
-## Completion Readiness
-
-At closeout, use [completion readiness](CODEX_COMPLETION.md#completion-readiness)
-for the already selected execution route.
+| Execution or verification fails | [bounded diagnosis](ROOT_EXECUTION.md#configured-execution-and-bounded-diagnosis) using the tool's output |

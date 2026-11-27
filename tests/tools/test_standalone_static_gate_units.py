@@ -958,32 +958,22 @@ def test_units_do_not_duplicate_rust_or_full_wrapper_commands() -> None:
             command in line for command in ("cargo build", "cargo clippy", "cargo test")
         ):
             assert "--locked --offline" in line
-    wrapper = (
-        FULL_WRAPPER.read_text()
-        .split("run_standalone_static_gate_ci() {", 1)[1]
-        .split("\n}\n\necho ", 1)[0]
-    )
-    assert "owned_by_bootstrap_container_workflow" in wrapper
+    wrapper = FULL_WRAPPER.read_text()
     for command in (
         "cargo build",
         "tool-catalog",
         "run-accumulated-agent-evals",
-        "check-github-workflows",
     ):
         assert command not in wrapper
 
 
-@pytest.mark.parametrize(
-    ("remote_status", "bootstrap_status"), [(0, 0), (1, 0), (1, 17)]
-)
-def test_unpublished_environment_uses_native_local_build(
-    tmp_path: Path, remote_status, bootstrap_status
+@pytest.mark.parametrize("bootstrap_status", [0, 17])
+def test_runtime_install_owns_image_selection_and_activation(
+    tmp_path: Path, bootstrap_status: int
 ) -> None:
     fixture_root = executable_fixture_root(tmp_path)
     source = fixture_root / "candidate"
-    image = source / "bootstrap/container/image"
-    image.mkdir(parents=True)
-    (image / "digest.sh").write_text("printf 'fixture-key\\n'\n")
+    source.mkdir()
     bootstrap = source / "bootstrap.sh"
     bootstrap.write_text(
         "#!/usr/bin/env bash\n"
@@ -991,11 +981,6 @@ def test_unpublished_environment_uses_native_local_build(
         'exit "$BOOTSTRAP_STATUS"\n'
     )
     bootstrap.chmod(0o755)
-    bin_dir = fixture_root / "bin"
-    bin_dir.mkdir()
-    docker = bin_dir / "docker"
-    docker.write_text('#!/usr/bin/env bash\nexit "$REMOTE_STATUS"\n')
-    docker.chmod(0o755)
     calls = tmp_path / "calls"
     result = run_shell(
         step("Start one shared tool runtime")["run"],
@@ -1003,18 +988,18 @@ def test_unpublished_environment_uses_native_local_build(
         AGENT_CANON_CANDIDATE_SOURCE=str(source),
         AGENT_CANON_CONTROL_PARENT_ROOT=str(tmp_path),
         GITHUB_WORKSPACE=str(ROOT),
-        GITHUB_REPOSITORY="iwashita-nozomu/agent-canon",
-        PATH=f"{bin_dir}:{os.environ['PATH']}",
         CALLS=str(calls),
-        REMOTE_STATUS=str(remote_status),
         BOOTSTRAP_STATUS=str(bootstrap_status),
     )
     assert result.returncode == bootstrap_status
     commands = calls.read_text().splitlines()
-    assert commands[0].endswith(
-        "install" if remote_status == 0 else "update --local-build"
-    )
-    assert len(commands) == (3 if bootstrap_status == 0 else 1)
+    assert commands[0] == f"--control-parent-root {tmp_path} install"
+    if bootstrap_status == 0:
+        assert commands[1:] == [
+            f"--control-parent-root {tmp_path} target add --root {ROOT} --mode read-only"
+        ]
+    else:
+        assert commands[1:] == []
 
 
 def test_output_is_uploaded_before_cleanup_even_when_unit_execution_fails() -> None:

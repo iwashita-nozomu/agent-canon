@@ -1657,7 +1657,7 @@ entries:
       - tests/agent_tools/test_tool_dispatch.py
 
   - id: check-github-workflows
-    summary: Validates GitHub Actions and selected repository workflow policy.
+    summary: Runs native analyzers for GitHub Actions.
     path: tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs
     family: ci
     role: checker

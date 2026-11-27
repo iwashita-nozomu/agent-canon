@@ -317,7 +317,6 @@ def test_native_checker_cli_help_and_argparse_root_spellings() -> None:
 
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
-        copy_required_surfaces(root)
         for root_args in ((f"--root={root}",), ("--r", str(root))):
             result = subprocess.run(
                 [_native_cli(), "check-github-workflows", *root_args],
@@ -329,34 +328,10 @@ def test_native_checker_cli_help_and_argparse_root_spellings() -> None:
             assert "GITHUB_WORKFLOWS_CHECKED=0" in result.stdout
 
 
-def copy_required_surfaces(root: Path) -> None:
-    """Copy only standalone surfaces consumed by the checker."""
-    for relative in (
-        ".github/AGENTS.md",
-        ".github/PULL_REQUEST_TEMPLATE.md",
-        ".github/PULL_REQUEST_TEMPLATE/agent_canon.md",
-        "templates/documents/github/pull-request/agent_canon.md",
-        "agents/skills/agent-canon-update.md",
-        "README.md",
-    ):
-        source = ROOT / relative
-        destination = root / relative
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.write_bytes(source.read_bytes())
-
-
 def write_workflow(root: Path, text: str) -> None:
     path = root / ".github" / "workflows" / "ci.yml"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
-
-
-def write_dashboard_workflow(root: Path, text: str) -> Path:
-    """Write a dashboard workflow fixture for the focused header checker."""
-    path = root / ".github" / "workflows" / "agent-runtime-dashboard.yml"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text, encoding="utf-8")
-    return path
 
 
 VALID_WORKFLOW = """\
@@ -380,7 +355,6 @@ jobs:
 def test_standalone_repository_passes() -> None:
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
-        copy_required_surfaces(root)
         write_workflow(root, VALID_WORKFLOW)
         result = run_checker(root)
         assert result.returncode == 0, result.stdout + result.stderr
@@ -392,7 +366,6 @@ def test_standalone_repository_passes() -> None:
 def test_checker_only_scans_standalone_workflows() -> None:
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
-        copy_required_surfaces(root)
         write_workflow(root, VALID_WORKFLOW)
         vendor = root / "vendor" / "agent-canon" / ".github" / "workflows"
         vendor.mkdir(parents=True)
@@ -405,7 +378,6 @@ def test_checker_only_scans_standalone_workflows() -> None:
 def test_native_actionlint_failure_is_visible() -> None:
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
-        copy_required_surfaces(root)
         write_workflow(root, "name: Broken\njobs: [\n")
         result = run_checker(root)
         assert result.returncode != 0
@@ -418,7 +390,6 @@ def test_native_actionlint_failure_is_visible() -> None:
 def test_native_zizmor_rejects_default_checkout_credentials_in_artifact() -> None:
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
-        copy_required_surfaces(root)
         vulnerable_workflow = VALID_WORKFLOW.replace(
             "        with:\n          persist-credentials: false\n", ""
         ).replace(
@@ -479,48 +450,3 @@ def test_runtime_dashboard_preserves_pr_context_and_skips_diagnostics_for_prs() 
     assert "dashboard" in workflow["jobs"]
     dashboard_job = workflow["jobs"]["dashboard"]
     assert dashboard_job["if"] == "github.event_name != 'pull_request'"
-
-
-def test_dashboard_header_checker_rejects_missing_pr_trigger_or_job_guard() -> None:
-    """Require both the PR context and the diagnostic exclusion at their owner."""
-    source = RUNTIME_DASHBOARD_WORKFLOW.read_text(encoding="utf-8")
-    with tempfile.TemporaryDirectory() as directory:
-        root = Path(directory)
-        copy_required_surfaces(root)
-        write_workflow(root, VALID_WORKFLOW)
-        write_dashboard_workflow(root, source)
-        assert run_checker(root).returncode == 0
-
-        ordered_job = (
-            "  dashboard:\n"
-            "    if: github.event_name != 'pull_request'\n"
-            "    runs-on: ubuntu-latest\n"
-        )
-        reordered_job = (
-            "  dashboard:\n"
-            "    runs-on: ubuntu-latest\n"
-            "    if: github.event_name != 'pull_request'\n"
-        )
-        reordered = source.replace(ordered_job, reordered_job, 1)
-        assert reordered != source
-        write_dashboard_workflow(root, reordered)
-        assert run_checker(root).returncode == 0
-
-        mutations = (
-            (
-                "missing_text:pull_request:",
-                "  pull_request:\n",
-                "",
-            ),
-            (
-                "missing_dashboard_pr_job_exclusion",
-                "jobs:\n  dashboard:\n    if: github.event_name != 'pull_request'\n",
-                "jobs:\n  dashboard:\n",
-            ),
-        )
-        for expected_message, removed_text, replacement in mutations:
-            mutated = source.replace(removed_text, replacement, 1)
-            assert mutated != source
-            write_dashboard_workflow(root, mutated)
-            result = run_checker(root)
-            assert expected_message in result.stdout + result.stderr
