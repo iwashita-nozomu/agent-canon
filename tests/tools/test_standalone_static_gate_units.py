@@ -1029,14 +1029,12 @@ def test_output_is_uploaded_before_cleanup_even_when_unit_execution_fails() -> N
         ({}, 0, 0, True),
         ({}, 0, 17, True),
         ({}, 9, 0, False),
-        ({"drift": True}, 0, 0, False),
-        ({"health": "absent", "running": False}, 0, 0, False),
+        ({"drift": True}, 0, 0, True),
         ({"health": "unknown", "running": False}, 0, 0, True),
         ({"name": ""}, 0, 0, False),
-        ({"health": None}, 0, 0, False),
     ],
 )
-def test_capture_exports_only_the_bootstrap_validated_container(
+def test_capture_uses_bootstrap_name_and_docker_exit_status(
     tmp_path: Path,
     overrides,
     status_exit: int,

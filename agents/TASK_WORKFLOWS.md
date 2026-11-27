@@ -31,7 +31,6 @@ task catalog, runtime profile matrix, or closeout tools as policy authority.
 | workflow family and role guidance | `agents/task_catalog.yaml` `workflow_families[].id`, `workflow_families[].roles` |
 | default specialists and review packs | `agents/task_catalog.yaml`; `agents/agents_config.json` |
 | role behavior and write authority | `.codex/agents/*.toml` |
-| Skill selection and canonical Skill text | `agents/skills/catalog.yaml`; selected Skill links |
 | skill selection | `agents/skills/catalog.yaml`; `.codex/personal/skills/*/SKILL.md`; `tools/bin/agent-canon route --prompt` |
 | implementation guidance and closeout | [agents/skills/codex-task-workflow.md](skills/codex-task-workflow.md); selected family row in `agents/task_catalog.yaml` |
 | closeout authority | `agents/canonical/CODEX_COMPLETION.md`; `tools/runtime/dispatch/agent-canon/src/report_artifact_checks.rs` |

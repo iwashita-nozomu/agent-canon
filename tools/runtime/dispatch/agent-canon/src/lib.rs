@@ -36,7 +36,6 @@
 // downstream implementation report_artifact_checks.rs owns pure report artifact checks
 // downstream implementation active_design_packet.rs owns native persisted active-design packet normalization
 // downstream implementation run_evaluation.rs evaluates one selected run bundle
-// downstream implementation generated_completeness.rs owns the G2 receipt API and CLI operation
 // downstream implementation update_lifecycle_contract.rs validates immutable lifecycle records and gate verdicts
 // downstream implementation work_log.rs reads historical work-log snapshots for explicit Eval
 // downstream implementation python_sequence_matcher.rs owns CPython-compatible sequence similarity
@@ -89,7 +88,6 @@ pub mod experiment_registry;
 pub mod extract_docx;
 pub mod file_surface_inventory;
 pub mod formal_proof;
-pub mod generated_completeness;
 pub mod git_read;
 pub mod github_status_lifecycle;
 pub mod gpu_command_admission;

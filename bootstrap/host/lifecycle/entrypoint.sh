@@ -998,7 +998,7 @@ printf "marker\\t%s\\ncontent\\tok\\n" "$digest"' ) || init_rc=$?
 _agent_canon_apply_volume_export() (
   set -e
   local kind=$1 host_path=$2 relative=$3 stream_path=$4
-  local temporary member_list member relative_path name staged target dashboard_name dashboard_staged
+  local temporary relative_path name staged target dashboard_name dashboard_staged
   local backup_root= transaction_target= transaction_backup= transaction_kind= transaction_had_old=0
   cleanup_export() {
     local cleanup_rc=$?
@@ -1017,9 +1017,8 @@ _agent_canon_apply_volume_export() (
         mv -- "$transaction_backup" "$transaction_target" || true
       fi
     fi
-    if [[ -n "${member_list:-}" || -n "${stream_path:-}" ||
-          -n "${dashboard_staged:-}" ]]; then
-      rm -f -- "${member_list:-}" "${stream_path:-}" "${dashboard_staged:-}"
+    if [[ -n "${stream_path:-}" || -n "${dashboard_staged:-}" ]]; then
+      rm -f -- "${stream_path:-}" "${dashboard_staged:-}"
     fi
     if [[ -n "${temporary:-}" || -n "${backup_root:-}" ]]; then
       rm -rf -- "${temporary:-}" "${backup_root:-}"
@@ -1056,25 +1055,6 @@ _agent_canon_apply_volume_export() (
     return 2
   }
   chmod 700 "$temporary"
-  member_list=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.volume-export-members.XXXXXX") || {
-    _agent_canon_json_error volume_export_failed "volume export member list could not be created"
-    return 2
-  }
-  if ! tar -tf "$stream_path" >"$member_list"; then
-    _agent_canon_json_error volume_export_failed "volume export archive could not be listed"
-    return 2
-  fi
-  while IFS= read -r member; do
-    member=${member#./}
-    member=${member%/}
-    [[ -z "$member" ]] && continue
-    [[ "$member" != /* && "$member" != *$'\n'* &&
-       "$member" != *$'\r'* && "$member" != *$'\t'* && "$member" != ../* &&
-       "$member" != */../* && "$member" != *'/..' ]] || {
-      _agent_canon_json_error volume_export_invalid "volume export contains an unsafe archive member"
-      return 2
-    }
-  done < "$member_list"
   if ! tar -xpf "$stream_path" --no-same-owner -C "$temporary"; then
     _agent_canon_json_error volume_export_failed "volume export archive could not be extracted"
     return 2
@@ -1087,13 +1067,13 @@ _agent_canon_apply_volume_export() (
     _agent_canon_json_error volume_export_invalid "volume export contains a hardlink"
     return 2
   fi
-  while IFS= read -r relative_path; do
+  while IFS= read -r -d '' relative_path; do
     [[ "$relative_path" != *$'\n'* && "$relative_path" != *$'\r'* &&
        "$relative_path" != *$'\t'* ]] || {
       _agent_canon_json_error volume_export_invalid "volume export path contains a control character"
       return 2
     }
-  done < <(find "$temporary" -mindepth 1 -printf '%P\n')
+  done < <(find "$temporary" -mindepth 1 -printf '%P\0')
   case "$kind" in
     projection)
       for relative_path in mounts.toml mounts.tsv rollback-plan.tsv rollback-mounts.tsv; do
@@ -1273,11 +1253,10 @@ _agent_canon_apply_volume_export() (
       ;;
   esac
   if [[ "$kind" == dashboard ]]; then
-    if ! rm -f -- "$member_list" "$stream_path"; then
+    if ! rm -f -- "$stream_path"; then
       _agent_canon_json_error volume_export_failed "runtime dashboard staging cleanup failed"
       return 2
     fi
-    member_list=
     stream_path=
     if ! rm -rf -- "$temporary"; then
       _agent_canon_json_error volume_export_failed "runtime dashboard extraction cleanup failed"

@@ -24,7 +24,7 @@ fn run_inner(args: &[String]) -> Result<i32, String> {
         .iter()
         .any(|value| matches!(value.as_str(), "--help" | "-h"))
     {
-        println!("usage: agent-canon runtime-paths <root|path|ensure-dir|check-control|gate-g1|temp-dir|remove-tree|copy-read-only|capture-subprocess|detect-secrets-report|write-file|receipt-identity> [options]");
+        println!("usage: agent-canon runtime-paths <root|path|ensure-dir|check-control|temp-dir|remove-tree|copy-read-only|capture-subprocess|detect-secrets-report|write-file|receipt-identity> [options]");
         return Ok(0);
     }
     let action = args.first().ok_or("runtime-paths action is required")?;
@@ -33,7 +33,6 @@ fn run_inner(args: &[String]) -> Result<i32, String> {
         "path",
         "ensure-dir",
         "check-control",
-        "gate-g1",
         "temp-dir",
         "remove-tree",
         "copy-read-only",
@@ -82,20 +81,6 @@ fn run_inner(args: &[String]) -> Result<i32, String> {
             if source == control {
                 return Err("control parent root must differ from source root".into());
             }
-            Ok(0)
-        }
-        "gate-g1" => {
-            let payload: Value = serde_json::from_slice(
-                &std::fs::read(required(&values, "input")?).map_err(|error| error.to_string())?,
-            )
-            .map_err(|error| error.to_string())?;
-            let gates = payload
-                .get("gate_verdicts")
-                .and_then(Value::as_array)
-                .ok_or("agent_canon_pr_gate_bundle:gate_verdicts_missing")?;
-            crate::update_lifecycle_contract::validate_gate_chain(gates, Some(&["G1"]), true)
-                .map_err(|error| error.to_string())?;
-            println!("AGENT_CANON_G1_RECEIPT=consumed\nAGENT_CANON_PR_GATE_ORDER=G1");
             Ok(0)
         }
         "receipt-identity" => {

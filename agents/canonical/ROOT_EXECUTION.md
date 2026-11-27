@@ -16,87 +16,16 @@ additional startup packet or a dependency of generated consumer instructions.
 
 ## Configured execution and bounded diagnosis
 
-Run the current repository owner's existing entrypoint with its configured
-settings and standard tool defaults. This owner-defined procedure is the fixed
-execution route: entrypoint, configuration resolution, required backend,
-formatter, validation, and publication steps. Task inputs may vary through its
-documented parameters; fixed does not mean frozen argv, absolute paths, versions,
-or SHAs. Preserve native resolution and existing integrity/pin requirements.
+Run the repository's existing entrypoint with its configured environment.
+Use the dependencies' diagnostics and exit statuses. A separate check is useful
+when it covers a condition the installed environment can encounter and the
+dependency leaves that condition unchecked. Keep access and resource boundaries
+with the execution entrypoint.
 
-Carry the selected route through retries, resumption, and delegation. Reuse its
-owner reference and known command in the existing task/Issue or handoff; a callee
-consumes that selection rather than rerouting. Do not add a route manifest, lock,
-extra approval, or per-command proof to establish continuity.
-
-An entrypoint failure is not permission to call a lower-level implementation,
-recreate the steps in a temporary script or GitHub Actions workflow, add a wrapper,
-or substitute another backend, runtime, daemon, worker, or formatter. Use a direct
-native command or alternate transport only when the existing owner already defines
-it for that operation and its conditions hold; discovery or success alone does
-not authorize an alternative or establish equivalent validation.
-
-Incidental environment diagnosis serves the requested outcome, not a separate
-infrastructure repair project. A failed command does not make environment repair
-or exhaustive root-cause proof the next task. Repair only a demonstrated cause
-needed for the requested outcome and within scope/authority, at its owning
-configuration, implementation, and directly affected consumers. If the route must
-change, use that owner's existing Issue/PR workflow and validate the changed
-contract. A failure or available tool does not authorize a route change.
-
-The engineering reason is that bypassing the entrypoint can drop its configuration,
-permissions, resource limits, or failure semantics. Success on that bypass does
-not prove the selected route; repairing its owner avoids a second implementation.
-
-For a program execution request, use this order:
-
-1. Invoke the repository owner's prescribed entrypoint with its existing settings
-   and standard defaults. Reuse known roots, selectors, and context; do not run
-   separate `status`, identity, installed-tool, backend, or availability probes
-   before the requested command.
-2. If it succeeds, continue the task without route diagnosis. If it fails, keep
-   the exact command, output, exit/signal, and execution plane. An entrypoint
-   rejection is failure evidence even when the program did not start; do not
-   replay it merely to obtain another failure record. Shared cwd, hostname, or
-   checkout does not prove parent/worker execution equivalence. Keep a worker's
-   access failure scoped to that worker, not a host outage or test assertion.
-   Preserve observed parent success as counterevidence, not proof of worker repair.
-   Use the observed failure and current context to decide the next owning repair.
-   No failure-topic file or per-attempt ledger is required.
-
-3. Identify which required outcome the failure prevents before expanding diagnosis.
-   A program assertion or test failure is not by itself an environment defect.
-   Warnings, optional settings, and unavailable diagnostic tools are not new gates.
-   Do not turn a blocked verification command into a blocker of independent edits,
-   review, or authorized publication.
-4. Inspect only evidence that can change the next authorized action. Follow a
-   concrete hypothesis to the responsible code/configuration before an in-scope
-   repair; do not inventory the host or normalize every environment difference.
-   When isolation is implicated and the comparison can determine that action,
-   inspect the relevant effective sandbox/approval, groups/namespaces, or socket
-   access without credentials. Trace launch/configuration overrides only as needed;
-   generated defaults do not prove which setting ran. Do not substitute parent-only
-   tests for worker repair or weaken permissions. Retry the same entrypoint only
-   after a concrete changed premise and within existing rerun limits.
-5. End incidental diagnosis once the next action is decided, scope/access prevents
-   a remedy, or further inspection offers no actionable evidence. Reuse the observed
-   failure; do not repeat probes, retries, or environment-selection questions with
-   unchanged premises. Uncertainty about the full cause is not permission to keep
-   digging. Briefly record the failed action, evidence, affected verification, and
-   next owner/action in the existing task/Issue, then resume independent authorized
-   work without waiting for environment repair. Preserve unknown causes as unknown.
-
-Do not ask the user to select an environment or inject ad-hoc host/container,
-OS/WSL, CPU/GPU, runtime, or profile overrides. Missing optional selectors and
-new tasks/sessions do not justify discovery, setup, wrappers, auto-detection,
-cache state, or fallback execution. Successful execution does not prove every
-validation property, but an additional route probe does not prove it either.
-
-Keep required safety, permission, target-admission, integrity, and resource checks
-inside the selected entrypoint. This order does not bypass a known unsafe or
-unauthorized operation. Explicit diagnosis, installation, or environment-change
-requests use their own existing owner route and scope; do not turn those procedures
-into ordinary execution prerequisites. Never switch a required backend, weaken
-validation, or report an unrun command as passed.
+Follow an observed failure to the responsible code or configuration. If the first
+route cannot complete the request, try an existing route that preserves the
+required behavior and validation. Continue independent work while investigating.
+Report the evidence and its effect on the requested outcome.
 
 ## Checkout and dependency identity
 
