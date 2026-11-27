@@ -2286,7 +2286,7 @@ def test_volume_copy_runs_embedded_helper_with_real_posix_shell(tmp_path: Path) 
         '   [ "${AGENT_CANON_COPY_KIND:-}" = mount-registry ]; then\n'
         '  script=$(printf "%s" "$script" | sed -e \'s/\\$\\$/1/g\')\n'
         "  barrier_function='mv() {\n"
-        '    if [ "$1" = "-f" ] && [ "$2" = "--" ] &&\n'
+        '    if [ "$1" = "-fT" ] && [ "$2" = "--" ] &&\n'
         '       [ "$4" = "$FAKE_VOLUME_ROOT/mount-registry.toml" ]; then\n'
         '      : > "$FAKE_VOLUME_IMPORT_BARRIER/arrived-$FAKE_COPY_NAME"\n'
         '      while [ "$(find "$FAKE_VOLUME_IMPORT_BARRIER" -type f -name "arrived-*" | wc -l)" -lt 2 ]; do\n'
@@ -2668,70 +2668,6 @@ printf 'result=%s\\n' "$?"
     ) in route_log.read_text(encoding="utf-8")
 
 
-def test_volume_export_digest_corruption_is_rejected(tmp_path: Path) -> None:
-    """A corrupted host projection fails the Docker copy readback digest."""
-    control = tmp_path / "control"
-    runtime = tmp_path / "runtime"
-    stage = tmp_path / "stage"
-    control.mkdir()
-    runtime.mkdir()
-    stage.mkdir()
-    control_digest = hashlib.sha256(str(control.resolve()).encode("utf-8")).hexdigest()
-    volume_name = f"agent-canon-runtime-{control_digest}"
-    volume_root = tmp_path / f".fake-volume-{volume_name}"
-    exchange = volume_root / "exchange"
-    exchange.mkdir(parents=True)
-    (exchange / "mounts.tsv").write_text("", encoding="utf-8")
-    (exchange / "mounts.toml").write_text(
-        'schema = "agent-canon.mount-registry.v2"\n', encoding="utf-8"
-    )
-    state_path = tmp_path / "docker-state.json"
-    state_path.write_text(
-        json.dumps(
-            {
-                "images": {},
-                "containers": {},
-                "volumes": {
-                    volume_name: {
-                        "Name": volume_name,
-                        "Labels": {},
-                        "Mountpoint": str(volume_root),
-                    }
-                },
-                "next": 1,
-            }
-        ),
-        encoding="utf-8",
-    )
-    result = subprocess.run(
-        [
-            "bash",
-            "-c",
-            (
-                f"source {str(ADAPTER)!r}; "
-                f"AGENT_CANON_DOCKER_CMD={str(ROOT / 'tests/bootstrap/fake_docker.py')!r}; "
-                f"AGENT_CANON_REPOSITORY_ROOT={str(control)!r}; "
-                f"AGENT_CANON_CONTROL_ROOT={str(control)!r}; "
-                f"AGENT_CANON_STATE_VOLUME_NAME={volume_name!r}; "
-                f"AGENT_CANON_STATE_ROOT={str(runtime)!r}; "
-                f"AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}; "
-                f"AGENT_CANON_IMAGE_REF=image; "
-                f"_agent_canon_volume_copy export projection {str(stage)!r}"
-            ),
-        ],
-        check=False,
-        capture_output=True,
-        text=True,
-        env={
-            **os.environ,
-            "FAKE_DOCKER_STATE": str(state_path),
-            "FAKE_DOCKER_CORRUPT_COPY": "1",
-        },
-    )
-    assert result.returncode == 2
-    assert json.loads(result.stderr)["code"] == "volume_copy_failed"
-
-
 def test_volume_export_rejects_fifo_before_publish(tmp_path: Path) -> None:
     """A FIFO in a bounded tree export cannot reach the host projection."""
     control = tmp_path / "control"
@@ -3092,7 +3028,7 @@ def test_private_feedback_volume_copy_fails_if_initialized_spool_is_absent(
     assert (stage / "stale.txt").read_text(encoding="utf-8") == "stale\n"
 
 
-def test_private_feedback_volume_clear_requires_the_exported_tree_digest(
+def test_private_feedback_volume_clear_requires_the_exported_tree(
     tmp_path: Path,
 ) -> None:
     """A readback receipt clears only the exact private-feedback snapshot."""
@@ -3112,16 +3048,8 @@ def test_private_feedback_volume_clear_requires_the_exported_tree_digest(
     (eval_spool_neighbor / "retained-eval.txt").write_text(
         "different owner\n", encoding="utf-8"
     )
-    entries = []
-    for path in sorted(feedback.rglob("*")):
-        if path.is_file():
-            entries.append(
-                f"{hashlib.sha256(path.read_bytes()).hexdigest()}  ./"
-                f"{path.relative_to(feedback).as_posix()}\n"
-            )
-    snapshot_digest = hashlib.sha256(
-        "".join(sorted(entries)).encode("utf-8")
-    ).hexdigest()
+    snapshot = tmp_path / "published-feedback"
+    shutil.copytree(feedback, snapshot)
     state_path = tmp_path / "docker-state.json"
     state_path.write_text(
         json.dumps(
@@ -3141,7 +3069,7 @@ def test_private_feedback_volume_clear_requires_the_exported_tree_digest(
         encoding="utf-8",
     )
 
-    def clear(expected_digest: str) -> subprocess.CompletedProcess[str]:
+    def clear() -> subprocess.CompletedProcess[str]:
         command = (
             f"source {str(ADAPTER)!r}; "
             f"AGENT_CANON_DOCKER_CMD={str(ROOT / 'tests/bootstrap/fake_docker.py')!r}; "
@@ -3151,7 +3079,7 @@ def test_private_feedback_volume_clear_requires_the_exported_tree_digest(
             f"AGENT_CANON_STATE_ROOT={str(runtime)!r}; "
             f"AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}; "
             "AGENT_CANON_IMAGE_REF=image; "
-            f"_agent_canon_volume_copy clear private-feedback '' private-feedback {expected_digest}"
+            f"_agent_canon_volume_copy clear private-feedback {str(snapshot)!r} private-feedback"
         )
         return subprocess.run(
             ["bash", "-c", command],
@@ -3164,20 +3092,20 @@ def test_private_feedback_volume_clear_requires_the_exported_tree_digest(
     (feedback / "newer.txt").write_text(
         "not in acknowledged snapshot\n", encoding="utf-8"
     )
-    mismatch = clear(snapshot_digest)
+    mismatch = clear()
     assert mismatch.returncode == 2
     assert feedback.is_dir()
     assert (feedback / "newer.txt").is_file()
     (feedback / "newer.txt").unlink()
 
-    result = clear(snapshot_digest)
+    result = clear()
     assert result.returncode == 0, result.stderr
     assert feedback.is_dir()
     assert list(feedback.iterdir()) == []
     assert (eval_spool_neighbor / "retained-eval.txt").is_file()
 
 
-def test_eval_volume_clear_requires_the_exported_run_digest(tmp_path: Path) -> None:
+def test_eval_volume_clear_requires_the_exported_run(tmp_path: Path) -> None:
     """An eval ACK cannot delete a run whose volume bytes changed meanwhile."""
     control = tmp_path / "control"
     runtime = tmp_path / "runtime"
@@ -3194,15 +3122,8 @@ def test_eval_volume_clear_requires_the_exported_run_digest(tmp_path: Path) -> N
     neighboring_run = volume_root / "spool" / "other-run"
     neighboring_run.mkdir()
     (neighboring_run / "collection.json").write_text("other\n", encoding="utf-8")
-    entries = [
-        f"{hashlib.sha256(path.read_bytes()).hexdigest()}  ./"
-        f"{path.relative_to(run_spool).as_posix()}\n"
-        for path in run_spool.rglob("*")
-        if path.is_file()
-    ]
-    snapshot_digest = hashlib.sha256(
-        "".join(sorted(entries)).encode("utf-8")
-    ).hexdigest()
+    snapshot = tmp_path / "published-run"
+    shutil.copytree(run_spool, snapshot)
     state_path = tmp_path / "docker-state.json"
     state_path.write_text(
         json.dumps(
@@ -3222,7 +3143,7 @@ def test_eval_volume_clear_requires_the_exported_run_digest(tmp_path: Path) -> N
         encoding="utf-8",
     )
 
-    def clear(expected_digest: str) -> subprocess.CompletedProcess[str]:
+    def clear() -> subprocess.CompletedProcess[str]:
         command = (
             f"source {str(ADAPTER)!r}; "
             f"AGENT_CANON_DOCKER_CMD={str(ROOT / 'tests/bootstrap/fake_docker.py')!r}; "
@@ -3232,7 +3153,7 @@ def test_eval_volume_clear_requires_the_exported_run_digest(tmp_path: Path) -> N
             f"AGENT_CANON_STATE_ROOT={str(runtime)!r}; "
             f"AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}; "
             "AGENT_CANON_IMAGE_REF=image; "
-            f"_agent_canon_volume_copy clear eval '' eval-run {expected_digest}"
+            f"_agent_canon_volume_copy clear eval {str(snapshot)!r} eval-run"
         )
         return subprocess.run(
             ["bash", "-c", command],
@@ -3243,12 +3164,12 @@ def test_eval_volume_clear_requires_the_exported_run_digest(tmp_path: Path) -> N
         )
 
     (run_spool / "newer.txt").write_text("not in acknowledged run\n", encoding="utf-8")
-    mismatch = clear(snapshot_digest)
+    mismatch = clear()
     assert mismatch.returncode == 2
     assert (run_spool / "newer.txt").is_file()
     (run_spool / "newer.txt").unlink()
 
-    result = clear(snapshot_digest)
+    result = clear()
     assert result.returncode == 0, result.stderr
     assert not run_spool.exists()
     assert (neighboring_run / "collection.json").is_file()

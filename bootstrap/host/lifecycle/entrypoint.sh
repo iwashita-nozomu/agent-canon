@@ -756,18 +756,6 @@ _agent_canon_drop_legacy_controller_state() {
   done
 }
 
-_agent_canon_path_digest() {
-  local path=$1
-  [[ -e "$path" && ! -L "$path" ]] || return 1
-  if [[ -f "$path" ]]; then
-    _agent_canon_sha256 "$path"
-    return
-  fi
-  [[ -d "$path" ]] || return 1
-  [[ -z "$(find "$path" -type l -print -quit)" ]] || return 1
-  (cd "$path" && find . -type f -exec sha256sum {} + | LC_ALL=C sort | sha256sum | awk '{print $1}')
-}
-
 _agent_canon_validate_codex_home() {
   local path=$1 allowed link relative_link target expected invalid
   allowed="$AGENT_CANON_REPOSITORY_ROOT/.codex"
@@ -796,24 +784,6 @@ _agent_canon_validate_codex_home() {
     esac
   done)
   [[ -z "$invalid" ]]
-}
-
-_agent_canon_codex_digest() {
-  local path=$1 link mode
-  _agent_canon_validate_codex_home "$path" || return 1
-  (
-    cd "$path"
-    {
-      find . -type f -print | LC_ALL=C sort | while IFS= read -r link; do
-        mode=$(stat -c '%a' -- "$link") || exit 1
-        printf 'file\t%s\t%s\t%s\n' "$link" "$mode" \
-          "$(sha256sum -- "$link" | awk '{print $1}')"
-      done
-      find . -type l -print | LC_ALL=C sort | while IFS= read -r link; do
-        printf 'link\t%s\t%s\n' "$link" "$(readlink -- "$link")"
-      done
-    } | sha256sum | awk '{print $1}'
-  )
 }
 
 _agent_canon_init_state_volume() {
@@ -1030,8 +1000,8 @@ printf "marker\\t%s\\ncontent\\tok\\n" "$digest"' ) || init_rc=$?
 
 _agent_canon_apply_volume_export() (
   set -e
-  local kind=$1 host_path=$2 relative=$3 stream_path=$4 expected_digest=$5
-  local temporary member_list member relative_path source_digest name staged target dashboard_name dashboard_staged
+  local kind=$1 host_path=$2 relative=$3 stream_path=$4
+  local temporary member_list member relative_path name staged target dashboard_name dashboard_staged
   local backup_root= transaction_target= transaction_backup= transaction_kind= transaction_had_old=0
   cleanup_export() {
     local cleanup_rc=$?
@@ -1061,15 +1031,16 @@ _agent_canon_apply_volume_export() (
   }
   trap cleanup_export EXIT
   begin_directory_transaction() {
-    transaction_kind=directory
-    transaction_target=$1
+    local destination=$1
     backup_root=$(mktemp -d "$AGENT_CANON_RUNTIME_ROOT/.volume-export-backup.XXXXXX") || return 1
     transaction_backup="$backup_root/old"
-    if [[ -e "$transaction_target" || -L "$transaction_target" ]]; then
-      [[ ! -L "$transaction_target" ]] || return 1
-      mv -- "$transaction_target" "$transaction_backup" || return 1
+    if [[ -e "$destination" || -L "$destination" ]]; then
+      [[ -d "$destination" && ! -L "$destination" ]] || return 1
+      mv -T -- "$destination" "$transaction_backup" || return 1
       transaction_had_old=1
     fi
+    transaction_kind=directory
+    transaction_target=$destination
   }
   finish_transaction() {
     rm -rf -- "$backup_root"
@@ -1079,10 +1050,6 @@ _agent_canon_apply_volume_export() (
     transaction_had_old=0
     backup_root=
   }
-  if [[ ! -f "$stream_path" || -L "$stream_path" || ! "$expected_digest" =~ ^[0-9a-f]{64}$ ]]; then
-    _agent_canon_json_error volume_export_invalid "volume export stream or digest is invalid"
-    return 2
-  fi
   if [[ ! -d "$host_path" || -L "$host_path" ]]; then
     _agent_canon_json_error volume_export_destination_invalid "volume export destination is not a directory"
     return 2
@@ -1146,20 +1113,11 @@ _agent_canon_apply_volume_export() (
           *) rm -rf -- "$temporary"; _agent_canon_json_error volume_export_invalid "controller projection contains an unexpected path" ;;
         esac
       done < <(find "$temporary" -mindepth 1 -maxdepth 1 -printf '%P\n')
-      source_digest=$(
-        for name in mounts.toml mounts.tsv rollback-plan.tsv rollback-mounts.tsv; do
-          if [[ -f "$temporary/$name" && ! -L "$temporary/$name" ]]; then
-            printf '%s\t%s\n' "$name" "$(_agent_canon_sha256 "$temporary/$name")"
-          else
-            printf '%s\tabsent\n' "$name"
-          fi
-        done | sha256sum | awk '{print $1}'
-      )
       backup_root=$(mktemp -d "$AGENT_CANON_RUNTIME_ROOT/.volume-export-backup.XXXXXX") || {
         _agent_canon_json_error volume_export_failed "controller projection backup could not be created"
         return 2
       }
-      local backup_target="$backup_root/old" backup_presence="$backup_root/presence"
+      local backup_target="$backup_root/old"
       mkdir -p "$backup_target"
       for name in mounts.toml mounts.tsv rollback-plan.tsv rollback-mounts.tsv; do
         target="$host_path/$name"
@@ -1168,31 +1126,16 @@ _agent_canon_apply_volume_export() (
             _agent_canon_json_error volume_export_destination_invalid "controller projection target is not a regular file"
             return 2
           }
-          printf 'present\t%s\n' "$name" >> "$backup_presence"
           cp -a -- "$target" "$backup_target/$name" || {
             _agent_canon_json_error volume_export_failed "controller projection backup could not be copied"
             return 2
           }
-          [[ -f "$backup_target/$name" && ! -L "$backup_target/$name" ]] || {
-            _agent_canon_json_error volume_export_failed "controller projection backup readback is invalid"
-            return 2
-          }
-          [[ "$(_agent_canon_sha256 "$target")" == "$(_agent_canon_sha256 "$backup_target/$name")" ]] || {
-            _agent_canon_json_error volume_export_failed "controller projection backup readback differs"
-            return 2
-          }
-        else
-          printf 'absent\t%s\n' "$name" >> "$backup_presence"
         fi
         if [[ "${AGENT_CANON_TEST_VOLUME_EXPORT_FAIL_BACKUP:-}" == "$name" ]]; then
           _agent_canon_json_error volume_export_failed "injected controller projection backup failure"
           return 2
         fi
       done
-      [[ "$(wc -l < "$backup_presence")" == 4 ]] || {
-        _agent_canon_json_error volume_export_failed "controller projection backup presence readback is incomplete"
-        return 2
-      }
       transaction_kind=projection
       transaction_target=$host_path
       transaction_backup=$backup_target
@@ -1201,7 +1144,7 @@ _agent_canon_apply_volume_export() (
         target="$host_path/$name"
         if [[ -f "$staged" && ! -L "$staged" ]]; then
           [[ ! -L "$target" ]] || { _agent_canon_json_error volume_export_destination_invalid "controller projection target is a symlink"; return 2; }
-          mv -f -- "$staged" "$target" || { _agent_canon_json_error volume_export_failed "controller projection file could not be published"; return 2; }
+          mv -fT -- "$staged" "$target" || { _agent_canon_json_error volume_export_failed "controller projection file could not be published"; return 2; }
           if [[ "${AGENT_CANON_TEST_VOLUME_EXPORT_FAIL_AFTER:-}" == "$name" ]]; then
             _agent_canon_json_error volume_export_failed "injected controller projection publish failure"
             return 2
@@ -1214,12 +1157,12 @@ _agent_canon_apply_volume_export() (
       ;;
     eval)
       [[ -d "$temporary/$relative" && ! -L "$temporary/$relative" ]] || {
-        rm -rf -- "$temporary"
         _agent_canon_json_error volume_export_invalid "evaluation tree is missing"
+        return 2
       }
       [[ -z "$(find "$temporary" -mindepth 1 -maxdepth 1 ! -name "$relative" -print -quit)" ]] || {
-        rm -rf -- "$temporary"
         _agent_canon_json_error volume_export_invalid "evaluation export contains an unexpected path"
+        return 2
       }
       [[ -z "$(find "$temporary/$relative" -type l -print -quit)" ]] || {
         _agent_canon_json_error volume_export_invalid "evaluation export contains a symlink"
@@ -1227,10 +1170,6 @@ _agent_canon_apply_volume_export() (
       }
       [[ -z "$(find "$temporary/$relative" ! -type d ! -type f -print -quit)" ]] || {
         _agent_canon_json_error volume_export_invalid "evaluation export contains a special file"
-        return 2
-      }
-      source_digest=$(_agent_canon_path_digest "$temporary/$relative") || {
-        _agent_canon_json_error volume_export_invalid "evaluation digest could not be computed"
         return 2
       }
       target="$host_path/$relative"
@@ -1246,8 +1185,8 @@ _agent_canon_apply_volume_export() (
     dashboard)
       dashboard_name="agent-runtime-dashboard-${relative}.md"
       [[ -f "$temporary/$dashboard_name" && ! -L "$temporary/$dashboard_name" ]] || {
-        rm -rf -- "$temporary"
         _agent_canon_json_error volume_export_invalid "runtime dashboard report is missing or invalid"
+        return 2
       }
       target="$host_path/$dashboard_name"
       if [[ -e "$target" || -L "$target" ]]; then
@@ -1264,19 +1203,15 @@ _agent_canon_apply_volume_export() (
         _agent_canon_json_error volume_export_failed "runtime dashboard report could not be staged"
         return 2
       }
-      source_digest=$(_agent_canon_sha256 "$dashboard_staged") || {
-        _agent_canon_json_error volume_export_failed "runtime dashboard staged digest could not be computed"
-        return 2
-      }
       ;;
     guide)
       [[ -d "$temporary/agent-improvement-guide" && ! -L "$temporary/agent-improvement-guide" ]] || {
-        rm -rf -- "$temporary"
         _agent_canon_json_error volume_export_invalid "improvement guide tree is missing"
+        return 2
       }
       [[ -z "$(find "$temporary" -mindepth 1 -maxdepth 1 ! -name agent-improvement-guide -print -quit)" ]] || {
-        rm -rf -- "$temporary"
         _agent_canon_json_error volume_export_invalid "improvement guide export contains an unexpected path"
+        return 2
       }
       [[ -z "$(find "$temporary/agent-improvement-guide" -type l -print -quit)" ]] || {
         _agent_canon_json_error volume_export_invalid "improvement guide export contains a symlink"
@@ -1284,10 +1219,6 @@ _agent_canon_apply_volume_export() (
       }
       [[ -z "$(find "$temporary/agent-improvement-guide" ! -type d ! -type f -print -quit)" ]] || {
         _agent_canon_json_error volume_export_invalid "improvement guide export contains a special file"
-        return 2
-      }
-      source_digest=$(_agent_canon_path_digest "$temporary/agent-improvement-guide") || {
-        _agent_canon_json_error volume_export_invalid "improvement guide digest could not be computed"
         return 2
       }
       begin_directory_transaction "$host_path" || {
@@ -1308,10 +1239,6 @@ _agent_canon_apply_volume_export() (
         _agent_canon_json_error volume_export_invalid "private feedback contains a special file"
         return 2
       }
-      source_digest=$(
-        cd "$temporary" && find . -type f ! -name .agent-canon-private-log-v1 -exec sha256sum {} + |
-          LC_ALL=C sort | sha256sum | awk '{print $1}'
-      )
       begin_directory_transaction "$host_path" || {
         _agent_canon_json_error volume_export_destination_invalid "private feedback destination is not a regular directory"
         return 2
@@ -1328,10 +1255,6 @@ _agent_canon_apply_volume_export() (
       }
       [[ -z "$(find "$temporary" ! -type d ! -type f ! -type l -print -quit)" ]] || {
         _agent_canon_json_error volume_export_invalid "Codex home contains a special file"
-        return 2
-      }
-      source_digest=$(_agent_canon_codex_digest "$temporary") || {
-        _agent_canon_json_error volume_export_invalid "Codex home digest could not be computed"
         return 2
       }
       begin_directory_transaction "$host_path" || {
@@ -1352,11 +1275,6 @@ _agent_canon_apply_volume_export() (
       _agent_canon_json_error volume_export_invalid "volume export kind is not supported"
       ;;
   esac
-  [[ "$source_digest" == "$expected_digest" ]] || {
-    rm -rf -- "$temporary"
-    _agent_canon_json_error volume_copy_failed "volume export digest readback differs"
-    return 2
-  }
   if [[ "$kind" == dashboard ]]; then
     if ! rm -f -- "$member_list" "$stream_path"; then
       _agent_canon_json_error volume_export_failed "runtime dashboard staging cleanup failed"
@@ -1381,13 +1299,13 @@ _agent_canon_apply_volume_export() (
 )
 
 _agent_canon_volume_copy() {
-  local direction=$1 kind=$2 host_path=$3 relative=${4:-} expected_digest=${5:-}
+  local direction=$1 kind=$2 host_path=$3 relative=${4:-}
   local volume=${AGENT_CANON_STATE_VOLUME_NAME:-}
   local copy_name="agent-canon-copy-$(_agent_canon_control_digest | cut -c1-16)-$$"
   [[ "$direction" == import || "$direction" == export || "$direction" == clear ||
      "$direction" == list ]] ||
     _agent_canon_json_error volume_copy_invalid "volume copy direction is invalid"
-  if [[ "$direction" != clear && "$direction" != list ]]; then
+  if [[ "$direction" != list && ( "$direction" != clear || "$kind" != host-mounts ) ]]; then
     [[ "$host_path" = /* && "$host_path" != *$'\n'* && "$host_path" != *$'\r'* &&
        "$host_path" != *$'\t'* && "$host_path" != *,* ]] ||
       _agent_canon_json_error volume_copy_invalid "volume copy host path is invalid"
@@ -1411,10 +1329,6 @@ _agent_canon_volume_copy() {
     [[ "$relative" =~ ^[A-Za-z0-9_.-]{1,128}$ ]] ||
       _agent_canon_json_error volume_copy_invalid "volume copy relative ID is invalid"
   fi
-  if [[ "$direction" == clear && ( "$kind" == eval || "$kind" == private-feedback ) ]]; then
-    [[ "$expected_digest" =~ ^[0-9a-f]{64}$ ]] ||
-      _agent_canon_json_error volume_copy_invalid "volume copy acknowledgement digest is invalid"
-  fi
   local volume_mount="type=volume,src=$volume,dst=$AGENT_CANON_VOLUME_DESTINATION"
   if [[ "$direction" == export || "$direction" == list ]]; then
     if [[ "$direction" != export || "$kind" != private-feedback ]]; then
@@ -1422,7 +1336,7 @@ _agent_canon_volume_copy() {
     fi
   fi
   local -a mounts=(--mount "$volume_mount")
-  if [[ "$direction" == import ]]; then
+  if [[ "$direction" == import || ( "$direction" == clear && "$kind" != host-mounts ) ]]; then
     mounts+=(--mount "type=bind,src=$host_path,dst=/agent-canon-copy-input,readonly")
   fi
   if [[ "$kind" == codex-home && "$direction" == import ]]; then
@@ -1438,11 +1352,9 @@ _agent_canon_volume_copy() {
     --env "AGENT_CANON_COPY_DIRECTION=$direction" \
     --env "AGENT_CANON_COPY_KIND=$kind" \
     --env "AGENT_CANON_COPY_RELATIVE=$relative" \
-    --env "AGENT_CANON_COPY_EXPECTED_DIGEST=$expected_digest" \
     --env "AGENT_CANON_COPY_UID=$(id -u)" \
     --env "AGENT_CANON_COPY_GID=$(id -g)" \
     --env "AGENT_CANON_COPY_INSTALL_ROOT=${AGENT_CANON_REPOSITORY_ROOT:-}" \
-    --env "AGENT_CANON_COPY_DIGEST=$([[ "$direction" == import ]] && { if [[ "$kind" == codex-home ]]; then _agent_canon_codex_digest "$host_path"; else _agent_canon_path_digest "$host_path"; fi; } 2>/dev/null || true)" \
     --entrypoint /bin/sh \
     "$AGENT_CANON_IMAGE_REF" \
     -c 'set -eu
@@ -1450,50 +1362,10 @@ root=/var/lib/agent-canon
 direction="$AGENT_CANON_COPY_DIRECTION"
 kind="$AGENT_CANON_COPY_KIND"
 relative="$AGENT_CANON_COPY_RELATIVE"
-expected_digest="$AGENT_CANON_COPY_EXPECTED_DIGEST"
 uid_value="$AGENT_CANON_COPY_UID"
 gid_value="$AGENT_CANON_COPY_GID"
-digest="$AGENT_CANON_COPY_DIGEST"
 install_root="$AGENT_CANON_COPY_INSTALL_ROOT"
-digest_field() {
-  set -- $(cat)
-  [ "$#" -ge 1 ] || return 1
-  printf "%s" "$1"
-}
-file_digest() {
-  result=$(sha256sum -- "$1") || return 1
-  set -- $result
-  [ "$#" -ge 1 ] || return 1
-  printf "%s" "$1"
-}
-tree_digest() {
-  (cd "$1" && find . -type f ! -name .agent-canon-private-log-v1 -exec sha256sum {} + | LC_ALL=C sort | sha256sum | digest_field)
-}
-codex_digest() {
-  validate_codex_links "$1" "${2:-1}" || return 1
-  (
-    cd "$1"
-    {
-      find . -type f -print | LC_ALL=C sort | while IFS= read -r link; do
-        mode=$(stat -c "%a" -- "$link") || exit 1
-        printf "file\t%s\t%s\t%s\n" "$link" "$mode" \
-          "$(file_digest "$link")"
-      done
-      find . -type l -print | LC_ALL=C sort | while IFS= read -r link; do
-        printf "link\t%s\t%s\n" "$link" "$(readlink -- "$link")"
-      done
-    } | sha256sum | digest_field
-  )
-}
-projection_digest() {
-  for name in mounts.toml mounts.tsv rollback-plan.tsv rollback-mounts.tsv; do
-    if [ -f "$1/$name" ] && [ ! -L "$1/$name" ]; then
-      printf "%s\t%s\n" "$name" "$(file_digest "$1/$name")"
-    else
-      printf "%s\\tabsent\\n" "$name"
-    fi
-  done | sha256sum | digest_field
-}
+input=/agent-canon-copy-input
 validate_codex_links() {
   allowed="$install_root/.codex"
   require_targets="${2:-1}"
@@ -1527,7 +1399,6 @@ validate_codex_links() {
   case "$kind" in
     host-mounts) rm -f -- "$root/host-mounts.tsv" ;;
     eval)
-      [ "$expected_digest" != "" ] || exit 82
       lock_root="$root/runtime"
       [ -d "$lock_root" ] && [ ! -L "$lock_root" ] || exit 83
       exec 9>"$lock_root/lifecycle.lock"
@@ -1538,10 +1409,9 @@ validate_codex_links() {
       [ -z "$(find "$source" -type l -print -quit)" ] || exit 85
       [ -z "$(find "$source" ! -type d ! -type f -print -quit)" ] || exit 86
       [ -z "$(find "$source" -type f -links +1 -print -quit)" ] || exit 87
-      [ "$(tree_digest "$source")" = "$expected_digest" ] || exit 88
+      diff -qr --no-dereference -- "$input" "$source" >&2 || exit 88
       rm -rf -- "$source" ;;
     private-feedback)
-      [ "$expected_digest" != "" ] || exit 89
       spool_root="$root/runtime/spool"
       [ -d "$root/runtime" ] && [ ! -L "$root/runtime" ] || exit 90
       mkdir -p "$spool_root"
@@ -1555,7 +1425,7 @@ validate_codex_links() {
       [ -z "$(find "$source" -type l -print -quit)" ] || exit 93
       [ -z "$(find "$source" ! -type d ! -type f -print -quit)" ] || exit 94
       [ -z "$(find "$source" -type f -links +1 -print -quit)" ] || exit 95
-      [ "$(tree_digest "$source")" = "$expected_digest" ] || exit 96
+      diff -qr --no-dereference -- "$input" "$source" >&2 || exit 96
       find "$source" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} + ;;
     *) exit 81 ;;
   esac
@@ -1585,7 +1455,6 @@ elif [ "$direction" = list ]; then
   rm -f "$request_list"
   exit 0
 elif [ "$direction" = import ]; then
-  input=/agent-canon-copy-input
   case "$kind" in
     mount-registry) destination="$root/mount-registry.toml"; mode=444; expected=file ;;
     host-mounts) destination="$root/host-mounts.tsv"; mode=600; expected=file ;;
@@ -1598,10 +1467,9 @@ elif [ "$direction" = import ]; then
     temporary=$(mktemp "${destination}.XXXXXX") || exit 83
     trap "rm -f -- \"\$temporary\"" 0
     cp -- "$input" "$temporary"
-    [ -n "$digest" ] && [ "$(file_digest "$temporary")" = "$digest" ] || exit 82
     chmod "$mode" "$temporary"
     chown "$uid_value:$gid_value" "$temporary"
-    mv -f -- "$temporary" "$destination"
+    mv -fT -- "$temporary" "$destination"
   else
     [ -d "$input" ] && [ ! -L "$input" ] || exit 66
     if [ "$kind" = codex-home ]; then
@@ -1609,70 +1477,45 @@ elif [ "$direction" = import ]; then
     else
       [ -z "$(find "$input" -type l -print -quit)" ] || exit 67
     fi
-    skip_copy=0
-    marker_value=$(printf "agent-canon-private-log/v1\n%s" "$digest")
-    if [ "$kind" = private-log ] && [ -f "$destination/.agent-canon-private-log-v1" ] &&
-       [ "$(cat "$destination/.agent-canon-private-log-v1")" = "$marker_value" ] &&
-       [ "$(tree_digest "$destination")" = "$digest" ]; then
-      skip_copy=1
-    fi
-    if [ "$skip_copy" = 0 ] && { [ -e "$destination" ] || [ -L "$destination" ]; }; then
+    if [ -e "$destination" ] || [ -L "$destination" ]; then
       [ -d "$destination" ] && [ ! -L "$destination" ] || exit 68
+      if [ "$kind" = private-log ] &&
+         diff -qr --no-dereference --exclude=.agent-canon-private-log-v1 -- "$input" "$destination" >/dev/null; then
+        exit 0
+      fi
       find "$destination" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
-    elif [ "$skip_copy" = 0 ]; then
+    else
       mkdir -p "$destination"
     fi
-    if [ "$skip_copy" = 0 ]; then
-      cp -a "$input/." "$destination/"
-      if [ "$kind" = codex-home ]; then
-        validate_codex_links "$destination" || exit 85
-      fi
-      if [ "$kind" = codex-home ]; then
-        [ -n "$digest" ] && [ "$(codex_digest "$destination")" = "$digest" ] || exit 83
-      else
-        [ -n "$digest" ] && [ "$(tree_digest "$destination")" = "$digest" ] || exit 83
-      fi
-      find "$destination" -type d -exec chmod 700 {} +
-      chown -R "$uid_value:$gid_value" "$destination"
-    fi
-    if [ "$kind" = private-log ] && [ "$skip_copy" = 0 ]; then
-      printf "agent-canon-private-log/v1\n%s\n" "$digest" > "$destination/.agent-canon-private-log-v1"
-      chmod 600 "$destination/.agent-canon-private-log-v1"
-      chown "$uid_value:$gid_value" "$destination/.agent-canon-private-log-v1"
-    fi
-  fi
-  if [ "$direction" = import ]; then
-    printf "volume-copy-digest\t%s\n" "$digest"
+    cp -a "$input/." "$destination/"
+    find "$destination" -type d -exec chmod 700 {} +
+    chown -R "$uid_value:$gid_value" "$destination"
   fi
 else
   case "$kind" in
     projection)
       source="$root/exchange"; [ -d "$source" ] && [ ! -L "$source" ] || exit 69
       members=$(mktemp)
+      trap "rm -f -- \"\$members\"" 0
       for name in mounts.toml mounts.tsv rollback-plan.tsv rollback-mounts.tsv; do
         if [ -e "$source/$name" ]; then
           [ -f "$source/$name" ] && [ ! -L "$source/$name" ] || { rm -f "$members"; exit 70; }
           printf "%s\n" "$name" >> "$members"
         fi
       done
-      source_digest=$(projection_digest "$source")
-      tar -cf - -C "$source" --no-recursion -T "$members"
-      rm -f "$members" ;;
+      tar -cf - -C "$source" --no-recursion -T "$members" ;;
     eval)
       source="$root/spool/$relative"; [ -d "$source" ] && [ ! -L "$source" ] || exit 73
       [ -z "$(find "$source" -type l -print -quit)" ] || exit 74
-      source_digest=$(tree_digest "$source")
       tar -cf - -C "$root/spool" "$relative" ;;
     dashboard)
       dashboard_name="agent-runtime-dashboard-$relative.md"
       source="$root/runtime/reports/agent-runtime-dashboard/$dashboard_name"
       [ -f "$source" ] && [ ! -L "$source" ] || exit 80
-      source_digest=$(file_digest "$source")
       tar -cf - -C "$root/runtime/reports/agent-runtime-dashboard" "$dashboard_name" ;;
     guide)
       source="$root/runtime/reports/agent-improvement-guide"; [ -d "$source" ] && [ ! -L "$source" ] || exit 80
       [ -z "$(find "$source" -type l -print -quit)" ] || exit 81
-      source_digest=$(tree_digest "$source")
       tar -cf - -C "$root/runtime/reports" agent-improvement-guide ;;
     private-feedback)
       source="$root/runtime/spool/private-feedback"
@@ -1685,49 +1528,24 @@ else
       flock -s 9
       [ -z "$(find "$source" -type l -print -quit)" ] || exit 76
       [ -z "$(find "$source" ! -type d ! -type f -print -quit)" ] || exit 77
-      source_digest=$(tree_digest "$source")
       tar -cf - -C "$source" . ;;
     codex-home)
       source="$root/codex-home"; [ -d "$source" ] && [ ! -L "$source" ] || exit 77
       validate_codex_links "$source" 0 || exit 78
-      source_digest=$(codex_digest "$source" 0)
       tar -cf - -C "$source" . ;;
     *) exit 79 ;;
   esac
-printf "volume-copy-digest\t%s\n" "$source_digest" >&2
 fi' )
   if [[ "$direction" == export ]]; then
-    local stream_path digest_path expected_digest copy_readback copy_rc=0
+    local stream_path
     stream_path=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.volume-export.XXXXXX") ||
       _agent_canon_json_error volume_copy_failed "volume export stream file could not be created"
-    digest_path=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.volume-export-digest.XXXXXX") || {
+    if ! "${copy_command[@]}" >"$stream_path"; then
       rm -f -- "$stream_path"
-      _agent_canon_json_error volume_copy_failed "volume export digest file could not be created"
-    }
-    "${copy_command[@]}" >"$stream_path" 2>"$digest_path" || copy_rc=$?
-    if ((copy_rc != 0)); then
-      rm -f -- "$stream_path" "$digest_path"
-      _agent_canon_json_error volume_copy_failed "volume copy failed: $direction/$kind" || return $?
+      _agent_canon_json_error volume_copy_failed "volume copy failed: $direction/$kind"
+      return 2
     fi
-    copy_readback=$(<"$digest_path")
-    [[ "$copy_readback" =~ ^$'volume-copy-digest\t'[0-9a-f]{64}$ ]] || {
-      rm -f -- "$stream_path" "$digest_path"
-      _agent_canon_json_error volume_copy_readback_failed "volume export digest readback is invalid"
-    }
-    expected_digest=${copy_readback#*$'\t'}
-    if _agent_canon_apply_volume_export "$kind" "$host_path" "$relative" \
-      "$stream_path" "$expected_digest"; then
-      :
-    else
-      local export_rc=$?
-      rm -f -- "$stream_path" "$digest_path"
-      return "$export_rc"
-    fi
-    rm -f -- "$stream_path" "$digest_path"
-  elif [[ "$direction" == clear ]]; then
-    if ! "${copy_command[@]}" >/dev/null; then
-      _agent_canon_json_error volume_copy_failed "volume copy failed: $direction/$kind" || return $?
-    fi
+    _agent_canon_apply_volume_export "$kind" "$host_path" "$relative" "$stream_path"
   elif [[ "$direction" == list ]]; then
     local pending_ids
     if ! pending_ids=$("${copy_command[@]}"); then
@@ -1737,12 +1555,9 @@ fi' )
       _agent_canon_json_error volume_copy_readback_failed "volume copy list readback is invalid"
     printf '%s' "$pending_ids"
   else
-    local copy_readback
-    if ! copy_readback=$("${copy_command[@]}" ); then
+    if ! "${copy_command[@]}" >/dev/null; then
       _agent_canon_json_error volume_copy_failed "volume copy failed: $direction/$kind" || return $?
     fi
-    [[ "$copy_readback" =~ ^$'volume-copy-digest\t'[0-9a-f]{64}$ ]] ||
-      _agent_canon_json_error volume_copy_readback_failed "volume import digest readback is invalid"
   fi
 }
 
@@ -1756,8 +1571,8 @@ _agent_canon_import_host_inputs() {
 
 _agent_canon_publish_controller_projection() {
   local exchange="$AGENT_CANON_STATE_ROOT/container-runtime"
-  local staging source target expected_digest actual_digest
-  _agent_canon_volume_copy export projection "$exchange"
+  local staging source target
+  _agent_canon_volume_copy export projection "$exchange" || return $?
   [[ -d "$exchange" && ! -L "$exchange" ]] ||
     _agent_canon_json_error controller_projection_invalid \
       "controller projection exchange is unavailable"
@@ -1810,27 +1625,13 @@ _agent_canon_publish_controller_projection() {
       }
     fi
     if [[ -f "$staging/$source" ]]; then
-      chmod 644 "$staging/$source"
-      expected_digest=$(sha256sum "$staging/$source" | awk '{print $1}')
-      mv -f -- "$staging/$source" "$target" || {
+      chmod 644 "$staging/$source" && mv -fT -- "$staging/$source" "$target" || {
         rm -rf -- "$staging"
         _agent_canon_json_error controller_projection_publish_failed \
           "controller projection could not be published: $source"
       }
-      [[ -f "$target" && ! -L "$target" ]] || {
-        rm -rf -- "$staging"
-        _agent_canon_json_error controller_projection_publish_failed \
-          "controller projection readback is not a regular file: $source"
-      }
-      actual_digest=$(sha256sum "$target" | awk '{print $1}')
-      [[ "$actual_digest" == "$expected_digest" ]] || {
-        rm -rf -- "$staging"
-        _agent_canon_json_error controller_projection_publish_failed \
-          "controller projection readback differs: $source"
-      }
     else
-      # An absent controller export is authoritative.  Remove only an exact
-      # regular-file projection, then verify that no stale path remains.
+      # An absent controller export removes the corresponding host projection.
       if [[ -e "$target" || -L "$target" ]]; then
         rm -f -- "$target" || {
           rm -rf -- "$staging"
@@ -1838,11 +1639,6 @@ _agent_canon_publish_controller_projection() {
             "stale controller projection could not be removed: $source"
         }
       fi
-      [[ ! -e "$target" && ! -L "$target" ]] || {
-        rm -rf -- "$staging"
-        _agent_canon_json_error controller_projection_publish_failed \
-          "stale controller projection remains after removal: $source"
-      }
     fi
   done
   rmdir "$staging" 2>/dev/null || true
@@ -3628,13 +3424,8 @@ _agent_canon_private_feedback_sync() {
   local container=${1:-}
   local spool="$AGENT_CANON_STATE_ROOT/spool/private-feedback"
   local request="$spool/sync-request.json"
-  local snapshot_digest
   _agent_canon_volume_copy export private-feedback "$spool" private-feedback || return $?
   [[ -f "$request" && ! -L "$request" ]] || return 0
-  snapshot_digest=$(_agent_canon_path_digest "$spool") || {
-    _agent_canon_json_error private_feedback_snapshot_invalid "private feedback snapshot digest is unavailable"
-    return $?
-  }
   local request_body
   request_body=$(<"$request")
   request_body=${request_body%$'\n'}
@@ -3647,7 +3438,7 @@ _agent_canon_private_feedback_sync() {
   local source_remote=${AGENT_CANON_SOURCE_REPOSITORY_REMOTE:-}
   local source_remote_name=${AGENT_CANON_SOURCE_REPOSITORY_REMOTE_NAME:-origin}
   local branch configured current expected remote_head remote_tree local_tree
-  local local_oid remote_oid local_digest remote_digest
+  local local_oid remote_oid
   local source_identity remote_normalized configured_normalized
   local -a copied=()
   local -a touched=()
@@ -3836,28 +3627,19 @@ _agent_canon_private_feedback_sync() {
         return $?
       }
     if [[ "$relative" != raw/* ]]; then
-      local_digest=$(_agent_canon_sha256 "$source") ||
-        { _agent_canon_json_error private_feedback_readback_failed "private feedback snapshot bytes are unavailable"; return $?; }
-      remote_digest=$(git -C "$log_root" cat-file blob "$remote_oid" | sha256sum | awk '{print $1}') ||
-        { _agent_canon_json_error private_feedback_readback_failed "private log remote blob could not be read"; return $?; }
-      [[ "$remote_digest" == "$local_digest" ]] || {
+      if ! (set -o pipefail; git -C "$log_root" cat-file blob "$remote_oid" | cmp -- "$source" -); then
         _agent_canon_json_error private_feedback_readback_failed "private log remote blob bytes differ"
         return $?
-      }
+      fi
     fi
   done
 
-  local volume_cleanup_rc=0 host_snapshot_after
+  local volume_cleanup_rc=0
   _agent_canon_volume_copy import private-log "$log_root" || return $?
-  host_snapshot_after=$(_agent_canon_path_digest "$spool" 2>/dev/null || true)
-  if [[ "$host_snapshot_after" == "$snapshot_digest" ]]; then
+  if _agent_canon_volume_copy clear private-feedback "$spool" private-feedback; then
     rm -rf -- "$spool" || volume_cleanup_rc=2
   else
-    volume_cleanup_rc=2
-  fi
-  if ((volume_cleanup_rc == 0)); then
-    _agent_canon_volume_copy clear private-feedback "" private-feedback \
-      "$snapshot_digest" || volume_cleanup_rc=$?
+    volume_cleanup_rc=$?
   fi
   if ((volume_cleanup_rc != 0)); then
     printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"warning","operation":"archive","code":"published_cleanup_retained","execution_plane":"host_archive_adapter","branch":"%s","commit":"%s","tree":"%s"}\n' \
@@ -3876,11 +3658,7 @@ _agent_canon_archive_eval_sync() {
     _agent_canon_json_error eval_sync_request_missing "eval sync request is unavailable"
     return $?
   }
-  local snapshot_digest host_snapshot_after volume_cleanup_rc=0
-  snapshot_digest=$(_agent_canon_path_digest "$spool") || {
-    _agent_canon_json_error eval_sync_snapshot_invalid "eval sync snapshot digest is unavailable"
-    return $?
-  }
+  local volume_cleanup_rc=0
   local key value schema= operation= plane= requested_run= target_digest= source_root=
   local schema_count=0 operation_count=0 plane_count=0 run_count=0 target_count=0 source_count=0
   while IFS=$'\t' read -r key value; do
@@ -3948,15 +3726,10 @@ _agent_canon_archive_eval_sync() {
     archive-eval --spool-root "$spool" --run-id "$run_id" || adapter_rc=$?
   ((adapter_rc == 0)) || return "$adapter_rc"
   _agent_canon_volume_copy import private-log "$AGENT_CANON_PRIVATE_LOG_ROOT" || return $?
-  host_snapshot_after=$(_agent_canon_path_digest "$spool" 2>/dev/null || true)
-  if [[ "$host_snapshot_after" != "$snapshot_digest" ]]; then
-    printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"warning","operation":"eval_sync","code":"published_cleanup_retained","execution_plane":"host_archive_adapter","run_id":"%s"}\n' \
-      "$run_id" >&2
-    return 2
-  fi
-  rm -rf -- "$spool" || volume_cleanup_rc=2
-  if ((volume_cleanup_rc == 0)); then
-    _agent_canon_volume_copy clear eval "" "$run_id" "$snapshot_digest" || volume_cleanup_rc=$?
+  if _agent_canon_volume_copy clear eval "$spool" "$run_id"; then
+    rm -rf -- "$spool" || volume_cleanup_rc=2
+  else
+    volume_cleanup_rc=$?
   fi
   if ((volume_cleanup_rc != 0)); then
     printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"warning","operation":"eval_sync","code":"published_cleanup_retained","execution_plane":"host_archive_adapter","run_id":"%s"}\n' \
