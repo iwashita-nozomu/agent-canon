@@ -662,17 +662,15 @@ fn native_archives_bind_all_files_to_the_requested_source() {
 }
 
 #[test]
-fn archive_checksum_drift_is_rejected() {
-    let fixture = fixture("checksum");
+fn unreadable_archive_is_rejected() {
+    let fixture = fixture("unreadable-archive");
     let path = fixture
         .packages
         .join(format!("agent-canon-0.1.0-{TARGET}.tar.gz"));
-    let mut bytes = fs::read(&path).unwrap();
-    bytes.extend_from_slice(b"changed");
-    fs::write(path, bytes).unwrap();
+    fs::write(path, b"not a gzip archive").unwrap();
     let output = verify(&fixture, &[TARGET]);
     assert!(!output.status.success());
-    assert!(String::from_utf8_lossy(&output.stderr).contains("archive checksum differs"));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("native archive is unreadable"));
 }
 
 #[test]
@@ -854,8 +852,7 @@ fn conflicting_existing_asset_is_preserved() {
     let fixture = fixture("asset-conflict");
     let mut github = FakeGitHub::default();
     publish(&fixture, &mut github, false).unwrap();
-    github.release.as_mut().unwrap()["assets"][0]["digest"] =
-        Value::String(format!("sha256:{}", "0".repeat(64)));
+    github.release.as_mut().unwrap()["assets"][0]["size"] = Value::from(0);
     let writes = github.write_count();
     let error = publish(&fixture, &mut github, false).unwrap_err();
     assert!(error.to_string().contains("existing release asset differs"));
@@ -1056,7 +1053,13 @@ fn managed_native_update_verifies_release_before_switching_the_active_link() {
         .join("../../../../bootstrap/host/lifecycle/entrypoint.sh")
         .canonicalize()
         .unwrap();
-    for mode in ["valid", "existing", "checksum", "version", "changed"] {
+    for mode in [
+        "valid",
+        "existing",
+        "unreadable-archive",
+        "version",
+        "changed",
+    ] {
         let fixture = fixture(mode);
         git(&fixture.source, &["tag", "v0.1.0"]);
         write(&fixture.source, "CHANGE", b"next release\n");
@@ -1091,10 +1094,10 @@ fn managed_native_update_verifies_release_before_switching_the_active_link() {
             .output()
             .unwrap();
         assert_cli_success(&output, "package updater input");
-        if mode == "checksum" {
+        if mode == "unreadable-archive" {
             fs::write(
-                assets.join(format!("{package}.tar.gz.sha256")),
-                format!("{}  {package}.tar.gz\n", "0".repeat(64)),
+                assets.join(format!("{package}.tar.gz")),
+                b"not a gzip archive",
             )
             .unwrap();
         }

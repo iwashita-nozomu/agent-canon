@@ -203,7 +203,7 @@ Every sync also checks the latest stable native release when the explicit contro
 root is the user's home and `~/.local/bin/agent-canon` points into the managed
 `~/.local/share/agent-canon/native/` layout. The updater inherits the installed
 target, downloads with host `curl`, and uses the current CLI's existing
-`template-bundle native-verify` to check source tag, provenance and checksums.
+`template-bundle native-verify` to check source tag, provenance and archive contents.
 It runs the candidate CLI before atomically switching the link and retains prior
 versions. The existing 15-minute timer performs this check on every sync,
 including runs whose source is already current. Native update and source/runtime

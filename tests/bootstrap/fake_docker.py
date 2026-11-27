@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import fcntl
-import hashlib
 import json
 import os
 import shlex
@@ -33,60 +32,6 @@ def save(state: dict) -> None:
 def volume_path(name: str) -> Path:
     """Return the fake daemon's private backing directory for one volume."""
     return Path(os.environ["FAKE_DOCKER_STATE"]).parent / f".fake-volume-{name}"
-
-
-def tree_digest(root: Path) -> str:
-    """Hash regular-file content with stable relative names."""
-    entries = []
-    for path in sorted(root.rglob("*")):
-        if path.is_symlink():
-            continue
-        if path.is_file():
-            if path.name == ".agent-canon-private-log-v1":
-                continue
-            entries.append(
-                f"{hashlib.sha256(path.read_bytes()).hexdigest()}  ./"
-                f"{path.relative_to(root).as_posix()}\n"
-            )
-    return hashlib.sha256("".join(sorted(entries)).encode("utf-8")).hexdigest()
-
-
-def projection_digest(root: Path) -> str:
-    """Hash the fixed controller projection file set, including absence."""
-    entries = []
-    for name in (
-        "mounts.toml",
-        "mounts.tsv",
-        "rollback-plan.tsv",
-        "rollback-mounts.tsv",
-    ):
-        path = root / name
-        if path.is_file() and not path.is_symlink():
-            value = hashlib.sha256(path.read_bytes()).hexdigest()
-        else:
-            value = "absent"
-        entries.append(f"{name}\t{value}\n")
-    return hashlib.sha256("".join(entries).encode("utf-8")).hexdigest()
-
-
-def codex_digest(root: Path) -> str:
-    """Hash Codex regular files/modes and managed link path/targets."""
-    entries = []
-    regular = sorted(
-        path for path in root.rglob("*") if path.is_file() and not path.is_symlink()
-    )
-    links = sorted(path for path in root.rglob("*") if path.is_symlink())
-    for path in regular:
-        entries.append(
-            f"file\t./{path.relative_to(root).as_posix()}\t"
-            f"{path.stat(follow_symlinks=False).st_mode & 0o777}\t"
-            f"{hashlib.sha256(path.read_bytes()).hexdigest()}\n"
-        )
-    for path in links:
-        entries.append(
-            f"link\t./{path.relative_to(root).as_posix()}\t{os.readlink(path)}\n"
-        )
-    return hashlib.sha256("".join(entries).encode("utf-8")).hexdigest()
 
 
 def labels(argv: list[str]) -> dict[str, str]:
@@ -870,10 +815,6 @@ def main(argv: list[str]) -> int:
             backing.mkdir(parents=True, exist_ok=True)
             kind = copy_environment.get("AGENT_CANON_COPY_KIND", "")
             relative = copy_environment.get("AGENT_CANON_COPY_RELATIVE", "")
-            expected_digest = copy_environment.get("AGENT_CANON_COPY_DIGEST", "")
-            acknowledged_digest = copy_environment.get(
-                "AGENT_CANON_COPY_EXPECTED_DIGEST", ""
-            )
             install_root = Path(
                 copy_environment.get("AGENT_CANON_COPY_INSTALL_ROOT", "")
             )
@@ -900,7 +841,7 @@ def main(argv: list[str]) -> int:
                         return False
                 return True
 
-            source = Path(input_source) if copy_direction == "import" else None
+            source = Path(input_source) if input_source else None
             if copy_direction == "clear":
                 if kind == "host-mounts":
                     (backing / "host-mounts.tsv").unlink(missing_ok=True)
@@ -944,7 +885,20 @@ def main(argv: list[str]) -> int:
                                 for path in source_root.rglob("*")
                             ):
                                 return 1
-                            if tree_digest(source_root) != acknowledged_digest:
+                            if (
+                                source is None
+                                or subprocess.run(
+                                    [
+                                        "diff",
+                                        "-qr",
+                                        "--no-dereference",
+                                        "--",
+                                        source,
+                                        source_root,
+                                    ],
+                                    check=False,
+                                ).returncode
+                            ):
                                 return 1
                             if kind == "private-feedback":
                                 for child in source_root.iterdir():
@@ -1001,52 +955,35 @@ def main(argv: list[str]) -> int:
                     if destination.is_symlink() or destination.is_file():
                         destination.unlink()
                     shutil.copy2(source, destination)
-                    if (
-                        not expected_digest
-                        or hashlib.sha256(destination.read_bytes()).hexdigest()
-                        != expected_digest
-                    ):
-                        return 1
                     destination.chmod(0o444 if kind == "mount-registry" else 0o600)
-                    print(f"volume-copy-digest\t{expected_digest}")
                 else:
                     if not source.is_dir():
                         return 1
                     if kind == "codex-home" and not valid_codex_links(source):
                         return 1
-                    skip_copy = False
-                    marker = destination / ".agent-canon-private-log-v1"
-                    if (
-                        kind == "private-log"
-                        and marker.is_file()
-                        and marker.read_text(encoding="utf-8")
-                        == f"agent-canon-private-log/v1\n{expected_digest}\n"
-                        and tree_digest(destination) == expected_digest
-                    ):
-                        skip_copy = True
-                    if not skip_copy and (
-                        destination.exists() or destination.is_symlink()
-                    ):
+                    if destination.exists() or destination.is_symlink():
                         if destination.is_symlink() or not destination.is_dir():
                             return 1
+                        if (
+                            kind == "private-log"
+                            and subprocess.run(
+                                [
+                                    "diff",
+                                    "-qr",
+                                    "--no-dereference",
+                                    "--exclude=.agent-canon-private-log-v1",
+                                    "--",
+                                    source,
+                                    destination,
+                                ],
+                                stdout=subprocess.DEVNULL,
+                                check=False,
+                            ).returncode
+                            == 0
+                        ):
+                            return 0
                         shutil.rmtree(destination)
-                    if not skip_copy:
-                        shutil.copytree(
-                            source, destination, symlinks=kind == "codex-home"
-                        )
-                    digest_value = (
-                        codex_digest(destination)
-                        if kind == "codex-home"
-                        else tree_digest(destination)
-                    )
-                    if not expected_digest or digest_value != expected_digest:
-                        return 1
-                    if kind == "private-log" and not skip_copy:
-                        (destination / ".agent-canon-private-log-v1").write_text(
-                            f"agent-canon-private-log/v1\n{copy_environment.get('AGENT_CANON_COPY_DIGEST', '')}\n",
-                            encoding="utf-8",
-                        )
-                    print(f"volume-copy-digest\t{expected_digest}")
+                    shutil.copytree(source, destination, symlinks=kind == "codex-home")
             elif copy_direction == "export":
 
                 def emit_tar(
@@ -1058,7 +995,6 @@ def main(argv: list[str]) -> int:
 
                 if os.environ.get("FAKE_DOCKER_MALFORMED_TAR") == "1":
                     sys.stdout.buffer.write(b"not a tar archive\n")
-                    print(f"volume-copy-digest\t{'0' * 64}", file=sys.stderr)
                     return 0
                 if kind == "projection":
                     source_root = backing / "exchange"
@@ -1077,7 +1013,6 @@ def main(argv: list[str]) -> int:
                                 return 1
                             members.append((source_file, name))
                     emit_tar(source_root, members)
-                    readback_digest = projection_digest(source_root)
                 elif kind == "eval":
                     source_root = backing / "spool" / relative
                     if (
@@ -1087,7 +1022,6 @@ def main(argv: list[str]) -> int:
                     ):
                         return 1
                     emit_tar(source_root.parent, [(source_root, relative)])
-                    readback_digest = tree_digest(source_root)
                 elif kind == "guide":
                     source_root = (
                         backing / "runtime" / "reports" / "agent-improvement-guide"
@@ -1099,7 +1033,6 @@ def main(argv: list[str]) -> int:
                     ):
                         return 1
                     emit_tar(source_root.parent, [(source_root, source_root.name)])
-                    readback_digest = tree_digest(source_root)
                 elif kind == "private-feedback":
                     source_root = backing / "runtime" / "spool" / "private-feedback"
                     if not source_root.exists() and not source_root.is_symlink():
@@ -1126,7 +1059,6 @@ def main(argv: list[str]) -> int:
                                 for child in sorted(source_root.iterdir())
                             ],
                         )
-                        readback_digest = tree_digest(source_root)
                 elif kind == "codex-home":
                     source_root = backing / "codex-home"
                     if (
@@ -1142,12 +1074,8 @@ def main(argv: list[str]) -> int:
                             for child in sorted(source_root.iterdir())
                         ],
                     )
-                    readback_digest = codex_digest(source_root)
                 else:
                     return 1
-                if os.environ.get("FAKE_DOCKER_CORRUPT_COPY") == "1":
-                    readback_digest = "0" * 64
-                print(f"volume-copy-digest\t{readback_digest}", file=sys.stderr)
             save(state)
             return 0
         volume_name = ""

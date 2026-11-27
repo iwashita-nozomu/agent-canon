@@ -562,11 +562,11 @@ fn profile_and_codex_exports_are_commit_bound_source_free_and_verifiable() {
     }
     let verified = template_bundle::verify_codex_user_bundle(&first).unwrap();
     assert_eq!(verified["bundle_digest"], one["bundle_digest"]);
-    fs::write(first.join("hooks/hooks.json"), b"{}\n").unwrap();
+    fs::remove_file(first.join("hooks/hooks.json")).unwrap();
     assert!(template_bundle::verify_codex_user_bundle(&first)
         .unwrap_err()
         .to_string()
-        .contains("digest differs"));
+        .contains("files differ from its manifest"));
 }
 
 #[test]

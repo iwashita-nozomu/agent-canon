@@ -92,7 +92,6 @@ jobs:
         run: |
           set -euo pipefail
           docker buildx create --name "$BUILDER" --driver docker-container --use
-          docker buildx inspect --bootstrap "$BUILDER"
           docker buildx build \
             --builder "$BUILDER" \
             --file bootstrap/container/image/Dockerfile \
@@ -146,11 +145,6 @@ jobs:
           set -euo pipefail
           printf '%s' "$GHCR_TOKEN" | docker login "$REGISTRY" \
             --username "$GHCR_USER" --password-stdin
-
-      - name: Reuse existing environment image
-        if: needs.prepare.outputs.exists == 'true'
-        run: |
-          echo "environment image already exists: $IMAGE"
 
       - name: Publish environment and main tags
         if: github.event_name != 'pull_request' && needs.prepare.outputs.exists != 'true'

@@ -75,7 +75,6 @@ convention_sources = [
     "agents/canonical/CODEX_COMPLETION.md",
     "agents/canonical/CODEX_ROUTING.md",
 ]
-workflow_consumers = ["tools/validation/ci/checks/check_agent_canon_pr.sh"]
 stale_owner_phrases = ["runtime-profiles-and-check-matrix.md`、`agents/canonical/CODEX_WORKFLOW.md", "agents/canonical/CODEX_SUBAGENTS.md`、`documents/conventions/REVIEW_PROCESS.md"]
 forwarder_markers = ["FORWARDER_CALLER", "FORWARDER_ACTION", "FORWARDER_SEVERITY=fix-now", "FORWARDER_PROMPT", "caller_process_chain"]
 forwarder_policy_markers = ["*_FORWARDER=deprecated", "*_FORWARDER_SEVERITY=fix-now", "caller chain", "canonical command"]

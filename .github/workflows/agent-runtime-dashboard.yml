@@ -77,28 +77,9 @@ jobs:
               return "${status}"
             fi
           }
-          key_log="${AGENT_CANON_DASHBOARD_EVIDENCE_ROOT}/runtime-image-key.log"
-          if key="$(bash "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap/container/image/digest.sh" "${AGENT_CANON_CANDIDATE_SOURCE}" 2>"${key_log}")"; then
-            cat -- "${key_log}"
-          else
-            status=$?
-            cat -- "${key_log}"
-            exit "${status}"
-          fi
-          image="ghcr.io/${GITHUB_REPOSITORY}:env-${key}"
-          if docker buildx imagetools inspect "${image}" \
-            >"${AGENT_CANON_DASHBOARD_EVIDENCE_ROOT}/runtime-image-inspect.log" 2>&1; then
-            run_logged runtime-install "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" \
-              --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" \
-              install
-          else
-            run_logged runtime-local-build "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" \
-              --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" \
-              update --local-build
-          fi
-          run_logged runtime-start "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" \
+          run_logged runtime-install "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" \
             --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" \
-            start
+            install
           run_logged runtime-target "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" \
             --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" \
             target add --root "${GITHUB_WORKSPACE}" --mode read-only

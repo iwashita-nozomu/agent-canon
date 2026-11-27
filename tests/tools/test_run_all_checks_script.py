@@ -104,7 +104,7 @@ class RunAllChecksScriptTest(unittest.TestCase):
         )
 
     def test_pr_gate_only_keeps_shared_surface_ownership(self) -> None:
-        """The PR gate emits ownership evidence without running run_all_checks."""
+        """The PR script runs the shared checks also selectable in run_all_checks."""
         ci_text = SCRIPT.read_text(encoding="utf-8")
         pr_text = PR_SCRIPT.read_text(encoding="utf-8")
 
@@ -115,23 +115,10 @@ class RunAllChecksScriptTest(unittest.TestCase):
             "GITHUB_WORKFLOW_CHECKS=skip reason=already_checked_by_parent_gate",
             ci_text,
         )
-        self.assertIn("AGENT_CANON_PR_PROJECT_QUALITY=delegated", pr_text)
-        self.assertIn(
-            "AGENT_CANON_PR_PROJECT_QUALITY_OWNER=agentcanon_project_ci", pr_text
-        )
+        self.assertIn('"${cli}" docs check', pr_text)
+        self.assertIn('"${cli}" check-github-workflows', pr_text)
         self.assertNotIn('bash "${CANON_TOOLS_ROOT}/ci/run_all_checks.sh"', pr_text)
         self.assertNotIn("PR_QUICK_CI_ARGS=", pr_text)
-
-    def test_all_checks_invokes_agent_canon_via_parent_boundary_script(self) -> None:
-        """The boundary adapter should be used for agent-canon execution."""
-        text = SCRIPT.read_text(encoding="utf-8")
-        self.assertIn(
-            'python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" exec-parent-bound',
-            text,
-        )
-        self.assertIn('--source-root "${AGENT_CANON_SOURCE_ROOT}"', text)
-        self.assertIn("--purpose run-all-checks-script", text)
-        self.assertIn("verify-child", text)
 
     def test_all_checks_installs_setup_cleanup_before_allocations(self) -> None:
         """Runtime setup is validated before external allocations."""

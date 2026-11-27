@@ -30,19 +30,11 @@ upstream implementation ../../tools/validation/ci/runners/run_standalone_static_
 - `tools/bin/agent-canon docs check`
 - `tools/validation/ci/checks/check_docker_build.sh`
 
-## Expected Outcome
-
-- 今回の変更に対して最低限必要な gate が実行されている
-- `pass / fail / 未実行` が短く整理されている
-- deeper review や追加 validation が必要か判断できる
-- full-confidence check の前後で caller checkout の tracked working tree と index が変化していない
-
 ## Selection
 
 [documents/runtime/runtime-profiles-and-check-matrix.md](../../documents/runtime/runtime-profiles-and-check-matrix.md) を読み、変更した
 責務に対応する profile と、その profile が要求する route だけを選びます。
-この入口は command list や default sequence を再定義しません。選択した
-route の結果（pass / fail / 未実行）と追加調査の要否だけを記録します。
+導入済みの環境で起こり得る条件を確認し、実行したツールの診断と終了状態を使います。
 
 full-confidence が必要な場合だけ、下記の shared runtime/read-only target
 route に進みます。
@@ -60,7 +52,6 @@ CONTROL_PARENT_ROOT="$(cd "${SOURCE_ROOT}/.." && pwd -P)"
 COMMON=(--control-parent-root "${CONTROL_PARENT_ROOT}")
 
 ./bootstrap.sh "${COMMON[@]}" install
-./bootstrap.sh "${COMMON[@]}" start
 ./bootstrap.sh "${COMMON[@]}" target add \
   --root "${SOURCE_ROOT}" \
   --mode read-only
@@ -70,13 +61,4 @@ COMMON=(--control-parent-root "${CONTROL_PARENT_ROOT}")
   full --quick
 ```
 
-`full` の後ろは `run_all_checks.sh` の optionです。unit runnerは `/proc/self/mountinfo` の最深一致 mountが `ro` であることを確認してから、既存の `run_all_checks.sh` bodyをそのまま呼びます。bodyの exit code と finding は変更せず、失敗を成功に変換しません。graph checkを抑制したり、失敗を別の合否判定へ置き換えたりもしません。`CARGO_HOME`、`RUSTUP_HOME`、Cargo targetは外部runtime配下に置き、CLIはimage-owned `/usr/local/bin/agent-canon`を使います。`.gitignore`、`git restore`、`git reset`、`git clean`、`git stash` による隠蔽・復元は行いません。
-
-この経路で保証するのは実行境界だけです。read-only targetのtracked treeとindexが実行前後で変わらないこと、引数とbodyの終了状態がcallerへ戻ることを確認します。既存bodyが返した失敗は、その失敗原因の調査対象として残ります。
-
-## Boundary
-
-- profile activation は runtime profile/check matrix が正本です。
-- `run_all_checks.sh` は read-only target内で再利用する既存 check bodyです。Host checkoutからの direct full-confidence routeは使用しません。
-- GitHub metadata、receipt publication、control-parent transactionを持つ `check_agent_canon_pr.sh` の移行は別責務です。
-- 深い diff review は [`change-review`](../skills/change-review.md) を使います。
+`full` の後ろの引数は `run_all_checks.sh` に渡ります。実行結果は同スクリプトの診断と終了状態で確認します。

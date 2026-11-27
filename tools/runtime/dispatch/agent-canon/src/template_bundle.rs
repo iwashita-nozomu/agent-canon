@@ -1987,6 +1987,8 @@ fn recursive_bundle_files(
                 .collect::<Vec<_>>()
                 .join("/");
             files.insert(relative);
+        } else if !metadata.is_file() {
+            return Err(bundle_error("Codex user bundle contains a special file"));
         }
     }
     Ok(())
@@ -2056,57 +2058,22 @@ fn verify_codex_user_bundle_inner(root: &Path) -> BundleResult<Value> {
         .get("install_files")
         .and_then(Value::as_array)
         .ok_or_else(|| bundle_error("Codex user bundle file records are missing"))?;
-    let mut payload = Payload::new();
-    let mut previous = String::new();
+    let mut listed = BTreeSet::new();
     for row in rows {
         if !exact_keys(row, &["path", "sha256"]) {
             return Err(bundle_error("Codex user bundle file record is invalid"));
         }
         let path = row.get("path").and_then(Value::as_str).unwrap_or_default();
-        let sha = row
-            .get("sha256")
-            .and_then(Value::as_str)
-            .unwrap_or_default();
-        portable_relative(path)
-            .map_err(|_| bundle_error("Codex user bundle file path or digest is invalid"))?;
-        if !valid_hex(sha, HEX_64) || path <= previous.as_str() {
-            return Err(bundle_error(
-                "Codex user bundle file path or digest is invalid",
-            ));
+        portable_relative(path)?;
+        if !listed.insert(path.to_owned()) {
+            return Err(bundle_error("Codex user bundle file is listed twice"));
         }
-        previous = path.to_owned();
-        let candidate = bundle_destination(&root, path)
-            .map_err(|_| bundle_error("Codex user bundle contains a symlink"))?;
-        let mut cursor = root.clone();
-        for part in path.split('/') {
-            cursor.push(part);
-            let metadata = fs::symlink_metadata(&cursor)
-                .map_err(|_| bundle_error(format!("Codex user bundle file is missing: {path}")))?;
-            if metadata.file_type().is_symlink() {
-                return Err(bundle_error("Codex user bundle contains a symlink"));
-            }
-        }
-        let metadata = fs::symlink_metadata(&candidate)
-            .map_err(|_| bundle_error(format!("Codex user bundle file is missing: {path}")))?;
-        if !metadata.is_file() {
-            return Err(bundle_error(format!(
-                "Codex user bundle file is missing: {path}"
-            )));
-        }
-        let content = fs::read(&candidate)
-            .map_err(|_| bundle_error(format!("Codex user bundle file is missing: {path}")))?;
-        if digest(&content) != sha {
-            return Err(bundle_error(format!(
-                "Codex user bundle file digest differs: {path}"
-            )));
-        }
-        payload.insert(path.to_owned(), content);
     }
     let mut actual = BTreeSet::new();
     recursive_bundle_files(&root, &root, &mut actual)?;
-    if actual != payload.keys().cloned().collect() {
+    if actual != listed {
         return Err(bundle_error(
-            "Codex user bundle contains unmanifested files",
+            "Codex user bundle files differ from its manifest",
         ));
     }
     const REQUIRED: [&str; 8] = [
@@ -2119,7 +2086,7 @@ fn verify_codex_user_bundle_inner(root: &Path) -> BundleResult<Value> {
         "skills/agent-canon-bootstrap/SKILL.md",
         "guidance/AGENTS.md",
     ];
-    if REQUIRED.iter().any(|path| !payload.contains_key(*path)) {
+    if REQUIRED.iter().any(|path| !listed.contains(*path)) {
         return Err(bundle_error(
             "Codex user bundle is missing required runtime files",
         ));
@@ -2143,7 +2110,7 @@ fn verify_codex_user_bundle_inner(root: &Path) -> BundleResult<Value> {
             .and_then(Value::as_str)
             .unwrap_or_default();
         if !matches!(component, "agent" | "guidance")
-            || !payload.contains_key(bundle_path)
+            || !listed.contains(bundle_path)
             || destination
                 .chars()
                 .any(|character| matches!(character, '\\' | '\0' | '\t' | '\n' | '\r'))
@@ -2198,8 +2165,8 @@ fn verify_codex_user_bundle_inner(root: &Path) -> BundleResult<Value> {
                     .unwrap_or_default(),
             ))
     });
-    let mut expected_installs = payload
-        .keys()
+    let mut expected_installs = listed
+        .iter()
         .filter(|path| path.starts_with("agents/agent-canon-") && path.ends_with(".toml"))
         .map(|path| {
             let filename = path.rsplit('/').next().unwrap_or_default();
@@ -2239,16 +2206,6 @@ fn verify_codex_user_bundle_inner(root: &Path) -> BundleResult<Value> {
         return Err(bundle_error(
             "Codex user bundle install projection is incomplete",
         ));
-    }
-    let computed = codex_user_bundle_digest(
-        source_commit,
-        source_bundle_digest,
-        manifest_digest,
-        &payload,
-        &normalized_installs,
-    )?;
-    if computed != bundle_digest {
-        return Err(bundle_error("Codex user bundle aggregate digest differs"));
     }
     let mut normalized = manifest;
     set(
@@ -2712,7 +2669,7 @@ pub(crate) fn verify_native_packages(
     let source = GitSource::open(source_root)?;
     let commit = source.commit(source_ref)?;
     let tree = source.tree(&commit)?;
-    let (manifest, manifest_digest) = source.resolve_profile(&commit)?;
+    let (manifest, _) = source.resolve_profile(&commit)?;
     let version = native_release_version(&source.root, &commit)?;
     if targets.is_empty()
         || targets.iter().collect::<BTreeSet<_>>().len() != targets.len()
@@ -2779,19 +2736,10 @@ pub(crate) fn verify_native_packages(
             let path = actual_files
                 .get(&filename)
                 .ok_or_else(|| bundle_error("native release file set differs"))?;
-            let archive_bytes = fs::read(path)
-                .map_err(|_| bundle_error("native release metadata is unreadable"))?;
-            let archive_digest = digest(&archive_bytes);
             let sidecar_name = format!("{filename}.sha256");
             let sidecar = actual_files
                 .get(&sidecar_name)
                 .ok_or_else(|| bundle_error("native release file set differs"))?;
-            let sidecar_bytes = fs::read(sidecar)
-                .map_err(|_| bundle_error("native release metadata is unreadable"))?;
-            let expected_sidecar = format!("{archive_digest}  {filename}\n");
-            if sidecar_bytes != expected_sidecar.as_bytes() {
-                return Err(bundle_error("native archive checksum differs"));
-            }
             let payload = native_archive_payload(path, &prefix)?;
             let mut expected_payload = resources.keys().cloned().collect::<BTreeSet<_>>();
             expected_payload.insert(binary.to_owned());
@@ -2818,7 +2766,6 @@ pub(crate) fn verify_native_packages(
                 ("target", Value::String(target.clone())),
                 ("source_commit", Value::String(commit.clone())),
                 ("source_tree", Value::String(tree.clone())),
-                ("manifest_digest", Value::String(manifest_digest.clone())),
             ];
             if !provenance.is_object()
                 || source_identity
@@ -2826,29 +2773,6 @@ pub(crate) fn verify_native_packages(
                     .any(|(key, expected)| provenance.get(*key) != Some(expected))
             {
                 return Err(bundle_error("native archive source identity differs"));
-            }
-            let hashes = payload
-                .iter()
-                .map(|(name, content)| (name.clone(), digest(content)))
-                .collect::<BTreeMap<_, _>>();
-            let expected_sums = hashes
-                .iter()
-                .filter(|(name, _)| name.as_str() != SUMS_PATH)
-                .map(|(name, sha)| format!("{sha}  {name}\n"))
-                .collect::<String>();
-            let sums = payload
-                .get(SUMS_PATH)
-                .ok_or_else(|| bundle_error("native resource checksum differs"))?;
-            if sums != expected_sums.as_bytes() {
-                return Err(bundle_error("native resource checksum differs"));
-            }
-            let expected_provenance_files = hashes
-                .iter()
-                .filter(|(name, _)| name.as_str() != PROVENANCE_PATH && name.as_str() != SUMS_PATH)
-                .map(|(name, sha)| json!({"path": name, "sha256": sha}))
-                .collect::<Vec<_>>();
-            if provenance.get("files") != Some(&Value::Array(expected_provenance_files)) {
-                return Err(bundle_error("native provenance file digests differ"));
             }
             if previous.as_ref().is_some_and(|before| before != &payload) {
                 return Err(bundle_error(

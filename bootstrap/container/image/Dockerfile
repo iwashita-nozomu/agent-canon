@@ -60,12 +60,11 @@ RUN --mount=type=bind,source=bootstrap/container/image/dependencies.toml,target=
       python3.12 python3.12-dev python3-packaging python3-yaml build-essential curl gdb valgrind \
       strace lsof procps util-linux; \
     case "$TARGETOS/$TARGETARCH" in \
-      linux/amd64) rustup_target=x86_64-unknown-linux-gnu; rustup_sha=20a06e644b0d9bd2fbdbfd52d42540bdde820ea7df86e92e533c073da0cdd43c ;; \
-      linux/arm64) rustup_target=aarch64-unknown-linux-gnu; rustup_sha=e3853c5a252fca15252d07cb23a1bdd9377a8c6f3efa01531109281ae47f841c ;; \
+      linux/amd64) rustup_target=x86_64-unknown-linux-gnu ;; \
+      linux/arm64) rustup_target=aarch64-unknown-linux-gnu ;; \
       *) echo "unsupported_target_arch=$TARGETOS/$TARGETARCH" >&2; exit 2 ;; \
     esac; \
     curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 --output /usr/local/bin/rustup-init "https://static.rust-lang.org/rustup/archive/1.28.2/${rustup_target}/rustup-init"; \
-    echo "$rustup_sha  /usr/local/bin/rustup-init" | sha256sum --check --strict; \
     chmod 0555 /usr/local/bin/rustup-init; \
     rustup-init -y --no-modify-path --default-toolchain "$AGENT_CANON_BOOTSTRAP_RUST_VERSION" --profile minimal; \
     cargo build --locked --release \

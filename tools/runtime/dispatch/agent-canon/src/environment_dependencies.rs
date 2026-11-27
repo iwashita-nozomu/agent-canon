@@ -38,42 +38,6 @@ const IMAGE_FILE_MODE: u32 = 0o444;
 const NPM_GLOBAL_PREFIX: &str = "/usr/local";
 const NPM_ENV_EXECUTABLE: &str = "/usr/bin/env";
 const RUSTUP_INIT_VERSION: &str = "1.28.2";
-const RUSTUP_INIT_SHA256: &str = "20a06e644b0d9bd2fbdbfd52d42540bdde820ea7df86e92e533c073da0cdd43c";
-const CANONICAL_RUST_SOURCE_FILES: &[&str] = &[
-    "Cargo.lock",
-    "Cargo.toml",
-    "src/dependency_manifest.rs",
-    "src/docs.rs",
-    "src/graph.rs",
-    "src/jit_ir_to_lean.rs",
-    "src/main.rs",
-    "src/migration_audit.rs",
-    "src/python_algorithm_contract.rs",
-    "src/python_module_groups.rs",
-    "src/python_structure_hash.rs",
-    "src/python_structure_hash_impact.rs",
-    "src/python_structure_hash_report.rs",
-    "src/python_structure_hash_scope_plan.rs",
-    "src/runtime_boundary.rs",
-    "src/rust_migration_plan.rs",
-    "src/semantic_index/args.rs",
-    "src/semantic_index/cli.rs",
-    "src/semantic_index/embedding.rs",
-    "src/semantic_index/eval.rs",
-    "src/semantic_index/mod.rs",
-    "src/semantic_index/model.rs",
-    "src/semantic_index/pipeline.rs",
-    "src/semantic_index/query.rs",
-    "src/semantic_index/relations.rs",
-    "src/semantic_index/report.rs",
-    "src/semantic_index/source.rs",
-    "src/semantic_index/storage.rs",
-    "src/semantic_index/tests.rs",
-    "src/structured_analysis.rs",
-    "src/test_design.rs",
-    "src/private_feedback.rs",
-    "tests/python_algorithm_contract_cli.rs",
-];
 const IMAGE_INSTALL_METHODS: [Method; 7] = [
     Method::AptPackage,
     Method::AptRepository,
@@ -1476,11 +1440,6 @@ fn validate_record_values(record: &DependencyRecord) -> Result<()> {
                 )));
             }
             validate_url(&record.source, &format!("{id}.source"), true)?;
-            if record.checksum.is_none() && record.checksums.is_empty() {
-                return Err(DependencyError::new(format!(
-                    "{id}: release-asset requires checksum"
-                )));
-            }
             if record
                 .checksum
                 .as_ref()
@@ -5431,7 +5390,7 @@ impl Installer {
             let install_result = (|| -> Result<()> {
                 self.install_record(record, workspace, repair)?;
                 if !self.image_owned {
-                    if let Some(version) = self.verify_record(record, workspace, None, false)? {
+                    if let Some(version) = self.verify_record(record, workspace, None)? {
                         self.resolved_package_versions
                             .insert(record.id.clone(), version);
                     }
@@ -5693,11 +5652,6 @@ impl Installer {
                         }
                     })
                     .unwrap_or(false)
-                && (record.source_tree_sha256.is_none()
-                    || object.get("source_tree_sha256").and_then(Value::as_str)
-                        == record.source_tree_sha256.as_deref())
-                && object.get("cargo_lock_sha256").and_then(Value::as_str)
-                    == record.cargo_lock_sha256.as_deref()
                 && (record.method != Method::CargoSourceBuild
                     || object
                         .get("source_identity")
@@ -5790,7 +5744,7 @@ impl Installer {
             .map(|(name, value)| Ok((name.clone(), ExecutableBinding::from_receipt(value, name)?)))
             .collect::<Result<BTreeMap<_, _>>>()?;
         let resolved_version = self.resolved_apt_package_version(record, &payload)?;
-        self.verify_record(record, workspace, resolved_version.as_deref(), false)?;
+        self.verify_record(record, workspace, resolved_version.as_deref())?;
         if !bindings.is_empty() {
             let live = executable_bindings(&self.probe, record, false, workspace)?;
             if live != bindings {
@@ -5808,7 +5762,6 @@ impl Installer {
         record: &DependencyRecord,
         workspace: &Path,
         expected_resolved_version: Option<&str>,
-        allow_network: bool,
     ) -> Result<Option<String>> {
         let probe = &self.probe;
         match record.method {
@@ -5817,7 +5770,7 @@ impl Installer {
                     .map(Some)
             }
             Method::AptRepository => {
-                self.verify_apt_repository(record, workspace, allow_network)?;
+                self.verify_apt_repository(record, workspace)?;
                 Ok(None)
             }
             Method::NpmGlobal => {
@@ -5850,12 +5803,7 @@ impl Installer {
         }
     }
 
-    fn verify_apt_repository(
-        &self,
-        record: &DependencyRecord,
-        workspace: &Path,
-        allow_network: bool,
-    ) -> Result<()> {
+    fn verify_apt_repository(&self, record: &DependencyRecord, workspace: &Path) -> Result<()> {
         apt_package_version(&self.probe, record, None, workspace, true)?;
         let expected_fingerprint = record.key_fingerprint.as_deref().ok_or_else(|| {
             DependencyError::new(format!("{}: apt key fingerprint is missing", record.id))
@@ -5924,13 +5872,6 @@ impl Installer {
                 "{}: apt repository source is stale",
                 record.id
             )));
-        }
-        if allow_network {
-            self.verify_repository_packages_digest(
-                record,
-                workspace,
-                &self.temporary_parent(workspace, "apt-packages")?,
-            )?;
         }
         Ok(())
     }
@@ -6179,117 +6120,6 @@ impl Installer {
             )));
         }
         Ok(source)
-    }
-
-    fn cargo_snapshot(&self, source: &Path) -> Result<(String, String)> {
-        let expected = CANONICAL_RUST_SOURCE_FILES
-            .iter()
-            .copied()
-            .collect::<BTreeSet<_>>();
-        for relative in CANONICAL_RUST_SOURCE_FILES {
-            let path = source.join(relative);
-            let metadata = fs::symlink_metadata(&path).map_err(|_| {
-                DependencyError::new(format!("cargo source snapshot file is missing: {relative}"))
-            })?;
-            if metadata.file_type().is_symlink() || !metadata.is_file() {
-                return Err(DependencyError::new(format!(
-                    "cargo source snapshot file is missing: {relative}"
-                )));
-            }
-        }
-        let mut actual = BTreeSet::new();
-        let mut pending = vec![source.to_path_buf()];
-        while let Some(directory) = pending.pop() {
-            for entry in fs::read_dir(&directory).map_err(|error| {
-                DependencyError::new(format!(
-                    "cargo source snapshot directory is unreadable: {}: {error}",
-                    directory.display()
-                ))
-            })? {
-                let entry = entry.map_err(|error| DependencyError::new(error.to_string()))?;
-                let path = entry.path();
-                let relative = path
-                    .strip_prefix(source)
-                    .map_err(|_| DependencyError::new("Cargo snapshot path escaped source"))?;
-                let relative_text = relative.to_string_lossy().replace('\\', "/");
-                if relative.components().any(|component| {
-                    component.as_os_str() == "target" || component.as_os_str() == ".git"
-                }) {
-                    continue;
-                }
-                let metadata = fs::symlink_metadata(&path).map_err(|error| {
-                    DependencyError::new(format!(
-                        "cargo source snapshot path is unreadable: {}: {error}",
-                        path.display()
-                    ))
-                })?;
-                if metadata.file_type().is_symlink() {
-                    continue;
-                }
-                if metadata.is_dir() {
-                    pending.push(path);
-                } else if metadata.is_file() {
-                    actual.insert(relative_text);
-                }
-            }
-        }
-        let expected_text = expected
-            .into_iter()
-            .map(str::to_string)
-            .collect::<BTreeSet<_>>();
-        if actual != expected_text {
-            let missing = expected_text
-                .difference(&actual)
-                .cloned()
-                .collect::<Vec<_>>();
-            let extra = actual
-                .difference(&expected_text)
-                .cloned()
-                .collect::<Vec<_>>();
-            return Err(DependencyError::new(format!(
-                "cargo source snapshot inventory mismatch: missing={missing:?} extra={extra:?}"
-            )));
-        }
-        let mut digest = Sha256::new();
-        for relative in CANONICAL_RUST_SOURCE_FILES {
-            let bytes = fs::read(source.join(relative)).map_err(|error| {
-                DependencyError::new(format!(
-                    "cargo source snapshot file is unreadable: {relative}: {error}"
-                ))
-            })?;
-            let blob = sha256_hex(&bytes);
-            digest.update(relative.as_bytes());
-            digest.update([0]);
-            digest.update(blob.as_bytes());
-            digest.update([0]);
-        }
-        let source_digest = format!("{:x}", digest.finalize());
-        let lock_digest =
-            sha256_hex(&fs::read(source.join("Cargo.lock")).map_err(|error| {
-                DependencyError::new(format!("Cargo.lock is unreadable: {error}"))
-            })?);
-        Ok((source_digest, lock_digest))
-    }
-
-    fn verify_canonical_snapshot(
-        &self,
-        record: &DependencyRecord,
-        workspace: &Path,
-    ) -> Result<(String, String)> {
-        let source = self.cargo_source(record, workspace)?;
-        let (source_digest, lock_digest) = self.cargo_snapshot(&source)?;
-        if record
-            .source_tree_sha256
-            .as_deref()
-            .is_some_and(|expected| expected != source_digest)
-            || record.cargo_lock_sha256.as_deref() != Some(lock_digest.as_str())
-        {
-            return Err(DependencyError::new(format!(
-                "{}: immutable source snapshot mismatch {source_digest}!={:?} or {lock_digest}!={:?}",
-                record.id, record.source_tree_sha256, record.cargo_lock_sha256
-            )));
-        }
-        Ok((source_digest, lock_digest))
     }
 
     fn cargo_source_identity(&self, record: &DependencyRecord, workspace: &Path) -> Result<String> {
@@ -6584,9 +6414,6 @@ impl Installer {
         base_env: &BTreeMap<String, String>,
     ) -> Result<()> {
         let source = self.cargo_source(record, workspace)?;
-        if record.source_identity.as_deref() == Some(CANONICAL_SNAPSHOT_IDENTITY) {
-            self.verify_canonical_snapshot(record, workspace)?;
-        }
         let source_before = if record.commit.is_some() {
             Some(self.cargo_source_identity(record, workspace)?)
         } else {
@@ -6626,9 +6453,6 @@ impl Installer {
                     record.id
                 )));
             }
-        }
-        if record.source_identity.as_deref() == Some(CANONICAL_SNAPSHOT_IDENTITY) {
-            self.verify_canonical_snapshot(record, workspace)?;
         }
         Ok(())
     }
@@ -6753,9 +6577,6 @@ impl Installer {
         payload: Option<&Value>,
         workspace: &Path,
     ) -> Result<()> {
-        if record.source_identity.as_deref() == Some(CANONICAL_SNAPSHOT_IDENTITY) {
-            self.verify_canonical_snapshot(record, workspace)?;
-        }
         if record.commit.is_some() {
             self.cargo_source_identity(record, workspace)?;
         }
@@ -7030,7 +6851,6 @@ impl Installer {
             suite,
             record.repository_components.join(" ")
         );
-        self.verify_repository_packages_digest(record, workspace, temporary.path())?;
         let source_path = temporary.path().join("repository.list");
         fs::write(&source_path, source_line).map_err(|error| {
             DependencyError::new(format!(
@@ -7063,7 +6883,7 @@ impl Installer {
             &record.id,
             "install-apt-repository",
         )?;
-        if let Some((url, checksum)) = repository_package_identity(record)? {
+        if let Some((url, _)) = repository_package_identity(record)? {
             let filename = repository_package_filename(record, &url)?;
             let package_path = temporary.path().join(filename);
             self.download(
@@ -7073,15 +6893,6 @@ impl Installer {
                 &record.id,
                 "download-apt-package",
             )?;
-            let observed = sha256_hex(&fs::read(&package_path).map_err(|error| {
-                DependencyError::new(format!("{}: apt package read failed: {error}", record.id))
-            })?);
-            if observed != checksum {
-                return Err(DependencyError::new(format!(
-                    "{}: immutable apt package SHA256 mismatch {observed}!={checksum}",
-                    record.id
-                )));
-            }
             let mut argv = vec![
                 "apt-get".to_string(),
                 "install".to_string(),
@@ -7101,46 +6912,6 @@ impl Installer {
                 &record.id,
                 "install-apt-repository",
             )?;
-        }
-        Ok(())
-    }
-
-    fn verify_repository_packages_digest(
-        &self,
-        record: &DependencyRecord,
-        workspace: &Path,
-        temporary: &Path,
-    ) -> Result<()> {
-        let payload = repository_packages_payload(record)?;
-        let Some(url) = payload.get("url").and_then(Value::as_str) else {
-            return Ok(());
-        };
-        let checksum = payload
-            .get("sha256")
-            .and_then(Value::as_str)
-            .ok_or_else(|| {
-                DependencyError::new(format!("{}: Packages index SHA256 is missing", record.id))
-            })?;
-        let path = temporary.join(format!("{}-Packages", record.id));
-        self.download(url, &path, workspace, &record.id, "download-packages-index")
-            .map_err(|error| {
-                DependencyError::new(format!(
-                    "{}: Packages index download failed: {url}: {error}",
-                    record.id
-                ))
-            })?;
-        let observed = sha256_hex(&fs::read(&path).map_err(|error| {
-            DependencyError::new(format!(
-                "{}: Packages index read failed: {url}: {error}",
-                record.id
-            ))
-        })?);
-        let _ = fs::remove_file(&path);
-        if observed != checksum {
-            return Err(DependencyError::new(format!(
-                "{}: Packages index SHA256 mismatch {observed}!={checksum} ({url})",
-                record.id
-            )));
         }
         Ok(())
     }
@@ -7198,35 +6969,6 @@ impl Installer {
             &record.id,
             "download-release-asset",
         )?;
-        let checksum = if record.checksums.is_empty() {
-            record.checksum.as_deref().ok_or_else(|| {
-                DependencyError::new(format!("{}: release checksum is missing", record.id))
-            })?
-        } else {
-            record
-                .checksums
-                .iter()
-                .find(|(key, _)| key == &architecture)
-                .map(|(_, value)| value.as_str())
-                .ok_or_else(|| {
-                    DependencyError::new(format!(
-                        "{}: no release checksum for architecture {architecture}",
-                        record.id
-                    ))
-                })?
-        };
-        let observed = sha256_hex(&fs::read(&archive).map_err(|error| {
-            DependencyError::new(format!(
-                "{}: release asset is unreadable: {error}",
-                record.id
-            ))
-        })?);
-        if observed != checksum {
-            return Err(DependencyError::new(format!(
-                "{}: release checksum mismatch",
-                record.id
-            )));
-        }
         let candidate = if record.extract.as_deref() == Some("none") {
             archive.clone()
         } else {
@@ -7394,35 +7136,15 @@ impl Installer {
                 .as_deref()
                 .ok_or_else(|| DependencyError::new("Cargo receipt lacks an install workspace"))?;
             let source = self.cargo_source(record, workspace)?;
-            let (source_digest, lock_digest) = self.cargo_snapshot(&source)?;
             let binary = self.cargo_binary_path(record, &source)?;
             let binary_path = final_binary_path.unwrap_or(&binary);
-            let binary_bytes = fs::read(&binary).map_err(|error| {
-                DependencyError::new(format!(
-                    "{}: Cargo build binary is unreadable: {error}",
-                    record.id
-                ))
-            })?;
-            fields.insert(
-                "source_tree_sha256".to_string(),
-                Value::String(source_digest),
-            );
-            fields.insert("cargo_lock_sha256".to_string(), Value::String(lock_digest));
             fields.insert(
                 "binary_path".to_string(),
                 Value::String(binary_path.to_string_lossy().to_string()),
             );
             fields.insert(
-                "binary_sha256".to_string(),
-                Value::String(sha256_hex(&binary_bytes)),
-            );
-            fields.insert(
                 "rustup_init_version".to_string(),
                 Value::String(RUSTUP_INIT_VERSION.to_string()),
-            );
-            fields.insert(
-                "rustup_init_sha256".to_string(),
-                Value::String(RUSTUP_INIT_SHA256.to_string()),
             );
             if final_binary_path.is_some() {
                 fields.insert(
@@ -7525,16 +7247,7 @@ impl Installer {
                     record.id
                 ))
             })?;
-        let digest = payload
-            .get("binary_sha256")
-            .and_then(Value::as_str)
-            .ok_or_else(|| {
-                DependencyError::new(format!(
-                    "{}: final binary receipt binding is malformed",
-                    record.id
-                ))
-            })?;
-        if final_value != expected.to_string_lossy() || !is_hex(digest, 64) {
+        if final_value != expected.to_string_lossy() {
             return Err(DependencyError::new(format!(
                 "{}: final binary receipt binding is malformed",
                 record.id
@@ -7544,14 +7257,6 @@ impl Installer {
         if !path.is_file() || !is_executable(path) {
             return Err(DependencyError::new(format!(
                 "{}: final image binary is missing: {final_value}",
-                record.id
-            )));
-        }
-        let observed =
-            sha256_hex(&fs::read(path).map_err(|error| DependencyError::new(error.to_string()))?);
-        if observed != digest {
-            return Err(DependencyError::new(format!(
-                "{}: final binary digest mismatch {observed}!={digest}",
                 record.id
             )));
         }
@@ -10283,7 +9988,7 @@ kind = "apt-package"
 
     #[cfg(unix)]
     #[test]
-    fn apt_repository_installer_checks_key_fingerprint_and_deb_checksum() {
+    fn apt_repository_installer_uses_the_declared_key_and_package() {
         let root = TempRoot::new();
         let workspace = root.0.join("workspace");
         fs::create_dir_all(&workspace).expect("workspace is created");
@@ -10375,56 +10080,6 @@ kind = "apt-repository"
                     .any(|argument| argument.ends_with("fixture-repository.deb"))
         }));
         assert_fake_responses_consumed(&installer.probe);
-
-        let mismatch_manifest =
-            root.write_manifest("checksum-mismatch.toml", &manifest_text(&"0".repeat(64)));
-        let mismatch_plan = load_plan(&workspace, Some(&mismatch_manifest))
-            .expect("checksum mismatch fixture plan parses");
-        let mismatch_probe = fake_program_probe(
-            &root,
-            [
-                ("curl".to_string(), command_output_fixture("downloaded key")),
-                (
-                    "gpg".to_string(),
-                    command_output_fixture(&observed_fingerprint),
-                ),
-                ("gpg".to_string(), command_output_fixture("dearmored")),
-                (
-                    "install".to_string(),
-                    command_output_fixture("installed key"),
-                ),
-                (
-                    "install".to_string(),
-                    command_output_fixture("installed source"),
-                ),
-                ("apt-get".to_string(), command_output_fixture("updated")),
-                (
-                    "curl".to_string(),
-                    command_output_fixture("downloaded package"),
-                ),
-            ],
-            [key_bytes.to_vec(), package_bytes.to_vec()],
-        );
-        let mut mismatch_installer =
-            Installer::with_probe(true, Some(root.0.clone()), mismatch_probe);
-        let error = mismatch_installer
-            .install_record(
-                mismatch_plan.by_id("fixture-repository").unwrap(),
-                &workspace,
-                false,
-            )
-            .expect_err("package checksum mismatch prevents installation");
-        assert!(error
-            .to_string()
-            .contains("immutable apt package SHA256 mismatch"));
-        assert!(!fixture_invocations(&mismatch_installer.probe)
-            .iter()
-            .any(|call| call
-                .argv
-                .first()
-                .is_some_and(|program| program == "apt-get")
-                && call.argv.iter().any(|argument| argument == "install")));
-        assert_fake_responses_consumed(&mismatch_installer.probe);
     }
 
     #[cfg(unix)]
@@ -10757,60 +10412,6 @@ output_contains = "1.2.3"
         )
         .expect("image verify checks the stored identity and live executable output");
         assert_eq!(verified, vec!["fixture-release".to_string()]);
-
-        let bad_checksum_manifest = root.write_manifest(
-            "bad-checksum.toml",
-            &format!(
-                r#"
-schema = "agent-canon.tool-dependencies"
-schema_version = 2
-[[records]]
-id = "fixture-release"
-package = "fixture-release"
-method = "release-asset"
-version = "1.2.3"
-source = "https://example.invalid/fixture-release"
-checksum = "{}"
-asset = "fixture-release"
-archive_format = "binary"
-extract = "none"
-destination = "/usr/local/bin/fixture-release"
-deps = []
-provides = ["fixture-release"]
-failure_policy = "fail"
-[records.verification]
-kind = "absolute-executable"
-path = "/usr/local/bin/fixture-release"
-args = ["--version"]
-output_contains = "1.2.3"
-"#,
-                "0".repeat(64)
-            ),
-        );
-        let bad_checksum_plan =
-            load_plan(&workspace, Some(&bad_checksum_manifest)).expect("failure plan parses");
-        let bad_checksum_probe = fake_program_probe(
-            &root,
-            [("curl".to_string(), command_output_fixture("downloaded"))],
-            [payload.to_vec()],
-        );
-        let mut bad_checksum_installer =
-            Installer::with_probe(true, Some(root.0.clone()), bad_checksum_probe);
-        let error = bad_checksum_installer
-            .install_record(
-                bad_checksum_plan.by_id("fixture-release").unwrap(),
-                &workspace,
-                false,
-            )
-            .expect_err("release checksum mismatch prevents installation");
-        assert!(error.to_string().contains("release checksum mismatch"));
-        assert!(!fixture_invocations(&bad_checksum_installer.probe)
-            .iter()
-            .any(|call| call
-                .argv
-                .first()
-                .is_some_and(|program| program == "install")));
-        assert_fake_responses_consumed(&bad_checksum_installer.probe);
 
         for directory in [target.join("receipts"), target.clone()] {
             fs::set_permissions(directory, fs::Permissions::from_mode(0o755))

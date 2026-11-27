@@ -992,7 +992,7 @@ entries:
     writes: false
     default_wiring:
       ci: false
-      pr_check: true
+      pr_check: false
     docs:
       - tools/README.md
       - documents/tools/README.md
@@ -1492,7 +1492,7 @@ entries:
       - tests/agent_tools/test_route.py
 
   - id: check-convention-compliance
-    summary: Verifies convention sources and workflow gate wiring stay connected.
+    summary: Checks convention sources and their tool references.
     path: tools/runtime/dispatch/agent-canon/src/convention_compliance.rs
     family: agent_tools
     role: checker
@@ -1657,7 +1657,7 @@ entries:
       - tests/agent_tools/test_tool_dispatch.py
 
   - id: check-github-workflows
-    summary: Validates GitHub Actions and selected repository workflow policy.
+    summary: Runs native analyzers for GitHub Actions.
     path: tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs
     family: ci
     role: checker
@@ -1718,37 +1718,6 @@ entries:
       - .codex/README.md
     tests: []
     test_exempt_reason: Validated by tools/runtime/dispatch/agent-canon cargo tests and devcontainer smoke.
-
-  - id: materialize-agent-canon-pr-g2
-    summary: Materializes the canonical G2 receipt from the ordered passing AgentCanon generated-completeness checks.
-    path: tools/runtime/dispatch/agent-canon/src/generated_completeness.rs
-    family: ci
-    role: checker
-    status: canonical
-    audience: workflow
-    placement: workflow_helper
-    command: tools/bin/agent-canon materialize-agent-canon-pr-g2 --g1-bundle <path> --source-root <root> --control-parent-root <root> --runtime-root <root> [--output <path>]
-    dispatch:
-      runtime: native
-      argv: [tools/bin/agent-canon, materialize-agent-canon-pr-g2]
-      execution_plane: tool-container
-      cwd: source-root
-      env: allowlisted
-      stdin: inherited
-      stdout: captured
-      stderr: captured
-      exit: propagate
-      signal: propagate
-      side_effect: external-artifact
-    writes: true
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - documents/agent-canon/agent-canon-update-route.md
-      - agents/skills/agent-canon-update.md
-    tests:
-      - tools/runtime/dispatch/agent-canon/tests/generated_completeness_native.rs
 
   - id: check-agent-canon-pr
     summary: Runs the standalone AgentCanon PR readiness checklist.
@@ -1835,8 +1804,8 @@ entries:
     dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "check-agent-runtime-alignment"]}
     writes: false
     default_wiring:
-      ci: false
-      pr_check: true
+      ci: true
+      pr_check: false
     docs:
       - tools/README.md
       - documents/tools/README.md

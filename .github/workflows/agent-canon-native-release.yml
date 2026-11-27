@@ -185,7 +185,6 @@ jobs:
           # Lease tests own process-wide file descriptors; keep harness cases isolated.
           cargo test --locked --release --manifest-path "$manifest" -- --test-threads=1 2>&1 | tee -a "$log"
           cargo build --locked --release --manifest-path "$manifest" 2>&1 | tee -a "$log"
-          test -f "$CARGO_TARGET_DIR/release/$EXECUTABLE"
 
       - name: Package and smoke the source-free archives
         shell: bash

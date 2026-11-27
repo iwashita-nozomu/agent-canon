@@ -13,7 +13,6 @@
 // downstream implementation config.rs applies managed Codex context defaults while preserving TOML values
 // downstream implementation dependency_headers.rs checks selected dependency manifests and typed edge syntax
 // downstream implementation run_evaluation.rs scores and reports one agent run bundle
-// downstream implementation generated_completeness.rs routes the G2 receipt producer
 // downstream implementation graph.rs routes one-build dependency and runtime-evidence graph commands
 // downstream implementation graph_client.rs exposes the in-process typed graph client API and native consumer CLI
 // downstream implementation source_dependency_graph.rs exports tracked-source facts and source target resolution
@@ -106,10 +105,10 @@ mod tool_rejection_preflight;
 use agent_canon::runtime_boundary;
 use agent_canon::{
     catalog, codex_runtime_summary, compare_agent_run_paths, cpp_source_canonical_ir,
-    cpp_template_to_lean, entrypoint_composer, extract_docx, formal_proof, generated_completeness,
-    jit_canonical_ir, lean_recursive_proof_search, native_release, operational_ir_to_lean,
-    report_artifact_checks, run_evaluation, stablehlo_value_closure, template_bundle,
-    theorem_graph_board, theorem_graph_circularity_check, tool_dispatch, tool_proof_coverage,
+    cpp_template_to_lean, entrypoint_composer, extract_docx, formal_proof, jit_canonical_ir,
+    lean_recursive_proof_search, native_release, operational_ir_to_lean, report_artifact_checks,
+    run_evaluation, stablehlo_value_closure, template_bundle, theorem_graph_board,
+    theorem_graph_circularity_check, tool_dispatch, tool_proof_coverage,
 };
 use std::env;
 
@@ -141,7 +140,6 @@ Commands:
   test-design <check> [paths...]
   run-evaluation (--run-id ID|--report-dir PATH) [options]
   codex-hook [EVENT|--group EVENT] [--contract|--list]
-  materialize-agent-canon-pr-g2 --g1-bundle <path> --source-root <root> --control-parent-root <root> --runtime-root <root> [--output <path>]
   notebook-quality [paths...] [--root <repo-root>] [--changed|--all] [--format text|json]
   generated-artifact-guard [--root <repo-root>]
   check-algorithm-config-partition [--root <repo-root>] [--exclude <pattern>]... [--format text|json] [--fail-on-finding] [--fail-on-default] [paths...]
@@ -278,10 +276,6 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "codex-hook" {
         std::process::exit(agent_canon::hook_dispatcher::run(&args[2..]));
-    }
-
-    if args.len() >= 2 && args[1] == generated_completeness::SELECTOR {
-        std::process::exit(generated_completeness::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "numeric-performance" {

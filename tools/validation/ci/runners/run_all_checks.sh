@@ -18,7 +18,7 @@
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/runtime_log_archive.rs manages mounted hook/eval log archive branches
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/skill_frontmatter.rs validates runtime skill YAML frontmatter
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/workflow_selection_eval.rs validates workflow selection routing cases
-# upstream implementation ../../../runtime/dispatch/agent-canon/src/github_workflow_check.rs validates GitHub workflow and PR checklist contracts
+# upstream implementation ../../../runtime/dispatch/agent-canon/src/github_workflow_check.rs runs GitHub workflow analyzers
 # upstream implementation ../../../../bootstrap/container/image/Dockerfile defines the shared tool image
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/bootstrap_runtime.rs owns lifecycle readback
 # @dependency-end
@@ -391,9 +391,9 @@ echo "RUST_CHECKS=owned_by_bootstrap_container_static_gate"
 if [ "$SKIP_GITHUB_WORKFLOWS" -eq 1 ]; then
   echo "GITHUB_WORKFLOW_CHECKS=skip reason=already_checked_by_parent_gate"
 elif run_agent_canon check-github-workflows --root "${WORKSPACE_ROOT}" 2>&1; then
-  echo "✅ GitHub workflow / PR template checks 成功"
+  echo "✅ GitHub workflow checks 成功"
 else
-  echo "❌ GitHub workflow / PR template checks 失敗"
+  echo "❌ GitHub workflow checks 失敗"
   EXIT_CODE=1
 fi
 if "$PYTHON_BIN" -m pytest -q \
