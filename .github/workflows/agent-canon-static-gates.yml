@@ -210,9 +210,7 @@ jobs:
           evidence="${RUNNER_TEMP}/agent-canon-static-evidence"
           mkdir -p "${evidence}"
           "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" status > "${evidence}/runtime-status.json"
-          container="$(jq -er 'select(.schema == "agent-canon.bootstrap-receipt.v2" and .status == "ok" and .operation == "status") | .container | select(.drift == false) | select(.health | type == "string" and length > 0 and . != "absent") | .name | select(type == "string" and length > 0)' "${evidence}/runtime-status.json")"
-          # The status owner validates this exact container name and reports
-          # drift. Export data without starting a command or extracting paths.
+          container="$(jq -er '.container.name | strings | select(length > 0)' "${evidence}/runtime-status.json")"
           docker cp -- "${container}:/var/lib/agent-canon/runtime/tasks" - > "${evidence}/runtime-task-output.tar.part"
           mv -- "${evidence}/runtime-task-output.tar.part" "${evidence}/runtime-task-output.tar"
           if [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then

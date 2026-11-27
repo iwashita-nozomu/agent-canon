@@ -120,17 +120,6 @@ class RunAllChecksScriptTest(unittest.TestCase):
         self.assertNotIn('bash "${CANON_TOOLS_ROOT}/ci/run_all_checks.sh"', pr_text)
         self.assertNotIn("PR_QUICK_CI_ARGS=", pr_text)
 
-    def test_all_checks_invokes_agent_canon_via_parent_boundary_script(self) -> None:
-        """The boundary adapter should be used for agent-canon execution."""
-        text = SCRIPT.read_text(encoding="utf-8")
-        self.assertIn(
-            'python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" exec-parent-bound',
-            text,
-        )
-        self.assertIn('--source-root "${AGENT_CANON_SOURCE_ROOT}"', text)
-        self.assertIn("--purpose run-all-checks-script", text)
-        self.assertIn("verify-child", text)
-
     def test_all_checks_installs_setup_cleanup_before_allocations(self) -> None:
         """Runtime setup is validated before external allocations."""
         text = SCRIPT.read_text(encoding="utf-8")

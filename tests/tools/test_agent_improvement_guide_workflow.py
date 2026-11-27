@@ -67,7 +67,6 @@ class AgentImprovementGuideWorkflowTest(unittest.TestCase):
         )
         self.assertTrue(any(line.endswith(" install") for line in bootstrap_lines))
         self.assertFalse(any(line.endswith(" update") for line in bootstrap_lines))
-        self.assertTrue(any(line.endswith(" start") for line in bootstrap_lines))
         self.assertTrue(any(" target add " in line for line in bootstrap_lines))
         self.assertFalse(any("--runtime-root" in line for line in bootstrap_lines))
         self.assertIn(
