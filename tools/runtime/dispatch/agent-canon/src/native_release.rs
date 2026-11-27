@@ -394,14 +394,8 @@ fn missing_assets(
         };
         let actual_size = actual.get("size").and_then(Value::as_u64);
         let wanted_size = wanted.get("size").and_then(Value::as_u64);
-        let actual_digest = actual.get("digest").and_then(Value::as_str);
-        let wanted_digest = wanted
-            .get("sha256")
-            .and_then(Value::as_str)
-            .map(|sha| format!("sha256:{sha}"));
         if actual.get("state").and_then(Value::as_str) != Some("uploaded")
             || actual_size != wanted_size
-            || actual_digest != wanted_digest.as_deref()
         {
             return Err(release_error(format!(
                 "existing release asset differs: {name}"

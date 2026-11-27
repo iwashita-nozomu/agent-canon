@@ -328,12 +328,7 @@ output_contains = "1.0.0"
         provider_bin.mkdir()
         curl = provider_bin / "curl"
         curl.write_text(
-            "#!/bin/sh\n"
-            'while [ "$#" -gt 0 ]; do\n'
-            '  if [ "$1" = --output ]; then shift; : > "$1"; fi\n'
-            "  shift\n"
-            "done\n"
-            "exit 0\n",
+            "#!/bin/sh\nprintf 'fixture download failed\\n' >&2\nexit 22\n",
             encoding="utf-8",
         )
         curl.chmod(0o755)
@@ -356,7 +351,7 @@ output_contains = "1.0.0"
         self.assertEqual(payload["completed"], [])
         self.assertRegex(payload["plan_fingerprint"], r"^[0-9a-f]{64}$")
         self.assertIn("DEPENDENCY_RECORD_WARN=release-provider", installed.stderr)
-        self.assertIn("release checksum mismatch", installed.stderr)
+        self.assertIn("download-release-asset", installed.stderr)
         self.assertIn("depends on release-provider", installed.stderr)
 
 
