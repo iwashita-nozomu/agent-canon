@@ -359,15 +359,10 @@ def test_codex_hook_routes_register_only_trusted_project_targets(
     manifest_lines = global_links.read_text(encoding="utf-8").splitlines()
     assert link_record.rstrip("\n") in manifest_lines
     assert config_record.rstrip("\n") in manifest_lines
-    bundle_records = [
-        line
-        for line in global_links.read_text(encoding="utf-8").splitlines()
-        if line.startswith("bundle-file\t")
-    ]
-    assert len(bundle_records) == install_receipt["files"]
-    assert all(line.split("\t")[3] == "644" for line in bundle_records)
     installed_guidance = codex_home / "AGENTS.md"
     installed_agent = codex_home / "agents" / "agent-canon-worker.toml"
+    assert installed_guidance.is_symlink()
+    assert installed_agent.is_symlink()
     assert (
         installed_guidance.read_bytes() == (bundle / "guidance/AGENTS.md").read_bytes()
     )
@@ -385,16 +380,7 @@ def test_codex_hook_routes_register_only_trusted_project_targets(
         timeout=120,
     )
     assert repeated_install.returncode == 0, repeated_install.stderr
-    assert (
-        len(
-            [
-                line
-                for line in global_links.read_text(encoding="utf-8").splitlines()
-                if line.startswith("bundle-file\t")
-            ]
-        )
-        == install_receipt["files"]
-    )
+    assert global_links.read_text(encoding="utf-8").splitlines() == manifest_lines
 
     def run_hook(project: Path) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
@@ -460,20 +446,19 @@ def test_codex_hook_routes_register_only_trusted_project_targets(
         line.split("\t")[2] for line in mounts.read_text(encoding="utf-8").splitlines()
     }
 
-    installed_guidance.write_text("user-owned edit\n", encoding="utf-8")
-    conflicted = subprocess.run(
-        [*bundle_common, "codex", "bundle-uninstall"],
+    installed_guidance.unlink()
+    installed_guidance.write_text("user-owned file\n", encoding="utf-8")
+    collision = subprocess.run(
+        [*bundle_common, "codex", "bundle-install"],
         check=False,
         capture_output=True,
         text=True,
         env=environment,
         timeout=120,
     )
-    assert conflicted.returncode == 2
-    assert installed_guidance.read_text(encoding="utf-8") == "user-owned edit\n"
-    assert not list(runtime_root.glob(".global-links-validate.*"))
-    assert not list(runtime_root.glob(".global-links-remove.*"))
-    installed_guidance.write_bytes((bundle / "guidance/AGENTS.md").read_bytes())
+    assert collision.returncode == 0
+    assert "codex_install_collision" in collision.stderr
+    assert installed_guidance.read_text(encoding="utf-8") == "user-owned file\n"
     removed_bundle = subprocess.run(
         [*bundle_common, "codex", "bundle-uninstall"],
         check=False,
@@ -483,7 +468,7 @@ def test_codex_hook_routes_register_only_trusted_project_targets(
         timeout=120,
     )
     assert removed_bundle.returncode == 0, removed_bundle.stderr
-    assert not installed_guidance.exists()
+    assert installed_guidance.read_text(encoding="utf-8") == "user-owned file\n"
     assert not installed_agent.exists()
     assert not list(runtime_root.glob(".global-links-validate.*"))
     assert not list(runtime_root.glob(".global-links-remove.*"))

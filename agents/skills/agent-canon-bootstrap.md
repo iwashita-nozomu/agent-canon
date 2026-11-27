@@ -95,13 +95,10 @@ evidence.
   registered read-only through the same target owner as the runtime source.
   Untrusted or absent project trust runs the user hook without registering or
   mounting that project. Registrations persist until the existing `target remove`
-  operation removes them; `codex bundle-uninstall` removes the bundle's own
-  target. Use
-  `codex bundle-install`/`codex bundle-uninstall` only for the profile's copied
-  agent and guidance files; their hashes are recorded by the existing
-  `global-links.tsv` owner. Run bundle-uninstall before removing the plugin
-  through Codex if those copies are no longer wanted. These commands do not
-  install or remove the plugin, mutate plugin cache, or edit config/trust settings. From a source-backed
+  operation removes them. `codex bundle-install` links agent and guidance files
+  from the installed bundle into Codex and preserves existing files.
+  `codex bundle-uninstall` removes links pointing to that bundle and removes its
+  target registration. Codex manages the plugin installation. From a source-backed
   install, `template export` remains available for a registered read-only target;
   its receipt identifies the output inside the control runtime. Use a host-built
   package directory for Codex registration rather than treating a volume path as

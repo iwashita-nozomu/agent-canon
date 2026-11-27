@@ -82,9 +82,6 @@ USAGE
   fi
 }
 
-_agent_canon_sha256() {
-  sha256sum "$1" | awk '{print $1}'
-}
 
 _agent_canon_json_escape() {
   local value=$1
@@ -3750,52 +3747,34 @@ _agent_canon_eval_sync_locked() {
 }
 
 _agent_canon_remove_global_links() {
-  local scope=${1:-all} home_root codex_home
+  local home_root
   home_root=$(realpath -e -- "$HOME")
-  codex_home=${CODEX_HOME:-$home_root/.codex}
-  codex_home=$(realpath -m -- "$codex_home")
+  [[ "$AGENT_CANON_CONTROL_ROOT" == "$home_root" ]] || return 0
   local skills_link="$home_root/.agents/skills"
   # The manifest owns the complete directory link. Never traverse it while
   # removing legacy per-skill records: doing so would delete canonical source.
   local manifest="$AGENT_CANON_STATE_ROOT/global-links.tsv"
-  if [[ "$scope" == bundle && ( -e "$manifest" || -L "$manifest" ) &&
-        ( ! -f "$manifest" || -L "$manifest" ) ]]; then
-    _agent_canon_json_error global_links_manifest_invalid \
-      "global link manifest is not a regular file"
-    return 2
-  fi
   [[ -f "$manifest" && ! -L "$manifest" ]] || return 0
-  if [[ "$scope" == bundle ]]; then
-    local validation_snapshot
-    validation_snapshot=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.global-links-validate.XXXXXX") || return $?
-    if ! _agent_canon_global_bundle_records_snapshot "$validation_snapshot"; then
-      rm -f -- "$validation_snapshot"
-      return 2
-    fi
-    rm -f -- "$validation_snapshot"
-  fi
-  local key target source mode digest resolved config_tmp manifest_tmp
+  local key target source mode legacy_field resolved config_tmp
   local failures=()
-  while IFS=$'\t' read -r key target source mode digest; do
+  while IFS=$'\t' read -r key target source mode legacy_field; do
     case "$key" in
       schema)
-        [[ "$target" == agent-canon.global-links.v1 && -z "$source$mode$digest" ]] || {
+        [[ "$target" == agent-canon.global-links.v1 && -z "$source$mode$legacy_field" ]] || {
           _agent_canon_json_error global_links_manifest_invalid \
             "global link manifest schema is invalid"
           return 2
         }
         ;;
       link)
-        [[ "$scope" == all && "$AGENT_CANON_CONTROL_ROOT" == "$home_root" ]] || continue
         [[ "$target" != "$skills_link"/* ]] || continue
-        [[ -L "$target" && -n "$source" && -z "$mode$digest" ]] || continue
+        [[ -L "$target" && -n "$source" && -z "$mode$legacy_field" ]] || continue
         resolved=$(readlink -f -- "$target" 2>/dev/null || printf '')
         if [[ "$resolved" == "$source" ]]; then
           if ! rm -f -- "$target"; then failures+=("$target"); fi
         fi ;;
       config)
-        [[ "$scope" == all && "$AGENT_CANON_CONTROL_ROOT" == "$home_root" ]] || continue
-        [[ "$target" == "$home_root/.codex/config.toml" && -L "$target" && -f "$source" && -n "$mode" && "$digest" =~ ^[0-9a-f]{64}$ ]] || continue
+        [[ "$target" == "$home_root/.codex/config.toml" && -L "$target" && -f "$source" && "$mode" =~ ^[0-7]{3,4}$ ]] || continue
         resolved=$(readlink -f -- "$target" 2>/dev/null || printf '')
         if [[ "$resolved" == "$source" ]]; then
           if ! config_tmp=$(mktemp "$home_root/.codex/.config.toml.restore.XXXXXX"); then
@@ -3807,37 +3786,8 @@ _agent_canon_remove_global_links() {
             failures+=("$target")
           fi
         fi ;;
-      bundle-file)
-        [[ "$scope" == all || "$scope" == bundle ]] || continue
-        [[ "$source" =~ ^(agents/agent-canon-[A-Za-z0-9_.-]+\.toml|guidance/AGENTS\.md)$ &&
-           "$mode" =~ ^[0-7]{3,4}$ && "$digest" =~ ^[0-9a-f]{64}$ ]] || {
-          _agent_canon_json_error global_links_manifest_invalid \
-            "bundle file ownership record is invalid"
-          return 2
-        }
-        if [[ "$source" == guidance/AGENTS.md ]]; then
-          [[ "$target" == "$codex_home/AGENTS.md" ]] || {
-            _agent_canon_json_error global_links_manifest_invalid \
-              "bundle guidance target differs from its canonical destination"
-            return 2
-          }
-        else
-          [[ "${source#agents/}" != */* &&
-             "$target" == "$codex_home/agents/${source##*/}" ]] || {
-            _agent_canon_json_error global_links_manifest_invalid \
-              "bundle agent target differs from its canonical destination"
-            return 2
-          }
-        fi
-        if [[ -e "$target" || -L "$target" ]]; then
-          if [[ -f "$target" && ! -L "$target" &&
-                "$(_agent_canon_sha256 "$target")" == "$digest" &&
-                "$(stat -c '%a' -- "$target")" == "$mode" ]]; then
-            rm -f -- "$target" || failures+=("$target")
-          else
-            failures+=("$target")
-          fi
-        fi ;;
+      bundle-file) ;;
+
       *)
         _agent_canon_json_error global_links_manifest_invalid \
           "global link manifest contains an unknown key: $key"
@@ -3849,27 +3799,32 @@ _agent_canon_remove_global_links() {
     _agent_canon_json_error uninstall_links_failed "owned global link cleanup failed: ${failures[*]}"
     return 2
   fi
-  if [[ "$scope" == bundle ]]; then
-    manifest_tmp=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.global-links-remove.XXXXXX") || return $?
-    if ! awk -F '\t' '$1 != "bundle-file" { print }' "$manifest" > "$manifest_tmp" ||
-       ! chmod 600 -- "$manifest_tmp" || ! mv -f -- "$manifest_tmp" "$manifest"; then
-      rm -f -- "$manifest_tmp"
-      _agent_canon_json_error global_links_manifest_write_failed \
-        "bundle ownership records could not be removed from the global link manifest"
-      return 2
-    fi
-  fi
 }
 
 _agent_canon_codex_bundle_uninstall_locked() {
-  _agent_canon_remove_global_links bundle || return $?
-  local target_digest
+  local codex_home=${CODEX_HOME:-$HOME/.codex}
+  local bundle_root target expected target_digest
+  bundle_root=$(realpath -e -- "$AGENT_CANON_REPOSITORY_ROOT") || return $?
+  if [[ "$codex_home" == /* && ! -L "$codex_home" ]]; then
+    target="$codex_home/AGENTS.md"
+    if [[ -L "$target" && "$(readlink -- "$target")" == "$bundle_root/guidance/AGENTS.md" ]]; then
+      rm -- "$target" || return $?
+    fi
+    if [[ ! -L "$codex_home/agents" ]]; then
+      for target in "$codex_home"/agents/agent-canon-*.toml; do
+        expected="$bundle_root/agents/${target##*/}"
+        if [[ -L "$target" && "$(readlink -- "$target")" == "$expected" ]]; then
+          rm -- "$target" || return $?
+        fi
+      done
+    fi
+  fi
   target_digest=$(_agent_canon_target_digest "$AGENT_CANON_REPOSITORY_ROOT" || true)
   if [[ -n "$target_digest" ]]; then
     _agent_canon_target_operation_locked remove "$AGENT_CANON_REPOSITORY_ROOT" \
       "$target_digest" "/targets/$target_digest" >/dev/null || return $?
   fi
-  printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"ok","operation":"codex_bundle_uninstall","code":"owned_files_removed"}\n'
+  printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"ok","operation":"codex_bundle_uninstall","code":"owned_links_removed"}\n'
 }
 
 _agent_canon_codex_bundle_uninstall() {
@@ -3934,111 +3889,6 @@ _agent_canon_codex_target_remove() {
   bash "$AGENT_CANON_REPOSITORY_ROOT/bootstrap.sh" \
     --control-parent-root "$AGENT_CANON_CONTROL_ROOT" \
     target remove --root "$target_root" --mode read-only >/dev/null
-}
-
-_agent_canon_global_bundle_records_snapshot() {
-  local destination=$1 preserve_all=${2:-0} manifest="$AGENT_CANON_STATE_ROOT/global-links.tsv"
-  local raw key target source mode digest extra schema_seen=0
-  : > "$destination"
-  [[ -e "$manifest" || -L "$manifest" ]] || return 0
-  [[ -f "$manifest" && ! -L "$manifest" ]] || {
-    _agent_canon_json_error global_links_manifest_invalid \
-      "global link manifest is not a regular file"
-    return 2
-  }
-  while IFS= read -r raw || [[ -n "$raw" ]]; do
-    IFS=$'\t' read -r key target source mode digest extra <<< "$raw"
-    case "$key" in
-      schema)
-        [[ "$schema_seen" == 0 && "$target" == agent-canon.global-links.v1 &&
-           -z "$source$mode$digest$extra" ]] || {
-          _agent_canon_json_error global_links_manifest_invalid \
-            "global link manifest schema is invalid"
-          return 2
-        }
-        schema_seen=1
-        ;;
-      link)
-        [[ -n "$target" && "$target" == /* && -n "$source" && "$source" == /* &&
-           -z "$mode$digest$extra" ]] || {
-          _agent_canon_json_error global_links_manifest_invalid \
-            "global link manifest link record is invalid"
-          return 2
-        }
-        if [[ "$preserve_all" == 1 ]]; then
-          printf 'link\t%s\t%s\n' "$target" "$source" >> "$destination"
-        fi
-        ;;
-      config)
-        [[ -n "$target" && "$target" == /* && -n "$source" && "$source" == /* &&
-           -n "$mode" && "$digest" =~ ^[0-9a-f]{64}$ && -z "$extra" ]] || {
-          _agent_canon_json_error global_links_manifest_invalid \
-            "global link manifest config record is invalid"
-          return 2
-        }
-        if [[ "$preserve_all" == 1 ]]; then
-          printf 'config\t%s\t%s\t%s\t%s\n' \
-            "$target" "$source" "$mode" "$digest" >> "$destination"
-        fi
-        ;;
-      bundle-file)
-        [[ -n "$target" && "$target" == /* &&
-           "$source" =~ ^(agents/agent-canon-[A-Za-z0-9_.-]+\.toml|guidance/AGENTS\.md)$ &&
-           "$mode" =~ ^[0-7]{3,4}$ && "$digest" =~ ^[0-9a-f]{64}$ && -z "$extra" ]] || {
-          _agent_canon_json_error global_links_manifest_invalid \
-            "global link manifest bundle-file record is invalid"
-          return 2
-        }
-        printf 'bundle-file\t%s\t%s\t%s\t%s\n' \
-          "$target" "$source" "$mode" "$digest" >> "$destination"
-        ;;
-      *)
-        _agent_canon_json_error global_links_manifest_invalid \
-          "global link manifest contains an unknown key: $key"
-        return 2
-        ;;
-    esac
-  done < "$manifest"
-  [[ "$schema_seen" == 1 ]] || {
-    _agent_canon_json_error global_links_manifest_invalid \
-      "global link manifest schema is missing"
-    return 2
-  }
-}
-
-_agent_canon_global_bundle_file_record_write() {
-  local target=$1 source=$2 mode=$3 digest=$4
-  local manifest="$AGENT_CANON_STATE_ROOT/global-links.tsv"
-  local snapshot temporary raw key existing_target existing_source existing_mode existing_digest extra
-  snapshot=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.bundle-links.XXXXXX") || return $?
-  temporary=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.global-links.XXXXXX") || {
-    rm -f -- "$snapshot"
-    return 2
-  }
-  if ! _agent_canon_global_bundle_records_snapshot "$snapshot" 1; then
-    rm -f -- "$snapshot" "$temporary"
-    return 2
-  fi
-  {
-    printf 'schema\tagent-canon.global-links.v1\n'
-    while IFS= read -r raw || [[ -n "$raw" ]]; do
-      IFS=$'\t' read -r key existing_target existing_source existing_mode existing_digest extra <<< "$raw"
-      if [[ "$key" != bundle-file || "$existing_target" != "$target" ]]; then
-        printf '%s\n' "$raw"
-      fi
-    done < "$snapshot"
-    printf 'bundle-file\t%s\t%s\t%s\t%s\n' \
-      "$target" "$source" "$mode" "$digest"
-  } > "$temporary" || {
-    rm -f -- "$snapshot" "$temporary"
-    return 2
-  }
-  rm -f -- "$snapshot"
-  chmod 600 -- "$temporary" || {
-    rm -f -- "$temporary"
-    return 2
-  }
-  mv -f -- "$temporary" "$manifest"
 }
 
 _agent_canon_codex_hook() {
@@ -4157,10 +4007,9 @@ _agent_canon_codex_hook() {
 }
 
 _agent_canon_codex_bundle_install_locked() {
-  local container records bundle_digest source_commit kind component bundle_path destination digest extra
-  local codex_home target source parent source_root created installed=0
-  local snapshot row_type row_target row_source row_mode row_digest row_extra previous_digest previous_mode current_digest
-  local temporary backup source_current source_part
+  local container records bundle_digest source_commit kind component bundle_path destination metadata
+  local codex_home target source parent source_root installed=0
+  local source_current source_part
   local bundle_root bundle_target_digest bundle_container_root
   local -a source_parts=()
   [[ "${AGENT_CANON_SOURCE_FREE_BUNDLE:-0}" == 1 ]] || {
@@ -4187,7 +4036,7 @@ _agent_canon_codex_bundle_install_locked() {
     verify --root "$AGENT_CANON_SOURCE_DESTINATION" --format install-tsv > "$records"; then
     rm -f -- "$records"
     _agent_canon_json_error codex_bundle_invalid \
-      "Codex user bundle integrity readback failed"
+      "Codex user bundle validation failed"
     return 2
   fi
   source_root=$(realpath -e -- "$AGENT_CANON_REPOSITORY_ROOT") || {
@@ -4220,11 +4069,11 @@ _agent_canon_codex_bundle_install_locked() {
     return 2
   }
   local bundle_headers=0
-  while IFS=$'\t' read -r kind component bundle_path destination digest extra; do
+  while IFS=$'\t' read -r kind component bundle_path destination metadata; do
     case "$kind" in
       bundle)
-        [[ "$bundle_headers" == 0 && "$component" =~ ^[0-9a-f]{64}$ &&
-           "$bundle_path" =~ ^[0-9a-f]{40}$ && -z "$destination$digest$extra" ]] || {
+        [[ "$bundle_headers" == 0 && -n "$component" && -n "$bundle_path" &&
+           -z "$destination$metadata" ]] || {
           rm -f -- "$records"
           _agent_canon_json_error codex_bundle_invalid \
             "Codex bundle verification record is invalid"
@@ -4235,9 +4084,7 @@ _agent_canon_codex_bundle_install_locked() {
         bundle_headers=1
         ;;
       install)
-        [[ "$bundle_headers" == 1 && -z "$extra" &&
-           ( "$component" == agent || "$component" == guidance ) &&
-           "$digest" =~ ^[0-9a-f]{64}$ ]] || {
+        [[ "$bundle_headers" == 1 ]] || {
           rm -f -- "$records"
           _agent_canon_json_error codex_bundle_invalid \
             "Codex bundle install record is invalid"
@@ -4273,10 +4120,10 @@ _agent_canon_codex_bundle_install_locked() {
             return 2
           }
         done
-        [[ -f "$source" && "$(_agent_canon_sha256 "$source")" == "$digest" ]] || {
+        [[ -f "$source" ]] || {
           rm -f -- "$records"
           _agent_canon_json_error codex_bundle_invalid \
-            "Codex bundle install source failed host readback"
+            "Codex bundle install source is unavailable"
           return 2
         }
         target="$codex_home/${destination#codex/}"
@@ -4288,94 +4135,15 @@ _agent_canon_codex_bundle_install_locked() {
           return 2
         }
         mkdir -p -- "$parent" || { rm -f -- "$records"; return 2; }
-        current_digest=
-        snapshot=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.bundle-files.XXXXXX") || {
-          rm -f -- "$records"
-          return 2
-        }
-        if ! _agent_canon_global_bundle_records_snapshot "$snapshot"; then
-          rm -f -- "$records" "$snapshot"
-          return 2
-        fi
-        previous_digest=
-        previous_mode=
-        while IFS=$'\t' read -r row_type row_target row_source row_mode row_digest row_extra; do
-          if [[ "$row_type" == bundle-file && "$row_target" == "$target" ]]; then
-            [[ -z "$previous_digest" ]] || {
-              rm -f -- "$records" "$snapshot"
-              _agent_canon_json_error global_links_manifest_invalid \
-                "Codex destination has multiple ownership records"
-              return 2
-            }
-            previous_digest=$row_digest
-            previous_mode=$row_mode
-          fi
-        done < "$snapshot"
-        rm -f -- "$snapshot"
-        backup=
-        created=0
-        if [[ -e "$target" || -L "$target" ]]; then
-          [[ -f "$target" && ! -L "$target" &&
-             "$previous_digest" =~ ^[0-9a-f]{64}$ &&
-             "$previous_mode" =~ ^[0-7]{3,4}$ ]] || {
-            rm -f -- "$records"
-            _agent_canon_json_error codex_install_collision \
-              "Codex path is not an owned regular bundle file: $target"
-            return 2
-          }
-          current_digest=$(_agent_canon_sha256 "$target")
-          [[ "$current_digest" == "$previous_digest" &&
-             "$(stat -c '%a' -- "$target")" == "$previous_mode" ]] || {
-            rm -f -- "$records"
-            _agent_canon_json_error codex_install_conflict \
-              "Codex bundle file was modified and is preserved: $target"
-            return 2
-          }
-          if [[ "$current_digest" != "$digest" ]]; then
-            backup=$(mktemp "$parent/.agent-canon-bundle-backup.XXXXXX") || {
-              rm -f -- "$records"
-              return 2
-            }
-            cp -- "$target" "$backup" || {
-              rm -f -- "$records" "$backup"
-              return 2
-            }
-            chmod "$previous_mode" "$backup" || {
-              rm -f -- "$records" "$backup"
-              return 2
-            }
-          fi
-        else
-          created=1
-        fi
-        if [[ "${current_digest:-}" != "$digest" ]]; then
-          temporary=$(mktemp "$parent/.agent-canon-bundle-install.XXXXXX") || {
-            [[ -z "$backup" ]] || rm -f -- "$backup"
-            rm -f -- "$records"
-            return 2
-          }
-          if ! cp -- "$source" "$temporary" || ! chmod 644 -- "$temporary" ||
-             [[ "$(_agent_canon_sha256 "$temporary")" != "$digest" ]] ||
-             ! mv -f -- "$temporary" "$target"; then
-            rm -f -- "$temporary"
-            [[ -z "$backup" ]] || rm -f -- "$backup"
-            rm -f -- "$records"
-            _agent_canon_json_error codex_install_write_failed \
-              "Codex bundle file could not be installed and read back: $target"
-            return 2
-          fi
-        fi
-        if ! _agent_canon_global_bundle_file_record_write "$target" "$bundle_path" 644 "$digest"; then
-          if [[ -n "$backup" ]]; then
-            mv -f -- "$backup" "$target"
-          elif ((created == 1)); then
-            rm -f -- "$target"
-          fi
-          [[ -z "$backup" ]] || rm -f -- "$backup"
+        if [[ -L "$target" && "$(readlink -- "$target")" == "$source" ]]; then
+          :
+        elif [[ -e "$target" || -L "$target" ]]; then
+          _agent_canon_json_warning codex_install_collision "preserving existing Codex path: $target"
+          continue
+        elif ! ln -sT -- "$source" "$target"; then
           rm -f -- "$records"
           return 2
         fi
-        [[ -z "$backup" ]] || rm -f -- "$backup"
         installed=$((installed + 1))
         ;;
       *)
@@ -4417,27 +4185,20 @@ _agent_canon_install_global_links() {
   local config_target="$codex_home/config.toml"
   local config_source="$source_root/config.toml"
   local skills_link="$home_root/.agents/skills"
-  local link source resolved mode digest preserved_bundle_files
+  local link source resolved mode
   [[ -d "$skill_source_root" && ! -L "$skill_source_root" ]] || {
     _agent_canon_json_warning skill_source_missing "skills setup deferred for unavailable source: $skill_source_root"
     return 0
   }
-  preserved_bundle_files=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.bundle-files.XXXXXX") || return $?
-  if ! _agent_canon_global_bundle_records_snapshot "$preserved_bundle_files"; then
-    rm -f -- "$preserved_bundle_files"
-    return 2
-  fi
   mkdir -p "$home_root/.agents" "$codex_home/agents"
   # A correct directory link survives ordinary Git updates unchanged.
   if [[ -L "$skills_link" ]]; then
     resolved=$(readlink -f -- "$skills_link" 2>/dev/null || printf '')
     [[ "$resolved" == "$skill_source_root" ]] || {
-      rm -f -- "$preserved_bundle_files"
       _agent_canon_json_warning skill_link_collision "preserving existing skills link: $skills_link"
       return 0
     }
   elif [[ -e "$skills_link" ]]; then
-    rm -f -- "$preserved_bundle_files"
     _agent_canon_json_warning skill_link_collision "preserving existing skills directory: $skills_link"
     return 0
   else
@@ -4445,8 +4206,6 @@ _agent_canon_install_global_links() {
   fi
   : > "$manifest"
   printf 'schema\tagent-canon.global-links.v1\n' >> "$manifest"
-  cat -- "$preserved_bundle_files" >> "$manifest"
-  rm -f -- "$preserved_bundle_files"
   printf 'link\t%s\t%s\n' "$skills_link" "$skill_source_root" >> "$manifest"
 
   # A personal config is the one remaining file view.  Preserve it only when
@@ -4487,8 +4246,7 @@ _agent_canon_install_global_links() {
   fi
   _agent_canon_apply_context_defaults "$container" "$config_source" || return $?
   if [[ -L "$config_target" && "$(readlink -f -- "$config_target")" == "$config_source" ]]; then
-    digest=$(_agent_canon_sha256 "$config_source")
-    printf 'config\t%s\t%s\t%s\t%s\n' "$config_target" "$config_source" "$mode" "$digest" >> "$manifest"
+    printf 'config\t%s\t%s\t%s\n' "$config_target" "$config_source" "$mode" >> "$manifest"
   fi
   for source in "$AGENT_CANON_REPOSITORY_ROOT/.codex/agents"/*.toml; do
     [[ -f "$source" && ! -L "$source" ]] || continue
