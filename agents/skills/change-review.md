@@ -50,10 +50,10 @@ requirement; Skill selection alone does not require a second review.
 
 ## Generated code comparison
 
-When code size is relevant to a generated-code evaluation, compare the same
-source scope across candidate commits with [code-complexity](../../documents/tools/code_complexity.md).
-Use the measured source and compressed byte deltas alongside evidence of
-correctness and the review of the changed code.
+Use [code-complexity](../../documents/tools/code_complexity.md) when a review
+needs evidence about encoded source size. Compare the measured byte lengths for
+the same path scope. Base judgments about correctness on tests and judgments
+about readability and structure on the reviewed code.
 
 ## Explicit security audit
 
