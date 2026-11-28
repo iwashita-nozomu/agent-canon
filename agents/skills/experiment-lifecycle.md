@@ -31,11 +31,11 @@ requires a request for that outcome.
 
 ## Method
 
-1. Identify the requested models, variants, update counts, and any other
-   conditions that define the comparison. Before proposing a run, state what it
-   would verify, which decision its result could change, and what the existing
-   records leave open. When that gap could change the decision, use the
-   smallest run that can answer the question and state its stopping condition.
+1. Start with the requested outcome. Work backward to the decision the experiment
+   must support and the evidence needed for it, keeping the requested comparison
+   conditions. Use existing results when they answer the question. When an
+   evidence gap matters to the outcome, state why and choose the smallest run
+   that can close it, with a stopping condition.
    For tuning, use [Hyperparameter selection](computational-optimization.md#hyperparameter-selection)
    to select one grounded setting. A user request for hyperparameter comparison
    activates the comparison protocol.

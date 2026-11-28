@@ -2,7 +2,7 @@
 name: experiment-lifecycle
 description: "Use for requested experiment planning, execution, validation, result interpretation, reruns, or topic setup."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"aaf8c2c0944beddb4f5939d2e55617b33d9412108037fb7796199acbaa7c5eae"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"ee15e5d5bb6d78d766b90518113c7c860a89328af62db16c13b3884a6b78e50d"} -->
 
 <!--
 @dependency-start

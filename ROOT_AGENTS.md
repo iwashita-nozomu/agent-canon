@@ -136,12 +136,11 @@ context/evidence. The contracts below apply without an installed Skill/runtime.
 
 ## Validation Routing
 
-Judge acceptance and completion by evidence of the required behavior. Treat
-processing time as an observation. Add consumer checks for explicit consumer migration.
-Before proposing or running a check, name the property it will verify, the
-decision its result could change, and the gap in the evidence already available.
-Reuse evidence that settles the decision. Run the smallest check that can close
-a remaining gap, and broaden coverage only when the required behavior calls for it.
+Start with the requested end result. Work backward to the properties that must
+hold and the decisions needed to achieve it. Use existing evidence to settle
+those decisions. When an evidence gap matters to the outcome, explain what
+decision it affects and choose the smallest check that can resolve it.
+Treat processing time as an observation. Add consumer checks for explicit consumer migration.
 Format final edited files with the configured formatter before delivery and include
 its diff; unavailable formatting stays unverified. Tests, observations, and proofs
 establish different properties: report only what the evidence establishes.
