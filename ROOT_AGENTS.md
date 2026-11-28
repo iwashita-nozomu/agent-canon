@@ -139,7 +139,8 @@ context/evidence. The contracts below apply without an installed Skill/runtime.
 Start with the requested end result. Work backward to the properties that must
 hold and the decisions needed to achieve it. Use existing evidence to settle
 those decisions. When an evidence gap matters to the outcome, explain what
-decision it affects and choose the smallest check that can resolve it.
+decision it affects and choose a check that resolves it across the required
+conditions.
 Treat processing time as an observation. Add consumer checks for explicit consumer migration.
 Format final edited files with the configured formatter before delivery and include
 its diff; unavailable formatting stays unverified. Tests, observations, and proofs

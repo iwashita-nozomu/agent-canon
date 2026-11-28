@@ -43,7 +43,7 @@ AgentCanon members; host names remain owned by the registered host rather than
 being added to the public catalog. Reuse settled selection instead of probing
 built-in availability or rerouting a known owner.
 
-Use `tools/bin/agent-canon route --prompt ... --mode routing-only` or the canonical changed-path route. The caller must pass `--mode repo-changing` for an explicitly authorized edit; omitted mode remains non-write. Select the smallest owner set whose responsibilities are reachable from the request. Add a candidate only with a concrete activation condition; do not execute candidates preemptively or replace routing with another classifier/handoff schema.
+Use `tools/bin/agent-canon route --prompt ... --mode routing-only` or the canonical changed-path route. The caller must pass `--mode repo-changing` for an explicitly authorized edit; omitted mode remains non-write. Select owners who cover the requested outcomes. Add a candidate only with a concrete activation condition; do not execute candidates preemptively or replace routing with another classifier/handoff schema.
 
 作業途中で新しい観測や要求変更が生じたら、変わった判断に必要な owner
 guidance を読み直します。最初に解決した選択は、影響する前提が変わらない限り

@@ -42,8 +42,8 @@ run の再現に必要な protocol、source、command、environment、seed、ide
 `literature-survey`、`experiment-lifecycle`、`experiment-review`、および
 `report-writing` を、実際に外部資料、run、比較判断、または reader-facing report が
 必要な範囲で使います。複数の変更を一緒に比較する場合は、設計がその帰属を支えない
-限り個別効果を主張しません。結果を見た後は、説明更新、追加検証、fresh rerun、次の
-変更、または範囲を限定した終了のうち、evidence が支持する次の action を選びます。
+限り個別効果を主張しません。結果を見た後は、依頼された成果に残る課題から次の作業を
+選びます。成果が揃った時点で完了とし、報告の結論は観測が支える範囲で述べます。
 以下の state 名は代表例であり、すべての task が同じ branch を通る必要はありません。
 
 - `report_rewrite_required`: 同じ result の説明を直す

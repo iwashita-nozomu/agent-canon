@@ -958,12 +958,12 @@ skill_families:
         - ["マークダウン", "体裁"]
         - ["マークダウン", "リンク"]
   - id: mvp-skeleton
-    purpose: Define MVP, prototype, v0, and thin-slice work as the smallest complete final product scope with a runnable core path, required failure and cleanup behavior, and acceptance evidence.
+    purpose: Deliver an explicitly requested MVP or prototype with runnable paths, required failure and cleanup behavior, and acceptance evidence.
     canonical_doc: agents/skills/mvp-skeleton.md
     shim: .codex/personal/skills/mvp-skeleton/SKILL.md
     discovery:
       name: mvp-skeleton
-      description: "Use when creating, scaffolding, planning, or implementing an MVP, prototype, runnable vertical slice, product skeleton, v0, or thin vertical slice and the agent must define the smallest complete final product scope. Trigger for MVP作成, プロトタイプ, 骨格だけ, core runnable path, thin vertical slice, scope creep, over-polish, and cases where early implementation is getting unnecessary UI, architecture, features, or tests."
+      description: "Use for an explicitly requested MVP, prototype, runnable vertical slice, product skeleton, or v0. Deliver the requested paths with observable acceptance."
   - id: document-canon-cleanup
     purpose: Find non-canonical documents and route edits to source canon instead of mirrors, generated evidence, or stale copies.
     canonical_doc: agents/skills/document-canon-cleanup.md

@@ -175,7 +175,7 @@ priority = 1
 
 [[model_profiles.role_instructions]]
 id = "sol_execution"
-text = "Emit concrete implementation plans and completion checks only for actions that can change the decision tuple or strictly reduce unresolved blockers, validation, or request clauses. Prefer minimum decision-relevant total work before minimum makespan."
+text = "Plan for the full agreed outcome. Choose actions and completion checks that resolve its outstanding requirements and blockers."
 priority = 2
 
 [[model_profiles]]

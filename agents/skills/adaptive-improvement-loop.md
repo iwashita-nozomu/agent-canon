@@ -29,8 +29,8 @@ upstream design ../canonical/skills.md skill canon registry
 
 ## Procedure
 
-対象の改善目標と、依頼・利用可能資源に見合う終了条件を決めます。反復が続く作業には
-停止予算または停止条件を置き、未確定の原因は実装前に調べます。`dependency-analysis`
+対象の改善目標と、合意済みの終了条件を確認します。探索の停止条件は各試行の判断に使い、
+未確定の原因は実装前に調べます。`dependency-analysis`
 または `change-review` は、依存や実装責務が選択に影響するときに使います。
 
 数値の改善では、[Before optional changes](computational-optimization.md#before-optional-changes)
