@@ -23,12 +23,12 @@ Keep that boundary in the common root rather than copying a second formatter
 checklist into every Skill.
 
 | Surface | Configuration owner | Formatting operation |
-| --- | --- | --- |
+|----|----|----|
 | Editor whitespace | [`.editorconfig`](../../.editorconfig) | EditorConfig-aware editor; not a substitute for a language formatter |
 | Python | [`ruff.toml`](../../ruff.toml) | `ruff format <edited Python paths...>` |
 | C, C++, CUDA | [`.clang-format`](../../.clang-format) | `clang-format -i --style=file <edited paths...>` |
 | Rust | [`rustfmt.toml`](../../rustfmt.toml) | Owning crate's existing formatting command, or `rustfmt` on edited files using its declared edition |
-| Markdown | [`.markdownlint-cli2.jsonc`](../../.markdownlint-cli2.jsonc) | `agent-canon docs format --root . <edited Markdown paths...>` |
+| Markdown | Quarto's Pandoc GFM writer | [Markdown execution](#markdown-execution) |
 | VS Code integration | [Settings](../../.vscode/settings.json), [recommendations](../../.vscode/extensions.json) | Format on save for Python, C/C++/CUDA and Rust using the selected native formatter |
 
 Run commands from the repository's existing working context and name the edited
@@ -39,40 +39,32 @@ do not expand a bounded edit to a whole-workspace reformat.
 
 ### Markdown execution
 
-Run the installed native CLI's `agent-canon docs format --root . <edited paths...>`
-in the writable work checkout. It delegates fixes to `markdownlint-cli2 --fix`
-with the repository configuration and preserves two-space Markdown hard breaks.
-The executable must be available on `PATH`.
+For every Markdown file in the requested work, use Quarto's Pandoc in the shared
+tool runtime to produce a GFM candidate in the writable task area. Emit YAML
+front matter through the GFM writer.
 
-Use `agent-canon docs check` for Markdown checks. The
-[command owner](../tools/agent-canon.md#commands) lists its providers and
-rendering checks.
-
-If the already selected environment is a shared resident with read-only source
-mounts, format a writable task snapshot and copy back only the selected files.
-Preserve local link targets for any selected checks and remove the snapshot
-when its use ends. This conditional route preserves the source mount boundary.
-
-### GitHub math formatting
-
-For Markdown with math intended for GitHub, use Quarto's Pandoc in the shared
-tool runtime to produce a GFM candidate in the writable task area.
-
-```bash
-quarto pandoc "$source" --from=gfm+tex_math_dollars --to=gfm \
-  --wrap=preserve --output "$candidate"
+``` bash
+quarto pandoc "$source" --from=gfm+tex_math_dollars+yaml_metadata_block \
+  --to=gfm+yaml_metadata_block --standalone --wrap=preserve --output "$candidate"
 ```
 
-Use the configured GitHub connection on the host to render the publication
-candidate.
+Inspect the candidate's diff for changes to content or document metadata before
+applying it to the work checkout. Update generated Markdown through its owning
+generator. Use `agent-canon docs check` for the selected Markdown checks.
 
-```bash
+### GitHub rendering
+
+For a GitHub publication candidate, use the configured GitHub connection on the
+host to render the final Markdown.
+
+``` bash
 gh api --method POST markdown -f mode=gfm -F text=@"$candidate" >"$preview"
 ```
 
-Check that GitHub recognizes the intended inline and display equations and
-inspect the candidate's diff before applying it. Use the GitHub page preview
-when the task needs confirmation of a particular TeX command's display.
+Inspect the rendered content that matters to the change, such as tables,
+checklists, code blocks, or equations. Use the GitHub page preview when a
+client-rendered feature such as a particular TeX command is the subject of
+verification.
 
 ## Engineering rationale
 

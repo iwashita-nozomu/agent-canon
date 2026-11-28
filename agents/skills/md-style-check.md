@@ -26,13 +26,9 @@ downstream implementation ../../tests/tools/test_fix_mermaid.py tests native Mer
 
 ## Procedure
 
-Run `agent-canon docs format --root . <edited paths...>` with `markdownlint-cli2`
-available and inspect the final diff. The
-[formatter settings](../../documents/design/formatting.md#markdown-execution)
-describe how to use the shared environment when it exposes source read-only.
-
-For GitHub-bound Markdown containing equations, use
-[Pandoc formatting and the GitHub renderer](../../documents/design/formatting.md#github-math-formatting).
+Use [Pandoc formatting](../../documents/design/formatting.md#markdown-execution)
+for each Markdown file in the requested work. For GitHub publication, use
+[GitHub rendering](../../documents/design/formatting.md#github-rendering).
 Run `agent-canon docs check --root . <edited paths...>` in the
 [shared tool runtime](agent-canon-bootstrap.md) for the selected Markdown checks.
 
