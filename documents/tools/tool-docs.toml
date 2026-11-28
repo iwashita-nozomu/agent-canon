@@ -111,6 +111,14 @@ language = "rust"
 summary = "Rust test design resilience diagnostics."
 
 [[tool]]
+id = "code-complexity"
+classification = "public"
+tool = "tools/runtime/dispatch/agent-canon/src/code_complexity.rs"
+doc = "documents/tools/code_complexity.md"
+language = "rust"
+summary = "Compression-based measurement for comparing committed code."
+
+[[tool]]
 id = "notebook-quality"
 classification = "internal"
 tool = "tools/runtime/dispatch/agent-canon/src/notebook_quality.rs"

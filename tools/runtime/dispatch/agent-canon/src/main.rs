@@ -13,6 +13,7 @@
 // downstream implementation config.rs applies managed Codex context defaults while preserving TOML values
 // downstream implementation dependency_headers.rs checks selected dependency manifests and typed edge syntax
 // downstream implementation run_evaluation.rs scores and reports one agent run bundle
+// downstream implementation code_complexity.rs measures compressed code snapshot size
 // downstream implementation graph.rs routes one-build dependency and runtime-evidence graph commands
 // downstream implementation graph_client.rs exposes the in-process typed graph client API and native consumer CLI
 // downstream implementation source_dependency_graph.rs exports tracked-source facts and source target resolution
@@ -60,6 +61,7 @@ mod agent_search;
 mod check_algorithm_config_partition;
 mod check_solid_evidence;
 pub mod classify_path_risk;
+mod code_complexity;
 mod config;
 mod dependency_headers;
 mod dependency_manifest;
@@ -139,6 +141,7 @@ Commands:
   codex-config --source-config <path>
   test-design <check> [paths...]
   run-evaluation (--run-id ID|--report-dir PATH) [options]
+  code-complexity [--root ROOT] [--base REV] [--target REV] [-- PATH ...]
   codex-hook [EVENT|--group EVENT] [--contract|--list]
   notebook-quality [paths...] [--root <repo-root>] [--changed|--all] [--format text|json]
   generated-artifact-guard [--root <repo-root>]
@@ -264,6 +267,10 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "run-evaluation" {
         std::process::exit(run_evaluation::run_cli(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "code-complexity" {
+        std::process::exit(code_complexity::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "runtime-log-archive-git" {
