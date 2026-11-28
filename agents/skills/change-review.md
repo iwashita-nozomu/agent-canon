@@ -41,19 +41,14 @@ requirement; Skill selection alone does not require a second review.
    or reviewer wording; validate reviewer hypotheses against source or direct
    static proof. Unreachable branches and upstream-guaranteed checks are deletion
    candidates, not speculative test triggers.
+   Apply the [naming convention](../../documents/rule/naming.md) when names
+   need to convey a distinction such as a variable's role or unit.
 5. Check generated views against their source. Reuse applicable validation;
    select a language, numerical, or
    document specialist only for unresolved risk in that changed surface.
 6. Report concrete findings with location, reachable effect, and evidence. Keep
    uncertain causes explicit and route durable unresolved work to its owner; a
    local finding alone creates no extra Issue or gate.
-
-## Generated code comparison
-
-Use [code-complexity](../../documents/tools/code_complexity.md) when a review
-needs evidence about encoded source size. Compare the measured byte lengths for
-the same path scope. Base judgments about correctness on tests and judgments
-about readability and structure on the reviewed code.
 
 ## Explicit security audit
 
