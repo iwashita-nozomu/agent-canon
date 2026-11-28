@@ -118,13 +118,13 @@ or execution of a theory-only request.
 
 ## Hyperparameter selection
 
-Propose one initial setting and explain its basis, using the agreed setting, the
-method's equations or bounds, a relevant measured scale, or a documented setting
-under matching conditions. For example, judge the learning rate by the
-optimizer's actual update relative to parameter scale. Use existing evidence
-when it settles the choice. Before measuring, state the unknown quantity and
-how its value would affect the setting. If the choice depends on that result,
-use a representative input or a short run with the single baseline setting.
+Start with the numerical outcome the setting must support and work backward to
+what determines the choice. Propose one initial setting grounded in the agreed
+setting, the method's equations or bounds, a relevant measured scale, or a
+documented setting under matching conditions. For example, use the update size
+relative to parameter scale when it determines the learning-rate choice. When
+the choice depends on an unknown quantity, state why it matters and measure it
+with a representative input or a short run with the single baseline setting.
 If that run fails, trace the cause before adjusting the setting.
 
 Present and run hyperparameter comparisons only when the user explicitly
