@@ -35,6 +35,8 @@ requires a request for that outcome.
    conditions that define the comparison. Use the existing records to establish
    coverage before choosing where to start. State the question, the inputs and
    comparison that can answer it, and the stopping condition for the request.
+   For tuning, use [Hyperparameter selection](computational-optimization.md#hyperparameter-selection)
+   to ground candidate settings and choose the cheapest informative comparison.
 2. Run through the project's existing runner and environment. Preserve their
    configured defaults and execution semantics; use a specialized profile or
    variant only when the requested evidence needs it.

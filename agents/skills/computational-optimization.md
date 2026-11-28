@@ -26,6 +26,7 @@ every numerical question.
   residual, constraint, derivative, stopping rule, tolerance, or numerical status.
 - A convergence regression, non-finite result, or numerical performance claim is
   in scope.
+- Selecting or diagnosing numerical or training hyperparameters is in scope.
 - Implementing a numerical formula or removing unsupported stabilization is in scope.
 
 ## Loss changes
@@ -114,6 +115,24 @@ change while continuing independent authorized work. Reuse valid existing runs.
 Source/specification-proven repairs and removal of a known-invalid correction can
 proceed directly. They need no run of the known-invalid code, performance benchmark
 or execution of a theory-only request.
+
+## Hyperparameter selection
+
+Start with the agreed setting or a comparable measured baseline. For each value
+being tuned, tie the initial value and candidate range to the method's equations
+or bounds, a relevant measured scale, or a documented setting under matching
+conditions. For example, judge a learning rate by the optimizer's actual update
+relative to parameter scale. When the scale is unknown, measure it on a
+representative input or a short baseline run before choosing values.
+
+Reuse comparable results first. Screen a small, hypothesis-driven set of
+candidates with the cheapest experiment that can distinguish the expected
+effects. Use the same inputs, initialization or seed, metric, and budget across
+candidates as applicable, then inspect the numerical trajectory and stopping
+reason. If the baseline fails, trace the failure before changing settings.
+Reserve a full-scale comparison for viable candidates when the remaining
+question requires it, such as long-run stability. Keep any run conditions the
+user explicitly requested.
 
 ## Remove unsupported stabilization
 
