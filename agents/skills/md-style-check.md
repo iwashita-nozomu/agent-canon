@@ -31,12 +31,10 @@ available and inspect the final diff. The
 [formatter settings](../../documents/design/formatting.md#markdown-execution)
 describe how to use the shared environment when it exposes source read-only.
 
-For Markdown intended for GitHub, run `agent-canon docs check --root . <edited paths...>`.
-Run it directly in the existing [shared tool runtime](agent-canon-bootstrap.md).
-Resolve missing image providers through the shared image installation.
-Use the edited checkout or a snapshot with the same content. The check runs
-lint and link checks, parses GitHub Flavored Markdown, and renders Mermaid
-blocks.
+For GitHub-bound Markdown containing equations, use
+[Pandoc formatting and the GitHub renderer](../../documents/design/formatting.md#github-math-formatting).
+Run `agent-canon docs check --root . <edited paths...>` in the
+[shared tool runtime](agent-canon-bootstrap.md) for the selected Markdown checks.
 
 For a requested equation preview, render the expressions with an available
 renderer that supports the source syntax. If Pandoc's MathML writer cannot
