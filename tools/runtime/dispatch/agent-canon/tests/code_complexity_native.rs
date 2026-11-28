@@ -1,6 +1,6 @@
 // @dependency-start
 // contract test
-// responsibility Checks the public compression measurement against known Git blobs.
+// responsibility Checks the public compression measurement against known Git file records.
 // upstream implementation ../src/code_complexity.rs code snapshot measurement
 // @dependency-end
 
@@ -11,7 +11,7 @@ use std::io::Read;
 use std::path::Path;
 use std::process::{Command, Output};
 
-fn git(root: &Path, args: &[&str]) {
+fn git(root: &Path, args: &[&str]) -> Output {
     let output = Command::new("git")
         .args([
             "-c",
@@ -28,6 +28,7 @@ fn git(root: &Path, args: &[&str]) {
         .output()
         .unwrap();
     assert!(output.status.success(), "{output:?}");
+    output
 }
 
 fn tool(root: &Path, args: &[&str]) -> Output {
@@ -39,9 +40,12 @@ fn tool(root: &Path, args: &[&str]) -> Output {
         .unwrap()
 }
 
-fn reference_size(files: &[&[u8]]) -> usize {
+fn reference_size(files: &[(&[u8], bool, &[u8])]) -> usize {
     let mut stream = Vec::new();
-    for bytes in files {
+    for (path, executable, bytes) in files {
+        stream.extend_from_slice(&(path.len() as u64).to_le_bytes());
+        stream.extend_from_slice(path);
+        stream.push(u8::from(*executable));
         stream.extend_from_slice(&(bytes.len() as u64).to_le_bytes());
         stream.extend_from_slice(bytes);
     }
@@ -53,7 +57,7 @@ fn reference_size(files: &[&[u8]]) -> usize {
 }
 
 #[test]
-fn compares_the_same_paths_using_committed_bytes() {
+fn compares_the_same_scope_using_paths_modes_and_committed_bytes() {
     let repo = tempfile::tempdir().unwrap();
     let root = repo.path();
     git(root, &["init", "-q"]);
@@ -68,15 +72,24 @@ fn compares_the_same_paths_using_committed_bytes() {
     git(root, &["commit", "-qm", "base"]);
 
     git(root, &["rm", "src/z.rs"]);
+    git(root, &["mv", "src/a.rs", "src/file with spaces.rs"]);
+    git(
+        root,
+        &["update-index", "--chmod=+x", "src/file with spaces.rs"],
+    );
     git(root, &["commit", "-qm", "target"]);
-    fs::write(root.join("src/a.rs"), b"worktree edit").unwrap();
+    fs::write(root.join("src/file with spaces.rs"), b"worktree edit").unwrap();
     fs::write(root.join("src/untracked.rs"), b"untracked").unwrap();
 
     let output = tool(&root.join("src"), &["--base", "HEAD^", "--", "src"]);
     assert!(output.status.success(), "{output:?}");
     let report: Value = serde_json::from_slice(&output.stdout).unwrap();
-    let base_gzip = reference_size(&[original, &repeated]);
-    let target_gzip = reference_size(&[original]);
+    let base_gzip = reference_size(&[
+        (b"src/a.rs", false, original),
+        (b"src/z.rs", false, &repeated),
+    ]);
+    let target_gzip = reference_size(&[(b"src/file with spaces.rs", true, original)]);
+    assert_eq!(report["schema"], "agent_canon.code_complexity.v2");
     assert_eq!(report["base"]["files"], 2);
     assert_eq!(report["target"]["files"], 1);
     assert_eq!(
@@ -105,4 +118,39 @@ fn compares_the_same_paths_using_committed_bytes() {
     let bad_revision = tool(root, &["--target", "missing-revision"]);
     assert_eq!(bad_revision.status.code(), Some(2));
     assert!(bad_revision.stdout.is_empty());
+}
+
+#[cfg(unix)]
+#[test]
+fn preserves_path_bytes_outside_utf8() {
+    use std::ffi::OsStr;
+    use std::os::unix::ffi::OsStrExt;
+
+    let repo = tempfile::tempdir().unwrap();
+    let root = repo.path();
+    let path = b"src/\xff.rs";
+    let bytes = b"fn main() {}\n";
+    git(root, &["init", "-q"]);
+    // Git can store this name even on filesystems that require UTF-8 names.
+    fs::write(root.join("blob"), bytes).unwrap();
+    let blob = git(root, &["hash-object", "-w", "blob"]);
+    let object = std::str::from_utf8(&blob.stdout).unwrap().trim();
+    let mut entry = format!("100644,{object},").into_bytes();
+    entry.extend_from_slice(path);
+    let index = Command::new("git")
+        .args(["update-index", "--add", "--cacheinfo"])
+        .arg(OsStr::from_bytes(&entry))
+        .current_dir(root)
+        .output()
+        .unwrap();
+    assert!(index.status.success(), "{index:?}");
+    git(root, &["commit", "-qm", "raw path"]);
+
+    let output = tool(root, &["--", "src"]);
+    assert!(output.status.success(), "{output:?}");
+    let report: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(
+        report["target"]["gzip_bytes"],
+        reference_size(&[(path, false, bytes)])
+    );
 }

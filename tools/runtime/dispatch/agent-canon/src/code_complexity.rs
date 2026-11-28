@@ -5,7 +5,7 @@
 // upstream implementation git_dependency_diff_summary.rs shared Git output adapters
 // @dependency-end
 
-use agent_canon::git_dependency_diff_summary::git_stdout;
+use agent_canon::git_dependency_diff_summary::{git_stdout, git_stdout_bytes};
 use flate2::{write::GzEncoder, Compression};
 use serde::Serialize;
 use std::io::{self, BufRead, BufReader, Read, Write};
@@ -14,9 +14,10 @@ use std::process::{Command, Stdio};
 
 const HELP: &str = "Usage: agent-canon code-complexity [--root ROOT] [--base REV] \
 [--target REV] [-- PATH ...]\n\n\
-Measure the gzip description length of committed file contents. The target defaults to HEAD.\n\
+Measure the gzip description length of selected committed files, including paths and modes.\n\
+The target defaults to HEAD.\n\
 Supply --base to compare two snapshots with the same repository-relative paths.\n\
-Output is JSON. A successful measurement has exit status 0 regardless of the delta.";
+Output is JSON. The delta is a difference of measured lengths in bytes.";
 
 struct Options<'a> {
     root: PathBuf,
@@ -76,6 +77,12 @@ struct Report<'a> {
     delta: Option<Delta>,
 }
 
+struct TreeFile<'a> {
+    executable: bool,
+    object: &'a [u8],
+    path: &'a [u8],
+}
+
 #[derive(Default)]
 struct ByteCount(u64);
 
@@ -109,15 +116,23 @@ fn measure(root: &Path, revision: &str, paths: &[String]) -> Result<Snapshot, St
         "ls-tree".into(),
         "-rz".into(),
         "--full-tree".into(),
-        "--format=%(objectmode) %(objectname)".into(),
         commit.clone(),
         "--".into(),
     ];
     args.extend_from_slice(paths);
-    let entries = git_stdout(root, &args)?;
-    let blobs = entries.split_terminator('\0').filter_map(|entry| {
-        let (mode, object) = entry.split_once(' ')?;
-        matches!(mode, "100644" | "100755").then_some(object)
+    let entries = git_stdout_bytes(root, &args)?;
+    let files = entries.split(|&byte| byte == 0).filter_map(|entry| {
+        let (executable, metadata) = if let Some(metadata) = entry.strip_prefix(b"100644 blob ") {
+            (false, metadata)
+        } else {
+            (true, entry.strip_prefix(b"100755 blob ")?)
+        };
+        let tab = metadata.iter().position(|&byte| byte == b'\t')?;
+        Some(TreeFile {
+            executable,
+            object: &metadata[..tab],
+            path: &metadata[tab + 1..],
+        })
     });
 
     let mut child = Command::new("git")
@@ -129,7 +144,7 @@ fn measure(root: &Path, revision: &str, paths: &[String]) -> Result<Snapshot, St
         .map_err(|error| format!("unable to start git cat-file: {error}"))?;
     let stdin = child.stdin.take().expect("piped child stdin");
     let stdout = child.stdout.take().expect("piped child stdout");
-    let result = compress_blobs(stdin, BufReader::new(stdout), blobs);
+    let result = compress_tree(stdin, BufReader::new(stdout), files);
     if result.is_err() {
         let _ = child.kill();
     }
@@ -146,17 +161,18 @@ fn measure(root: &Path, revision: &str, paths: &[String]) -> Result<Snapshot, St
     })
 }
 
-fn compress_blobs<'a>(
+fn compress_tree<'a>(
     mut requests: impl Write,
     mut responses: impl BufRead,
-    blobs: impl Iterator<Item = &'a str>,
+    tree: impl Iterator<Item = TreeFile<'a>>,
 ) -> io::Result<(u64, u64, u64)> {
     let mut encoder = GzEncoder::new(ByteCount::default(), Compression::new(6));
     let mut header = String::new();
     let mut files = 0;
     let mut source_bytes = 0;
-    for object in blobs {
-        writeln!(requests, "{object}")?;
+    for file in tree {
+        requests.write_all(file.object)?;
+        requests.write_all(b"\n")?;
         header.clear();
         responses.read_line(&mut header)?;
         // The batch response is "<object> blob <size>\n", followed by <size> bytes and a newline.
@@ -165,14 +181,23 @@ fn compress_blobs<'a>(
             .nth(2)
             .and_then(|size| size.parse::<u64>().ok())
             .ok_or_else(|| {
-                io::Error::other(format!("cannot read Git blob {object}: {header:?}"))
+                io::Error::other(format!(
+                    "cannot read Git blob for {:?}: {header:?}",
+                    String::from_utf8_lossy(file.path)
+                ))
             })?;
+        encoder.write_all(&(file.path.len() as u64).to_le_bytes())?;
+        encoder.write_all(file.path)?;
+        encoder.write_all(&[u8::from(file.executable)])?;
         encoder.write_all(&size.to_le_bytes())?;
         let copied = io::copy(&mut responses.by_ref().take(size), &mut encoder)?;
         let mut delimiter = [0];
         responses.read_exact(&mut delimiter)?;
         if copied != size || delimiter[0] != b'\n' {
-            return Err(io::Error::other(format!("invalid Git blob frame {object}")));
+            return Err(io::Error::other(format!(
+                "invalid Git blob frame for {:?}",
+                String::from_utf8_lossy(file.path)
+            )));
         }
         source_bytes += size;
         files += 1;
@@ -192,8 +217,8 @@ fn report(options: Options<'_>) -> Result<Report<'_>, String> {
         gzip_bytes: i128::from(target.gzip_bytes) - i128::from(base.gzip_bytes),
     });
     Ok(Report {
-        schema: "agent_canon.code_complexity.v1",
-        method: "gzip-level-6-git-blob-length-prefix-v1",
+        schema: "agent_canon.code_complexity.v2",
+        method: "gzip-level-6-git-file-tree-v2",
         paths: options.paths,
         target,
         base,
