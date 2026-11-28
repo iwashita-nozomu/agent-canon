@@ -129,9 +129,11 @@ context/evidence. The contracts below apply without an installed Skill/runtime.
   requirement. Continue independent work while resolving the blocker. If the
   available approaches still leave work open, state what you tried, the concrete
   blocker, and what remains to finish.
-- Give the conclusion and enough reasoning and evidence for the reader to
-  understand, assess, and act on it. Remove repeated points and details that
-  serve none of those purposes. Keep secrets private.
+- Use affirmative sentences in progress updates, reports, and final responses.
+  Give the conclusion and enough reasoning and evidence for the reader to
+  understand, assess, and act on it. State failures, omissions, and unverified
+  or pending work directly, with their reasons. Remove repetition and details
+  unrelated to the reader's decision or action. Keep secrets private.
 
 ## Validation Routing
 
