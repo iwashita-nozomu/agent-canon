@@ -2,7 +2,7 @@
 name: computational-optimization
 description: "Use for loss functions and changes to their terms, numerical optimization, solvers, preconditioners, convergence, gradients, Jacobians, Hessians, KKT conditions, tolerances, and optimization benchmarks."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"92d1e19fb3f76fb1c850091c3680e96d61f51a9463672a61339eca1f31ff3da0"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"eaec1d3a2be1392336c4b57b87dafcb2fe73f582f9267a230cc75e6be55d568b"} -->
 
 <!--
 @dependency-start

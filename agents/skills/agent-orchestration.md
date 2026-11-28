@@ -35,8 +35,10 @@ Use the known Skill. Consult the [task catalog](../task_catalog.yaml),
 [Skill catalog](catalog.yaml), or [dependency map](skill-dependencies.yaml) for an
 unresolved route. Use the bounded route for one owner and writer. Activate
 specialists for a decision or guarantee they own. Route mathematical work to
-[computational-optimization](computational-optimization.md), including
-[loss definitions and term changes](computational-optimization.md#loss-changes).
+[computational-optimization](computational-optimization.md) for
+[loss definitions and term changes](computational-optimization.md#loss-changes)
+and [hyperparameter selection](computational-optimization.md#hyperparameter-selection),
+including learning-rate choices and diagnosis of poor training settings.
 
 ## Delegation selection
 
