@@ -11,7 +11,7 @@ use std::io::Read;
 use std::path::Path;
 use std::process::{Command, Output};
 
-fn git(root: &Path, args: &[&str]) {
+fn git(root: &Path, args: &[&str]) -> Output {
     let output = Command::new("git")
         .args([
             "-c",
@@ -28,6 +28,7 @@ fn git(root: &Path, args: &[&str]) {
         .output()
         .unwrap();
     assert!(output.status.success(), "{output:?}");
+    output
 }
 
 fn tool(root: &Path, args: &[&str]) -> Output {
@@ -130,9 +131,19 @@ fn preserves_path_bytes_outside_utf8() {
     let path = b"src/\xff.rs";
     let bytes = b"fn main() {}\n";
     git(root, &["init", "-q"]);
-    fs::create_dir(root.join("src")).unwrap();
-    fs::write(root.join(OsStr::from_bytes(path)), bytes).unwrap();
-    git(root, &["add", "src"]);
+    // Git can store this name even on filesystems that require UTF-8 names.
+    fs::write(root.join("blob"), bytes).unwrap();
+    let blob = git(root, &["hash-object", "-w", "blob"]);
+    let object = std::str::from_utf8(&blob.stdout).unwrap().trim();
+    let mut entry = format!("100644,{object},").into_bytes();
+    entry.extend_from_slice(path);
+    let index = Command::new("git")
+        .args(["update-index", "--add", "--cacheinfo"])
+        .arg(OsStr::from_bytes(&entry))
+        .current_dir(root)
+        .output()
+        .unwrap();
+    assert!(index.status.success(), "{index:?}");
     git(root, &["commit", "-qm", "raw path"]);
 
     let output = tool(root, &["--", "src"]);
