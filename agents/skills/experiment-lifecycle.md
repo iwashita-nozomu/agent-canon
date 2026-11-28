@@ -36,7 +36,8 @@ requires a request for that outcome.
    coverage before choosing where to start. State the question, the inputs and
    comparison that can answer it, and the stopping condition for the request.
    For tuning, use [Hyperparameter selection](computational-optimization.md#hyperparameter-selection)
-   to ground candidate settings and choose the cheapest informative comparison.
+   to select one grounded setting. A user request for hyperparameter comparison
+   activates the comparison protocol.
 2. Run through the project's existing runner and environment. Preserve their
    configured defaults and execution semantics; use a specialized profile or
    variant only when the requested evidence needs it.
