@@ -26,6 +26,7 @@ project commands.
 
 ## Public command routes
 
+- [Code complexity](code_complexity.md) compares compressed size across code commits.
 - `bootstrap.sh ... tool run --root <target> <catalog-id> -- <args...>` runs a
   typed catalog entry through the authenticated runtime.
 - `bootstrap.sh ... exec --root <target> -- <argv...>` runs an explicit argv

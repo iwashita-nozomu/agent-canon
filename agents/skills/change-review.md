@@ -48,6 +48,13 @@ requirement; Skill selection alone does not require a second review.
    uncertain causes explicit and route durable unresolved work to its owner; a
    local finding alone creates no extra Issue or gate.
 
+## Generated code comparison
+
+When code size is relevant to a generated-code evaluation, compare the same
+source scope across candidate commits with [code-complexity](../../documents/tools/code_complexity.md).
+Use the measured source and compressed byte deltas alongside evidence of
+correctness and the review of the changed code.
+
 ## Explicit security audit
 
 For a requested security audit, retain the target revision and authorized scope.

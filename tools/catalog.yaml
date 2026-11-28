@@ -2487,6 +2487,28 @@ entries:
       - tests/tools/test_save_experiment_result_annex.py
 
 
+  - id: code-complexity
+    public: true
+    summary: Measures gzip description length for committed code and compares candidate snapshots.
+    path: tools/runtime/dispatch/agent-canon/src/code_complexity.rs
+    family: validation
+    role: helper
+    status: canonical
+    audience: user
+    placement: user_entrypoint
+    command: tools/bin/agent-canon code-complexity
+    dispatch: {runtime: rust, cwd: target-root, argv: ["tools/bin/agent-canon", "code-complexity"]}
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/code_complexity.md
+    tests:
+      - tools/runtime/dispatch/agent-canon/tests/code_complexity_native.rs
+
   - id: notebook-quality
     summary: Validates notebooks as readable runnable demos instead of fine-grained tests.
     path: tools/runtime/dispatch/agent-canon/src/notebook_quality.rs
