@@ -33,9 +33,10 @@ an unresolved definition or inconsistent meaning that needs separate review.
 
 ## Japanese revision
 
-説明文は肯定形で書き、対象・目的・作用・結果を直接述べます。
-否定形による説明を禁止します。例えば「私は既存の学習経路で損失を変更し、
-学習を実行します」と、主体と実行内容を肯定形で示します。
+説明文と報告は肯定形で書き、対象・目的・作用・結果を直接述べます。
+失敗、欠落、未実施、未確認は、該当する状態と理由を伝えます。
+例えば「受入確認は未実施です。旧環境では cargo の欠落でテストの起動に失敗しました」と
+書きます。
 
 返答・進捗・完了報告では、各文から「誰・何が、何に対して、何をしたか」が
 分かるように書きます。処理主体や対象が切り替わる文・箇条書きには、その名前を
@@ -63,6 +64,7 @@ an unresolved definition or inconsistent meaning that needs separate review.
 
 ## Structure before writeout
 
+[肯定形で書く指針](#japanese-revision) は、検証結果、完了報告、IssueとPRの報告に適用します。
 結論のそばに、判断を追えるだけの根拠を残します。前提、反証、検証範囲は、結論の
 解釈や読者の対応に必要な分だけ説明します。同じ主張の繰り返しや、読者の判断に
 関係しない操作履歴・但し書きは削ります。
