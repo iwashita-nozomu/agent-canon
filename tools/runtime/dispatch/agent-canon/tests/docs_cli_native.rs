@@ -1,14 +1,14 @@
 // @dependency-start
 // contract test
-// responsibility Checks missing Markdown providers without changing source files.
-// upstream implementation ../src/docs.rs dispatches Markdown formatting and checks
+// responsibility Checks documentation CLI failures without changing source files.
+// upstream implementation ../src/docs.rs dispatches Markdown checks
 // @dependency-end
 
 use std::fs;
 use std::process::Command;
 
 #[test]
-fn format_reports_missing_formatter_without_rewriting_source() {
+fn retired_format_command_preserves_source() {
     let root = tempfile::tempdir().unwrap();
     let selected = root.path().join("selected.md");
     let source = b"# Title\r\n\r\nFirst line  \r\nNext line \r\n";
@@ -20,8 +20,8 @@ fn format_reports_missing_formatter_without_rewriting_source() {
         .env("PATH", "")
         .output()
         .unwrap();
-    assert_eq!(output.status.code(), Some(1), "{output:?}");
-    assert!(String::from_utf8_lossy(&output.stderr).contains("markdownlint-cli2"));
+    assert_eq!(output.status.code(), Some(2), "{output:?}");
+    assert!(String::from_utf8_lossy(&output.stderr).contains("unknown docs command format"));
     assert_eq!(fs::read(selected).unwrap(), source);
 }
 

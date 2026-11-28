@@ -3871,12 +3871,6 @@ mod tests {
     }
 
     #[test]
-    fn rejects_retired_markdown_formatter() {
-        let result = Args::parse(&["format".to_string(), "README.md".to_string()]);
-        assert_eq!(result.unwrap_err(), "unknown docs command format");
-    }
-
-    #[test]
     fn parses_link_apply_arguments_without_weakening_other_docs_commands() {
         let args = vec![
             "links".to_string(),
