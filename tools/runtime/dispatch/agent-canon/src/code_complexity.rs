@@ -171,7 +171,7 @@ fn compress_blobs<'a>(
         let copied = io::copy(&mut responses.by_ref().take(size), &mut encoder)?;
         let mut delimiter = [0];
         responses.read_exact(&mut delimiter)?;
-        if copied != size || delimiter != [b'\n'] {
+        if copied != size || delimiter[0] != b'\n' {
             return Err(io::Error::other(format!("invalid Git blob frame {object}")));
         }
         source_bytes += size;
