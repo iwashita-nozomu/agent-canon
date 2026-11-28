@@ -129,10 +129,9 @@ context/evidence. The contracts below apply without an installed Skill/runtime.
   requirement. Continue independent work while resolving the blocker. If the
   available approaches still leave work open, state what you tried, the concrete
   blocker, and what remains to finish.
-- Report commit/push separately and distinguish implemented, verified, published,
-  and applied. State the reason beside each material conclusion. Explain how the
-  source, derivation, or observed result supports that judgment. State material
-  limits and uncertainty. Keep secrets private.
+- State the conclusion and its reason together. Include evidence, delivery
+  status, and limitations when they affect the reader's understanding, judgment,
+  or next action. Keep secrets private.
 
 ## Validation Routing
 
