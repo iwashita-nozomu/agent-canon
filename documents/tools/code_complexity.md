@@ -5,7 +5,6 @@
 contract design
 responsibility Defines the Git snapshot scope and compression measurement.
 upstream implementation ../../tools/runtime/dispatch/agent-canon/src/code_complexity.rs native CLI
-downstream design ../../agents/skills/change-review.md generated code comparison
 @dependency-end
 -->
 
@@ -46,8 +45,8 @@ $`C_U`$ は一般に計算不能です。固定したgzipデコーダで $`E(T)`
 `delta.gzip_bytes` は独立に圧縮した二つの記述長の差です。基準を入力として対象を復元する記述の
 最短長は条件付きコルモゴロフ複雑性で定義されます。差分の符号は前者についてだけ解釈します。
 
-## 生成コードの評価
+## 格納量の比較
 
-gzipは直近32 KiBまでの重複を利用します。コメント、ファイル名、書式、ファイル順も測定値に影響します。
-生成コードの評価では格納量や元のデータの圧縮しやすさを確認する資料に使い、正しさはテストで、
-可読性と構造はコードレビューで確認します。[DEFLATE仕様 §3.2](https://www.rfc-editor.org/rfc/rfc1951.html#section-3.2)
+このツールは、選択したファイル集合のgzip格納量を比較するために使います。gzipは直近32 KiBまでの
+重複を利用します。変数名、コメント、ファイル名、書式、ファイル順も測定値に影響します。
+[DEFLATE仕様 §3.2](https://www.rfc-editor.org/rfc/rfc1951.html#section-3.2)
