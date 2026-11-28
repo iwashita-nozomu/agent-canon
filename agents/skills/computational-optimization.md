@@ -118,21 +118,18 @@ or execution of a theory-only request.
 
 ## Hyperparameter selection
 
-Start with the agreed setting or a comparable measured baseline. For each value
-being tuned, tie the initial value and candidate range to the method's equations
-or bounds, a relevant measured scale, or a documented setting under matching
-conditions. For example, judge a learning rate by the optimizer's actual update
-relative to parameter scale. When the scale is unknown, measure it on a
-representative input or a short baseline run before choosing values.
+Propose one initial setting and explain its basis, using the agreed setting, the
+method's equations or bounds, a relevant measured scale, or a documented setting
+under matching conditions. For example, judge the learning rate by the
+optimizer's actual update relative to parameter scale. If a measurement is
+needed, use a representative input or a short run with the single baseline
+setting. If that run fails, trace the cause before adjusting the setting.
 
-Reuse comparable results first. Screen a small, hypothesis-driven set of
-candidates with the cheapest experiment that can distinguish the expected
-effects. Use the same inputs, initialization or seed, metric, and budget across
-candidates as applicable, then inspect the numerical trajectory and stopping
-reason. If the baseline fails, trace the failure before changing settings.
-Reserve a full-scale comparison for viable candidates when the remaining
-question requires it, such as long-run stability. Keep any run conditions the
-user explicitly requested.
+Present and run hyperparameter comparisons only when the user explicitly
+requests one. Reuse comparable results and screen a few justified settings with
+the cheapest experiment that can distinguish them. Match inputs, initialization
+or seed, metric, and budget as applicable. Use a full-scale comparison when the
+requested question requires it, such as long-run stability.
 
 ## Remove unsupported stabilization
 
