@@ -32,9 +32,10 @@ requires a request for that outcome.
 ## Method
 
 1. Identify the requested models, variants, update counts, and any other
-   conditions that define the comparison. Use the existing records to establish
-   coverage before choosing where to start. State the question, the inputs and
-   comparison that can answer it, and the stopping condition for the request.
+   conditions that define the comparison. Before proposing a run, state what it
+   would verify, which decision its result could change, and what the existing
+   records leave open. When that gap could change the decision, use the
+   smallest run that can answer the question and state its stopping condition.
    For tuning, use [Hyperparameter selection](computational-optimization.md#hyperparameter-selection)
    to select one grounded setting. A user request for hyperparameter comparison
    activates the comparison protocol.

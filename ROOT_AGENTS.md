@@ -138,7 +138,10 @@ context/evidence. The contracts below apply without an installed Skill/runtime.
 
 Judge acceptance and completion by evidence of the required behavior. Treat
 processing time as an observation. Add consumer checks for explicit consumer migration.
-Reuse unchanged results; broaden suites only when those guarantees require it.
+Before proposing or running a check, name the property it will verify, the
+decision its result could change, and the gap in the evidence already available.
+Reuse evidence that settles the decision. Run the smallest check that can close
+a remaining gap, and broaden coverage only when the required behavior calls for it.
 Format final edited files with the configured formatter before delivery and include
 its diff; unavailable formatting stays unverified. Tests, observations, and proofs
 establish different properties: report only what the evidence establishes.
