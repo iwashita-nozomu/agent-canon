@@ -17,6 +17,9 @@ commit identity, and performs deterministic gates before publication.
 
 ## Command
 
+Run the command where Git and Quarto are available. Quarto's Pandoc formats the
+Wiki pages as GFM before the page-set digest is computed.
+
 ```bash
 agent-canon wiki-publish \
   --wiki-root /path/to/agent-canon.wiki \
@@ -58,7 +61,7 @@ agent-canon wiki-publish \
   - require `Home.md`, `_Sidebar.md`, `_Footer.md`;
   - each page must contain exact `AGENT_CANON_WIKI_SOURCE_COMMIT=<sha>` binding.
 - Formatting and digest:
-  - checks/prepare runs markdown/math/Mermaid formatting before reviewer approval;
+  - preparation formats Markdown with Pandoc's GFM writer before reviewer approval;
   - deterministic SHA-256 is computed on sorted page paths and prepared bytes;
   - publish requires exact `--expected-page-set-digest` match and rejects mismatch.
 - Publish readback:

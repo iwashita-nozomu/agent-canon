@@ -56,10 +56,9 @@ downstream implementation ../../../tools/runtime/dispatch/agent-canon/src/conven
 - workflow、依存関係、責務境界、状態遷移、routing、review gate、multi-step 手順を説明する reader-facing Markdown では、Mermaid 図を既定の visual 候補にします。
 - Mermaid 図は Markdown 内の fenced `mermaid` code block として保持し、本文の責務説明と併記して正本化します。
 - Mermaid 図には、図が示す関係を本文で短く説明します。
-- Markdown の整形は、変更したファイルを対象に `agent-canon docs format` から既存の
-  `markdownlint-cli2` を呼び出します。
-  [Markdown style check の実行手順](../../../agents/skills/md-style-check.md#procedure) に沿って
-  GitHub向けの文書を検査します。
+- Markdown の整形は [Pandocの実行手順](../../design/formatting.md#markdown-execution) に従います。
+  GitHub向けの文書は [Markdown style check の手順](../../../agents/skills/md-style-check.md#procedure)
+  で検査します。
 - 体裁チェックの設定はリポジトリ root の [`.markdownlint-cli2.jsonc`](../../../.markdownlint-cli2.jsonc) を使います。
   例外が必要な場合は設定ファイルと規約文書を同時に更新します。
 - 空行は 1 行に保ち、見出しには本文または箇条書きを続けます。
@@ -68,15 +67,9 @@ downstream implementation ../../../tools/runtime/dispatch/agent-canon/src/conven
 
 ## 数式の表記
 
-- インライン数式は `$...$` で記述する。
-- 表示数式は double-dollar delimiter をそれぞれ独立行に置き、block の前後に
-  空行を入れる。
-- 数式の記述先は、本文中の inline `$...$` と standalone double-dollar block の
-  2 形式に限定する。
-- fence info の listed aliases は大文字・小文字の双方を同一 alias として正規化し、
-  すべて同じ数式表記規約に従う。`text` / `plaintext` / `txt` / `plain` は literal
-  output 用、`math` / `latex` / `tex` は standalone display math への移行対象として
-  扱う。
+- インライン数式は GitHub の `$...$` または Pandoc のGFM出力を使います。
+- 別行立ての数式は `math` フェンスまたは独立した `$$` 行で囲みます。
+- `text` / `plaintext` / `txt` / `plain` は文字列をそのまま見せる場合に使います。
 
 ## 文書構造の判断
 

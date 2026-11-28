@@ -19,8 +19,7 @@ downstream implementation ../../tests/tools/test_fix_mermaid.py tests native Mer
 
 - Purpose: keep changed Markdown aligned with the document owner's formatting and
   link rules.
-- Use when: Markdown changed, docs format/check is selected, or a docs-check
-  finding needs repair.
+- Use when Markdown changes or a docs-check finding needs repair.
 - Boundary: the document owner decides meaning and evidence; this skill handles
   formatting, headings, links, math, Mermaid, and the selected formatter route.
 

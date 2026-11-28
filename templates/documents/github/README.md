@@ -82,7 +82,7 @@ duplicate owner を作らず、source と checked-in standalone targets を同�
   checker route として、対象 surface に対応する検証結果を束ねる。dependency graph
   などの internal subcommand は `check_agent_canon_pr.sh` の実行責務であり、checklist
   authority として重複掲載しない。
-- GitHub YAML parse、Markdown/docs format/check、および gate が呼び出す
+- GitHub YAML parse、PandocでのMarkdown整形、`agent-canon docs check`、および gate が呼び出す
   `tools/bin/agent-canon check-github-workflows --root .` を実行する。
 - Maintenance Issue Form は canonical source と checked-in standalone target の
   `name:` 以下を read back し、operational field ID、required flag、表示順の一致を確認する。

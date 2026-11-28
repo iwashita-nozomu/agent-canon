@@ -18,7 +18,7 @@ run-local template です。本文を書く前に、次の欄を埋めて reader
 - canonical source / generated projection / run-local artifact:
 - owner and responsibility boundary:
 - required readback and targeted validation:
-- formatter command: `tools/bin/agent-canon docs format <paths...>`
+- formatter: Quarto Pandoc GFM writer
 - checker command: `tools/bin/agent-canon docs check <paths...>`
 - post-format source readback:
 - rendered/projection readback identity:

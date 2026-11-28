@@ -22,7 +22,7 @@
 // downstream implementation github_workflow_check.rs validates standalone workflows and PR templates
 // downstream implementation python_cli_options.rs resolves unique argparse-compatible option prefixes
 // downstream implementation theorem_graph_board.rs builds formal-proof theorem route summaries
-// downstream implementation ../../../../../tests/tools/test_fix_mermaid.py exercises docs formatter coverage readback through this CLI
+// downstream implementation ../../../../../tests/tools/test_fix_mermaid.py exercises document checks through this CLI
 // downstream implementation jit_ir_to_lean.rs routes JIT-canonical JSON to Lean evidence generation
 // downstream implementation stablehlo_value_closure.rs exposes scoped SSA dependency closure APIs
 // downstream implementation theorem_graph_circularity_check.rs validates theorem graph proof frontiers

@@ -201,7 +201,6 @@ struct Args {
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum DocsCommand {
     Check,
-    Format,
     Links,
     RenderRuntimeProfile,
     Help,
@@ -263,7 +262,6 @@ fn run_parsed(args: Args) -> i32 {
             0
         }
         DocsCommand::Check => render_check(&root, &args.paths),
-        DocsCommand::Format => render_format(&root, &args.paths),
         DocsCommand::Links if args.consumer => consumer_link_audit(&root),
         DocsCommand::Links => run_link_audit(
             &root,
@@ -1595,7 +1593,6 @@ impl Args {
     fn parse(args: &[String]) -> Result<Self, String> {
         let command = match args.first().map(|item| item.as_str()) {
             Some("check") => DocsCommand::Check,
-            Some("format") => DocsCommand::Format,
             Some("links") => DocsCommand::Links,
             Some("render-runtime-profile") => DocsCommand::RenderRuntimeProfile,
             Some("help") | Some("--help") | Some("-h") => DocsCommand::Help,
@@ -2013,7 +2010,6 @@ fn usage_text() -> &'static str {
 \n\
 commands:\n\
   check                   check Markdown lint, links, math, Mermaid, headings, and runtime-profile docs\n\
-  format                  fix selected Markdown with markdownlint-cli2\n\
   find-redundant-designs  report exact duplicate design documents; --delete requires an exact source mutation capability\n\
   find-similar-designs    compare Markdown design documents and write an external runtime report\n\
   organize-designs        plan design-document placement; --apply requires an exact source mutation capability\n\
@@ -2036,8 +2032,7 @@ examples:\n\
   tools/bin/agent-canon docs links --apply --mutation-capability-json '<json>' documents/tools/agent-canon.md\n\
   tools/bin/agent-canon docs check-entrypoints --root . --format json\n\
   tools/bin/agent-canon docs check-bootstrap --root .\n\
-  tools/bin/agent-canon docs check-bootstrap --root <seed> --static-seed-consumer\n\
-  tools/bin/agent-canon docs format README.md"
+  tools/bin/agent-canon docs check-bootstrap --root <seed> --static-seed-consumer"
 }
 
 fn print_usage() {
@@ -2402,7 +2397,7 @@ fn python_list_repr(values: &[&str]) -> String {
 
 fn render_check(root: &Path, raw_paths: &[String]) -> i32 {
     let markdown_files = collect_markdown_files(root, raw_paths);
-    let mut succeeded = run_markdownlint_cli(root, &markdown_files, false);
+    let mut succeeded = run_markdownlint_cli(root, &markdown_files);
     succeeded &= run_lychee(root, &markdown_files);
     let mut findings = Vec::new();
     for path in &markdown_files {
@@ -2457,11 +2452,6 @@ fn render_check(root: &Path, raw_paths: &[String]) -> i32 {
     } else {
         1
     }
-}
-
-fn render_format(root: &Path, raw_paths: &[String]) -> i32 {
-    let files = collect_markdown_files(root, raw_paths);
-    i32::from(!run_markdownlint_cli(root, &files, true))
 }
 
 fn consumer_link_audit(root: &Path) -> i32 {
@@ -2916,7 +2906,7 @@ fn docs_provider_config(
     }
 }
 
-fn run_markdownlint_cli(root: &Path, files: &[PathBuf], fix: bool) -> bool {
+fn run_markdownlint_cli(root: &Path, files: &[PathBuf]) -> bool {
     if files.is_empty() {
         return true;
     }
@@ -2939,9 +2929,6 @@ fn run_markdownlint_cli(root: &Path, files: &[PathBuf], fix: bool) -> bool {
         .arg("--config")
         .arg(config.path())
         .arg("--no-globs");
-    if fix {
-        command.arg("--fix");
-    }
     for path in files {
         command.arg(format!(":{}", path.display()));
     }
@@ -3873,30 +3860,14 @@ mod tests {
     }
 
     #[test]
-    fn help_exposes_check_and_format_commands() {
+    fn help_exposes_check_commands() {
         let usage = usage_text();
 
         assert!(usage.contains("docs check"));
-        assert!(usage.contains("docs format"));
         assert!(usage.contains("docs links"));
         assert!(usage.contains("--mutation-capability-json"));
         assert!(usage.contains("docs check-entrypoints"));
         assert!(usage.contains("docs check-bootstrap"));
-    }
-
-    #[test]
-    fn parses_formatter_command_arguments() {
-        let args = vec![
-            "format".to_string(),
-            "--root".to_string(),
-            "/repo".to_string(),
-            "README.md".to_string(),
-        ];
-        let parsed = Args::parse(&args).expect("args should parse");
-
-        assert_eq!(parsed.command, DocsCommand::Format);
-        assert_eq!(parsed.root, PathBuf::from("/repo"));
-        assert_eq!(parsed.paths, vec!["README.md"]);
     }
 
     #[test]
