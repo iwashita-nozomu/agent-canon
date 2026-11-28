@@ -1,6 +1,6 @@
 // @dependency-start
 // contract implementation
-// responsibility Publishes source-bound wiki page sets through the existing Git and docs providers.
+// responsibility Publishes source-bound wiki page sets through Git and Pandoc.
 // upstream design ../../../../../agents/skills/wiki-publication.md owns publication and reviewer authority
 // upstream implementation ./runtime_boundary.rs owns external staging and atomic output
 // downstream test ../../../../../tests/agent_tools/test_wiki_publish.py verifies native CLI behavior
@@ -148,27 +148,28 @@ fn prepare(
     let mut prepared = BTreeMap::new();
     for page in pages {
         let temporary = tempfile::tempdir_in(&staging).map_err(storage)?;
-        let formatted = temporary.path().join("page.md");
+        let input = temporary.path().join("page.md");
         let text = fs::read_to_string(&page)
             .map_err(storage)?
             .replace("\r\n", "\n")
             .replace('\r', "\n");
         runtime
-            .atomic_write_bytes(&formatted, text.as_bytes(), 0o644)
+            .atomic_write_bytes(&input, text.as_bytes(), 0o644)
             .map_err(storage)?;
-        command(
+        let text = command(
             runner,
             &[
-                "tools/bin/agent-canon".into(),
-                "docs".into(),
-                "format".into(),
-                formatted.to_string_lossy().into(),
+                "quarto".into(),
+                "pandoc".into(),
+                input.to_string_lossy().into(),
+                "--from=gfm+tex_math_dollars+yaml_metadata_block".into(),
+                "--to=gfm+yaml_metadata_block".into(),
+                "--standalone".into(),
+                "--wrap=preserve".into(),
             ],
             &options.source,
             "format_source_page",
         )?;
-        let bytes = fs::read(&formatted).map_err(storage)?;
-        let text = std::str::from_utf8(&bytes).map_err(storage)?;
         let marker = text.lines().find_map(|line| {
             line.strip_prefix(MARKER)
                 .map(|value| value.strip_suffix("-->").unwrap_or(value))
@@ -183,6 +184,7 @@ fn prepare(
                 "rewrite_source_marker_before_publish",
             ));
         }
+        let bytes = text.into_bytes();
         hasher.update(
             format!(
                 "{}\0{}\0",
@@ -538,6 +540,7 @@ mod tests {
         fn execute(&mut self, args: &[String], _: &Path) -> std::io::Result<Output> {
             self.calls.push(args.to_vec());
             let stdout = match args.get(1).map(String::as_str) {
+                Some("pandoc") => fs::read_to_string(&args[2])?,
                 Some("cat-file") => self.kind.clone(),
                 Some("ls-remote") if args.get(2).is_some_and(|value| value == "--symref") => {
                     self.heads.clone()

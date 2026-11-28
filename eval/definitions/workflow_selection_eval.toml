@@ -127,9 +127,9 @@ limit = 25
 prompt_templates = [
   "agent-canon docs check で {subject} の markdown heading と link を直して",
   "agent-canon docs check を通して {subject} のマークダウン体裁を修正して",
-  "repo-changing docs patch として agent-canon docs format で {subject} の markdownlint を確認して修正して",
+  "repo-changing docs patch として {subject} を Pandoc で整形して agent-canon docs check で確認して",
   "agent-canon docs check を使い、{subject} の markdown link と heading を直して",
-  "agent-canon docs format で {subject} のフォーマット周辺を確認して修正して",
+  "{subject} の GFM 整形を見直し、agent-canon docs check で確認して修正して",
 ]
 subjects = [
   "workflow README",

@@ -1,7 +1,7 @@
 <!--
 @dependency-start
 contract reference
-responsibility Documents the unified Rust docs formatter and checker.
+responsibility Documents the unified Rust documentation checks.
 upstream implementation ../../tools/runtime/dispatch/agent-canon/src/docs.rs implements docs check, format, and check-bootstrap.
 upstream implementation ../../tools/runtime/dispatch/agent-canon/src/docs.rs implements the native exact duplicate-design route.
 upstream implementation ../../tools/runtime/dispatch/agent-canon/src/entrypoint_owner_map.rs implements docs check-entrypoints.
@@ -44,7 +44,6 @@ examples in a compact text block.
 ```bash
 tools/bin/agent-canon docs -h
 tools/bin/agent-canon docs check <paths...>
-tools/bin/agent-canon docs format <paths...>
 tools/bin/agent-canon docs find-redundant-designs [--design-root <path>] [--delete] [--mutation-capability-json <json>] [--runtime-root <path>] [--output <path>]
 tools/bin/agent-canon docs check-entrypoints [--root <repo-root>] [--format text|json]
 tools/bin/agent-canon docs check-bootstrap [--root <path>] [--static-seed-consumer | --source-policy PATH]
@@ -146,9 +145,7 @@ property/metamorphic candidates. Its detailed contract lives in
 current stage, and `DEFERRED_SKILLS` for dynamic wave triggers. Use it before
 broad skill-selection prose or subagent fan-out.
 
-`format` passes selected files to the installed `markdownlint-cli2 --fix` with
-the repository configuration. Its diagnostics include rules that require a
-manual correction.
+Use [Pandoc](../design/formatting.md#markdown-execution) to format Markdown.
 
 `check` uses `markdownlint-cli2` and offline `lychee` for lint and links.
 Quarto's Pandoc reads GitHub Flavored Markdown, and `mmdc` renders the Mermaid

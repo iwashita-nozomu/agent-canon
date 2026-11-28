@@ -37,7 +37,7 @@ repo responsibilities.
    - once initialized, clone default branch and require checked-out branch equals it.
 4. Inventory all top-level `.md` pages in the wiki sidecar; require
    `Home.md`, `_Sidebar.md`, and `_Footer.md`.
-5. `tools/bin/agent-canon docs format` each page to normalized bytes,
+5. Format each page with the [Pandoc GFM writer](../../documents/design/formatting.md#markdown-execution),
    bind the exact source commit marker,
    and compute deterministic SHA-256 over sorted page path+bytes.
 6. In check mode, return digest and summary; publish requires
