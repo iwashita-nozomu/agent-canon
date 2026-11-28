@@ -44,14 +44,35 @@ in the writable work checkout. It delegates fixes to `markdownlint-cli2 --fix`
 with the repository configuration and preserves two-space Markdown hard breaks.
 The executable must be available on `PATH`.
 
-Use `agent-canon docs check` for GitHub-bound changes. The
+Use `agent-canon docs check` for Markdown checks. The
 [command owner](../tools/agent-canon.md#commands) lists its providers and
-rendering checks. Report any formatting or checks left unverified.
+rendering checks.
 
 If the already selected environment is a shared resident with read-only source
 mounts, format a writable task snapshot and copy back only the selected files.
 Preserve local link targets for any selected checks and remove the snapshot
 when its use ends. This conditional route preserves the source mount boundary.
+
+### GitHub math formatting
+
+For Markdown with math intended for GitHub, use Quarto's Pandoc in the shared
+tool runtime to produce a GFM candidate in the writable task area.
+
+```bash
+quarto pandoc "$source" --from=gfm+tex_math_dollars --to=gfm \
+  --wrap=preserve --output "$candidate"
+```
+
+Use the configured GitHub connection on the host to render the publication
+candidate.
+
+```bash
+gh api --method POST markdown -f mode=gfm -F text=@"$candidate" >"$preview"
+```
+
+Check that GitHub recognizes the intended inline and display equations and
+inspect the candidate's diff before applying it. Use the GitHub page preview
+when the task needs confirmation of a particular TeX command's display.
 
 ## Engineering rationale
 
