@@ -113,7 +113,7 @@ not part of this assumed base. Provider procedures stay with their owners.
 
 ## Task Skill Sets
 
-Choose the smallest applicable composition once from the requested outcome.
+Choose the skills that together cover the requested outcomes.
 Reuse the selected owners, available definitions, and task facts while they
 remain valid. A set describes how responsibilities compose; it does not activate
 every member or create another routing state. External members are selected

@@ -1,8 +1,8 @@
 ---
 name: mvp-skeleton
-description: "Use when creating, scaffolding, planning, or implementing an MVP, prototype, runnable vertical slice, product skeleton, v0, or thin vertical slice and the agent must define the smallest complete final product scope. Trigger for MVP作成, プロトタイプ, 骨格だけ, core runnable path, thin vertical slice, scope creep, over-polish, and cases where early implementation is getting unnecessary UI, architecture, features, or tests."
+description: "Use for an explicitly requested MVP, prototype, runnable vertical slice, product skeleton, or v0. Deliver the requested paths with observable acceptance."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"6c79b4b221ccfff1f852c3a9e5949e6b194da67d9f523590b4bb3912c3d304f9"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"25488ca8ff0ff808efb60c494b928f4c0fb2cecfe347947edefa2f4df1b122bb"} -->
 
 <!--
 @dependency-start

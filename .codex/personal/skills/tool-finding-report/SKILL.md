@@ -2,7 +2,7 @@
 name: tool-finding-report
 description: "Use when running tools or checkers to report findings for the requested scope. Preserve raw or structured evidence as needed; prioritize findings when triage requires it and compare before/after impact only when requested."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"aae598abc3c036fde7c52c118ce34442bf0adf97cf6b25d2b574390a9a19a188"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"80bc159fe33d2934985c33645d4333cbff8e27463034fa6519abba6db63bd58b"} -->
 
 <!--
 @dependency-start

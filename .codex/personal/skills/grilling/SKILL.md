@@ -2,7 +2,7 @@
 name: grilling
 description: "Use when the user explicitly asks to grill a plan, decision, or idea; ask the settled prerequisite frontier in rounds with recommendations, inspect facts through the agent, and wait for shared understanding before any action."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"216d91920b812d6207e7d0c4fdaeb8e7d65b1c8934eb5f47778f8ad5d073a2d9"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"acca933835e72ca860e6a10e60a397d0eba67c04c7860eaeea1a765eab4898db"} -->
 
 <!--
 @dependency-start

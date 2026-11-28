@@ -2,7 +2,7 @@
 name: user-guided-debugging
 description: "Use when the user explicitly requests one-issue-at-a-time debugging with visible pre-edit problems. Present the next issue after each fix while continuing agreed work and validation unless the user sets a stop or wait boundary."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"13534ae06e81a4efaf8fead8f120f954439bbfeb6b44a4ada2b9eb22d7b01e52"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"60ac0db6b34abaf6c4afbaa84d319f81cbdd77c9b2447a5aaf9abaa7cd954b8a"} -->
 
 <!--
 @dependency-start

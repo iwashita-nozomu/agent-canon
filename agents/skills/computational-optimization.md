@@ -128,10 +128,11 @@ with a representative input or a short run with the single baseline setting.
 If that run fails, trace the cause before adjusting the setting.
 
 Present and run hyperparameter comparisons only when the user explicitly
-requests one. Reuse comparable results and screen a few justified settings with
-the cheapest experiment that can distinguish them. Match inputs, initialization
-or seed, metric, and budget as applicable. Use a full-scale comparison when the
-requested question requires it, such as long-run stability.
+requests one. Preserve the requested settings, comparison conditions, and run
+lengths. Reuse comparable results and choose justified candidates where the
+user has left the choice open. Match inputs, initialization or seed, metric,
+and budget as applicable. Use the run length needed to answer the requested
+question, such as long-run stability.
 
 ## Remove unsupported stabilization
 

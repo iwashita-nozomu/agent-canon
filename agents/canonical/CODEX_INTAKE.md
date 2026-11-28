@@ -81,14 +81,11 @@ AgentCanon の更新・再構築を要求しません。
 まず現在の cause、適用される constraints、変更後に必要な guarantee を特定し、
 その判断を変える範囲だけを読みます。過去 task の context sweep や handoff は
 既定の着手条件にせず、現在の cause/guarantee が同じ根拠を要求するとき
-だけ再利用します。user request から要求された file、workflow、check、doc、PR
-state と acceptance criteria は `requested_scope` として保存し、選択された owner
-と validation で必要な `work_scope` だけを具体化します。
+だけ再利用します。依頼された対象・成果物・受入条件を `requested_scope` として保持し、
+その全体を満たす担当と検証を選びます。
 未選択の出力を調査開始の前提にせず、profile / document bucket も request に無関係
 である evidence がある場合だけ `not_applicable` にします。
-Large delivery / Shared canon でも、bounded responsibility route は作業順序を
-決める artifact です。対象範囲の正本は `requested_scope` に残します。読む
-slice を選ぶための coverage map は事前に要求しません。実際の範囲更新は、共通の
+担当による分割は作業順序を決めるために使います。実際の範囲更新は、共通の
 [scope principle](../../ROOT_AGENTS.md#always-on-boundary) に従います。
 
 - `documents/`
