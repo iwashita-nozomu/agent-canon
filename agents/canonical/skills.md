@@ -46,28 +46,19 @@ catalog IDs, and generated adapters for parity.
 
 Read the selected session's registered `SKILL.md` under the active instruction
 hierarchy. Use [Owner-First Read Trace](../skills/agent-orchestration.md#owner-first-read-trace)
-to locate the canonical owner and the delegated sections relevant to the
-current decision; the trace does not replace higher-priority reading
-requirements. Resolve adapter-relative links from the adapter's real file
-directory, not the product working directory. Only after a read failure inspect
-that entry's link target and generated state through the existing bootstrap
-owner; do not substitute a same-named file from another checkout. Explicit
-source maintenance edits the canonical owner in the selected development
-checkout.
+to locate the canonical owner and the sections relevant to the current
+decision. Resolve links from the adapter's real directory. If a read fails,
+inspect that entry's target and generated state through the bootstrap owner,
+using the same source binding.
+Source maintenance edits the canonical owner in the selected development checkout.
 
-An adapter's “Read the canonical owner” instruction uses that same point-of-use
-boundary: open the owner's Reader Map or short common conditions, then the selected
-section. The thin adapter is a pointer, not a second copy of branch policy.
-Reuse guidance already available in the current model context with the same
-source binding; selecting the Skill again does not require reopening it.
-Keep reads within the tool's output limit. After truncation, fetch only the
-missing relevant range instead of repeating the combined file read. Restore
-needed content after compaction when it is no longer in context.
+Start with the owner's reader map or common conditions and read the selected
+section. Reuse guidance from the same source while it remains in context.
+After truncation or compaction, retrieve the relevant text that is missing.
 When an owner invokes a tool, use the existing CLI, API, script, or Make entrypoint
 through [the Host entrypoint](CLI_ENTRYPOINTS.md#host-entrypoint), passing its
 native argv and retaining the current registered target and source-root resolution.
-AgentCanon does not materialize a private command packet or binding language before
-execution; the existing entrypoint remains responsible for its own arguments and
+The existing entrypoint remains responsible for its own arguments and
 semantics.
 
 Visibility and naming rules are owned by

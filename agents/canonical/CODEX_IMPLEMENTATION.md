@@ -110,7 +110,7 @@ feasibility support](../../documents/conventions/software-engineering-principles
 using the target contract and known providers. Extend the investigation only for an unknown
 entrypoint, failed invocation, or unmet behavior that could change the decision;
 reuse [prior failed attempts](../../documents/operations/notes-lifecycle.md#retrieve-before-deciding)
-when they bear on it. This does not require a repository-wide survey or new packet.
+when they bear on it.
 
 When a related branch/PR or prepared checkout exists, verify it serves the same
 owner surface and continue it through [Branch Reuse Default](CODEX_INTAKE.md#branch-reuse-default)
@@ -118,30 +118,15 @@ and [repository-topic-clone](../skills/repository-topic-clone.md) before creatin
 
 ## File Dependency Manifest
 
-The [dependency manifest](../../documents/design/dependency-manifest-design.md)
-is optional metadata for explicitly selected graph analysis. Ordinary file
-creation, editing, and PR validation do not require a manifest or a matching
-`contract` entry.
+Trace scope through imports, includes, callers, links, and build configuration.
+For code, use the existing LSP or dependency owner to follow affected contracts.
+Use [dependency analysis](../skills/dependency-analysis.md#method) for cause
+localization and hand off the relevant source evidence and affected consumers.
 
-For ordinary scope discovery, follow actual import/include/call-site references,
-standard links, build/package configuration, and the responsible owner routes.
-Existing dependency annotations may add useful context when present. Add or
-change an annotation only when the requested work changes that annotation or an
-explicit graph-analysis task needs it. Missing annotations are not a repair
-requirement for other file changes.
-
-When an annotation itself is edited, preserve its declared relation semantics,
-repository-relative paths, target existence, and comment syntax. For code
-changes, use the existing LSP/code-dependency owner to follow definitions,
-references, and callers through affected contracts. Handoffs carry the
-decision-relevant source evidence and consumer closure; they do not require an
-all-edge recursive listing, `dependency_edit_scope.txt`, or
-`dependency_graph.tsv` on every task.
-
-The `dependency-analysis` [Method](../skills/dependency-analysis.md#method) also
-owns cause localization for a requested repair. Its optional header scanning,
-format, graph, and design-claim tools are separate conditional operations, not
-generic gates for ordinary edits.
+Change a [dependency annotation](../../documents/design/dependency-manifest-design.md)
+when the request changes it or selected graph analysis needs it. Preserve its
+relation semantics, repository-relative paths, existing targets, and comment
+syntax.
 
 ## 5. Implementation
 
@@ -205,7 +190,6 @@ stays separate.
 ### Return from a repair detour
 
 Use this section when diagnosis or cause repair interrupts requested code work.
-The cause owner is a repair destination, not a replacement for the task.
 
 1. Before moving to that owner, retain the original target's repository/path and
    symbol or block, interrupted operation, and acceptance in the current context.
@@ -216,7 +200,7 @@ The cause owner is a repair destination, not a replacement for the task.
    selected checks permit resumption, return to the retained target, inspect the
    affected code or inputs, and perform its next unfinished operation. For nested
    repairs, resume the most recently interrupted operation first. Reuse unchanged
-   evidence rather than restarting intake or unrelated diagnosis.
+   evidence.
 3. Complete the target's remaining implementation and selected acceptance check
    before taking an unrelated finding or reporting completion. When no further
    target edit is needed, explain why and continue its selected verification;
@@ -233,7 +217,7 @@ their agreed scope; this return step adds no edit or execution authority.
 
 For selected delegation, read [Codex Subagents](CODEX_SUBAGENTS.md) and the selected
 role's current TOML. They own model/profile, authority, context capsule, and write
-scope; this file does not duplicate the role inventory. The selected delegation
+scope. The selected delegation
 verdict supplies one implementer role/profile. Consume that verdict unchanged: a
 fixed `execute_spark` packet dispatches directly to `spark_worker`; unresolved
 design or repair stays with its selected reasoning owner. Do not apply a second

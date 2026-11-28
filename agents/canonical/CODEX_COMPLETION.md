@@ -26,10 +26,8 @@ artifacts and state below apply only to `coordination`, not `bounded_fast_path`.
 
 ## Completion Bar
 
-Account for all active request clauses, the complete affected responsibility unit,
-selected validation, activated review, and authorized publication/cleanup. Preserve
-the agreed target and required input domain rather than calling an incomplete
-slice complete. Each material result has its actual operation and evidence.
+Account for the full agreed target, its required input domain, and each requested
+result through its actual operation and evidence.
 Necessary path/link presence, forbidden legacy-path absence, and sufficient
 behavior are different claims; select the evidence the changed contract requires.
 For changed code, use the [implementation and deletion review](CODEX_IMPLEMENTATION.md#5-implementation)
@@ -50,47 +48,28 @@ and unresolved claims with their effects on completion. Recheck only changed or
 invalidated evidence. When Local Capability Priority was selected, retain its
 [capability decision](../skills/agent-orchestration.md#local-capability-priority).
 
-An implemented, published, or handed-off result is not automatically verified or
-applied. An unmet requirement returns to its next owning action through
-[Completion Readiness](#completion-readiness), rather than becoming a terminal
-response with a remaining-work list. Unrelated checks and other Issues do not
-become completion prerequisites.
-
 ## Bounded delivery
 
 For `bounded_fast_path`, use the current conversation and actual diff/results.
-Report the final checks and an activated review when one was selected. No work
-ledger, scope table, or per-commit evidence record is required.
-If the request includes base integration or publication, carry its current-base
-and authorized remote readback. Clean up only task-owned resources created by
-the selected operations. Decide commit and push under
-[delivery ownership](ROOT_DELIVERY.md#commit-and-push-decisions).
-
-The selected results are the evidence. A concrete new
-coordination need returns only that changed decision to the route owner; labels,
-links, and report length do not initiate a route change.
+If the request includes integration or publication, include the current base
+and remote readback. Use [commit and push decisions](ROOT_DELIVERY.md#commit-and-push-decisions).
+A new coordination need returns to the route owner.
 
 ## Completion Review
 
 Compare the agreed outcome with the actual diff, selected validation and activated
-review results. Finish authorized publication and synchronization with their native
-owner, then read back the resulting state. Preserve unknown state and clean up
-task-owned resources when their use ends. No custom closeout gate or run bundle
-is created.
+review results. For child work, follow [Coordinated delivery](#coordinated-delivery).
 
 ## 6. Validation
 
 Use the changed contract's selected profile/check matrix and the common
 [formatting and verification boundary](../../ROOT_AGENTS.md#validation-routing).
 静的解析、読み取り確認、docs / targeted tests / agent checks を、変更契約と残るリスクから選びます。
-Report the final-source formatter/check and selected validation results;
-later edits or integration invalidate only the affected evidence. Separate CI,
-format, and synthetic checker-retest paths are not extra completion predicates.
+Report the final-source formatter/check and selected validation results.
 
 For dependency/header changes, use the existing source-derived checks and relevant
-downstream review. Select a whole-repository dependency review only when the
-changed contract or explicit request requires it. Shared canon, Large Delivery,
-and high-risk labels alone do not request every repository check.
+downstream review. Select a whole-repository dependency review when the changed
+contract or explicit request requires it.
 
 For a failed or unverified property, use the
 [common completion rule](../../ROOT_AGENTS.md#task-entry) to reconsider the
@@ -136,5 +115,4 @@ entrypoints needed by the runnable commit together under
 [Branch Scope](../../documents/operations/BRANCH_SCOPE.md). Read back authorized
 publication and clean up task-owned temporary resources, preserving unknown state.
 
-Selected Eval and archival operations retain their existing owners. Report their
-actual results when requested; they do not require new run bundles or progress files.
+Report actual results from the selected Eval and archive owners.

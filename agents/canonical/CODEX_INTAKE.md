@@ -9,19 +9,12 @@ upstream design ../../documents/design/entrypoint-owner-map.md document responsi
 @dependency-end
 -->
 
-Read the selected section for task intake or a change to the relevant checkout/context.
-Return to [Codex Workflow](CODEX_WORKFLOW.md) for phase selection; do not
-load inactive phases or restart completed intake merely by following a link.
+Use [Codex Workflow](CODEX_WORKFLOW.md) to select the current phase.
 
 ## Optional Context
 
-These are lookup routes, not a startup checklist. Read a named section only
-when its fact can change the current decision; stop once that fact is resolved.
-Reuse already loaded instructions and selected owners. Inactive rows require
-neither reading nor a `not_applicable` inventory unless an active contract asks.
-Selected Skills follow the same point-of-use rule through
-[Owner-First Read Trace](../skills/agent-orchestration.md#owner-first-read-trace):
-read common constraints and current branches, not the full body or every linked file.
+Read the row that can resolve the current decision. For Skills, use the
+[owner-first reading rule](../skills/agent-orchestration.md#owner-first-read-trace).
 
 | Missing decision or active operation | Read only the matching owner/slice |
 | --- | --- |
@@ -40,22 +33,11 @@ read common constraints and current branches, not the full body or every linked 
 | A relevant unresolved hazard or prior failure is identified | the matching [guardrail](../../documents/notes/guardrails/README.md) or [engineering avoidance](../../documents/notes/guardrails/engineering_avoidances.md), not the entire collection |
 | Product container work is explicitly in scope | the product's own container documentation and execution owner, not an assumed `docker/README.md` in every checkout |
 
-The former Base Runtime Packet / Cross-Cutting Packet lists are represented by
-these conditions, not by an unconditional bundle. A configured route may require
-a specific slice; the index does not itself activate that route. Read generated
-`.codex/personal/skills/<selected-skill>/SKILL.md` only for a selected Skill.
-
 ## Agent Canon Freshness
 
-通常のコード・文書変更は、既存の作業経路で要求差分へ着手します。環境診断・変更の
-適用条件は [ROOT_AGENTS.md の Always-On Boundary](../../ROOT_AGENTS.md#always-on-boundary)
-に従います。この節は、task 開始ごとの source/parent 環境分類、freshness preflight、
-AgentCanon の更新・再構築を要求しません。
-
-- AgentCanon source/runtime の変更が今回の要求範囲にある場合だけ、standalone source checkout から `$agent-canon-update` と `$pr-processing` に入ります。親repoへlive root view、vendor、submodule pinを同期しません。consumer root [AGENTS.md](../../AGENTS.md) は、親が明示 composer で common [ROOT_AGENTS.md](../../ROOT_AGENTS.md) と consumer-specific text を合成して通常 file として管理します。
-- 親で AgentCanon source の変更を所有する場合だけ、repository-topic lifecycle の `<anchor>/workspace/<topic>/agent-canon` checkout と既存 cleanup route を使います。親の product test、Docker、CI、GPU は親の既存 entrypoint で実行し、AgentCanon runtime はそれらを発見または mount しません。root instruction composition は runtime projection ではありません。
-- Issue 修正の作業 branch は開始時と PR 公開前に最新 main を取り込み、競合があればその変更範囲で解消します。包含済みなら merge は no-op です。これは作業 source の統合であり、runtime 更新や環境構築ではありません。別の AgentCanon 保守 PR の merge・配布完了を、本題へ戻る前提にしません。
-- 必要な検証が実行不能なら、失敗した command、理由、未検証の性質を既存 Issue / PR に残し、その操作と独立した編集・差分確認・PR 公開を続けます。未実施を成功扱いせず、対象外の環境修理・再構築や他 Issue の完了を終了条件へ追加しません。診断だけで環境変更は認可されません。
+通常のコード・文書変更は、既存の作業経路で着手します。親のテスト・Docker・CI・GPU は親の
+既存 entrypoint を使います。AgentCanon source/runtime が変更対象の場合は
+[AgentCanonの更新手順](../skills/agent-canon-update.md) を使います。
 
 ## Branch Reuse Default
 
@@ -66,8 +48,8 @@ AgentCanon の更新・再構築を要求しません。
 - 新しいbranchや作業場所が必要なら、標準の `git worktree add`、`git clone`、
   `git switch` を依頼された範囲で使います。新規配置の目安は `workspace/<topic>/<repo>`、
   branch名にはIssue番号を含めます。作成済みの配置はそのまま使います。
-- 開始時とPR公開前に、作業branchで `git fetch origin main` と `git merge origin/main`
-  を実行します。競合はGitのindexと双方の内容を確認して解消します。
+- 開始時とPR公開前は [mainの取込みと競合解消](../../documents/rule/repository-topic-clone.md#main取込みと競合解消)
+  に従います。
 - 衝突する書込みは同じcheckout内で順番に行い、既存の作業状態を保持します。
   他者の変更の採否が必要な部分は保留し、合意済みの独立作業を続けます。
 - 利用を終えたcheckoutは、保持する内容の保存先と利用終了を確認し、

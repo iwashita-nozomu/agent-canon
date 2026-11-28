@@ -89,27 +89,14 @@ tools/bin/agent-canon run-managed-experiment \
   use [research-workflow](research-workflow.md),
   [adaptive-improvement-loop](adaptive-improvement-loop.md), or
   [experiment-review](experiment-review.md) only when that work is selected.
-- Completing an experiment-topic branch, rather than one run or backlog
-  iteration: use [report-writing](report-writing.md) first for reader
-  reconstruction and report structure, then [paper-writing](paper-writing.md)
-  for an arXiv-level manuscript in the project's established manuscript
-  location. Carry forward the original base ref and commit, purpose or
-  hypothesis, and intended delta from the existing branch plan, README, or
-  current context into the report and any active handoff/resume. If the
-  comparison base changes, identify it separately without replacing the
-  original branch origin. Connect the research question, related work, method,
-  evidence/results, limitations, and reproduction details as applicable. Carry
-  forward run identities and retained evidence through their existing owners;
-  for numerical work, present numerical results before runtime outcomes,
-  preserve claim limits, and identify missing observations. This branch report
-  does not request publication or make ordinary runs/iterations manuscript
-  tasks. It does not move raw-result, artifact, or retention ownership from
-  their existing owners.
+- Completing an experiment-topic branch: follow the
+  [branch requirements](../../documents/operations/BRANCH_SCOPE.md#experiment-topic-branch-scope).
+  Use [report-writing](report-writing.md) first for report structure and
+  [paper-writing](paper-writing.md) for the arXiv-level manuscript.
 - Retiring AgentCanon topic code: apply the existing
   [topic branch scope](../../documents/operations/BRANCH_SCOPE.md#experiment-topic-branch-scope)
   and [archive and summary policy](../../documents/experiments/result-log-retention-and-visualization.md#experiment-archive-and-summary-retention).
   That policy requires retrievable retained evidence before retirement and
   preserves shared models/helpers, execution/regression infrastructure, and
   completed summaries on `main`; list exact summaries missing from `main` in
-  the target Issue. This closeout route does not apply to every run or retention
-  plan.
+  the target Issue.

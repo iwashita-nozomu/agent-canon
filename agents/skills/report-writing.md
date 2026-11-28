@@ -21,9 +21,8 @@ downstream implementation ../../tools/runtime/dispatch/agent-canon/src/dependenc
 
 ## Procedure
 
-資料の仮定と判定基準を読み、結論のそばに決め手の事実と採用理由を書きます。
-結論が当てはまる範囲を示し、コマンド、設定、手順は既存の実行記録を参照します。
-検証結果と完了報告は [報告の指針](../internal-routines/verification-result-structuring.md#structure-before-writeout) に従います。
+資料の仮定と判定基準を確認し、[報告の指針](../internal-routines/verification-result-structuring.md#structure-before-writeout)
+に従って、結論と根拠、その適用範囲を示します。
 
 1. 章立てを決めます。使える構成は再利用し、不足する構成は
    [structure-planning](structure-planning.md#before-prose) で決めます。

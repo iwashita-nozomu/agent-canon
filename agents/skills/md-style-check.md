@@ -49,9 +49,7 @@ gaps with the reason.
 
 Use `structure-planning`, docs completeness/consistency review, or report-writing
 only when the changed document owner selects them for a real structural or
-reader-facing decision. This skill does not create a second checklist, schema,
-approval gate, or validation-failure packet; failed checks follow the existing
-failure owner.
+reader-facing decision.
 
 ## Core References
 

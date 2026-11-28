@@ -2,7 +2,7 @@
 name: subagent-bootstrap
 description: "Use when a selected route needs child delegation or durable coordination/resumption."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"d3c52ad411e2ff81b39b339115918525f747276d7c0307216593480b1633e3fa"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"fc2dd4f0e1a0db0ab847802115b68b5916e27c60360c5c2c24bd76887595fe83"} -->
 
 <!--
 @dependency-start
