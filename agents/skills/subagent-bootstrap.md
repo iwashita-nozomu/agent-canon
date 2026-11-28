@@ -18,12 +18,10 @@ downstream design ../../.codex/personal/skills/subagent-bootstrap/SKILL.md runti
 ## Purpose
 
 Prepare and launch a selected specialist through native Codex collaboration.
-Workflow and role selection remain with their existing owners.
 
 ## Use When
 
-Use when the typed task route requires a child or durable coordination or
-resumption. Repository-changing work alone does not select either.
+Use when the task route calls for a child, coordination, or resumption.
 
 ## Launch and Handoff
 
@@ -31,27 +29,16 @@ Apply [Delegation selection](agent-orchestration.md#delegation-selection) before
 preparing a child handoff. Durable coordination can remain with the current agent.
 
 Resolve the task and role from the selected catalog route and
-[CODEX_SUBAGENTS](../canonical/CODEX_SUBAGENTS.md). Use relative links from the
-selected workflow as conditional owner guidance, not as a blanket read list.
-Read the selected canonical Skill's common constraints and the content needed
-for the current handoff, deferring inactive, later, or recovery branches until
-their conditions apply. Read applicable prerequisites under [In-flight skill
-reads](task-routing.md#in-flight-skill-reads); related candidates remain
-unloaded unless their route activates. A child launch is not completion: use the
-actual host result to determine whether the handoff finished, and record actual
-results or failures through the selected workflow's existing route. Monitor
-rows alone do not establish completion. Existing Eval or owner review can assess
-whether the route missed necessary work; a different route alone is not failure.
+[CODEX_SUBAGENTS](../canonical/CODEX_SUBAGENTS.md). Use [In-flight Skill reads](task-routing.md#in-flight-skill-reads)
+for the handoff and its prerequisites. Read the actual child result to confirm
+completion, and record the result or failure through the selected workflow.
 
-[COMMUNICATION_PROTOCOL](../COMMUNICATION_PROTOCOL.md) owns handoff and context
+[COMMUNICATION_PROTOCOL](../COMMUNICATION_PROTOCOL.md#handoff-packet) owns handoff and context
 fields. For a write-capable child, pass its agreed Git checkout and allowed paths in the message; [repository-topic-clone](repository-topic-clone.md) owns checkout
-preparation. Do not create a run bundle or scope ledger. Read
+preparation. Read
 [direct-luna-communication](direct-luna-communication.md) only when Luna is the
 selected profile, and [subagent-startup](../internal-routines/subagent-startup.md)
 only when that private route is selected.
-
-The parent relays packets and actual results. The child acts within its
-assigned authority; a failed or incomplete child result is not completed work.
 
 ## Reuse and Parallel Work
 
@@ -67,10 +54,9 @@ scopes and distinct checkouts prepared by the repository-topic owner.
 A timeout or empty update is an observation, not a cancellation or replacement
 decision. Preserve a nonterminal writer's scope and follow CODEX_SUBAGENTS for
 the active runtime's status, message, interrupt, and close capabilities. Return
-the concrete blocker and recovered evidence to the parent.
+the concrete blocker and recovered evidence to the parent. Confirm the
+parent's execution authority before taking over blocked child work.
 
 ## Validation
 
-Use only the selected validation and owning review gate. A child result is
-evidence for its assigned action, not proof of unrelated work or an unrun check.
-For a selected Skill or tool, read its current owner and invoke its native CLI/API/script entrypoint with argv and process-result semantics preserved.
+Use the selected validation and review to confirm the assigned result.

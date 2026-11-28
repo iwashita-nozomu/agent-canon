@@ -16,13 +16,8 @@ downstream implementation ../tools/runtime/dispatch/agent-canon/src/compare_agen
 
 ## Reader Map
 
-This file is a workflow reader map. It points to the owner surfaces that describe
-workflow families, roles, Skills, and closeout checks.
-Use `Workflow Contract Owners` to find the canonical owner, `Common Evidence
-Packet` to understand task/run handoff data, `Design Artifact Shape` for
-implementation design anchors, and `Workflow Family Reader Paths` to route by
-family. This file maps readers to owner surfaces; it does not replace the
-task catalog, runtime profile matrix, or closeout tools as policy authority.
+Use the tables below to find the owner for a workflow family, role, Skill, or
+validation decision.
 
 ## Workflow Contract Owners
 
@@ -37,20 +32,10 @@ task catalog, runtime profile matrix, or closeout tools as policy authority.
 | validation failure response taxonomy | `documents/runtime/runtime-profiles-and-check-matrix.json`; generated reader projection: [documents/runtime/runtime-profiles-and-check-matrix.md](../documents/runtime/runtime-profiles-and-check-matrix.md) |
 | validation failure response workflow projections | [agents/canonical/CODEX_WORKFLOW.md](canonical/CODEX_WORKFLOW.md); [agents/canonical/CODEX_SUBAGENTS.md](canonical/CODEX_SUBAGENTS.md); [documents/conventions/REVIEW_PROCESS.md](../documents/conventions/REVIEW_PROCESS.md) |
 
-Contract edits start in the owner surface. This reader map changes when the
-reader path changes.
-
 ## Native Coordination
 
-Use the current Codex collaboration tools for launch, continuation, waiting, and
-completion. Carry the target, agreed scope, needed source context, expected result,
-and validation route in the handoff. Keep scope and progress in Git and the current
-conversation. A launch is not completion; retain actual results and failures.
-
-Read the applicable ROOT and selected Skill directly. The selected tool owner
-provides its existing CLI, API, script, or Make entrypoint. Preserve its arguments,
-execution boundary and results. Hook logs and Eval accumulation keep their own
-existing evidence routes.
+Use [native collaboration](COMMUNICATION_PROTOCOL.md#native-collaboration) and
+the [handoff packet](COMMUNICATION_PROTOCOL.md#handoff-packet).
 
 ## Design Artifact Shape
 
@@ -83,11 +68,6 @@ repository-wide template or policy.
 | Comprehensive Development | `agents/task_catalog.yaml` `workflow_families[].id=comprehensive_development` |
 | Adaptive Improvement Loop | `agents/task_catalog.yaml` `workflow_families[].id=adaptive_improvement_loop` |
 | IssueWorker Publication | `agents/task_catalog.yaml` `workflow_families[].id=issue_worker_publication`; logical route executes the `publisher` role for explicit candidates |
-
-Family rows provide routing context rather than a dispatch schedule. Safety,
-authority, and validation prohibitions stay with their canonical owners;
-[documents/runtime/runtime-profiles-and-check-matrix.md](../documents/runtime/runtime-profiles-and-check-matrix.md) selects the active
-validation matrix for the changed path and risk class.
 
 ## Actual Route Evidence
 

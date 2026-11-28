@@ -27,12 +27,9 @@ and source support before drafting. A bounded wording edit can retain the
 existing structure; use `md-style-check` for a wording-independent typo, link,
 or formatting fix.
 
-Write explanatory prose from the selected structure using established facts and
-their sources. Give the reader a link to the relevant runbook or execution record
-as the entire treatment of commands, steps, setup, and execution conditions.
-Before returning the text, replace any such details in the body, examples,
-notes, or tables with that link. A requested how-to places the requested steps
-in its own procedure.
+Write from established facts and their sources. In explanatory prose, link to
+the relevant runbook or execution record for commands, setup, and conditions.
+Put the steps for a requested how-to in its procedure.
 
 設計文書では、節ごとに異なる内容を書きます。
 
@@ -44,14 +41,11 @@ in its own procedure.
 同じ保証を言い換えた文も一か所にまとめます。未決事項は依頼で尋ねられたものだけを扱い、
 観測結果の意味を左右する根拠の限界は該当する事実のそばに置きます。
 
-If a diagram would clarify workflow,
-dependency, ownership, state, or handoff, explain the specific question it
-answers and use `code-visualization` for its selected rendering. Route a
+If a diagram would clarify workflow, dependency, ownership, state, or handoff,
+state the question it answers and use `code-visualization`. Route a
 mathematical or implementation-derived claim through `formal-proof-workflow`
 when that proof is part of the request; present its scope, assumptions,
 limitations, and validation evidence accurately.
-For the selected renderer, provide its native input and check the requested
-output.
 
 Review the reader path and completeness against the requested scope. Use
 `document_flow_reviewer` for a structural gap and add docs-completeness or

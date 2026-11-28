@@ -56,23 +56,11 @@ instrumentation, environment setup, or reporting machinery to satisfy it.
 
 ## Continuation and blockers
 
-A progress update is not a final report. Keep the request active while required
-implementation, validation, integration, publication, cleanup, or its result
-remains unresolved. An acknowledgement, apology, promise, child claim/handoff,
-post-hoc healthy status, or incomplete result is not the requested operation or
-its success. Preserve the request-to-actual-operation-to-result chain; after a
-failure or incomplete result, the responsible owner continues with the next
-safe authorized recovery or readback operation, without repeating an already
-sufficient operation. Continue investigation only for an unresolved fact that
-could change the requested implementation, required validation, or conclusion.
-Reuse still-applicable evidence instead of repeating classifications or adding
-unrelated prerequisites; once the fact is resolved, proceed with the work.
-New relevant evidence can reopen a question. Required authorization, safety
-checks, and selected validation remain in force.
-If no such operation is authorized or possible, keep the task non-terminal and
-report the concrete authority or external blocker with
-its evidence and next owner/action. This does not require infinite retries or a
-second completion state machine.
+Follow [Task Entry](../../ROOT_AGENTS.md#task-entry) when work remains. Use
+[bounded diagnosis](ROOT_EXECUTION.md#configured-execution-and-bounded-diagnosis)
+for a fact that could change the implementation, validation, or conclusion.
+When authorization or external conditions block the next action, report the
+concrete blocker, its evidence, and the owner who can resolve it.
 
 ## Reader-facing writing
 
@@ -112,9 +100,7 @@ at each editing-batch boundary and before final validation, staging, commit,
 publication, or handoff. Source configuration and direct commands belong to
 [Formatter settings](../../documents/design/formatting.md#ownership-and-purpose).
 Record the actual command, target files, and result, including success, in the
-existing task/Issue. Reuse that common boundary rather than a second formatter
-checklist here; later edits, generation, fixers, or conflict resolution invalidate
-the earlier formatting result.
+existing task/Issue. Run the affected check on the final files after any later edits.
 
 Select the current result's [validation and delivery route](CODEX_COMPLETION.md#reader-map).
 The changed contract and its failure semantics determine the checks. A bounded route

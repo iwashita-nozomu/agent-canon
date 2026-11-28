@@ -23,21 +23,13 @@ limit context, work scope, team mode, or task size, and selecting it needs no
 fresh environment preflight. Record the selection and evidence in the existing
 task result; inactive profiles need no inventory.
 
-Markdown links identify the expected role and Skill route. When delegation is
-selected, use the configured native collaboration route; candidate role
-metadata alone does not launch a child. Preserve actual launch, completion,
-and failure results. A blocked child does not create a parent fallback.
-User-guided debugging retains the common ROOT boundary.
-
 ## Task Classification
 
 Select the primary family from [the task catalog](../task_catalog.yaml), using
 `tasks[].family`. The
 [family reader paths](../TASK_WORKFLOWS.md#workflow-family-reader-paths) explain
 those records, including Owner-Bounded Change and IssueWorker Publication.
-Keep one selected primary family when work spans domains. This document does
-not maintain another family enumeration or infer mandatory stages from size,
-file type, or prompt keywords.
+Keep one primary family when work spans domains.
 
 Environment work selects its family only when an environment/configuration
 contract is actually in scope. Existing-environment execution or an unavailable
@@ -68,11 +60,7 @@ becomes active only when the selected typed route requires child handoff.
 User invocation uses `$skill-name`.
 
 A later operation, finding, or changed premise can activate a related Skill.
-Select it under the caller's stated condition, read its current sections, and
-use its existing native CLI/API/script entrypoint at handoff. Selected validation
-retains its owner-defined order and process-result semantics. Native argv remains
-owned by the existing [CLI owner](CLI_ENTRYPOINTS.md#host-entrypoint), not by a
-second AgentCanon command schema.
+Use [in-flight Skill reads](../skills/task-routing.md#in-flight-skill-reads).
 
 Before claiming a capability gap in an API, dependency, configuration, or
 extension point, use [API surface traversal](../../documents/design/api-surface-traversal-policy.md).
@@ -113,17 +101,12 @@ candidates require a distinct unresolved claim/risk; reuse an active reviewer
 that owns the same claim and context. Multiple writers need dependency-expanded
 disjoint scope, integration order, and collision-safe checkout ownership.
 
-Before implementation, settle the owner/design decision using
-[Design Integrity Gate](CODEX_IMPLEMENTATION.md#design-integrity-gate). Read
-coordination-specific design and review artifacts only when selected. Carry
-reusable rules into the existing canon rather than runtime-only duplicates.
+Before implementation, settle the owner and design using the
+[Design Integrity Gate](CODEX_IMPLEMENTATION.md#design-integrity-gate).
 
 At delivery, use [Completion Readiness](CODEX_COMPLETION.md#completion-readiness)
-for the already selected route. Decide commit and push separately under
-[delivery ownership](ROOT_DELIVERY.md#commit-and-push-decisions). A sharing,
-handoff, remote-backup, or PR purpose with existing authority permits the chosen
-push without another permission round trip. Record explicit no-push instructions
-or actual blockers. A standalone branch transport retains its exact remote,
+and [commit and push decisions](ROOT_DELIVERY.md#commit-and-push-decisions).
+A standalone branch transport retains its exact remote,
 branch, commit/tree, SHA ref push, remote readback, and unchanged local identity
 evidence; it does not claim PR lifecycle or merge readiness. PR mutation uses
 [pr-processing](../skills/pr-processing.md).

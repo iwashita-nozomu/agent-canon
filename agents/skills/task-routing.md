@@ -17,7 +17,8 @@ downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/s
 
 ## Purpose
 
-Choose the minimum skill/tool route from a prompt, changed paths, or explicit area. Ordinary routing does not require a Decision Sufficiency packet; later high-risk or genuinely ambiguous implementation owners may invoke that policy through `agent-orchestration`.
+Choose the Skills and tools for the requested outcomes from a prompt, changed
+paths, or explicit area.
 
 ## Canonical output
 
@@ -28,22 +29,22 @@ SELECTED_SKILLS=<ordered skills that should execute now>
 DEFERRED_CANDIDATES=<candidate skills + activation evidence still required>
 ```
 
-`SELECTED_SKILLS` is the one source of truth for execution. Deferred candidates do not execute until their evidence becomes true. Selecting a Skill does not activate every branch inside it.
+`SELECTED_SKILLS` lists the Skills to use now. A deferred candidate activates
+when its condition is met.
 
 LCPの `DEFERRED_SKILLS` 境界は [`agent-orchestration.md#Local Capability Priority`](./agent-orchestration.md#local-capability-priority) を参照します。ここではskill candidateの状態だけを投影します。
 
-Historical names such as `SKILLS`, `ACTIVE_SKILLS`, `MATCHED_SKILLS`, `RELATED_SKILLS`, or `RELATED_SKILL_CANDIDATES` may be accepted as compatibility reads while callers migrate, but they are not independent state owners. New consumers read only the canonical selected/candidate state. If compatibility projections are emitted, they must be derived from the canonical state and may not carry extra routing meaning.
+Legacy output names are compatibility views of these two states. New callers
+use the canonical selected and candidate states.
 
 ## Operation
 
-Use an assumed built-in or an already-selected host provider directly when it
-owns the requested result. [Task skill sets](README.md#task-skill-sets) add only
-unresolved local responsibility. The native public-catalog route projects the
-AgentCanon members; host names remain owned by the registered host rather than
-being added to the public catalog. Reuse settled selection instead of probing
-built-in availability or rerouting a known owner.
+Use the host provider directly when it owns the result. See
+[Task Skill Sets](README.md#task-skill-sets) for AgentCanon responsibilities.
 
-Use `tools/bin/agent-canon route --prompt ... --mode routing-only` or the canonical changed-path route. The caller must pass `--mode repo-changing` for an explicitly authorized edit; omitted mode remains non-write. Select owners who cover the requested outcomes. Add a candidate only with a concrete activation condition; do not execute candidates preemptively or replace routing with another classifier/handoff schema.
+Use `tools/bin/agent-canon route --prompt ... --mode routing-only` or the
+changed-path route. Pass `--mode repo-changing` for an explicitly authorized
+edit. The default is read-only.
 
 作業途中で新しい観測や要求変更が生じたら、変わった判断に必要な owner
 guidance を読み直します。最初に解決した選択は、影響する前提が変わらない限り
@@ -55,15 +56,8 @@ to connect the selected owner's decision to actual tool inputs and returned evid
 
 ## In-flight skill reads
 
-呼び出し元スキルの操作中に新しい条件が成立したら、その判断や操作に必要な
-owner guidance を使う前に確認します。同一文書内の分岐やリンク先は、現在の条件と
-委譲された責務から選びます。inactive な説明まで網羅せず、既に確認した有効な文脈は
-再利用します。`skill-document-reader` は長い文書から必要箇所を探す補助にできますが、
-EOF metadata は実際に内容を理解・適用した証明ではなく、必須の admission gate でも
-ありません。新しい読込台帳や承認段階は作りません。
-
-このスキルから既存候補へ渡す判断点は次のとおりです。個別作業の条件はその呼び出し元に
-置き、候補辞書や選択状態の第二の正本にしません。
+新しい条件が成立したら、必要な箇所を [担当文書から読む](agent-orchestration.md#owner-first-read-trace)
+方法で確認します。`skill-document-reader` は長い文書から該当箇所を探すときに使えます。
 
 | 作業中に成立した条件 | 依存する判断・操作の前に読む関連スキル |
 | --- | --- |
@@ -74,14 +68,9 @@ EOF metadata は実際に内容を理解・適用した証明ではなく、必�
 | 検証結果のartifactを保存・更新する | [result-artifact-writeout](result-artifact-writeout.md) で実在する結果と保存先を確認する |
 
 解決したら得られた根拠と必要な変更だけを既存taskへ戻し、中断した操作から続けます。
-既知のリンク先は直接使い、担当が未解決の場合だけ既存routeで選択します。
-`SELECTED_SKILLS` / `DEFERRED_CANDIDATES` は必要な変更だけを反映し、全体のroutingを
-やり直しません。読むこと自体は修復、公開、追加検証、環境変更、委譲の権限を増やしません。
+担当が変わる場合は、該当する選択だけを更新します。
 
 ## Boundary
 
-Routing chooses owners; selected skills own their execution and validation. The full LCP policy is owned by [`agent-orchestration.md#Local Capability Priority`](./agent-orchestration.md#local-capability-priority). `DEFERRED_SKILLS` remains a skill candidate projection, not operation disposition.
-Before an implementation decision, use the selected Skill and its actual
-delegated owners to understand the applicable contract. A `downstream
-implementation` edge is opened when the active owner route needs that evidence;
-the existence of a link or reader-tool record does not itself settle the decision.
+Selected Skills own execution and validation. Open a downstream implementation
+reference when the selected decision needs its evidence.
